@@ -90,6 +90,7 @@ export default defineConfig(
   {
     files: [
       'src/components/UserProfile/UserSettings/UserGeneralSettings/index.tsx',
+      'src/components/RequestModal/BulkRequestModal.tsx',
     ],
     rules: {
       // jsx-a11y 6.10.2 crashes on this form's custom selector labels under ESLint 9.

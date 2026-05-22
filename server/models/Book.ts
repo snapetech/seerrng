@@ -5,6 +5,10 @@ import type {
   OpenLibraryWork,
 } from '@server/api/openlibrary';
 import type Media from '@server/entity/Media';
+import {
+  normalizeOpenLibraryEditionId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 
 export interface BookResult {
@@ -55,7 +59,7 @@ export interface BookIsbnCandidate {
 }
 
 const getEditionId = (key?: string): string | undefined =>
-  key?.replace('/books/', '');
+  key ? normalizeOpenLibraryEditionId(key) : undefined;
 
 const mapEditionIsbnCandidates = (
   editions: OpenLibraryEdition[]
@@ -97,7 +101,7 @@ export const mapOpenLibrarySearchDoc = (
   const isbn13 = doc.isbn
     ?.map((isbn) => normalizeValidIsbn(isbn))
     .find((isbn): isbn is string => !!isbn);
-  const workId = doc.key.replace('/works/', '');
+  const workId = normalizeOpenLibraryWorkId(doc.key);
 
   return {
     id: workId,
@@ -135,7 +139,7 @@ export const mapOpenLibraryWork = (
   const selectedCandidate = isbnCandidates[0];
 
   return {
-    id: work.key.replace('/works/', ''),
+    id: normalizeOpenLibraryWorkId(work.key),
     mediaType: 'book',
     title: work.title,
     author: authorName,
@@ -165,7 +169,7 @@ export const mapOpenLibraryAuthorWork = (
   const coverId = work.covers?.[0];
 
   return {
-    id: work.key.replace('/works/', ''),
+    id: normalizeOpenLibraryWorkId(work.key),
     mediaType: 'book',
     title: work.title,
     author: authorName,

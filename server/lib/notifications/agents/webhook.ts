@@ -288,25 +288,25 @@ class WebhookAgent
         settings.options.customHeaders
           .slice(0, MAX_WEBHOOK_CUSTOM_HEADERS)
           .forEach((header) => {
-          const key = header.key?.trim();
-          const value = header.value?.trim();
+            const key = header.key?.trim();
+            const value = header.value?.trim();
 
-          if (
-            key &&
-            value &&
-            WEBHOOK_HEADER_NAME.test(key) &&
-            !/[\r\n]/.test(value) &&
-            value.length <= MAX_WEBHOOK_HEADER_VALUE_LENGTH
-          ) {
-            // Don't override Authorization header if it's already set via authHeader
             if (
-              key.toLowerCase() !== 'authorization' ||
-              !settings.options.authHeader
+              key &&
+              value &&
+              WEBHOOK_HEADER_NAME.test(key) &&
+              !/[\r\n]/.test(value) &&
+              value.length <= MAX_WEBHOOK_HEADER_VALUE_LENGTH
             ) {
-              headers[key] = value;
+              // Don't override Authorization header if it's already set via authHeader
+              if (
+                key.toLowerCase() !== 'authorization' ||
+                !settings.options.authHeader
+              ) {
+                headers[key] = value;
+              }
             }
-          }
-        });
+          });
       }
 
       await axios.post(

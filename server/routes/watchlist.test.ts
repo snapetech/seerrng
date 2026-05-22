@@ -153,6 +153,7 @@ describe('POST /watchlist', () => {
     });
 
     assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.mbId, 'watchlist-release-group');
     assert.strictEqual(getAlbumMock.mock.callCount(), 1);
     assert.strictEqual(mediaRequestMock.mock.callCount(), 1);
     assert.deepStrictEqual(mediaRequestMock.mock.calls[0].arguments[0], {
@@ -261,14 +262,37 @@ describe('POST /watchlist', () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const body = {
       mediaType: MediaType.BOOK,
-      externalId: 'OLduplicateW',
+      externalId: '/works/OL123W',
       title: 'Duplicate Book',
     };
 
     const firstRes = await agent.post('/watchlist').send(body);
-    const duplicateRes = await agent.post('/watchlist').send(body);
+    const duplicateRes = await agent.post('/watchlist').send({
+      ...body,
+      externalId: 'ol123w',
+    });
 
     assert.strictEqual(firstRes.status, 201);
+    assert.strictEqual(firstRes.body.externalId, 'OL123W');
+    assert.strictEqual(duplicateRes.status, 409);
+  });
+
+  it('blocks duplicate music watchlist items by normalized MusicBrainz ID', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const body = {
+      mediaType: MediaType.MUSIC,
+      mbId: 'WATCHLIST-RELEASE-GROUP',
+      title: 'Duplicate Album',
+    };
+
+    const firstRes = await agent.post('/watchlist').send(body);
+    const duplicateRes = await agent.post('/watchlist').send({
+      ...body,
+      mbId: 'watchlist-release-group',
+    });
+
+    assert.strictEqual(firstRes.status, 201);
+    assert.strictEqual(firstRes.body.mbId, 'watchlist-release-group');
     assert.strictEqual(duplicateRes.status, 409);
   });
 });
@@ -341,7 +365,9 @@ describe('DELETE /watchlist/:mediaId', () => {
     );
 
     const agent = await loginAs('admin@seerr.dev', 'test1234');
-    const res = await agent.delete('/watchlist/OLdeleteW?mediaType=book');
+    const res = await agent.delete(
+      `/watchlist/${encodeURIComponent('/works/OLdeleteW')}?mediaType=book`
+    );
 
     assert.strictEqual(res.status, 204);
     assert.strictEqual(

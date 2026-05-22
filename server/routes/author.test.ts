@@ -175,6 +175,7 @@ describe('GET /author/:id', () => {
       limit: 1,
       offset: 0,
       totalItems: 2,
+      nextOffset: 1,
     });
     assert.strictEqual(res.body.works.length, 1);
     assert.strictEqual(res.body.works[0].id, 'OL1W');
@@ -234,6 +235,7 @@ describe('GET /author/:id/works', () => {
       limit: 1,
       offset: 1,
       totalItems: 2,
+      nextOffset: 2,
     });
     assert.strictEqual(res.body.works.length, 1);
     assert.strictEqual(res.body.works[0].id, 'OL2W');

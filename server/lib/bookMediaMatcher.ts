@@ -8,6 +8,10 @@ import type Media from '@server/entity/Media';
 import MediaIdentifier, {
   MediaIdentifierProvider,
 } from '@server/entity/MediaIdentifier';
+import {
+  normalizeOpenLibraryEditionId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import { In } from 'typeorm';
 
@@ -47,12 +51,6 @@ const uniqIdentifierLookups = (
 
   return unique;
 };
-
-const normalizeOpenLibraryWorkId = (key?: string): string | undefined =>
-  key?.replace('/works/', '');
-
-const normalizeOpenLibraryEditionId = (key?: string): string | undefined =>
-  key?.replace('/books/', '');
 
 const getSearchDocIsbns = (doc: OpenLibrarySearchDoc): string[] => [
   ...new Set(
@@ -138,7 +136,7 @@ export const findBookMediaForSearchDocs = async (
   userId?: number
 ): Promise<Map<string, Media>> => {
   const lookups = docs.flatMap((doc) => {
-    const workId = normalizeOpenLibraryWorkId(doc.key);
+    const workId = doc.key ? normalizeOpenLibraryWorkId(doc.key) : undefined;
     const isbnLookups = getSearchDocIsbns(doc).map((isbn) => ({
       provider: MediaIdentifierProvider.ISBN,
       value: isbn,
@@ -155,7 +153,7 @@ export const findBookMediaForSearchDocs = async (
   const mediaByWorkId = new Map<string, Media>();
 
   docs.forEach((doc) => {
-    const workId = normalizeOpenLibraryWorkId(doc.key);
+    const workId = doc.key ? normalizeOpenLibraryWorkId(doc.key) : undefined;
     const media =
       (workId
         ? mediaByIdentifier.get(
@@ -221,7 +219,9 @@ export const findBookMediaForWork = async (
   userId?: number
 ): Promise<Media | undefined> => {
   const editionLookups = editions
-    .map((edition) => normalizeOpenLibraryEditionId(edition.key))
+    .map((edition) =>
+      edition.key ? normalizeOpenLibraryEditionId(edition.key) : undefined
+    )
     .filter((editionId): editionId is string => !!editionId)
     .map((editionId) => ({
       provider: MediaIdentifierProvider.OPENLIBRARY_EDITION,

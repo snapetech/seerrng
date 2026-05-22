@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddBookWatchlistSyncSetting1780400000000
-  implements MigrationInterface
-{
+export class AddBookWatchlistSyncSetting1780400000000 implements MigrationInterface {
   name = 'AddBookWatchlistSyncSetting1780400000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

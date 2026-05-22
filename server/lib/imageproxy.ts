@@ -66,19 +66,16 @@ export const parseCacheControlMaxAge = (
 export const parseImageCacheFileMetadata = (
   filename: string,
   now = Date.now()
-):
-  | {
-      maxAge: number;
-      expireAt: number;
-      etag: string;
-      extension: string;
-      lastModified: number;
-      revalidateAfter: number;
-      isStale: boolean;
-    }
-  | null => {
-  const [maxAgeSt, expireAtSt, etag, extension, ...extra] =
-    filename.split('.');
+): {
+  maxAge: number;
+  expireAt: number;
+  etag: string;
+  extension: string;
+  lastModified: number;
+  revalidateAfter: number;
+  isStale: boolean;
+} | null => {
+  const [maxAgeSt, expireAtSt, etag, extension, ...extra] = filename.split('.');
 
   if (extra.length || !etag || !extension) {
     return null;

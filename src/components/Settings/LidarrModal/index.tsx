@@ -316,8 +316,8 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                 isSubmitting
                   ? intl.formatMessage(globalMessages.saving)
                   : lidarr
-                  ? intl.formatMessage(globalMessages.save)
-                  : intl.formatMessage(messages.add)
+                    ? intl.formatMessage(globalMessages.save)
+                    : intl.formatMessage(messages.add)
               }
               secondaryButtonType="warning"
               secondaryText={
@@ -528,10 +528,12 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                           {isTesting
                             ? intl.formatMessage(messages.loadingprofiles)
                             : !isValidated
-                            ? intl.formatMessage(
-                                messages.testFirstQualityProfiles
-                              )
-                            : intl.formatMessage(messages.selectQualityProfile)}
+                              ? intl.formatMessage(
+                                  messages.testFirstQualityProfiles
+                                )
+                              : intl.formatMessage(
+                                  messages.selectQualityProfile
+                                )}
                         </option>
                         {testResponse.profiles.length > 0 &&
                           testResponse.profiles.map((profile) => (
@@ -568,8 +570,10 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                           {isTesting
                             ? intl.formatMessage(messages.loadingrootfolders)
                             : !isValidated
-                            ? intl.formatMessage(messages.testFirstRootFolders)
-                            : intl.formatMessage(messages.selectRootFolder)}
+                              ? intl.formatMessage(
+                                  messages.testFirstRootFolders
+                                )
+                              : intl.formatMessage(messages.selectRootFolder)}
                         </option>
                         {testResponse.rootFolders.length > 0 &&
                           testResponse.rootFolders.map((folder) => (
@@ -611,12 +615,12 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                                 messages.loadingmetadataprofiles
                               )
                             : !isValidated
-                            ? intl.formatMessage(
-                                messages.testFirstMetadataProfiles
-                              )
-                            : intl.formatMessage(
-                                messages.selectMetadataProfile
-                              )}
+                              ? intl.formatMessage(
+                                  messages.testFirstMetadataProfiles
+                                )
+                              : intl.formatMessage(
+                                  messages.selectMetadataProfile
+                                )}
                         </option>
                         {testResponse.metadataProfiles.length > 0 &&
                           testResponse.metadataProfiles.map((profile) => (
@@ -658,8 +662,8 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                         !isValidated
                           ? intl.formatMessage(messages.testFirstTags)
                           : isTesting
-                          ? intl.formatMessage(messages.loadingTags)
-                          : intl.formatMessage(messages.selecttags)
+                            ? intl.formatMessage(messages.loadingTags)
+                            : intl.formatMessage(messages.selecttags)
                       }
                       isLoading={isTesting}
                       className="react-select-container"

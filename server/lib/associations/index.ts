@@ -1,5 +1,7 @@
 import ListenBrainzAPI from '@server/api/listenbrainz';
-import OpenLibraryAPI from '@server/api/openlibrary';
+import OpenLibraryAPI, {
+  type OpenLibraryAuthorWork,
+} from '@server/api/openlibrary';
 import TheAudioDb from '@server/api/theaudiodb';
 import TheMovieDb from '@server/api/themoviedb';
 import TmdbPersonMapper from '@server/api/themoviedb/personMapper';
@@ -12,6 +14,8 @@ import MediaIdentifier, {
 import MetadataArtist from '@server/entity/MetadataArtist';
 import type { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
+import { getSettings } from '@server/lib/settings';
 import { scoreTmdbResult } from '@server/lib/tmdbRank';
 import logger from '@server/logger';
 import { mapOpenLibraryAuthorWork } from '@server/models/Book';
@@ -33,6 +37,44 @@ import type {
 import { ASSOCIATION_LIMITS } from './types';
 
 const cache = cacheManager.getCache('associations');
+
+const ISO_639_1_TO_OPENLIBRARY: Record<string, string> = {
+  ar: 'ara',
+  ca: 'cat',
+  cs: 'cze',
+  da: 'dan',
+  de: 'ger',
+  el: 'gre',
+  en: 'eng',
+  es: 'spa',
+  et: 'est',
+  eu: 'baq',
+  fi: 'fin',
+  fr: 'fre',
+  he: 'heb',
+  hi: 'hin',
+  hr: 'hrv',
+  hu: 'hun',
+  it: 'ita',
+  ja: 'jpn',
+  ko: 'kor',
+  lt: 'lit',
+  nl: 'dut',
+  no: 'nor',
+  pl: 'pol',
+  pt: 'por',
+  ro: 'rum',
+  ru: 'rus',
+  sk: 'slo',
+  sl: 'slv',
+  sq: 'alb',
+  sr: 'srp',
+  sv: 'swe',
+  tr: 'tur',
+  uk: 'ukr',
+  vi: 'vie',
+  zh: 'chi',
+};
 
 const clamp01 = (n: number): number => Math.min(1, Math.max(0, n));
 
@@ -276,6 +318,62 @@ const scoreBookWork = (book: BookResult): number => {
   return clamp01(0.65 + recencyScore * 0.25 + metadataScore);
 };
 
+const normalizeBookAssociationTitle = (title: string) =>
+  title
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const getPreferredOpenLibraryLanguage = () => {
+  const settings = getSettings();
+  const language = (
+    settings.main.originalLanguage ||
+    settings.main.locale ||
+    ''
+  )
+    .split(/[-_]/)[0]
+    ?.toLowerCase();
+
+  return language ? ISO_639_1_TO_OPENLIBRARY[language] : undefined;
+};
+
+const filterBookAssociationWorks = (
+  works: OpenLibraryAuthorWork[],
+  currentWorkKey: string,
+  preferredLanguage?: string
+) => {
+  const seenTitles = new Set<string>();
+
+  return works.filter((work) => {
+    if (work.key === currentWorkKey) {
+      return false;
+    }
+
+    if (
+      preferredLanguage &&
+      work.languages?.length &&
+      !work.languages.some(
+        (language) =>
+          language.key.replace('/languages/', '').toLowerCase() ===
+          preferredLanguage
+      )
+    ) {
+      return false;
+    }
+
+    const titleKey = normalizeBookAssociationTitle(work.title);
+
+    if (seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
 const buildArtistEdges = async (
   mbArtistId: string,
   artistName: string,
@@ -295,8 +393,7 @@ const buildArtistEdges = async (
   const edges: AssociationEdge[] = similar.map((a, idx) => {
     const meta = metadata.get(a.artist_mbid);
     const imageResult = images[a.artist_mbid];
-    const artistThumb =
-      meta?.tadbThumb ?? imageResult?.artistThumb ?? null;
+    const artistThumb = meta?.tadbThumb ?? imageResult?.artistThumb ?? null;
     const node: ArtistResult = {
       id: a.artist_mbid,
       score: a.score,
@@ -386,9 +483,11 @@ const buildForBook = async (
   let work = await openLibrary.getWork(openLibraryId);
   let workId = openLibraryId;
 
-  if (!work.key?.startsWith('/works/')) {
+  if (!work.key || !/^\/works\//i.test(work.key)) {
     const edition = await openLibrary.getEdition(openLibraryId);
-    const editionWorkId = edition.works?.[0]?.key?.replace('/works/', '');
+    const editionWorkId = edition.works?.[0]?.key
+      ? normalizeOpenLibraryWorkId(edition.works[0].key)
+      : undefined;
     if (editionWorkId) {
       work = await openLibrary.getWork(editionWorkId);
       workId = editionWorkId;
@@ -411,17 +510,19 @@ const buildForBook = async (
       limit: ASSOCIATION_LIMITS.MAX_SAME_MEDIUM + 1,
     }),
   ]);
-  const books = authorWorks.entries
-    .filter((authorWork) => authorWork.key !== work.key)
-    .slice(0, ASSOCIATION_LIMITS.MAX_SAME_MEDIUM);
-  const bookIds = books.map((book) => book.key.replace('/works/', ''));
+  const books = filterBookAssociationWorks(
+    authorWorks.entries,
+    work.key,
+    getPreferredOpenLibraryLanguage()
+  ).slice(0, ASSOCIATION_LIMITS.MAX_SAME_MEDIUM);
+  const bookIds = books.map((book) => normalizeOpenLibraryWorkId(book.key));
   const mediaByOpenLibraryId = await findBookMediaByOpenLibraryIds(
     bookIds,
     user?.id
   );
 
   const edges = books.map((authorWork) => {
-    const bookId = authorWork.key.replace('/works/', '');
+    const bookId = normalizeOpenLibraryWorkId(authorWork.key);
     const node = mapOpenLibraryAuthorWork(
       authorWork,
       mediaByOpenLibraryId.get(bookId),

@@ -7,6 +7,7 @@ import MediaIdentifier, {
   MediaIdentifierProvider,
 } from '@server/entity/MediaIdentifier';
 import type { BlocklistResultsResponse } from '@server/interfaces/api/blocklistInterfaces';
+import { normalizeExternalMediaId } from '@server/lib/externalIds';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -79,7 +80,7 @@ const getBlocklistLookup = (id: string, mediaType: MediaType) => {
   }
 
   return {
-    externalId,
+    externalId: normalizeExternalMediaId(externalId, mediaType),
     mediaType,
   };
 };
@@ -212,7 +213,16 @@ blocklistRoutes.post(
       if (!parsedBody.success) {
         return next({ status: 400, message: 'Invalid blocklist payload.' });
       }
-      const values = parsedBody.data;
+      const values = {
+        ...parsedBody.data,
+        externalId: parsedBody.data.externalId
+          ? normalizeExternalMediaId(
+              parsedBody.data.externalId,
+              parsedBody.data.mediaType,
+              parsedBody.data.externalProvider
+            )
+          : undefined,
+      };
       logPayload = {
         externalId: values.externalId,
         mediaType: values.mediaType,

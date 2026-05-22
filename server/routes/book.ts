@@ -6,6 +6,7 @@ import {
   findBookMediaForSearchDocs,
   findBookMediaForWork,
 } from '@server/lib/bookMediaMatcher';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import logger from '@server/logger';
 import {
   mapOpenLibrarySearchDoc,
@@ -61,7 +62,7 @@ bookRoutes.get('/search', async (req, res, next) => {
       results: response.docs.map((doc) =>
         mapOpenLibrarySearchDoc(
           doc,
-          mediaByOpenLibraryId.get(doc.key.replace('/works/', ''))
+          mediaByOpenLibraryId.get(normalizeOpenLibraryWorkId(doc.key))
         )
       ),
     });
@@ -81,7 +82,7 @@ bookRoutes.get('/:id', async (req, res, next) => {
     return res.status(404).json({ status: 404, message: 'Book not found' });
   }
 
-  const bookId = parsedBookId.value;
+  const bookId = normalizeOpenLibraryWorkId(parsedBookId.value);
 
   try {
     const openLibrary = new OpenLibraryAPI();

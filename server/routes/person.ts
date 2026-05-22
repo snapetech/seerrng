@@ -7,10 +7,8 @@ import {
   mapCrewCredits,
   mapPersonDetails,
 } from '@server/models/Person';
-import {
-  parseOptionalLanguage,
-} from '@server/utils/validation';
 import { parsePositiveRouteId } from '@server/utils/routeId';
+import { parseOptionalLanguage } from '@server/utils/validation';
 import { Router } from 'express';
 
 const personRoutes = Router();

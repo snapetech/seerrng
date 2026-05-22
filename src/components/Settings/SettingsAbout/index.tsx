@@ -85,7 +85,7 @@ const SettingsAbout = () => {
                       ? `https://github.com/snapetech/seerrng/compare/${status.commitTag}...main`
                       : data.version.startsWith('main-')
                         ? `https://github.com/snapetech/seerrng/compare/${status.commitTag}...main`
-                      : 'https://github.com/snapetech/seerrng/releases'
+                        : 'https://github.com/snapetech/seerrng/releases'
                   }
                   target="_blank"
                   rel="noopener noreferrer"
@@ -104,7 +104,7 @@ const SettingsAbout = () => {
                       ? 'https://github.com/snapetech/seerrng/commits/main'
                       : data.version.startsWith('main-')
                         ? 'https://github.com/snapetech/seerrng/commits/main'
-                      : 'https://github.com/snapetech/seerrng/releases'
+                        : 'https://github.com/snapetech/seerrng/releases'
                   }
                   target="_blank"
                   rel="noopener noreferrer"

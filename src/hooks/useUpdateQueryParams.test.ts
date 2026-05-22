@@ -1,6 +1,6 @@
+import type { NextRouter } from 'next/router';
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
-import type { NextRouter } from 'next/router';
 import {
   filterQueryString,
   getPositiveQueryParamNumber,
