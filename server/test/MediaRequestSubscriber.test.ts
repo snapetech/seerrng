@@ -830,6 +830,113 @@ describe('MediaRequestSubscriber service dispatch', () => {
     assert.equal(savedRequest.status, MediaRequestStatus.COMPLETED);
   });
 
+  it('does not save Bookshelf identifiers already linked to another book media row', async () => {
+    const settings = getSettings();
+    settings.readarr = [
+      {
+        id: 20,
+        name: 'Bookshelf',
+        hostname: 'bookshelf.local',
+        port: 8787,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 11,
+        activeProfileName: 'Books',
+        activeMetadataProfileId: 12,
+        activeMetadataProfileName: 'Standard',
+        activeDirectory: '/books',
+        tags: [4],
+        is4k: false,
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        serviceType: 'ebook',
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.ISBN,
+            value: '9780441478125',
+            canonical: true,
+          }),
+        ],
+      })
+    );
+    const otherMedia = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.READARR,
+            value: 'readarr-work-id',
+            canonical: true,
+          }),
+        ],
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    request.serverId = 20;
+
+    mock.method(ReadarrAPI.prototype, 'lookupBook', async () => {
+      return [
+        {
+          title: 'The Left Hand of Darkness',
+          foreignBookId: 'readarr-work-id',
+          titleSlug: 'left-hand-darkness',
+          author: {
+            foreignAuthorId: 'le-guin-author-id',
+            authorName: 'Ursula K. Le Guin',
+          },
+          editions: [
+            {
+              foreignEditionId: 'edition-id',
+              title: 'The Left Hand of Darkness',
+              isbn13: '9780441478125',
+              monitored: true,
+            },
+          ],
+        },
+      ] as ReadarrBookLookupResult[];
+    });
+    mock.method(
+      ReadarrAPI.prototype,
+      'addBook',
+      async (payload: ReadarrBookOptions) =>
+        ({
+          ...payload,
+          id: 55,
+          titleSlug: 'left-hand-darkness',
+        }) as Awaited<ReturnType<ReadarrAPI['addBook']>>
+    );
+    mock.method(notificationManager, 'sendNotification', () => undefined);
+
+    await new MediaRequestSubscriber().sendToReadarr(request);
+
+    const readarrIdentifiers = await getRepository(MediaIdentifier).find({
+      where: {
+        provider: MediaIdentifierProvider.READARR,
+        value: 'readarr-work-id',
+      },
+      relations: { media: true },
+    });
+
+    assert.equal(readarrIdentifiers.length, 1);
+    assert.equal(readarrIdentifiers[0].media.id, otherMedia.id);
+  });
+
   it('fails book requests without posting incomplete Bookshelf metadata', async () => {
     const settings = getSettings();
     settings.readarr = [

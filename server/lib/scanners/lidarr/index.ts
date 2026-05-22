@@ -3,6 +3,7 @@ import LidarrAPI from '@server/api/servarr/lidarr';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import type {
   RunnableScanner,
   StatusBase,
@@ -92,7 +93,9 @@ class LidarrScanner
 
   private async processLidarrAlbum(lidarrAlbum: LidarrAlbum): Promise<void> {
     try {
-      const mbId = lidarrAlbum.foreignAlbumId;
+      const mbId = lidarrAlbum.foreignAlbumId
+        ? normalizeMusicBrainzId(lidarrAlbum.foreignAlbumId)
+        : undefined;
       if (!mbId) {
         this.log(
           'No MusicBrainz ID found for this title. Skipping item.',

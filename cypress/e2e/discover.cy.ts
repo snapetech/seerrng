@@ -297,9 +297,7 @@ describe('Discover', () => {
     cy.contains('.slider-header', 'Recent Requests')
       .next('[data-testid=media-slider]')
       .contains('[data-testid=request-card]', 'Failed Card Album')
-      .find(
-        'a[href="/music/56565656-5656-5656-5656-565656565656?manage=1"]'
-      )
+      .find('a[href="/music/56565656-5656-5656-5656-565656565656?manage=1"]')
       .should('contain', 'Failed');
   });
 

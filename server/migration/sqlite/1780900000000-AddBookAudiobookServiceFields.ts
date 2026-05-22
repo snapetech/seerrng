@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddBookAudiobookServiceFields1780900000000
-  implements MigrationInterface
-{
+export class AddBookAudiobookServiceFields1780900000000 implements MigrationInterface {
   name = 'AddBookAudiobookServiceFields1780900000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

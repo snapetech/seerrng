@@ -4,25 +4,25 @@ import useClickOutside from '@app/hooks/useClickOutside';
 import { Permission, useUser } from '@app/hooks/useUser';
 import { Transition } from '@headlessui/react';
 import {
+  BookOpenIcon,
   ClockIcon,
   CogIcon,
   EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
-  BookOpenIcon,
   MusicalNoteIcon,
   SparklesIcon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import {
+  BookOpenIcon as FilledBookOpenIcon,
   ClockIcon as FilledClockIcon,
   CogIcon as FilledCogIcon,
   ExclamationTriangleIcon as FilledExclamationTriangleIcon,
   EyeSlashIcon as FilledEyeSlashIcon,
   FilmIcon as FilledFilmIcon,
-  BookOpenIcon as FilledBookOpenIcon,
   MusicalNoteIcon as FilledMusicalNoteIcon,
   SparklesIcon as FilledSparklesIcon,
   TvIcon as FilledTvIcon,

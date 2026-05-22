@@ -2,8 +2,6 @@ import type {
   MbAlbumResult,
   MbArtistResult,
 } from '@server/api/musicbrainz/interfaces';
-import type { BookResult } from '@server/models/Book';
-export type { BookResult } from '@server/models/Book';
 import type {
   TmdbCollectionResult,
   TmdbMovieDetails,
@@ -15,6 +13,8 @@ import type {
 } from '@server/api/themoviedb/interfaces';
 import { MediaType as MainMediaType } from '@server/constants/media';
 import type Media from '@server/entity/Media';
+import type { BookResult } from '@server/models/Book';
+export type { BookResult } from '@server/models/Book';
 export type MediaType =
   | 'tv'
   | 'movie'

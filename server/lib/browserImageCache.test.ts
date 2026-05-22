@@ -154,8 +154,14 @@ describe('doesBrowserImageEtagMatch', () => {
   });
 
   it('ignores oversized or malformed validator headers', () => {
-    assert.equal(doesBrowserImageEtagMatch(`${'"x",'.repeat(400)}"abc"`, '"abc"'), false);
-    assert.equal(doesBrowserImageEtagMatch('"abc"\r\nX-Test: yes', '"abc"'), false);
+    assert.equal(
+      doesBrowserImageEtagMatch(`${'"x",'.repeat(400)}"abc"`, '"abc"'),
+      false
+    );
+    assert.equal(
+      doesBrowserImageEtagMatch('"abc"\r\nX-Test: yes', '"abc"'),
+      false
+    );
   });
 });
 

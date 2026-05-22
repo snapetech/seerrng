@@ -45,8 +45,7 @@ const messages = defineMessages('components.Discover.CreateSlider', {
   needresults: 'You need to have at least 1 result.',
   validationDatarequired: 'You must provide a data value.',
   validationTitlerequired: 'You must provide a title.',
-  validationDataLength:
-    'Data must be {maxLength, number} characters or fewer.',
+  validationDataLength: 'Data must be {maxLength, number} characters or fewer.',
   validationTitleLength:
     'Title must be {maxLength, number} characters or fewer.',
   addcustomslider: 'Create Custom Slider',

@@ -164,7 +164,11 @@ class GotifyAgent
       const endpoint = `${settings.options.url}/message?token=${settings.options.token}`;
       const notificationPayload = this.getNotificationPayload(type, payload);
 
-      await axios.post(endpoint, notificationPayload, NOTIFICATION_HTTP_OPTIONS);
+      await axios.post(
+        endpoint,
+        notificationPayload,
+        NOTIFICATION_HTTP_OPTIONS
+      );
 
       return true;
     } catch (e) {

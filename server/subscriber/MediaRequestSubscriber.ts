@@ -1830,7 +1830,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           (edition) => edition.isbn13
         )?.isbn13;
         const normalizedResultIsbn = normalizeValidIsbn(resultIsbn);
-        const identifiersToSave = [
+        const identifierCandidates = [
           (result.foreignBookId ?? bookInfo.foreignBookId)
             ? {
                 provider: MediaIdentifierProvider.READARR,
@@ -1849,13 +1849,29 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           ): identifier is {
             provider: MediaIdentifierProvider;
             value: string;
-          } =>
-            !!identifier &&
-            (identifier.provider === MediaIdentifierProvider.READARR ||
-              !existingIdentifierKeys.has(
-                `${identifier.provider}:${identifier.value}`
-              ))
+          } => !!identifier
         );
+        const existingCandidateIdentifiers = identifierCandidates.length
+          ? await identifierRepository.find({
+              where: identifierCandidates.map((identifier) => ({
+                provider: identifier.provider,
+                value: identifier.value,
+              })),
+              relations: { media: true },
+            })
+          : [];
+        const existingCandidateKeys = new Set(
+          existingCandidateIdentifiers.map(
+            (identifier) => `${identifier.provider}:${identifier.value}`
+          )
+        );
+        const identifiersToSave = identifierCandidates.filter((identifier) => {
+          const key = `${identifier.provider}:${identifier.value}`;
+
+          return (
+            !existingIdentifierKeys.has(key) && !existingCandidateKeys.has(key)
+          );
+        });
 
         if (identifiersToSave.length) {
           await identifierRepository.insert(

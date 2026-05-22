@@ -65,7 +65,7 @@ const QuotaSelector = ({
             ? messages.musicRequests
             : mediaType === 'book'
               ? messages.bookRequests
-            : messages.tvRequests,
+              : messages.tvRequests,
         {
           quotaLimit: (
             <select

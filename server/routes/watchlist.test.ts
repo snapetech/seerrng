@@ -262,18 +262,18 @@ describe('POST /watchlist', () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const body = {
       mediaType: MediaType.BOOK,
-      externalId: '/works/OLduplicateW',
+      externalId: '/works/OL123W',
       title: 'Duplicate Book',
     };
 
     const firstRes = await agent.post('/watchlist').send(body);
     const duplicateRes = await agent.post('/watchlist').send({
       ...body,
-      externalId: 'olduplicatew',
+      externalId: 'ol123w',
     });
 
     assert.strictEqual(firstRes.status, 201);
-    assert.strictEqual(firstRes.body.externalId, 'OLduplicateW');
+    assert.strictEqual(firstRes.body.externalId, 'OL123W');
     assert.strictEqual(duplicateRes.status, 409);
   });
 

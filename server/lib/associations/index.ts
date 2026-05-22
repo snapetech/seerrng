@@ -14,6 +14,7 @@ import MediaIdentifier, {
 import MetadataArtist from '@server/entity/MetadataArtist';
 import type { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import { getSettings } from '@server/lib/settings';
 import { scoreTmdbResult } from '@server/lib/tmdbRank';
 import logger from '@server/logger';
@@ -482,9 +483,11 @@ const buildForBook = async (
   let work = await openLibrary.getWork(openLibraryId);
   let workId = openLibraryId;
 
-  if (!work.key?.startsWith('/works/')) {
+  if (!work.key || !/^\/works\//i.test(work.key)) {
     const edition = await openLibrary.getEdition(openLibraryId);
-    const editionWorkId = edition.works?.[0]?.key?.replace('/works/', '');
+    const editionWorkId = edition.works?.[0]?.key
+      ? normalizeOpenLibraryWorkId(edition.works[0].key)
+      : undefined;
     if (editionWorkId) {
       work = await openLibrary.getWork(editionWorkId);
       workId = editionWorkId;
@@ -512,14 +515,14 @@ const buildForBook = async (
     work.key,
     getPreferredOpenLibraryLanguage()
   ).slice(0, ASSOCIATION_LIMITS.MAX_SAME_MEDIUM);
-  const bookIds = books.map((book) => book.key.replace('/works/', ''));
+  const bookIds = books.map((book) => normalizeOpenLibraryWorkId(book.key));
   const mediaByOpenLibraryId = await findBookMediaByOpenLibraryIds(
     bookIds,
     user?.id
   );
 
   const edges = books.map((authorWork) => {
-    const bookId = authorWork.key.replace('/works/', '');
+    const bookId = normalizeOpenLibraryWorkId(authorWork.key);
     const node = mapOpenLibraryAuthorWork(
       authorWork,
       mediaByOpenLibraryId.get(bookId),

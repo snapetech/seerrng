@@ -122,7 +122,7 @@ class OpenLibraryAPI extends ExternalAPI {
   }
 
   public async getWork(workId: string): Promise<OpenLibraryWork> {
-    const normalizedWorkId = workId.startsWith('/works/')
+    const normalizedWorkId = /^\/works\//i.test(workId)
       ? workId
       : `/works/${workId}`;
 
@@ -134,7 +134,7 @@ class OpenLibraryAPI extends ExternalAPI {
   }
 
   public async getEdition(editionId: string): Promise<OpenLibraryEdition> {
-    const normalizedEditionId = editionId.startsWith('/books/')
+    const normalizedEditionId = /^\/books\//i.test(editionId)
       ? editionId
       : `/books/${editionId}`;
 
@@ -187,7 +187,7 @@ class OpenLibraryAPI extends ExternalAPI {
     workId: string,
     limit = 100
   ): Promise<OpenLibraryEditionsResponse> {
-    const normalizedWorkId = workId.startsWith('/works/')
+    const normalizedWorkId = /^\/works\//i.test(workId)
       ? workId
       : `/works/${workId}`;
 

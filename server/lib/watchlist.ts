@@ -6,6 +6,10 @@ import type {
   WatchlistItem,
   WatchlistResponse,
 } from '@server/interfaces/api/discoverInterfaces';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 
 const mapLocalWatchlistItem = (item: Watchlist): WatchlistItem => ({
   id: item.id,
@@ -33,13 +37,13 @@ const getWatchlistDedupeKey = (item: WatchlistItem) => {
   }
 
   if (item.mediaType === MediaType.MUSIC && item.mbId) {
-    return `${item.mediaType}:mb:${item.mbId.toLocaleLowerCase()}`;
+    return `${item.mediaType}:mb:${normalizeMusicBrainzId(item.mbId)}`;
   }
 
   if (item.mediaType === MediaType.BOOK && item.externalId) {
-    return `${item.mediaType}:openlibrary:${item.externalId
-      .replace(/^\/?works\//, '')
-      .toLocaleLowerCase()}`;
+    return `${item.mediaType}:openlibrary:${normalizeOpenLibraryWorkId(
+      item.externalId
+    ).toLocaleLowerCase()}`;
   }
 
   return `${item.mediaType}:rating:${item.ratingKey}`;

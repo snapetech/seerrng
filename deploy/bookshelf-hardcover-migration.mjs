@@ -507,6 +507,23 @@ const normalizePathComparable = (value) => {
   return normalized.replace(/\/+$/, '');
 };
 
+const normalizeReadarrRootFolderPath = (value) => {
+  const normalized = normalizeText(value).replace(/\\/g, '/');
+  const pathPattern = /^\/[A-Za-z0-9._~:/@()+, -]+$/;
+
+  if (!pathPattern.test(normalized)) {
+    throw new Error(`Invalid Readarr root folder path: ${value}`);
+  }
+
+  const normalizedPath = path.posix.normalize(normalized);
+
+  if (normalizedPath === '.' || normalizedPath.includes('/../')) {
+    throw new Error(`Invalid Readarr root folder path: ${value}`);
+  }
+
+  return normalizedPath;
+};
+
 const deriveRootFolderPath = ({ book, author, rootFolders }) => {
   const direct = normalizeText(
     firstValue(book, [
@@ -2503,6 +2520,9 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
   };
 
   const resolveTargetIds = async (item, job, targetConfig) => {
+    const rootFolderPath = normalizeReadarrRootFolderPath(
+      item.addBook.rootFolderPath
+    );
     const qualityProfile = item.source.qualityProfileName
       ? targetConfig.qualityProfiles.find(
           (profile) =>
@@ -2527,7 +2547,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     let rootFolder = targetConfig.rootFolders.find(
       (folder) =>
         normalizePathComparable(folder.path ?? folder.Path) ===
-        normalizePathComparable(item.addBook.rootFolderPath)
+        normalizePathComparable(rootFolderPath)
     );
     const missing = [];
 
@@ -2549,10 +2569,8 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
         apiKey: job.apiKey,
         endpoint: '/rootfolder',
         body: {
-          path: item.addBook.rootFolderPath,
-          name:
-            item.addBook.rootFolderPath.split('/').filter(Boolean).pop() ??
-            'Books',
+          path: rootFolderPath,
+          name: rootFolderPath.split('/').filter(Boolean).pop() ?? 'Books',
           defaultQualityProfileId: Number(
             qualityProfile.id ?? qualityProfile.Id
           ),
@@ -2567,7 +2585,6 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
         },
       });
       targetConfig.rootFolders.push(createdRootFolder);
-      rootFolder = createdRootFolder;
     }
 
     if (missing.length) {
@@ -2577,6 +2594,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     return {
       qualityProfileId: Number(qualityProfile.id ?? qualityProfile.Id),
       metadataProfileId: Number(metadataProfile.id ?? metadataProfile.Id),
+      rootFolderPath,
     };
   };
 
@@ -2667,7 +2685,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       tags,
       author: {
         ...local.author,
-        rootFolderPath: item.addBook.rootFolderPath,
+        rootFolderPath: targetIds.rootFolderPath,
         qualityProfileId: targetIds.qualityProfileId,
         metadataProfileId: targetIds.metadataProfileId,
         monitored: false,
@@ -2744,7 +2762,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       ...lookupAuthor,
       qualityProfileId: targetIds.qualityProfileId,
       metadataProfileId: targetIds.metadataProfileId,
-      rootFolderPath: item.addBook.rootFolderPath,
+      rootFolderPath: targetIds.rootFolderPath,
       monitored: false,
       monitorNewItems: 'none',
       tags: [],
@@ -2828,7 +2846,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
           tags,
           author: {
             ...decision.result.author,
-            rootFolderPath: item.addBook.rootFolderPath,
+            rootFolderPath: targetIds.rootFolderPath,
             qualityProfileId: targetIds.qualityProfileId,
             metadataProfileId: targetIds.metadataProfileId,
             monitored: false,

@@ -365,4 +365,55 @@ describe('Readarr Scanner', () => {
     assert.strictEqual(identifiers.length, 1);
     assert.strictEqual(identifiers[0].media.mediaType, MediaType.BOOK);
   });
+
+  it('does not attach a secondary Bookshelf identifier already linked to another book', async () => {
+    const isbnMedia = await seedBook('9780000000009');
+    const readarrMedia = await getRepository(Media).save(
+      new Media({
+        tmdbId: 0,
+        mediaType: MediaType.BOOK,
+        status: MediaStatus.PROCESSING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.READARR,
+            value: 'readarr-duplicate',
+            canonical: true,
+          }),
+        ],
+      })
+    );
+
+    configureReadarr([{ syncEnabled: true }]);
+    getBooksImpl = async () => [
+      fakeReadarrBook({
+        foreignBookId: 'readarr-duplicate',
+        editions: [
+          {
+            foreignEditionId: 'edition-id',
+            title: 'Test Book',
+            isbn13: '9780000000009',
+            monitored: true,
+          },
+        ],
+      }),
+    ];
+
+    await readarrScanner.run();
+
+    const readarrIdentifiers = await getRepository(MediaIdentifier).find({
+      where: {
+        provider: MediaIdentifierProvider.READARR,
+        value: 'readarr-duplicate',
+      },
+      relations: { media: true },
+    });
+    const updatedIsbnMedia = await getRepository(Media).findOneOrFail({
+      where: { id: isbnMedia.id },
+    });
+
+    assert.strictEqual(readarrIdentifiers.length, 1);
+    assert.strictEqual(readarrIdentifiers[0].media.id, readarrMedia.id);
+    assert.strictEqual(updatedIsbnMedia.externalServiceSlug, 'test-book');
+  });
 });

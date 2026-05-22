@@ -11,6 +11,10 @@ import { QueryFailedError } from 'typeorm';
 
 import { MediaType } from '@server/constants/media';
 import { watchlistCreate } from '@server/interfaces/api/watchlistCreate';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 
 const watchlistRoutes = Router();
 const maxWatchlistId = 1_000_000_000;
@@ -31,11 +35,6 @@ const parseWatchlistExternalId = (id: unknown): string | undefined => {
     : undefined;
 };
 
-const normalizeWatchlistMusicId = (id: string): string => id.toLowerCase();
-
-const normalizeWatchlistBookId = (id: string): string =>
-  id.replace(/^\/?works\//i, '').replace(/^ol(\d+)w$/i, 'OL$1W');
-
 watchlistRoutes.post<never, Watchlist, Watchlist>(
   '/',
   async (req, res, next) => {
@@ -55,10 +54,10 @@ watchlistRoutes.post<never, Watchlist, Watchlist>(
       const values = {
         ...parsedBody.data,
         mbId: parsedBody.data.mbId
-          ? normalizeWatchlistMusicId(parsedBody.data.mbId)
+          ? normalizeMusicBrainzId(parsedBody.data.mbId)
           : undefined,
         externalId: parsedBody.data.externalId
-          ? normalizeWatchlistBookId(parsedBody.data.externalId)
+          ? normalizeOpenLibraryWorkId(parsedBody.data.externalId)
           : undefined,
       };
       logPayload = {
@@ -125,9 +124,9 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
 
     const mediaId =
       mediaType === MediaType.MUSIC
-        ? normalizeWatchlistMusicId(parsedMediaId as string)
+        ? normalizeMusicBrainzId(parsedMediaId as string)
         : mediaType === MediaType.BOOK
-          ? normalizeWatchlistBookId(parsedMediaId as string)
+          ? normalizeOpenLibraryWorkId(parsedMediaId as string)
           : parsedMediaId;
 
     await Watchlist.deleteWatchlist(mediaId, mediaType, req.user);

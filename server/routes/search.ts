@@ -11,6 +11,7 @@ import {
   findBookMediaForBookResults,
   findBookMediaForSearchDocs,
 } from '@server/lib/bookMediaMatcher';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import {
   findSearchProvider,
   type CombinedSearchResponse,
@@ -80,7 +81,7 @@ const dedupeBookSearchDocs = <
   const seenTitles = new Set<string>();
 
   return docs.filter((doc) => {
-    const key = doc.key.replace('/works/', '').toLocaleLowerCase();
+    const key = normalizeOpenLibraryWorkId(doc.key).toLocaleLowerCase();
     const titleKey = [
       normalizeSearchText(doc.title),
       normalizeSearchText(doc.author_name?.[0]),
@@ -391,7 +392,7 @@ searchRoutes.get('/', async (req, res, next) => {
       const mappedBookResults = dedupedBookDocs.map((doc) =>
         mapOpenLibrarySearchDoc(
           doc,
-          bookMediaMap.get(doc.key.replace('/works/', ''))
+          bookMediaMap.get(normalizeOpenLibraryWorkId(doc.key))
         )
       );
 

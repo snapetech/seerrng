@@ -7,6 +7,7 @@ import type Media from '@server/entity/Media';
 import MediaIdentifier, {
   MediaIdentifierProvider,
 } from '@server/entity/MediaIdentifier';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import {
@@ -166,14 +167,14 @@ const getAuthorWorksPayload = async (
   const works = await openLibrary.getAuthorWorks(authorId, { limit, offset });
   const preferredLanguage = getPreferredOpenLibraryLanguage();
   const filteredWorks = filterAuthorWorks(works.entries, preferredLanguage);
-  const ids = filteredWorks.map((work) => work.key.replace('/works/', ''));
+  const ids = filteredWorks.map((work) => normalizeOpenLibraryWorkId(work.key));
   const mediaByOpenLibraryId = await findBookMediaByOpenLibraryIds(ids, userId);
 
   return {
     works: filteredWorks.map((work) =>
       mapOpenLibraryAuthorWork(
         work,
-        mediaByOpenLibraryId.get(work.key.replace('/works/', '')),
+        mediaByOpenLibraryId.get(normalizeOpenLibraryWorkId(work.key)),
         undefined,
         authorId.replace(/^\/?authors\//, '')
       )
@@ -187,57 +188,57 @@ const getAuthorWorksPayload = async (
   };
 };
 
-authorRoutes.get<{ id: string }, AuthorDetails | { status: number; message: string }>(
-  '/:id',
-  async (req, res, next) => {
-    const parsedAuthorId = parseOpenLibraryAuthorId(req.params.id);
-    if ('error' in parsedAuthorId) {
-      return res.status(404).json({ status: 404, message: 'Author not found' });
-    }
-
-    const authorId = parsedAuthorId.value;
-    const limit = parsePositiveInt(req.query.limit, 20, 100);
-    const offset = parseNonNegativeInt(req.query.offset);
-    const openLibrary = new OpenLibraryAPI();
-
-    try {
-      const [author, worksPayload] = await Promise.all([
-        openLibrary.getAuthor(authorId),
-        getAuthorWorksPayload(authorId, limit, offset, req.user?.id),
-      ]);
-      const biography =
-        typeof author.bio === 'string' ? author.bio : author.bio?.value;
-      const normalizedAuthorId = author.key.replace('/authors/', '');
-
-      return res.status(200).json({
-        id: normalizedAuthorId,
-        name: author.name,
-        biography,
-        birthDate: author.birth_date,
-        deathDate: author.death_date,
-        posterPath: author.photos?.[0]
-          ? `https://covers.openlibrary.org/a/id/${author.photos[0]}-L.jpg`
-          : undefined,
-        works: worksPayload.works.map((work) => ({
-          ...work,
-          author: author.name,
-          authorId: normalizedAuthorId,
-        })),
-        pagination: worksPayload.pagination,
-      });
-    } catch (e) {
-      logger.error('Failed to retrieve author details', {
-        label: 'Author',
-        errorMessage: e instanceof Error ? e.message : 'Unknown error',
-        authorId,
-      });
-      return next({
-        status: 500,
-        message: 'Unable to retrieve author details.',
-      });
-    }
+authorRoutes.get<
+  { id: string },
+  AuthorDetails | { status: number; message: string }
+>('/:id', async (req, res, next) => {
+  const parsedAuthorId = parseOpenLibraryAuthorId(req.params.id);
+  if ('error' in parsedAuthorId) {
+    return res.status(404).json({ status: 404, message: 'Author not found' });
   }
-);
+
+  const authorId = parsedAuthorId.value;
+  const limit = parsePositiveInt(req.query.limit, 20, 100);
+  const offset = parseNonNegativeInt(req.query.offset);
+  const openLibrary = new OpenLibraryAPI();
+
+  try {
+    const [author, worksPayload] = await Promise.all([
+      openLibrary.getAuthor(authorId),
+      getAuthorWorksPayload(authorId, limit, offset, req.user?.id),
+    ]);
+    const biography =
+      typeof author.bio === 'string' ? author.bio : author.bio?.value;
+    const normalizedAuthorId = author.key.replace('/authors/', '');
+
+    return res.status(200).json({
+      id: normalizedAuthorId,
+      name: author.name,
+      biography,
+      birthDate: author.birth_date,
+      deathDate: author.death_date,
+      posterPath: author.photos?.[0]
+        ? `https://covers.openlibrary.org/a/id/${author.photos[0]}-L.jpg`
+        : undefined,
+      works: worksPayload.works.map((work) => ({
+        ...work,
+        author: author.name,
+        authorId: normalizedAuthorId,
+      })),
+      pagination: worksPayload.pagination,
+    });
+  } catch (e) {
+    logger.error('Failed to retrieve author details', {
+      label: 'Author',
+      errorMessage: e instanceof Error ? e.message : 'Unknown error',
+      authorId,
+    });
+    return next({
+      status: 500,
+      message: 'Unable to retrieve author details.',
+    });
+  }
+});
 
 authorRoutes.get<{ id: string }>('/:id/works', async (req, res, next) => {
   const parsedAuthorId = parseOpenLibraryAuthorId(req.params.id);

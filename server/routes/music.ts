@@ -10,6 +10,7 @@ import Media from '@server/entity/Media';
 import MetadataAlbum from '@server/entity/MetadataAlbum';
 import MetadataArtist from '@server/entity/MetadataArtist';
 import { Watchlist } from '@server/entity/Watchlist';
+import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import logger from '@server/logger';
 import { mapMusicDetails } from '@server/models/Music';
 import { filterEntityResponse } from '@server/utils/entityResponse';
@@ -36,6 +37,11 @@ const parseMusicBrainzId = (value: unknown) =>
     fieldName: 'MusicBrainz ID',
     maxLength: MAX_MUSICBRAINZ_ID_LENGTH,
   });
+
+const normalizeParsedMusicBrainzId = (
+  parsed: ReturnType<typeof parseMusicBrainzId>
+) =>
+  'error' in parsed ? parsed : { value: normalizeMusicBrainzId(parsed.value) };
 
 const mapMusicBrainzReleaseGroupToListenBrainzAlbum = (
   album: MbAlbumDetails
@@ -148,7 +154,9 @@ const getAlbumDetails = async (
 };
 
 musicRoutes.get('/:id', async (req, res, next) => {
-  const parsedMbId = parseMusicBrainzId(req.params.id);
+  const parsedMbId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedMbId) {
     return res.status(404).json({ status: 404, message: 'Album not found' });
   }
@@ -355,7 +363,9 @@ musicRoutes.get('/:id', async (req, res, next) => {
 });
 
 musicRoutes.get('/:id/artist', async (req, res, next) => {
-  const parsedMbId = parseMusicBrainzId(req.params.id);
+  const parsedMbId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedMbId) {
     return res.status(404).json({ status: 404, message: 'Album not found' });
   }
@@ -436,7 +446,9 @@ musicRoutes.get('/:id/artist', async (req, res, next) => {
 });
 
 musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
-  const parsedMbId = parseMusicBrainzId(req.params.id);
+  const parsedMbId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedMbId) {
     return res.status(404).json({ status: 404, message: 'Album not found' });
   }
@@ -483,7 +495,11 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
             page * pageSize
           );
 
-    const releaseGroupIds = paginatedReleaseGroups.map((rg) => rg.mbid);
+    const releaseGroupIds = [
+      ...new Set(
+        paginatedReleaseGroups.map((rg) => normalizeMusicBrainzId(rg.mbid))
+      ),
+    ];
 
     const mediaResponses = await Promise.allSettled([
       Media.getRelatedMedia(req.user, releaseGroupIds),
@@ -498,16 +514,22 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
       mediaResponses[1].status === 'fulfilled' ? mediaResponses[1].value : [];
 
     const albumMetadataMap = new Map(
-      albumMetadata.map((metadata) => [metadata.mbAlbumId, metadata])
+      albumMetadata.map((metadata) => [
+        normalizeMusicBrainzId(metadata.mbAlbumId),
+        metadata,
+      ])
     );
 
     const relatedMediaMap = new Map(
-      relatedMedia.map((media) => [media.mbId, media])
+      relatedMedia
+        .filter((media) => media.mbId)
+        .map((media) => [normalizeMusicBrainzId(media.mbId as string), media])
     );
 
     const transformedReleaseGroups = paginatedReleaseGroups.map(
       (releaseGroup) => {
-        const metadata = albumMetadataMap.get(releaseGroup.mbid);
+        const releaseGroupId = normalizeMusicBrainzId(releaseGroup.mbid);
+        const metadata = albumMetadataMap.get(releaseGroupId);
         return {
           id: releaseGroup.mbid,
           mediaType: 'album',
@@ -517,7 +539,7 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
           'primary-type': releaseGroup.type || 'Other',
           posterPath: metadata?.caaUrl ?? null,
           needsCoverArt: !metadata?.caaUrl,
-          mediaInfo: relatedMediaMap.get(releaseGroup.mbid),
+          mediaInfo: relatedMediaMap.get(releaseGroupId),
         };
       }
     );
@@ -542,7 +564,9 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
 });
 
 musicRoutes.get('/:id/artist-similar', async (req, res, next) => {
-  const parsedMbId = parseMusicBrainzId(req.params.id);
+  const parsedMbId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedMbId) {
     return res.status(404).json({ status: 404, message: 'Album not found' });
   }
