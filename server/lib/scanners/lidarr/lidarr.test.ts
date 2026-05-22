@@ -182,4 +182,23 @@ describe('Lidarr Scanner', () => {
     });
     assert.strictEqual(updated.status, MediaStatus.UNKNOWN);
   });
+
+  it('normalizes MusicBrainz release group IDs before saving scanned albums', async () => {
+    const mediaRepository = getRepository(Media);
+
+    configureLidarr([{ syncEnabled: true }]);
+    getAlbumsImpl = async () => [
+      fakeLidarrAlbum({
+        foreignAlbumId: ' RELEASE-GROUP-ID ',
+      }),
+    ];
+
+    await lidarrScanner.run();
+
+    const media = await mediaRepository.find({
+      where: { mediaType: MediaType.MUSIC },
+    });
+    assert.strictEqual(media.length, 1);
+    assert.strictEqual(media[0].mbId, 'release-group-id');
+  });
 });

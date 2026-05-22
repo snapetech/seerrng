@@ -28,6 +28,10 @@ import type {
   GenreSliderItem,
   WatchlistResponse,
 } from '@server/interfaces/api/discoverInterfaces';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { extractImageCacheUrls } from '@server/lib/imageCacheUrls';
 import { enqueueImageCacheWarm } from '@server/lib/imageCacheWarmer';
 import { getSettings } from '@server/lib/settings';
@@ -173,6 +177,83 @@ const emptyDiscoverResponse = (page: number) => ({
   results: [],
 });
 
+const normalizeDiscoverTitle = (value?: string) =>
+  (value ?? '')
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const dedupeMusicAlbums = <T extends MbAlbumResult>(albums: T[]): T[] => {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return albums.filter((album) => {
+    const idKey = normalizeMusicBrainzId(album.id);
+    const titleKey = [
+      normalizeDiscoverTitle(album.title),
+      normalizeDiscoverTitle(album['artist-credit']?.[0]?.name),
+      album['first-release-date']?.slice(0, 4) ?? '',
+      normalizeDiscoverTitle(album['primary-type']),
+    ].join('|');
+
+    if (seenIds.has(idKey) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenIds.add(idKey);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
+const dedupeFreshReleases = (releases: LbRelease[]): LbRelease[] => {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return releases.filter((release) => {
+    const idKey = normalizeMusicBrainzId(release.release_group_mbid);
+    const titleKey = [
+      normalizeDiscoverTitle(release.release_name),
+      normalizeDiscoverTitle(release.artist_credit_name),
+      release.release_date?.slice(0, 4) ?? '',
+      normalizeDiscoverTitle(release.release_group_primary_type),
+    ].join('|');
+
+    if (seenIds.has(idKey) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenIds.add(idKey);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
+const dedupeBookDocs = (
+  docs: OpenLibrarySearchDoc[]
+): OpenLibrarySearchDoc[] => {
+  const seenKeys = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return docs.filter((doc) => {
+    const key = normalizeOpenLibraryWorkId(doc.key).toLocaleLowerCase();
+    const titleKey = [
+      normalizeDiscoverTitle(doc.title),
+      normalizeDiscoverTitle(doc.author_name?.[0]),
+    ].join('|');
+
+    if (seenKeys.has(key) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenKeys.add(key);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
 const getUnknownTotalResults = (
   page: number,
   resultCount: number,
@@ -196,6 +277,37 @@ const getProviderWindow = (
     sliceStart: pageOffset - windowOffset,
     sliceEnd: pageOffset - windowOffset + itemsPerPage,
   };
+};
+
+const getRelatedMusicMediaMap = async (
+  ids: string[],
+  userId?: number
+): Promise<Map<string, MediaEntity>> => {
+  const normalizedIds = [...new Set(ids.map(normalizeMusicBrainzId))].filter(
+    Boolean
+  );
+
+  if (!normalizedIds.length) {
+    return new Map();
+  }
+
+  const relatedMedia = await getRepository(Media).find({
+    where: { mbId: In(normalizedIds), mediaType: MediaType.MUSIC },
+    relations: { requests: true, watchlists: true },
+  });
+
+  relatedMedia.forEach((media) => {
+    media.watchlists =
+      media.watchlists?.filter(
+        (watchlist) => watchlist.requestedBy.id === userId
+      ) ?? [];
+  });
+
+  return new Map(
+    relatedMedia
+      .filter((media) => media.mbId)
+      .map((media) => [normalizeMusicBrainzId(media.mbId as string), media])
+  );
 };
 
 const scoreMusicRelease = (release: LbRelease): number => {
@@ -1634,23 +1746,13 @@ discoverRoutes.get('/music', async (req, res) => {
         limit: providerWindow.limit,
         offset: providerWindow.offset,
       });
-      const albums = albumWindow.slice(
-        providerWindow.sliceStart,
-        providerWindow.sliceEnd
+      const albums = dedupeMusicAlbums(
+        albumWindow.slice(providerWindow.sliceStart, providerWindow.sliceEnd)
       );
-      const mbIds = albums.map((album) => album.id);
-      const relatedMedia = mbIds.length
-        ? await getRepository(Media).find({
-            where: { mbId: In(mbIds), mediaType: MediaType.MUSIC },
-            relations: { requests: true, watchlists: true },
-          })
-        : [];
-      relatedMedia.forEach((media) => {
-        media.watchlists =
-          media.watchlists?.filter(
-            (watchlist) => watchlist.requestedBy.id === req.user?.id
-          ) ?? [];
-      });
+      const relatedMediaMap = await getRelatedMusicMediaMap(
+        albums.map((album) => album.id),
+        req.user?.id
+      );
 
       return res.status(200).json({
         page,
@@ -1659,7 +1761,7 @@ discoverRoutes.get('/music', async (req, res) => {
         results: albums.map((album) =>
           mapAlbumResult(
             album,
-            relatedMedia.find((media) => media.mbId === album.id)
+            relatedMediaMap.get(normalizeMusicBrainzId(album.id))
           )
         ),
       });
@@ -1678,7 +1780,7 @@ discoverRoutes.get('/music', async (req, res) => {
           limit: providerWindow.limit,
           offset: providerWindow.offset,
         });
-      const sortedAlbums = releaseGroups.sort((a, b) => {
+      const sortedAlbums = dedupeMusicAlbums(releaseGroups).sort((a, b) => {
         if (sortByValue === 'ranked') {
           return scoreMusicAlbum(b) - scoreMusicAlbum(a);
         }
@@ -1706,19 +1808,10 @@ discoverRoutes.get('/music', async (req, res) => {
               providerWindow.sliceStart,
               providerWindow.sliceEnd
             );
-      const mbIds = albums.map((album) => album.id);
-      const relatedMedia = mbIds.length
-        ? await getRepository(Media).find({
-            where: { mbId: In(mbIds), mediaType: MediaType.MUSIC },
-            relations: { requests: true, watchlists: true },
-          })
-        : [];
-      relatedMedia.forEach((media) => {
-        media.watchlists =
-          media.watchlists?.filter(
-            (watchlist) => watchlist.requestedBy.id === req.user?.id
-          ) ?? [];
-      });
+      const relatedMediaMap = await getRelatedMusicMediaMap(
+        albums.map((album) => album.id),
+        req.user?.id
+      );
 
       return res.status(200).json({
         page,
@@ -1727,7 +1820,7 @@ discoverRoutes.get('/music', async (req, res) => {
         results: albums.map((album) =>
           mapAlbumResult(
             album,
-            relatedMedia.find((media) => media.mbId === album.id)
+            relatedMediaMap.get(normalizeMusicBrainzId(album.id))
           )
         ),
       });
@@ -1749,22 +1842,15 @@ discoverRoutes.get('/music', async (req, res) => {
         count: providerWindow.limit,
       });
       const albums = diversifyMusicAlbumsByArtist(
-        topAlbums.payload.release_groups.map(mapTopAlbumRelease),
+        dedupeMusicAlbums(
+          topAlbums.payload.release_groups.map(mapTopAlbumRelease)
+        ),
         providerWindow.sliceEnd
       ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
-      const mbIds = albums.map((album) => album.id);
-      const relatedMedia = mbIds.length
-        ? await getRepository(Media).find({
-            where: { mbId: In(mbIds), mediaType: MediaType.MUSIC },
-            relations: { requests: true, watchlists: true },
-          })
-        : [];
-      relatedMedia.forEach((media) => {
-        media.watchlists =
-          media.watchlists?.filter(
-            (watchlist) => watchlist.requestedBy.id === req.user?.id
-          ) ?? [];
-      });
+      const relatedMediaMap = await getRelatedMusicMediaMap(
+        albums.map((album) => album.id),
+        req.user?.id
+      );
 
       return res.status(200).json({
         page,
@@ -1776,7 +1862,7 @@ discoverRoutes.get('/music', async (req, res) => {
         results: albums.map((album) =>
           mapAlbumResult(
             album,
-            relatedMedia.find((media) => media.mbId === album.id)
+            relatedMediaMap.get(normalizeMusicBrainzId(album.id))
           )
         ),
       });
@@ -1866,19 +1952,10 @@ discoverRoutes.get('/music', async (req, res) => {
           return res.status(200).json(emptyDiscoverResponse(page));
         }
 
-        const fallbackMbIds = fallbackAlbums.map((album) => album.id);
-        const fallbackRelatedMedia = fallbackMbIds.length
-          ? await getRepository(Media).find({
-              where: { mbId: In(fallbackMbIds), mediaType: MediaType.MUSIC },
-              relations: { requests: true, watchlists: true },
-            })
-          : [];
-        fallbackRelatedMedia.forEach((media) => {
-          media.watchlists =
-            media.watchlists?.filter(
-              (watchlist) => watchlist.requestedBy.id === req.user?.id
-            ) ?? [];
-        });
+        const fallbackRelatedMediaMap = await getRelatedMusicMediaMap(
+          fallbackAlbums.map((album) => album.id),
+          req.user?.id
+        );
 
         return res.status(200).json({
           page,
@@ -1891,7 +1968,7 @@ discoverRoutes.get('/music', async (req, res) => {
           results: fallbackAlbums.map((album) =>
             mapAlbumResult(
               album,
-              fallbackRelatedMedia.find((media) => media.mbId === album.id)
+              fallbackRelatedMediaMap.get(normalizeMusicBrainzId(album.id))
             )
           ),
         });
@@ -1943,19 +2020,10 @@ discoverRoutes.get('/music', async (req, res) => {
         ),
         providerWindow.sliceEnd
       ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
-      const mbIds = albums.map((album) => album.id);
-      const relatedMedia = mbIds.length
-        ? await getRepository(Media).find({
-            where: { mbId: In(mbIds), mediaType: MediaType.MUSIC },
-            relations: { requests: true, watchlists: true },
-          })
-        : [];
-      relatedMedia.forEach((media) => {
-        media.watchlists =
-          media.watchlists?.filter(
-            (watchlist) => watchlist.requestedBy.id === req.user?.id
-          ) ?? [];
-      });
+      const relatedMediaMap = await getRelatedMusicMediaMap(
+        albums.map((album) => album.id),
+        req.user?.id
+      );
 
       return res.status(200).json({
         page,
@@ -1964,7 +2032,7 @@ discoverRoutes.get('/music', async (req, res) => {
         results: albums.map((album) =>
           mapAlbumResult(
             album,
-            relatedMedia.find((media) => media.mbId === album.id)
+            relatedMediaMap.get(normalizeMusicBrainzId(album.id))
           )
         ),
       });
@@ -1996,30 +2064,31 @@ discoverRoutes.get('/music', async (req, res) => {
         count: providerWindow.limit,
       });
     }
-    const sortedReleases = freshReleases.payload.releases
-      .filter((release) => release.release_group_mbid && release.release_name)
-      .filter(
-        (release) =>
-          !releaseTypeFilter.length ||
-          releaseTypeFilter.includes(
-            release.release_group_primary_type ?? 'Album'
-          )
-      )
-      .sort((a, b) => {
-        if (sortByValue === 'ranked') {
-          return scoreMusicRelease(b) - scoreMusicRelease(a);
-        }
+    const sortedReleases = dedupeFreshReleases(
+      freshReleases.payload.releases
+        .filter((release) => release.release_group_mbid && release.release_name)
+        .filter(
+          (release) =>
+            !releaseTypeFilter.length ||
+            releaseTypeFilter.includes(
+              release.release_group_primary_type ?? 'Album'
+            )
+        )
+    ).sort((a, b) => {
+      if (sortByValue === 'ranked') {
+        return scoreMusicRelease(b) - scoreMusicRelease(a);
+      }
 
-        if (sortByValue === 'listen_count.desc') {
-          return (b.listen_count ?? 0) - (a.listen_count ?? 0);
-        }
+      if (sortByValue === 'listen_count.desc') {
+        return (b.listen_count ?? 0) - (a.listen_count ?? 0);
+      }
 
-        const left = a.release_date ?? '';
-        const right = b.release_date ?? '';
-        return sortAscending
-          ? left.localeCompare(right)
-          : right.localeCompare(left);
-      });
+      const left = a.release_date ?? '';
+      const right = b.release_date ?? '';
+      return sortAscending
+        ? left.localeCompare(right)
+        : right.localeCompare(left);
+    });
     const releases =
       sortByValue === 'ranked'
         ? diversifyMusicAlbumsByArtist(
@@ -2045,19 +2114,10 @@ discoverRoutes.get('/music', async (req, res) => {
             providerWindow.sliceStart,
             providerWindow.sliceEnd
           );
-    const mbIds = releases.map((release) => release.release_group_mbid);
-    const relatedMedia = mbIds.length
-      ? await getRepository(Media).find({
-          where: { mbId: In(mbIds), mediaType: MediaType.MUSIC },
-          relations: { requests: true, watchlists: true },
-        })
-      : [];
-    relatedMedia.forEach((media) => {
-      media.watchlists =
-        media.watchlists?.filter(
-          (watchlist) => watchlist.requestedBy.id === req.user?.id
-        ) ?? [];
-    });
+    const relatedMediaMap = await getRelatedMusicMediaMap(
+      releases.map((release) => release.release_group_mbid),
+      req.user?.id
+    );
 
     const results = releases.map((release) =>
       mapAlbumResult(
@@ -2068,7 +2128,7 @@ discoverRoutes.get('/music', async (req, res) => {
               ? scoreMusicRelease(release)
               : (release.listen_count ?? 0),
         },
-        relatedMedia.find((media) => media.mbId === release.release_group_mbid)
+        relatedMediaMap.get(normalizeMusicBrainzId(release.release_group_mbid))
       )
     );
 
@@ -2219,17 +2279,20 @@ discoverRoutes.get('/books', async (req, res) => {
           limit: itemsPerPage,
           sort: openLibrarySort,
         });
+    const dedupedDocs = dedupeBookDocs(books.docs);
     const sortedDocs =
       sortByValue === 'ranked' && !shouldBlendDefaultSubjects
         ? shuffleRankedWindow(
             rankByQualityScore(
-              [...books.docs].sort((a, b) => scoreBookDoc(b) - scoreBookDoc(a)),
+              [...dedupedDocs].sort(
+                (a, b) => scoreBookDoc(b) - scoreBookDoc(a)
+              ),
               scoreBookDoc
             ),
             shuffleSeed
           )
-        : books.docs;
-    const ids = sortedDocs.map((doc) => doc.key.replace('/works/', ''));
+        : dedupedDocs;
+    const ids = sortedDocs.map((doc) => normalizeOpenLibraryWorkId(doc.key));
     const identifiers = ids.length
       ? await getRepository(MediaIdentifier).find({
           where: {
@@ -2259,7 +2322,7 @@ discoverRoutes.get('/books', async (req, res) => {
       results: sortedDocs.map((doc) => ({
         ...mapOpenLibrarySearchDoc(
           doc,
-          mediaByOpenLibraryId.get(doc.key.replace('/works/', ''))
+          mediaByOpenLibraryId.get(normalizeOpenLibraryWorkId(doc.key))
         ),
         score: scoreBookDoc(doc),
       })),

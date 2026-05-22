@@ -52,17 +52,81 @@ const sanitizeDisplayName = (displayName: string): string => {
 
 const READARR_LOOKUP_RETRY_DELAYS_MS =
   process.env.NODE_ENV === 'test' ? [1, 1, 1] : [500, 1500, 3000];
+const READARR_DISPATCH_RETRY_DELAYS_MS =
+  process.env.NODE_ENV === 'test'
+    ? [1, 1, 1]
+    : [300_000, 900_000, 1_800_000, 3_600_000];
 const READARR_MAX_EXPANDED_LOOKUP_TERMS = 18;
+const READARR_APPROVED_RETRY_BATCH_SIZE = 1;
+const readarrDispatchRetryTimers = new Map<
+  number,
+  { attempts: number; timer: NodeJS.Timeout }
+>();
 
 const sleep = (delayMs: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, delayMs));
 
 const isTransientExternalError = (error: unknown): boolean => {
-  const message = error instanceof Error ? error.message : String(error);
+  let current: unknown = error;
 
-  return /status code (429|502|503|504)|ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up/i.test(
-    message
-  );
+  while (current) {
+    const message =
+      current instanceof Error ? current.message : String(current);
+
+    if (
+      /(?:status code|status)\s*(429|502|503|504)|\b(429|502|503|504)\b|ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|timeout of \d+ms exceeded/i.test(
+        message
+      ) ||
+      /500\.InternalServerError|InternalServerError/i.test(message)
+    ) {
+      return true;
+    }
+
+    current = current instanceof Error ? current.cause : undefined;
+  }
+
+  return false;
+};
+
+const getRetryAfterMs = (error: unknown): number | undefined => {
+  let current: unknown = error;
+
+  while (current instanceof Error) {
+    const response = (
+      current as Error & {
+        response?: { headers?: Record<string, string | string[] | undefined> };
+      }
+    ).response;
+    const retryAfterHeader = response?.headers?.['retry-after'];
+    const retryAfter = Array.isArray(retryAfterHeader)
+      ? retryAfterHeader[0]
+      : retryAfterHeader;
+
+    if (retryAfter) {
+      const retryAfterSeconds = Number(retryAfter);
+      if (Number.isFinite(retryAfterSeconds)) {
+        return Math.max(retryAfterSeconds * 1000, 0);
+      }
+
+      const retryAfterDate = Date.parse(retryAfter);
+      if (!Number.isNaN(retryAfterDate)) {
+        return Math.max(retryAfterDate - Date.now(), 0);
+      }
+    }
+
+    current = current.cause;
+  }
+
+  return undefined;
+};
+
+const clearReadarrDispatchRetry = (requestId: number): void => {
+  const pendingRetry = readarrDispatchRetryTimers.get(requestId);
+
+  if (pendingRetry) {
+    clearTimeout(pendingRetry.timer);
+    readarrDispatchRetryTimers.delete(requestId);
+  }
 };
 
 const lookupReadarrBookWithRetry = async (
@@ -82,7 +146,12 @@ const lookupReadarrBookWithRetry = async (
         !isTransientExternalError(error) ||
         attempt >= READARR_LOOKUP_RETRY_DELAYS_MS.length
       ) {
-        throw error;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Bookshelf lookup failed for ${context.serviceType} term "${term}": ${errorMessage}`,
+          { cause: error }
+        );
       }
 
       const delayMs = READARR_LOOKUP_RETRY_DELAYS_MS[attempt];
@@ -202,6 +271,89 @@ const hydrateSoftcoverLookupResults = async (
 
 @EventSubscriber()
 export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
+  private scheduleReadarrDispatchRetry(
+    entity: MediaRequest,
+    error: unknown
+  ): void {
+    const existingRetry = readarrDispatchRetryTimers.get(entity.id);
+    const attempts = existingRetry ? existingRetry.attempts + 1 : 1;
+    const delayMs =
+      getRetryAfterMs(error) ??
+      READARR_DISPATCH_RETRY_DELAYS_MS[
+        Math.min(attempts - 1, READARR_DISPATCH_RETRY_DELAYS_MS.length - 1)
+      ];
+
+    if (existingRetry) {
+      clearTimeout(existingRetry.timer);
+    }
+
+    const timer = setTimeout(() => {
+      readarrDispatchRetryTimers.delete(entity.id);
+
+      getRepository(MediaRequest)
+        .findOne({
+          where: {
+            id: entity.id,
+            type: MediaType.BOOK,
+            status: MediaRequestStatus.APPROVED,
+          },
+        })
+        .then(async (request) => {
+          if (!request) {
+            return;
+          }
+
+          await this.sendToReadarr(request);
+        })
+        .catch((retryError) => {
+          logger.error('Error retrying Bookshelf request dispatch', {
+            label: 'Media Request',
+            requestId: entity.id,
+            errorMessage:
+              retryError instanceof Error
+                ? retryError.message
+                : String(retryError),
+          });
+        });
+    }, delayMs);
+
+    readarrDispatchRetryTimers.set(entity.id, { attempts, timer });
+
+    logger.warn(
+      'Bookshelf request hit a transient metadata limit; leaving request approved for retry.',
+      {
+        label: 'Media Request',
+        requestId: entity.id,
+        mediaId: entity.media.id,
+        attempt: attempts,
+        retryInMs: delayMs,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      }
+    );
+  }
+
+  public async retryApprovedReadarrRequests(
+    limit = READARR_APPROVED_RETRY_BATCH_SIZE
+  ): Promise<void> {
+    const requestRepository = getRepository(MediaRequest);
+    const requests = await requestRepository.find({
+      where: {
+        type: MediaType.BOOK,
+        status: MediaRequestStatus.APPROVED,
+      },
+      order: { updatedAt: 'ASC' },
+      take: limit,
+    });
+
+    for (const request of requests) {
+      if (readarrDispatchRetryTimers.has(request.id)) {
+        continue;
+      }
+
+      await this.sendToReadarr(request);
+    }
+  }
+
   private getBookStatusFromLinks(media: Media): MediaStatus {
     const hasEbook =
       media.serviceId !== null &&
@@ -1202,8 +1354,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
 
       const albumInfo = searchResults[0].album;
       const rootFolder = entity.rootFolder || lidarrSettings.activeDirectory;
-      const qualityProfile =
-        entity.profileId ?? lidarrSettings.activeProfileId;
+      const qualityProfile = entity.profileId ?? lidarrSettings.activeProfileId;
       const metadataProfile =
         entity.metadataProfileId ?? lidarrSettings.activeMetadataProfileId ?? 1;
       const tags = entity.tags
@@ -1679,7 +1830,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           (edition) => edition.isbn13
         )?.isbn13;
         const normalizedResultIsbn = normalizeValidIsbn(resultIsbn);
-        const identifiersToSave = [
+        const identifierCandidates = [
           (result.foreignBookId ?? bookInfo.foreignBookId)
             ? {
                 provider: MediaIdentifierProvider.READARR,
@@ -1698,13 +1849,29 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           ): identifier is {
             provider: MediaIdentifierProvider;
             value: string;
-          } =>
-            !!identifier &&
-            (identifier.provider === MediaIdentifierProvider.READARR ||
-              !existingIdentifierKeys.has(
-                `${identifier.provider}:${identifier.value}`
-              ))
+          } => !!identifier
         );
+        const existingCandidateIdentifiers = identifierCandidates.length
+          ? await identifierRepository.find({
+              where: identifierCandidates.map((identifier) => ({
+                provider: identifier.provider,
+                value: identifier.value,
+              })),
+              relations: { media: true },
+            })
+          : [];
+        const existingCandidateKeys = new Set(
+          existingCandidateIdentifiers.map(
+            (identifier) => `${identifier.provider}:${identifier.value}`
+          )
+        );
+        const identifiersToSave = identifierCandidates.filter((identifier) => {
+          const key = `${identifier.provider}:${identifier.value}`;
+
+          return (
+            !existingIdentifierKeys.has(key) && !existingCandidateKeys.has(key)
+          );
+        });
 
         if (identifiersToSave.length) {
           await identifierRepository.insert(
@@ -1760,6 +1927,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
 
       const requestRepository = getRepository(MediaRequest);
+      clearReadarrDispatchRetry(entity.id);
       entity.status = MediaRequestStatus.COMPLETED;
       await requestRepository.save(entity);
 
@@ -1771,12 +1939,18 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         bookFormat: requestedBookFormat,
       });
     } catch (e) {
+      if (isTransientExternalError(e)) {
+        this.scheduleReadarrDispatchRetry(entity, e);
+        return;
+      }
+
       const requestRepository = getRepository(MediaRequest);
       const mediaRepository = getRepository(Media);
       const media = await mediaRepository.findOne({
         where: { id: entity.media.id },
       });
 
+      clearReadarrDispatchRetry(entity.id);
       entity.status = MediaRequestStatus.FAILED;
       await requestRepository.save(entity);
 

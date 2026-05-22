@@ -26,7 +26,8 @@ export const isValidIsbn13 = (isbn: string): boolean => {
     .slice(0, 12)
     .split('')
     .reduce(
-      (total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3),
+      (total, digit, index) =>
+        total + Number(digit) * (index % 2 === 0 ? 1 : 3),
       0
     );
   const checkDigit = (10 - (sum % 10)) % 10;
@@ -43,7 +44,8 @@ export const convertIsbn10To13 = (isbn: string): string | undefined => {
   const sum = body
     .split('')
     .reduce(
-      (total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3),
+      (total, digit, index) =>
+        total + Number(digit) * (index % 2 === 0 ? 1 : 3),
       0
     );
   const checkDigit = (10 - (sum % 10)) % 10;

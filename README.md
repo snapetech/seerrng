@@ -95,7 +95,7 @@ services:
 
 ### Linux Packages
 
-This repo includes release workflows and packaging metadata for tarball, Debian, RPM, AppImage, Flatpak, Snap, AUR, PPA, and COPR style distribution. Use the GitHub releases for generated artifacts when available.
+This repo includes release workflows and packaging metadata for tarball, Debian, RPM, AppImage, Flatpak, Snap, AUR, PPA, and COPR style distribution. These packages install SeerrNG as a standalone service; Lidarr, Bookshelf, and other automation/media servers are optional external services configured inside SeerrNG. Use the GitHub releases for generated artifacts when available.
 
 ## Required Setup
 
@@ -174,6 +174,7 @@ deploy/install-bookshelf-backend.sh --migrate-to-hardcover
 node deploy/bookshelf-hardcover-migration.mjs --summary /path/to/hardcover-migration
 node deploy/bookshelf-hardcover-migration.mjs --validate /path/to/hardcover-migration
 node deploy/bookshelf-hardcover-migration.mjs --cutover-check /path/to/hardcover-migration
+node deploy/bookshelf-hardcover-migration.mjs --reconcile-local /path/to/hardcover-migration
 ```
 
 The migration is layered:
@@ -185,7 +186,14 @@ The migration is layered:
 - retry transient target errors and de-duplicate bad target metadata cache rows;
 - pre-create missing authors where Hardcover can resolve them;
 - optionally query a softcover Bookshelf endpoint to recover title/author/edition metadata, then remap that profile back through Hardcover;
+- query OpenLibrary for alternate title/author/ISBN profiles, then remap those candidates back through Hardcover;
 - optionally create deterministic local Bookshelf records for the books Hardcover still cannot import.
+
+Migration record states:
+
+- `native`: Bookshelf rows backed by Hardcover book, author, and edition IDs.
+- `shadow local`: Hardcover-shaped rows using stable `local:*` IDs when Hardcover has no acceptable entry yet.
+- `reconciled`: former shadow rows promoted in place after Hardcover later resolves them.
 
 The final fallback is explicit:
 
@@ -204,7 +212,12 @@ node deploy/bookshelf-hardcover-migration.mjs --apply --local-db-import \
 
 Local fallback records use stable IDs such as `local:ebook:1076`. They are
 visible through the Bookshelf API and count toward validation, but they are not
-native Hardcover metadata records.
+native Hardcover metadata records. Run `--reconcile-local` later to promote
+shadow records in place when Hardcover can resolve them, without creating a
+duplicate book.
+
+Reconciliation writes `local-reconciliation-report.json` and updates
+`applied-books.json` so promoted rows are marked `reconciledFromLocal: true`.
 
 See:
 
@@ -260,6 +273,7 @@ than the SeerrNG runtime container. Common ones include:
 | `BOOKSHELF_AUDIOBOOKS_CONFIG_DIR` | Audiobook Bookshelf/Readarr config directory. |
 | `HARDCOVER_EBOOK_API_KEY` / `HARDCOVER_AUDIOBOOK_API_KEY` | API keys for target Hardcover Bookshelf instances. |
 | `HARDCOVER_SOFTCOVER_EBOOK_BASE_URL` / `HARDCOVER_SOFTCOVER_AUDIOBOOK_BASE_URL` | Optional softcover recovery endpoints. |
+| `HARDCOVER_OPENLIBRARY_RECOVERY` | Enables OpenLibrary-assisted native Hardcover remapping. Defaults to `true`. |
 | `HARDCOVER_LOCAL_DB_IMPORT` | Enables deterministic local DB fallback after API and softcover recovery fail. |
 | `HARDCOVER_MATCH_CONCURRENCY` | Match report lookup concurrency. |
 | `HARDCOVER_API_TIMEOUT_MS` | Target API timeout for migration requests. |

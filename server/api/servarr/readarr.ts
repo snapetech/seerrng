@@ -177,7 +177,9 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
     }
   }
 
-  public async lookupAuthor(term: string): Promise<ReadarrAuthorLookupResult[]> {
+  public async lookupAuthor(
+    term: string
+  ): Promise<ReadarrAuthorLookupResult[]> {
     try {
       return await this.get<ReadarrAuthorLookupResult[]>('/author/lookup', {
         params: { term },
@@ -250,6 +252,7 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
           `/book/${existingBook.id}`,
           {
             ...existingBook,
+            editions: existingBook.editions ?? [],
             monitored: true,
             qualityProfileId:
               options.qualityProfileId ?? existingBook.qualityProfileId,

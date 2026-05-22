@@ -1,7 +1,7 @@
 pkgname=seerrng-bin
 pkgver=0.1.0
 pkgrel=1
-pkgdesc='Media request and discovery service with Plex, Jellyfin, Emby, Sonarr, Radarr, Lidarr, and Readarr integrations'
+pkgdesc='Standalone media request and discovery service with optional external service integrations'
 arch=('x86_64')
 url='https://github.com/snapetech/seerrng'
 license=('MIT')

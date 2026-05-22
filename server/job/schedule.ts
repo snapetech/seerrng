@@ -17,6 +17,7 @@ import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
+import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import schedule from 'node-schedule';
 
 interface ScheduledJob {
@@ -205,6 +206,25 @@ export const startJobs = (): void => {
     }),
     running: () => readarrScanner.status().running,
     cancelFn: () => readarrScanner.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'readarr-request-retry' as JobId,
+    name: 'Bookshelf Request Retry',
+    type: 'process',
+    interval: 'minutes',
+    cronSchedule: '*/5 * * * *',
+    job: schedule.scheduleJob('*/5 * * * *', () => {
+      logger.info('Starting scheduled job: Bookshelf Request Retry', {
+        label: 'Jobs',
+      });
+      new MediaRequestSubscriber().retryApprovedReadarrRequests().catch((e) => {
+        logger.error('Failed to retry approved Bookshelf requests', {
+          label: 'Jobs',
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      });
+    }),
   });
 
   // Checks if media is still available in plex/sonarr/radarr libs

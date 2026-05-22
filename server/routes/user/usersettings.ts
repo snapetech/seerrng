@@ -194,7 +194,7 @@ const parseGeneralSettingsBody = (
     'bookQuotaDays',
   ] as const) {
     value[fieldName] = parseOptionalNonNegativeInteger(
-    bodyObject[fieldName],
+      bodyObject[fieldName],
       USER_SETTINGS_LIMITS.quota
     );
   }

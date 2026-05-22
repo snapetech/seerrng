@@ -2488,6 +2488,18 @@ describe('GET /discover/watchlist', () => {
     );
     await getRepository(Watchlist).save([
       new Watchlist({
+        tmdbId: 123,
+        mediaType: MediaType.MOVIE,
+        title: 'Local Movie',
+        requestedBy: admin,
+        media: await getRepository(Media).save(
+          new Media({
+            tmdbId: 123,
+            mediaType: MediaType.MOVIE,
+          })
+        ),
+      }),
+      new Watchlist({
         mbId: 'profile-release-group',
         mediaType: MediaType.MUSIC,
         title: 'Profile Album',
@@ -2528,6 +2540,12 @@ describe('GET /discover/watchlist', () => {
       ),
       [
         {
+          title: 'Local Movie',
+          mediaType: 'movie',
+          mbId: null,
+          externalId: null,
+        },
+        {
           title: 'Profile Album',
           mediaType: 'music',
           mbId: 'profile-release-group',
@@ -2538,12 +2556,6 @@ describe('GET /discover/watchlist', () => {
           mediaType: 'book',
           mbId: null,
           externalId: 'OLprofileW',
-        },
-        {
-          title: 'Plex Movie',
-          mediaType: 'movie',
-          mbId: undefined,
-          externalId: undefined,
         },
       ]
     );

@@ -830,6 +830,113 @@ describe('MediaRequestSubscriber service dispatch', () => {
     assert.equal(savedRequest.status, MediaRequestStatus.COMPLETED);
   });
 
+  it('does not save Bookshelf identifiers already linked to another book media row', async () => {
+    const settings = getSettings();
+    settings.readarr = [
+      {
+        id: 20,
+        name: 'Bookshelf',
+        hostname: 'bookshelf.local',
+        port: 8787,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 11,
+        activeProfileName: 'Books',
+        activeMetadataProfileId: 12,
+        activeMetadataProfileName: 'Standard',
+        activeDirectory: '/books',
+        tags: [4],
+        is4k: false,
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        serviceType: 'ebook',
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.ISBN,
+            value: '9780441478125',
+            canonical: true,
+          }),
+        ],
+      })
+    );
+    const otherMedia = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.READARR,
+            value: 'readarr-work-id',
+            canonical: true,
+          }),
+        ],
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    request.serverId = 20;
+
+    mock.method(ReadarrAPI.prototype, 'lookupBook', async () => {
+      return [
+        {
+          title: 'The Left Hand of Darkness',
+          foreignBookId: 'readarr-work-id',
+          titleSlug: 'left-hand-darkness',
+          author: {
+            foreignAuthorId: 'le-guin-author-id',
+            authorName: 'Ursula K. Le Guin',
+          },
+          editions: [
+            {
+              foreignEditionId: 'edition-id',
+              title: 'The Left Hand of Darkness',
+              isbn13: '9780441478125',
+              monitored: true,
+            },
+          ],
+        },
+      ] as ReadarrBookLookupResult[];
+    });
+    mock.method(
+      ReadarrAPI.prototype,
+      'addBook',
+      async (payload: ReadarrBookOptions) =>
+        ({
+          ...payload,
+          id: 55,
+          titleSlug: 'left-hand-darkness',
+        }) as Awaited<ReturnType<ReadarrAPI['addBook']>>
+    );
+    mock.method(notificationManager, 'sendNotification', () => undefined);
+
+    await new MediaRequestSubscriber().sendToReadarr(request);
+
+    const readarrIdentifiers = await getRepository(MediaIdentifier).find({
+      where: {
+        provider: MediaIdentifierProvider.READARR,
+        value: 'readarr-work-id',
+      },
+      relations: { media: true },
+    });
+
+    assert.equal(readarrIdentifiers.length, 1);
+    assert.equal(readarrIdentifiers[0].media.id, otherMedia.id);
+  });
+
   it('fails book requests without posting incomplete Bookshelf metadata', async () => {
     const settings = getSettings();
     settings.readarr = [
@@ -1054,6 +1161,9 @@ describe('MediaRequestSubscriber service dispatch', () => {
       })
     );
     const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
 
     mock.method(OpenLibraryAPI.prototype, 'getWork', async () => undefined);
 
@@ -1113,6 +1223,242 @@ describe('MediaRequestSubscriber service dispatch', () => {
       id: request.id,
     });
     assert.equal(savedRequest.status, MediaRequestStatus.COMPLETED);
+  });
+
+  it('retries Hardcover-backed Bookshelf rate-limit failures surfaced as internal server errors', async () => {
+    const settings = getSettings();
+    settings.readarr = [
+      {
+        id: 20,
+        name: 'Bookshelf',
+        hostname: 'bookshelf.local',
+        port: 8787,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 11,
+        activeProfileName: 'Books',
+        activeMetadataProfileId: 12,
+        activeMetadataProfileName: 'Standard',
+        activeDirectory: '/books',
+        tags: [4],
+        is4k: false,
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        serviceType: 'ebook',
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.ISBN,
+            value: '9788427249530',
+          }),
+        ],
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+
+    mock.method(OpenLibraryAPI.prototype, 'getWork', async () => undefined);
+
+    let lookupAttempts = 0;
+    mock.method(ReadarrAPI.prototype, 'lookupBook', async () => {
+      lookupAttempts += 1;
+
+      if (lookupAttempts < 3) {
+        throw new Error(
+          '[Readarr] Failed to lookup book: HTTP request failed: [500:InternalServerError] [GET] at [https://hardcover.bookinfo.pro/search?q=9788427249530] looking up: returned error 429'
+        );
+      }
+
+      return [
+        {
+          title: 'Diary of a Wimpy Kid',
+          foreignBookId: 'readarr-book-id',
+          titleSlug: 'diary-of-a-wimpy-kid',
+          author: {
+            foreignAuthorId: 'jeff-kinney-author-id',
+            authorName: 'Jeff Kinney',
+          },
+          editions: [
+            {
+              foreignEditionId: 'edition-id',
+              title: 'Diary of a Wimpy Kid',
+              isbn13: '9788427249530',
+              monitored: true,
+            },
+          ],
+        },
+      ] as ReadarrBookLookupResult[];
+    });
+
+    mock.method(
+      ReadarrAPI.prototype,
+      'addBook',
+      async (payload: ReadarrBookOptions) => ({
+        ...payload,
+        id: 57,
+        titleSlug: 'diary-of-a-wimpy-kid',
+      })
+    );
+    mock.method(notificationManager, 'sendNotification', () => undefined);
+
+    await new MediaRequestSubscriber().sendToReadarr(request);
+
+    assert.equal(lookupAttempts, 3);
+
+    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(savedRequest.status, MediaRequestStatus.COMPLETED);
+  });
+
+  it('keeps Hardcover rate-limited book requests approved instead of failing hard', async () => {
+    const settings = getSettings();
+    settings.readarr = [
+      {
+        id: 20,
+        name: 'Bookshelf',
+        hostname: 'bookshelf.local',
+        port: 8787,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 11,
+        activeProfileName: 'Books',
+        activeMetadataProfileId: 12,
+        activeMetadataProfileName: 'Standard',
+        activeDirectory: '/books',
+        tags: [],
+        is4k: false,
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        serviceType: 'ebook',
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.ISBN,
+            value: '9788427249530',
+          }),
+        ],
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+
+    mock.method(OpenLibraryAPI.prototype, 'getWork', async () => undefined);
+    mock.method(ReadarrAPI.prototype, 'lookupBook', async () => {
+      throw new Error(
+        '[Readarr] Failed to lookup book: HTTP request failed: [500:InternalServerError] [GET] at [https://hardcover.bookinfo.pro/search?q=9788427249530] looking up: returned error 429'
+      );
+    });
+    const sendNotification = mock.method(
+      notificationManager,
+      'sendNotification',
+      () => undefined
+    );
+
+    await new MediaRequestSubscriber().sendToReadarr(request);
+
+    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(savedRequest.status, MediaRequestStatus.APPROVED);
+    assert.equal(sendNotification.mock.callCount(), 0);
+  });
+
+  it('honors Retry-After headers for rate-limited book request dispatch retries', async () => {
+    const settings = getSettings();
+    settings.readarr = [
+      {
+        id: 20,
+        name: 'Bookshelf',
+        hostname: 'bookshelf.local',
+        port: 8787,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 11,
+        activeProfileName: 'Books',
+        activeMetadataProfileId: 12,
+        activeMetadataProfileName: 'Standard',
+        activeDirectory: '/books',
+        tags: [],
+        is4k: false,
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        serviceType: 'ebook',
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+        identifiers: [
+          new MediaIdentifier({
+            provider: MediaIdentifierProvider.ISBN,
+            value: '9788427249530',
+          }),
+        ],
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+
+    mock.method(OpenLibraryAPI.prototype, 'getWork', async () => undefined);
+    mock.method(ReadarrAPI.prototype, 'lookupBook', async () => {
+      const axiosError = new Error(
+        'Request failed with status code 429'
+      ) as Error & {
+        response: { headers: Record<string, string> };
+      };
+      axiosError.response = { headers: { 'retry-after': '2' } };
+
+      throw new Error('[Readarr] Failed to lookup book: rate limited', {
+        cause: axiosError,
+      });
+    });
+    mock.method(notificationManager, 'sendNotification', () => undefined);
+
+    await new MediaRequestSubscriber().sendToReadarr(request);
+
+    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(savedRequest.status, MediaRequestStatus.APPROVED);
   });
 
   it('sends audiobook requests to the default audiobook Bookshelf server', async () => {

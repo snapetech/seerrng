@@ -217,11 +217,9 @@ router.post('/warm', warmRateLimit, (req, res) => {
     }
 
     if (url.length > maxWarmUrlLength) {
-      return res
-        .status(400)
-        .json({
-          error: `urls must be ${maxWarmUrlLength} characters or fewer.`,
-        });
+      return res.status(400).json({
+        error: `urls must be ${maxWarmUrlLength} characters or fewer.`,
+      });
     }
 
     urls.push(url);

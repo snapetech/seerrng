@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { mapOpenLibraryWork } from '@server/models/Book';
+import {
+  mapOpenLibrarySearchDoc,
+  mapOpenLibraryWork,
+} from '@server/models/Book';
 
 describe('mapOpenLibraryWork', () => {
   it('extracts and ranks unique ISBN candidates from editions', () => {
@@ -43,5 +46,36 @@ describe('mapOpenLibraryWork', () => {
       result.isbnCandidates?.map((candidate) => candidate.isbn),
       ['9780441478125', '9780679783268']
     );
+  });
+
+  it('normalizes uppercase Open Library work and edition prefixes', () => {
+    const result = mapOpenLibraryWork(
+      {
+        key: '/WORKS/ol123w',
+        title: 'Test Book',
+      },
+      undefined,
+      [
+        {
+          key: '/BOOKS/ol1m',
+          title: 'Paperback',
+          isbn_10: ['0-441-47812-3'],
+        },
+      ]
+    );
+
+    assert.strictEqual(result.id, 'OL123W');
+    assert.strictEqual(result.editionId, 'OL1M');
+  });
+});
+
+describe('mapOpenLibrarySearchDoc', () => {
+  it('normalizes uppercase Open Library search document prefixes', () => {
+    const result = mapOpenLibrarySearchDoc({
+      key: '/WORKS/ol456w',
+      title: 'Search Book',
+    });
+
+    assert.strictEqual(result.id, 'OL456W');
   });
 });

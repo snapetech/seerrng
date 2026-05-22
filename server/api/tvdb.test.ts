@@ -21,7 +21,10 @@ describe('tvdbTokenNeedsRefresh', () => {
     assert.equal(tvdbTokenNeedsRefresh('not-a-jwt', now), true);
     assert.equal(tvdbTokenNeedsRefresh('header.not-json.sig', now), true);
     assert.equal(tvdbTokenNeedsRefresh(encodePayload({}), now), true);
-    assert.equal(tvdbTokenNeedsRefresh(encodePayload({ exp: now + 60 }), now), true);
+    assert.equal(
+      tvdbTokenNeedsRefresh(encodePayload({ exp: now + 60 }), now),
+      true
+    );
   });
 
   it('refreshes oversized tokens before decoding payloads', () => {
