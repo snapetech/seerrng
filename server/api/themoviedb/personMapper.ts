@@ -21,18 +21,14 @@ class TmdbPersonMapper extends ExternalAPI {
   private tmdb: TheMovieDb;
 
   constructor() {
-    super(
-      'https://api.themoviedb.org/3',
-      getTmdbAuthParams(),
-      {
-        headers: getTmdbAuthHeaders(),
-        nodeCache: cacheManager.getCache('tmdb').data,
-        rateLimit: {
-          maxRequests: 20,
-          maxRPS: 50,
-        },
-      }
-    );
+    super('https://api.themoviedb.org/3', getTmdbAuthParams(), {
+      headers: getTmdbAuthHeaders(),
+      nodeCache: cacheManager.getCache('tmdb').data,
+      rateLimit: {
+        maxRequests: 20,
+        maxRPS: 50,
+      },
+    });
     this.tmdb = new TheMovieDb();
   }
 
@@ -188,10 +184,10 @@ class TmdbPersonMapper extends ExternalAPI {
                 current.popularity > prev.popularity ? current : prev
               )
             : availableMatches.length > 0
-            ? availableMatches.reduce((prev, current) =>
-                current.popularity > prev.popularity ? current : prev
-              )
-            : null;
+              ? availableMatches.reduce((prev, current) =>
+                  current.popularity > prev.popularity ? current : prev
+                )
+              : null;
 
         const mapping = {
           personId: exactMatch?.id ?? null,

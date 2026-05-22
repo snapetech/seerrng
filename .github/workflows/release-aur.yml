@@ -28,6 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Wait for Linux x64 release asset
+        id: linux_asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -38,6 +39,7 @@ jobs:
           for attempt in {1..80}; do
             if curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/octet-stream" "$url" -o /tmp/seerrng.tar.gz; then
               tar -tzf /tmp/seerrng.tar.gz | grep -q "seerrng-${TAG}-linux-x64/dist/index.js"
+              echo "sha256=$(sha256sum /tmp/seerrng.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             sleep 30
@@ -53,7 +55,7 @@ jobs:
           envsum="$(sha256sum seerrng.env | awk '{print $1}')"
           sys="$(sha256sum seerrng.sysusers | awk '{print $1}')"
           tmp="$(sha256sum seerrng.tmpfiles | awk '{print $1}')"
-          sed -i "s/^sha256sums=.*/sha256sums=('SKIP' '$svc' '$envsum' '$sys' '$tmp')/" PKGBUILD-bin
+          sed -i "s/^sha256sums=.*/sha256sums=('${{ steps.linux_asset.outputs.sha256 }}' '$svc' '$envsum' '$sys' '$tmp')/" PKGBUILD-bin
           bash ../scripts/validate-aur-pkgbuild-hashes.sh PKGBUILD-bin
 
       - name: Setup AUR SSH

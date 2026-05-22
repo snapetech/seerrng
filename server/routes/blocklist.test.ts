@@ -113,7 +113,7 @@ describe('POST /blocklist', () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const res = await agent.post('/blocklist').send({
       mediaType: MediaType.MUSIC,
-      externalId: 'musicbrainz-release-group-id',
+      externalId: 'MUSICBRAINZ-RELEASE-GROUP-ID',
       externalProvider: MediaIdentifierProvider.MUSICBRAINZ,
       title: 'Test Album',
     });
@@ -141,7 +141,7 @@ describe('POST /blocklist', () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const res = await agent.post('/blocklist').send({
       mediaType: MediaType.BOOK,
-      externalId: 'OL123W',
+      externalId: '/works/ol123w',
       externalProvider: MediaIdentifierProvider.OPENLIBRARY,
       title: 'Test Book',
     });
@@ -223,6 +223,39 @@ describe('POST /blocklist', () => {
     );
   });
 
+  it('blocks duplicate external blocklist ids after normalization', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const music = await agent.post('/blocklist').send({
+      mediaType: MediaType.MUSIC,
+      externalId: 'DUPLICATE-MUSIC-ID',
+      externalProvider: MediaIdentifierProvider.MUSICBRAINZ,
+      title: 'Duplicate Album',
+    });
+    const duplicateMusic = await agent.post('/blocklist').send({
+      mediaType: MediaType.MUSIC,
+      externalId: 'duplicate-music-id',
+      externalProvider: MediaIdentifierProvider.MUSICBRAINZ,
+      title: 'Duplicate Album',
+    });
+    const book = await agent.post('/blocklist').send({
+      mediaType: MediaType.BOOK,
+      externalId: '/works/ol333w',
+      externalProvider: MediaIdentifierProvider.OPENLIBRARY,
+      title: 'Duplicate Book',
+    });
+    const duplicateBook = await agent.post('/blocklist').send({
+      mediaType: MediaType.BOOK,
+      externalId: 'OL333W',
+      externalProvider: MediaIdentifierProvider.OPENLIBRARY,
+      title: 'Duplicate Book',
+    });
+
+    assert.strictEqual(music.status, 201);
+    assert.strictEqual(duplicateMusic.status, 412);
+    assert.strictEqual(book.status, 201);
+    assert.strictEqual(duplicateBook.status, 412);
+  });
+
   it('links an existing book media row through its identifier', async () => {
     const media = await getRepository(Media).save(
       new Media({
@@ -288,7 +321,7 @@ describe('GET and DELETE /blocklist/:id', () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     await agent.post('/blocklist').send({
       mediaType: MediaType.MUSIC,
-      externalId: 'musicbrainz-delete-id',
+      externalId: 'MUSICBRAINZ-DELETE-ID',
       externalProvider: MediaIdentifierProvider.MUSICBRAINZ,
       title: 'Delete Album',
     });

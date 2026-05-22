@@ -277,6 +277,39 @@ describe('ReadarrAPI.addBook', () => {
     });
   });
 
+  it('sends an empty editions array when monitoring an existing book without editions', async () => {
+    const api = new ReadarrAPI({
+      url: 'http://localhost:8787/api/v1',
+      apiKey: 'key',
+    });
+    const updatedBook = existingBook({ monitored: true });
+    mock.method(
+      ReadarrAPI.prototype as unknown as MockableReadarr,
+      'get',
+      async () => [existingBook({ monitored: false, editions: undefined })]
+    );
+    mock.method(
+      ReadarrAPI.prototype as unknown as MockableReadarr,
+      'post',
+      async () => updatedBook
+    );
+    const putMock = mock.fn(async () => ({ data: updatedBook }));
+    (
+      api as unknown as {
+        axios: { put: typeof putMock };
+      }
+    ).axios.put = putMock;
+
+    await api.addBook(bookOptions);
+
+    const updatePayload = (
+      putMock.mock.calls as unknown as {
+        arguments: [string, { editions?: unknown[] }];
+      }[]
+    )[0].arguments[1];
+    assert.deepStrictEqual(updatePayload.editions, []);
+  });
+
   it('posts a new book when no existing match is found', async () => {
     const api = new ReadarrAPI({
       url: 'http://localhost:8787/api/v1',

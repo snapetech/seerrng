@@ -7,7 +7,10 @@ const sourceSettingsPath = path.join(
   repoRoot,
   'cypress/config/settings.cypress.json'
 );
-const defaultTestConfigDirectory = path.join(repoRoot, 'cypress/runtime-config');
+const defaultTestConfigDirectory = path.join(
+  repoRoot,
+  'cypress/runtime-config'
+);
 const configDirectory =
   process.env.CONFIG_DIRECTORY || defaultTestConfigDirectory;
 const targetSettingsPath = path.join(configDirectory, 'settings.json');

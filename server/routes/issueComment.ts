@@ -1,14 +1,12 @@
+import { MAX_ISSUE_MESSAGE_LENGTH } from '@server/constants/issue';
 import { getRepository } from '@server/datasource';
 import IssueComment from '@server/entity/IssueComment';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { MAX_ISSUE_MESSAGE_LENGTH } from '@server/constants/issue';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import { parsePositiveRouteId } from '@server/utils/routeId';
-import {
-  parseBoundedString,
-} from '@server/utils/validation';
+import { parseBoundedString } from '@server/utils/validation';
 import { Router } from 'express';
 
 const issueCommentRoutes = Router();

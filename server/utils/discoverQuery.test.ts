@@ -1,9 +1,9 @@
-import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 import {
   appendDiscoverQueryString,
   buildDiscoverQueryString,
 } from '@server/utils/discoverQuery';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 describe('buildDiscoverQueryString', () => {
   it('omits nullish and empty query values', () => {

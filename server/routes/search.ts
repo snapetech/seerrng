@@ -11,6 +11,7 @@ import {
   findBookMediaForBookResults,
   findBookMediaForSearchDocs,
 } from '@server/lib/bookMediaMatcher';
+import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import {
   findSearchProvider,
   type CombinedSearchResponse,
@@ -45,6 +46,56 @@ const parseSearchQuery = (value: unknown) =>
     fieldName: 'Query',
     maxLength: MAX_SEARCH_QUERY_LENGTH,
   });
+
+const normalizeSearchText = (value?: string) =>
+  (value ?? '')
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const dedupeAlbumSearchResults = <T extends { id: string }>(
+  albums: T[]
+): T[] => {
+  const seenIds = new Set<string>();
+
+  return albums.filter((album) => {
+    const id = album.id.toLocaleLowerCase();
+
+    if (seenIds.has(id)) {
+      return false;
+    }
+
+    seenIds.add(id);
+    return true;
+  });
+};
+
+const dedupeBookSearchDocs = <
+  T extends { key: string; title: string; author_name?: string[] },
+>(
+  docs: T[]
+): T[] => {
+  const seenKeys = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return docs.filter((doc) => {
+    const key = normalizeOpenLibraryWorkId(doc.key).toLocaleLowerCase();
+    const titleKey = [
+      normalizeSearchText(doc.title),
+      normalizeSearchText(doc.author_name?.[0]),
+    ].join('|');
+
+    if (seenKeys.has(key) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenKeys.add(key);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
 
 searchRoutes.get('/', async (req, res, next) => {
   const parsedQuery = parseSearchQuery(req.query.query);
@@ -135,7 +186,10 @@ searchRoutes.get('/', async (req, res, next) => {
         )
         .map((p) => p.id.toString());
 
-      const albumIds = albumResults.map((album) => album.id);
+      const dedupedAlbumResults = dedupeAlbumSearchResults(albumResults);
+      const dedupedBookDocs = dedupeBookSearchDocs(bookResults.docs);
+
+      const albumIds = dedupedAlbumResults.map((album) => album.id);
       const artistIds = artistResults.map((artist) => artist.id);
       const tmdbPersonIds = tmdbResults.results
         .filter((result) => result.media_type === 'person')
@@ -269,7 +323,7 @@ searchRoutes.get('/', async (req, res, next) => {
         );
       }
 
-      const albumsWithArt = albumResults.map((album) => {
+      const albumsWithArt = dedupedAlbumResults.map((album) => {
         const metadata = albumMetadataMap.get(album.id);
 
         return {
@@ -323,20 +377,22 @@ searchRoutes.get('/', async (req, res, next) => {
       );
 
       const totalItems =
-        tmdbResults.total_results + musicResults.length + bookResults.numFound;
+        tmdbResults.total_results +
+        musicResults.length +
+        dedupedBookDocs.length;
       const totalPages = Math.max(
         tmdbResults.total_pages,
         Math.ceil(totalItems / 20)
       );
 
       const bookMediaMap = await findBookMediaForSearchDocs(
-        bookResults.docs,
+        dedupedBookDocs,
         req.user?.id
       );
-      const mappedBookResults = bookResults.docs.map((doc) =>
+      const mappedBookResults = dedupedBookDocs.map((doc) =>
         mapOpenLibrarySearchDoc(
           doc,
-          bookMediaMap.get(doc.key.replace('/works/', ''))
+          bookMediaMap.get(normalizeOpenLibraryWorkId(doc.key))
         )
       );
 

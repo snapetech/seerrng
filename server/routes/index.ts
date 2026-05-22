@@ -26,14 +26,14 @@ import {
   appDataStatus,
 } from '@server/utils/appDataVolume';
 import { getAppVersion, getCommitTag } from '@server/utils/appVersion';
+import restartFlag from '@server/utils/restartFlag';
 import { parsePositiveRouteId } from '@server/utils/routeId';
+import { isPerson } from '@server/utils/typeHelpers';
 import {
   parseBoundedString,
   parseOptionalBoundedString,
   parseOptionalLanguage,
 } from '@server/utils/validation';
-import restartFlag from '@server/utils/restartFlag';
-import { isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import artistRoutes from './artist';

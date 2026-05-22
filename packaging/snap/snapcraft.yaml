@@ -1,10 +1,11 @@
 name: seerrng
 base: core24
 version: '0.1.0'
-summary: Media request and discovery service
+summary: Standalone media request and discovery service
 description: |
-  SeerrNG integrates with Plex, Jellyfin, Emby, Sonarr, Radarr, Lidarr, and
-  Readarr to provide media discovery and request workflows.
+  SeerrNG can be configured to integrate with external Plex, Jellyfin, Emby,
+  Sonarr, Radarr, Lidarr, and Readarr-compatible services. Those services are
+  optional and are managed separately from this snap.
 grade: stable
 confinement: strict
 architectures:

@@ -28,6 +28,9 @@ for pkgbuild in "$@"; do
     fi
 
     source_name="${sources[$i]}"
+    if [[ "$source_name" == *"://"* ]]; then
+      continue
+    fi
     source_name="${source_name%%::*}"
     source_name="${source_name##*/}"
     source_path="${dir}/${source_name}"

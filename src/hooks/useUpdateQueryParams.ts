@@ -116,9 +116,7 @@ export const mergeQueryString = (
   const pathname = `${router.pathname}${
     queryString.length > 0 ? `?${queryString}` : ''
   }`;
-  const path = `${asPath}${
-    queryString.length > 0 ? `?${queryString}` : ''
-  }`;
+  const path = `${asPath}${queryString.length > 0 ? `?${queryString}` : ''}`;
 
   return { pathname, path };
 };

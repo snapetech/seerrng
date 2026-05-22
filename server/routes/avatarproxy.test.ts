@@ -118,12 +118,14 @@ describe('GET /avatarproxy/remote', () => {
   it('rejects duplicate remote avatar URL query params', async () => {
     mockAvatarDependencies();
 
-    const res = await request(createApp()).get('/avatarproxy/remote').query({
-      url: [
-        'https://secure.gravatar.com/avatar/abc?d=mm',
-        'https://secure.gravatar.com/avatar/def?d=mm',
-      ],
-    });
+    const res = await request(createApp())
+      .get('/avatarproxy/remote')
+      .query({
+        url: [
+          'https://secure.gravatar.com/avatar/abc?d=mm',
+          'https://secure.gravatar.com/avatar/def?d=mm',
+        ],
+      });
 
     assert.equal(res.status, 400);
     assert.deepEqual(res.body, { error: 'Avatar URL must be a string' });

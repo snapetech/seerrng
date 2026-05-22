@@ -5,6 +5,7 @@ import Media from '@server/entity/Media';
 import type { MediaIdentifierProvider } from '@server/entity/MediaIdentifier';
 import MediaIdentifier from '@server/entity/MediaIdentifier';
 import Season from '@server/entity/Season';
+import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import AsyncLock from '@server/utils/asyncLock';
@@ -13,6 +14,26 @@ import { randomUUID } from 'crypto';
 // Default scan rates (can be overidden)
 const BUNDLE_SIZE = 20;
 const UPDATE_RATE = 4 * 1000;
+
+const dedupeIdentifierCandidates = (
+  identifiers: {
+    provider: MediaIdentifierProvider;
+    value: string;
+  }[]
+) => {
+  const seen = new Set<string>();
+
+  return identifiers.filter((identifier) => {
+    const key = `${identifier.provider}:${identifier.value}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+};
 
 export type StatusBase = {
   running: boolean;
@@ -277,10 +298,11 @@ class BaseScanner<T> {
     }: ProcessOptions = {}
   ): Promise<void> {
     const mediaRepository = getRepository(Media);
+    const normalizedMbId = normalizeMusicBrainzId(mbId);
 
-    await this.asyncLock.dispatch(mbId, async () => {
+    await this.asyncLock.dispatch(normalizedMbId, async () => {
       const existing = await mediaRepository.findOne({
-        where: { mbId, mediaType: MediaType.MUSIC },
+        where: { mbId: normalizedMbId, mediaType: MediaType.MUSIC },
       });
 
       if (existing) {
@@ -341,7 +363,7 @@ class BaseScanner<T> {
         await mediaRepository.save(
           new Media({
             tmdbId: 0,
-            mbId,
+            mbId: normalizedMbId,
             mediaType: MediaType.MUSIC,
             mediaAddedAt,
             serviceId,
@@ -381,17 +403,33 @@ class BaseScanner<T> {
     const lockKey = `${provider}:${value}`;
 
     await this.asyncLock.dispatch(lockKey, async () => {
-      const identifierCandidates = [
+      const identifierCandidates = dedupeIdentifierCandidates([
         { provider, value },
         ...secondaryIdentifiers,
-      ];
-      const existingIdentifier = await identifierRepository.findOne({
+      ]);
+      const candidateKeys = new Set(
+        identifierCandidates.map(
+          (identifier) => `${identifier.provider}:${identifier.value}`
+        )
+      );
+      const existingIdentifiers = await identifierRepository.find({
         where: identifierCandidates.map((identifier) => ({
           provider: identifier.provider,
           value: identifier.value,
         })),
         relations: { media: true },
+        order: { id: 'ASC' },
       });
+      const existingIdentifier =
+        existingIdentifiers.find(
+          (identifier) =>
+            identifier.provider === provider &&
+            identifier.value === value &&
+            identifier.media.mediaType === MediaType.BOOK
+        ) ??
+        existingIdentifiers.find(
+          (identifier) => identifier.media.mediaType === MediaType.BOOK
+        );
       const existing =
         existingIdentifier?.media.mediaType === MediaType.BOOK
           ? existingIdentifier.media
@@ -491,9 +529,22 @@ class BaseScanner<T> {
         const existingKeys = new Set(
           (
             await identifierRepository.find({
-              where: { media: { id: existing.id } },
+              where: [
+                { media: { id: existing.id } },
+                ...identifierCandidates.map((identifier) => ({
+                  provider: identifier.provider,
+                  value: identifier.value,
+                })),
+              ],
+              relations: { media: true },
             })
-          ).map((identifier) => `${identifier.provider}:${identifier.value}`)
+          )
+            .filter(
+              (identifier) =>
+                identifier.media.id !== existing.id ||
+                candidateKeys.has(`${identifier.provider}:${identifier.value}`)
+            )
+            .map((identifier) => `${identifier.provider}:${identifier.value}`)
         );
         const missingIdentifiers = identifierCandidates.filter(
           (identifier) =>

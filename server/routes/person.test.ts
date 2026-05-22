@@ -113,13 +113,9 @@ const castCredit = (
 
 describe('GET /person/:id/combined_credits', () => {
   it('rejects malformed person IDs before provider calls', async () => {
-    const getMock = mockPrivate(
-      ExternalAPI.prototype,
-      'get',
-      async () => {
-        throw new Error('Provider should not be called');
-      }
-    ) as ReturnType<typeof mock.method>;
+    const getMock = mockPrivate(ExternalAPI.prototype, 'get', async () => {
+      throw new Error('Provider should not be called');
+    }) as ReturnType<typeof mock.method>;
 
     const agent = await login();
     const res = await agent.get('/person/not-a-number/combined_credits');

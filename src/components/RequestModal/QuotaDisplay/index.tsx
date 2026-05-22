@@ -88,7 +88,7 @@ const QuotaDisplay = ({
                         ? messages.music
                         : mediaType === 'book'
                           ? messages.book
-                        : messages.season
+                          : messages.season
                   ),
                   strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
                 })}

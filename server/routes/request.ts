@@ -29,6 +29,10 @@ import type {
   MediaRequestBody,
   RequestResultsResponse,
 } from '@server/interfaces/api/requestInterfaces';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -93,6 +97,62 @@ const getRequestLogBody = (body: Partial<MediaRequestBody> | undefined) => ({
   authorId: body?.authorId,
   userId: body?.userId,
 });
+
+const getBulkRequestLogBody = (
+  body: Partial<BulkMediaRequestBody> | undefined
+) => ({
+  mediaType: body?.mediaType,
+  itemCount: Array.isArray(body?.items) ? body.items.length : undefined,
+  firstMediaIds: Array.isArray(body?.items)
+    ? body.items.slice(0, 5).map((item) => item.mediaId)
+    : undefined,
+  serverId: body?.serverId,
+  profileId: body?.profileId,
+  metadataProfileId: body?.metadataProfileId,
+  format: body?.format,
+  userId: body?.userId,
+});
+
+const normalizeBulkRequestText = (value?: string) =>
+  (value ?? '')
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeBulkRequestMediaId = (mediaType: MediaType, mediaId: string) => {
+  if (mediaType === MediaType.BOOK) {
+    return normalizeOpenLibraryWorkId(mediaId).toLocaleLowerCase();
+  }
+
+  return normalizeMusicBrainzId(mediaId);
+};
+
+const getBulkRequestDedupeKey = (
+  mediaType: MediaType,
+  item: BulkMediaRequestBody['items'][number]
+) => {
+  if (mediaType === MediaType.BOOK) {
+    if (!item.isbn13 && !item.editionId && item.title) {
+      return [
+        'book-title-author',
+        normalizeBulkRequestText(item.title),
+        normalizeBulkRequestText(item.authorId),
+      ].join('|');
+    }
+
+    return [
+      normalizeBulkRequestMediaId(mediaType, item.mediaId),
+      normalizeBulkRequestText(item.title),
+      normalizeBulkRequestText(item.authorId),
+      normalizeBulkRequestText(item.isbn13),
+      normalizeBulkRequestText(item.editionId),
+    ].join('|');
+  }
+
+  return normalizeBulkRequestMediaId(mediaType, item.mediaId);
+};
 
 const logRequestServiceProfileFailure = (
   serviceType: string,
@@ -424,6 +484,7 @@ const sanitizeBulkMediaRequestBody = (
   }
 
   const sanitizedItems: BulkMediaRequestBody['items'] = [];
+  const seenItems = new Set<string>();
 
   for (const item of body.items) {
     if (item === null || typeof item !== 'object' || Array.isArray(item)) {
@@ -492,13 +553,21 @@ const sanitizeBulkMediaRequestBody = (
       return authorId;
     }
 
-    sanitizedItems.push({
+    const sanitizedItem = {
       mediaId,
       title: title.value,
       isbn13: isbn13.value,
       editionId: editionId.value,
       authorId: authorId.value,
-    });
+    };
+    const dedupeKey = getBulkRequestDedupeKey(body.mediaType, sanitizedItem);
+
+    if (seenItems.has(dedupeKey)) {
+      continue;
+    }
+
+    seenItems.add(dedupeKey);
+    sanitizedItems.push(sanitizedItem);
   }
 
   return {
@@ -689,11 +758,8 @@ const getBulkCoveredReason = async (
       return 'This album is blocklisted.';
     }
 
-    if (
-      media?.status === MediaStatus.AVAILABLE ||
-      media?.status === MediaStatus.PROCESSING
-    ) {
-      return 'This album is already available or processing.';
+    if (media?.status === MediaStatus.AVAILABLE) {
+      return 'This album is already available.';
     }
 
     if (media?.requests?.some(isActiveMediaRequest)) {
@@ -703,7 +769,7 @@ const getBulkCoveredReason = async (
     return undefined;
   }
 
-  const normalizedOpenLibraryId = mediaId.replace(/^\/?works\//, '');
+  const normalizedOpenLibraryId = normalizeOpenLibraryWorkId(mediaId);
   const identifier = await getRepository(MediaIdentifier).findOne({
     where: {
       provider: MediaIdentifierProvider.OPENLIBRARY,
@@ -1390,6 +1456,12 @@ requestRoutes.post<never, BulkMediaRequestResponse, BulkMediaRequestBody>(
       }
       const body = sanitizedBody.value;
 
+      logger.info('Bulk request received', {
+        label: 'Request',
+        requestBody: getBulkRequestLogBody(body),
+        userId: req.user.id,
+      });
+
       let requestUser = req.user;
 
       if (body.userId) {
@@ -1556,6 +1628,18 @@ requestRoutes.post<never, BulkMediaRequestResponse, BulkMediaRequestBody>(
           });
         }
       }
+
+      logger.info('Bulk request completed', {
+        label: 'Request',
+        mediaType: body.mediaType,
+        itemCount: body.items.length,
+        requestableCount: requestableItems.length,
+        createdCount: created.length,
+        skippedCount: skipped.length,
+        failedCount: failed.length,
+        createdRequestIds: created.slice(0, 50).map((request) => request.id),
+        userId: req.user.id,
+      });
 
       return res.status(207).json({ created, skipped, failed });
     } catch (error) {

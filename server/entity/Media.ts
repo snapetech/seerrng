@@ -1,5 +1,5 @@
-import RadarrAPI from '@server/api/servarr/radarr';
 import LidarrAPI from '@server/api/servarr/lidarr';
+import RadarrAPI from '@server/api/servarr/radarr';
 import ReadarrAPI from '@server/api/servarr/readarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import { MediaStatus, MediaType } from '@server/constants/media';
@@ -10,6 +10,7 @@ import type { User } from '@server/entity/User';
 import { Watchlist } from '@server/entity/Watchlist';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import downloadTracker from '@server/lib/downloadtracker';
+import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
@@ -50,7 +51,12 @@ class Media {
             (i) => i.tmdbId
           )
         : (items as (number | string)[]);
-      const finalIds = [...new Set<number | string>(ids)];
+      const isMusicIdLookup = typeof ids[0] === 'string';
+      const finalIds = [
+        ...new Set<number | string>(
+          isMusicIdLookup ? (ids as string[]).map(normalizeMusicBrainzId) : ids
+        ),
+      ];
 
       const media = await mediaRepository
         .createQueryBuilder('media')
@@ -61,7 +67,7 @@ class Media {
           { userId: user?.id }
         ) //,
         .where(
-          typeof finalIds[0] === 'string'
+          isMusicIdLookup
             ? 'media.mbId in (:...finalIds)'
             : 'media.tmdbId in (:...finalIds)',
           { finalIds }

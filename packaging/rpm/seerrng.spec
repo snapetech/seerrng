@@ -1,7 +1,7 @@
 Name:           seerrng
 Version:        0.1.0
 Release:        1%{?dist}
-Summary:        Media request and discovery service
+Summary:        Standalone media request and discovery service
 License:        MIT
 URL:            https://github.com/snapetech/seerrng
 Source0:        seerrng-v%{version}-linux-x64.tar.gz
@@ -24,8 +24,9 @@ Requires:       nodejs >= 22
 %{!?tmpfiles_create:%global tmpfiles_create() %{nil}}
 
 %description
-SeerrNG is a media request and discovery service for Plex, Jellyfin, Emby,
-Sonarr, Radarr, Lidarr, and Readarr environments.
+SeerrNG is a standalone media request and discovery service. It can be
+configured to talk to external Plex, Jellyfin, Emby, Sonarr, Radarr, Lidarr,
+and Readarr-compatible services, but those services are managed separately.
 
 %prep
 %autosetup -n seerrng-v%{version}-linux-x64

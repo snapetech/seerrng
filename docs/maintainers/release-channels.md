@@ -4,6 +4,14 @@ Release publishing is coordinated by `.github/workflows/release.yml` after a `v*
 tag is published. Package workflows are dispatch-only so a tag release does not
 double-publish.
 
+## Package Scope
+
+Linux packages install SeerrNG as a standalone Node service with its own system
+user, service unit, config environment file, and state directory. They do not
+install or manage Lidarr, Bookshelf, Readarr, Sonarr, Radarr, Plex, Jellyfin, or
+Emby. Those services remain optional external integrations configured from
+SeerrNG after installation.
+
 ## Live Test Deployment
 
 `request.snape.tech` is not connected to a developer's local checkout or local
