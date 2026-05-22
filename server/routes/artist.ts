@@ -7,6 +7,7 @@ import Media from '@server/entity/Media';
 import MetadataAlbum from '@server/entity/MetadataAlbum';
 import MetadataArtist from '@server/entity/MetadataArtist';
 import { getAssociations } from '@server/lib/associations';
+import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import logger from '@server/logger';
 import { parsePositiveInt } from '@server/utils/pagination';
 import {
@@ -30,8 +31,49 @@ const parseMusicBrainzId = (value: unknown, fieldName = 'Artist ID') =>
     maxLength: MAX_MUSICBRAINZ_ID_LENGTH,
   });
 
+const normalizeParsedMusicBrainzId = (
+  parsed: ReturnType<typeof parseMusicBrainzId>
+) =>
+  'error' in parsed ? parsed : { value: normalizeMusicBrainzId(parsed.value) };
+
+const normalizeReleaseGroupTitle = (title: string) =>
+  title
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const dedupeReleaseGroups = (releaseGroups: LbReleaseGroupExtended[]) => {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return releaseGroups.filter((releaseGroup) => {
+    const idKey = normalizeMusicBrainzId(releaseGroup.mbid);
+    const type = releaseGroup.secondary_types?.length
+      ? releaseGroup.secondary_types[0]
+      : releaseGroup.type || 'Other';
+    const titleKey = [
+      normalizeReleaseGroupTitle(releaseGroup.name),
+      releaseGroup.artist_credit_name.toLocaleLowerCase(),
+      releaseGroup.date?.slice(0, 4) ?? '',
+      type.toLocaleLowerCase(),
+    ].join('|');
+
+    if (seenIds.has(idKey) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenIds.add(idKey);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
 artistRoutes.get('/:id/similar', async (req, res, next) => {
-  const parsedArtistId = parseMusicBrainzId(req.params.id);
+  const parsedArtistId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedArtistId) {
     return res.status(404).json({ status: 404, message: 'Artist not found' });
   }
@@ -80,7 +122,9 @@ artistRoutes.get('/:id/similar', async (req, res, next) => {
 });
 
 artistRoutes.get('/:id', async (req, res, next) => {
-  const parsedArtistId = parseMusicBrainzId(req.params.id);
+  const parsedArtistId = normalizeParsedMusicBrainzId(
+    parseMusicBrainzId(req.params.id)
+  );
   if ('error' in parsedArtistId) {
     return res.status(404).json({ status: 404, message: 'Artist not found' });
   }
@@ -122,7 +166,8 @@ artistRoutes.get('/:id', async (req, res, next) => {
       throw new Error('Artist not found');
     }
 
-    const groupedReleaseGroups = artistData.releaseGroups.reduce(
+    const releaseGroups = dedupeReleaseGroups(artistData.releaseGroups);
+    const groupedReleaseGroups = releaseGroups.reduce(
       (acc, rg) => {
         const type = rg.secondary_types?.length
           ? rg.secondary_types[0]
@@ -186,7 +231,11 @@ artistRoutes.get('/:id', async (req, res, next) => {
       totalPages = 1;
     }
 
-    const mbIds = releaseGroupsToProcess.map((rg) => rg.mbid);
+    const mbIds = [
+      ...new Set(
+        releaseGroupsToProcess.map((rg) => normalizeMusicBrainzId(rg.mbid))
+      ),
+    ];
 
     const responses = await Promise.allSettled([
       musicbrainz
@@ -218,7 +267,11 @@ artistRoutes.get('/:id', async (req, res, next) => {
       albumMetadata.map((metadata) => [metadata.mbAlbumId, metadata])
     );
 
-    const mediaMap = new Map(relatedMedia.map((media) => [media.mbId, media]));
+    const mediaMap = new Map(
+      relatedMedia
+        .filter((media) => media.mbId)
+        .map((media) => [normalizeMusicBrainzId(media.mbId as string), media])
+    );
 
     const mappedReleaseGroups = releaseGroupsToProcess.map((releaseGroup) => {
       const metadata = metadataMap.get(releaseGroup.mbid);
@@ -235,7 +288,7 @@ artistRoutes.get('/:id', async (req, res, next) => {
         total_listen_count: releaseGroup.total_listen_count || 0,
         posterPath: coverArtUrl,
         needsCoverArt: !coverArtUrl,
-        mediaInfo: mediaMap.get(releaseGroup.mbid),
+        mediaInfo: mediaMap.get(normalizeMusicBrainzId(releaseGroup.mbid)),
       };
     });
 

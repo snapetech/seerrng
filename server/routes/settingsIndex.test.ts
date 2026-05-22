@@ -168,9 +168,11 @@ describe('Settings route input validation', () => {
     const jellyfinRes = await request(app).post('/settings/jellyfin').send({
       externalHostname: 'javascript:alert(1)',
     });
-    const jellyfinResetRes = await request(app).post('/settings/jellyfin').send({
-      jellyfinForgotPasswordUrl: 'javascript:alert(1)',
-    });
+    const jellyfinResetRes = await request(app)
+      .post('/settings/jellyfin')
+      .send({
+        jellyfinForgotPasswordUrl: 'javascript:alert(1)',
+      });
 
     assert.strictEqual(plexRes.status, 400);
     assert.match(plexRes.body.message, /webAppUrl must be a valid HTTP URL/);
@@ -204,9 +206,15 @@ describe('Settings route input validation', () => {
     assert.strictEqual(proxyShapeRes.status, 400);
     assert.match(proxyShapeRes.body.message, /proxy must be an object/);
     assert.strictEqual(proxyPortRes.status, 400);
-    assert.match(proxyPortRes.body.message, /proxy.port must be a valid number/);
+    assert.match(
+      proxyPortRes.body.message,
+      /proxy.port must be a valid number/
+    );
     assert.strictEqual(proxyEnabledRes.status, 400);
-    assert.match(proxyEnabledRes.body.message, /proxy.enabled must be a boolean/);
+    assert.match(
+      proxyEnabledRes.body.message,
+      /proxy.enabled must be a boolean/
+    );
     assert.strictEqual(saveMock.mock.callCount(), 0);
   });
 
@@ -498,7 +506,10 @@ describe('Settings route input validation', () => {
       /Gotify priority must be an integer/
     );
     assert.strictEqual(ntfyAuthRes.status, 400);
-    assert.match(ntfyAuthRes.body.message, /ntfy authMethodToken must be a boolean/);
+    assert.match(
+      ntfyAuthRes.body.message,
+      /ntfy authMethodToken must be a boolean/
+    );
   });
 
   it('persists normalized Gotify and ntfy notification bodies', async () => {

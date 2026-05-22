@@ -84,7 +84,9 @@ export const parseOptionalQueryBoolean = (
     return parsed;
   }
 
-  return { value: parsed.value === undefined ? undefined : parsed.value === 'true' };
+  return {
+    value: parsed.value === undefined ? undefined : parsed.value === 'true',
+  };
 };
 
 export const parseOptionalBodyBoolean = (

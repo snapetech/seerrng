@@ -75,7 +75,9 @@ describe('Top-level API route validation', () => {
 
   it('rejects missing Pushover sound tokens before provider lookup', async () => {
     const agent = await login();
-    const res = await agent.get('/api/v1/settings/notifications/pushover/sounds');
+    const res = await agent.get(
+      '/api/v1/settings/notifications/pushover/sounds'
+    );
 
     assert.strictEqual(res.status, 400);
     assert.match(res.body.message, /Pushover application token/);

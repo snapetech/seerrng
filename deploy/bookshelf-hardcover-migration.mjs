@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -31,7 +31,9 @@ const getValidationLookupRetries = () => {
   const retries = Number(rawValue);
 
   if (!Number.isInteger(retries) || retries < 0) {
-    throw new Error('HARDCOVER_VALIDATION_LOOKUP_RETRIES must be a non-negative integer.');
+    throw new Error(
+      'HARDCOVER_VALIDATION_LOOKUP_RETRIES must be a non-negative integer.'
+    );
   }
 
   return retries;
@@ -47,7 +49,9 @@ const getValidationLookupRetryDelayMs = () => {
   const delayMs = Number(rawValue);
 
   if (!Number.isInteger(delayMs) || delayMs < 0) {
-    throw new Error('HARDCOVER_VALIDATION_LOOKUP_RETRY_DELAY_MS must be a non-negative integer.');
+    throw new Error(
+      'HARDCOVER_VALIDATION_LOOKUP_RETRY_DELAY_MS must be a non-negative integer.'
+    );
   }
 
   return delayMs;
@@ -63,7 +67,9 @@ const getMigrationMaxBooks = () => {
   const maxBooks = Number(rawValue);
 
   if (!Number.isInteger(maxBooks) || maxBooks <= 0) {
-    throw new Error('HARDCOVER_MIGRATION_MAX_BOOKS must be a positive integer.');
+    throw new Error(
+      'HARDCOVER_MIGRATION_MAX_BOOKS must be a positive integer.'
+    );
   }
 
   return maxBooks;
@@ -79,7 +85,9 @@ const getRateLimitDelayMs = () => {
   const delayMs = Number(rawValue);
 
   if (!Number.isInteger(delayMs) || delayMs < 0) {
-    throw new Error('HARDCOVER_RATE_LIMIT_DELAY_MS must be a non-negative integer.');
+    throw new Error(
+      'HARDCOVER_RATE_LIMIT_DELAY_MS must be a non-negative integer.'
+    );
   }
 
   return delayMs;
@@ -95,7 +103,9 @@ const getRateLimitBatchSize = () => {
   const batchSize = Number(rawValue);
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
-    throw new Error('HARDCOVER_RATE_LIMIT_BATCH_SIZE must be a positive integer.');
+    throw new Error(
+      'HARDCOVER_RATE_LIMIT_BATCH_SIZE must be a positive integer.'
+    );
   }
 
   return batchSize;
@@ -111,7 +121,9 @@ const getRateLimitMaxRetries = () => {
   const maxRetries = Number(rawValue);
 
   if (!Number.isInteger(maxRetries) || maxRetries < 0) {
-    throw new Error('HARDCOVER_RATE_LIMIT_MAX_RETRIES must be a non-negative integer.');
+    throw new Error(
+      'HARDCOVER_RATE_LIMIT_MAX_RETRIES must be a non-negative integer.'
+    );
   }
 
   return maxRetries;
@@ -127,7 +139,9 @@ const getRateLimitBackoffBaseMs = () => {
   const baseMs = Number(rawValue);
 
   if (!Number.isInteger(baseMs) || baseMs <= 0) {
-    throw new Error('HARDCOVER_RATE_LIMIT_BACKOFF_BASE_MS must be a positive integer.');
+    throw new Error(
+      'HARDCOVER_RATE_LIMIT_BACKOFF_BASE_MS must be a positive integer.'
+    );
   }
 
   return baseMs;
@@ -143,11 +157,27 @@ const getRecoveryLookupLimit = () => {
   const limit = Number(rawValue);
 
   if (!Number.isInteger(limit) || limit <= 0) {
-    throw new Error('HARDCOVER_RECOVERY_LOOKUP_LIMIT must be a positive integer.');
+    throw new Error(
+      'HARDCOVER_RECOVERY_LOOKUP_LIMIT must be a positive integer.'
+    );
   }
 
   return limit;
 };
+
+const getOpenLibraryRecoveryEnabled = () => {
+  const rawValue = process.env.HARDCOVER_OPENLIBRARY_RECOVERY;
+
+  if (rawValue === undefined || rawValue === '') {
+    return true;
+  }
+
+  return rawValue === 'true' || rawValue === '1' || rawValue === 'yes';
+};
+
+const getOpenLibraryBaseUrl = () =>
+  normalizeText(process.env.HARDCOVER_OPENLIBRARY_BASE_URL) ||
+  'https://openlibrary.org';
 
 const getLocalImportEnabled = () => {
   const rawValue = process.env.HARDCOVER_LOCAL_IMPORT;
@@ -205,7 +235,9 @@ const getCheckpointInterval = () => {
   const interval = Number(rawValue);
 
   if (!Number.isInteger(interval) || interval <= 0) {
-    throw new Error('HARDCOVER_CHECKPOINT_INTERVAL must be a positive integer.');
+    throw new Error(
+      'HARDCOVER_CHECKPOINT_INTERVAL must be a positive integer.'
+    );
   }
 
   return interval;
@@ -240,7 +272,9 @@ const normalizeId = (value) =>
   value === undefined || value === null ? undefined : String(value);
 
 const findBookEditions = (book, editions) => {
-  const bookId = normalizeId(firstValue(book, ['Id', 'id', 'BookId', 'bookId']));
+  const bookId = normalizeId(
+    firstValue(book, ['Id', 'id', 'BookId', 'bookId'])
+  );
 
   return editions.filter((edition) => {
     const editionBookId = normalizeId(
@@ -319,7 +353,14 @@ export const extractTagLabels = (book, tags) => {
 
 const extractBookTitle = (book) =>
   normalizeText(
-    firstValue(book, ['Title', 'title', 'CleanTitle', 'cleanTitle', 'Name', 'name'])
+    firstValue(book, [
+      'Title',
+      'title',
+      'CleanTitle',
+      'cleanTitle',
+      'Name',
+      'name',
+    ])
   );
 
 const extractAuthorName = (book, authors, authorMetadata = []) => {
@@ -466,6 +507,23 @@ const normalizePathComparable = (value) => {
   return normalized.replace(/\/+$/, '');
 };
 
+const normalizeReadarrRootFolderPath = (value) => {
+  const normalized = normalizeText(value).replace(/\\/g, '/');
+  const pathPattern = /^\/[A-Za-z0-9._~:/@()+, -]+$/;
+
+  if (!pathPattern.test(normalized)) {
+    throw new Error(`Invalid Readarr root folder path: ${value}`);
+  }
+
+  const normalizedPath = path.posix.normalize(normalized);
+
+  if (normalizedPath === '.' || normalizedPath.includes('/../')) {
+    throw new Error(`Invalid Readarr root folder path: ${value}`);
+  }
+
+  return normalizedPath;
+};
+
 const deriveRootFolderPath = ({ book, author, rootFolders }) => {
   const direct = normalizeText(
     firstValue(book, [
@@ -496,7 +554,9 @@ const deriveRootFolderPath = ({ book, author, rootFolders }) => {
     firstValue(author, ['Path', 'path'])
   );
   const matchingRootFolders = rootFolders
-    .map((rootFolder) => normalizeText(firstValue(rootFolder, ['Path', 'path'])))
+    .map((rootFolder) =>
+      normalizeText(firstValue(rootFolder, ['Path', 'path']))
+    )
     .filter(Boolean)
     .sort((left, right) => right.length - left.length);
 
@@ -664,16 +724,14 @@ const fetchWithRetry = async (url, options = {}) => {
 
     console.error(
       `Rate limited (429) for ${url}. ` +
-      `Retry attempt ${attempt + 1}/${maxRetries}. ` +
-      `Waiting ${Math.round(delayMs / 1000)}s before retry.`
+        `Retry attempt ${attempt + 1}/${maxRetries}. ` +
+        `Waiting ${Math.round(delayMs / 1000)}s before retry.`
     );
 
     await sleep(delayMs);
   }
 
-  throw new Error(
-    `Rate limited after ${maxRetries + 1} attempts: ${url}`
-  );
+  throw new Error(`Rate limited after ${maxRetries + 1} attempts: ${url}`);
 };
 
 const lookupBook = async ({ baseUrl, apiKey, term }) => {
@@ -693,6 +751,20 @@ const lookupBook = async ({ baseUrl, apiKey, term }) => {
   const body = await response.json();
 
   return Array.isArray(body) ? body : [];
+};
+
+const fetchJson = async (url, options = {}) => {
+  const response = await fetchWithRetry(url, options);
+
+  if (!response.ok) {
+    const responseBody = await response.text().catch(() => '');
+
+    throw new Error(
+      `GET ${url} failed: ${response.status}${responseBody ? ` ${responseBody}` : ''}`
+    );
+  }
+
+  return response.json();
 };
 
 const lookupCacheKey = ({ serviceType, term }) =>
@@ -728,7 +800,10 @@ const writeLookupCache = async (migrationDir, lookupCache) => {
     writeJson(path.join(migrationDir, 'lookup-cache.json'), lookupCache)
   );
 
-  lookupCacheWrites.set(migrationDir, next.catch(() => {}));
+  lookupCacheWrites.set(
+    migrationDir,
+    next.catch(() => {})
+  );
   await next;
 };
 
@@ -800,7 +875,8 @@ const lookupBookCandidates = async ({
     });
 
     for (const candidate of results) {
-      const key = normalizeId(candidate.foreignBookId) ?? JSON.stringify(candidate);
+      const key =
+        normalizeId(candidate.foreignBookId) ?? JSON.stringify(candidate);
       if (seenBooks.has(key)) {
         continue;
       }
@@ -960,11 +1036,12 @@ const parseAuthorTitle = ({ title, authorTitle }) => {
     return undefined;
   }
 
-  const titleIndex = normalizeComparableText(rawAuthorTitle).lastIndexOf(
-    normalizedTitle
-  );
+  const titleIndex =
+    normalizeComparableText(rawAuthorTitle).lastIndexOf(normalizedTitle);
   const rawAuthorName =
-    titleIndex > 0 ? rawAuthorTitle.slice(0, titleIndex).trim() : rawAuthorTitle;
+    titleIndex > 0
+      ? rawAuthorTitle.slice(0, titleIndex).trim()
+      : rawAuthorTitle;
   const [lastName, ...firstNameParts] = rawAuthorName
     .split(',')
     .map((part) => part.trim())
@@ -999,6 +1076,97 @@ const identifiersFromLookupResult = (result, source) => {
     .filter(Boolean);
 
   return [...new Set(identifiers)];
+};
+
+const identifiersFromOpenLibraryDoc = (doc, source) => {
+  const identifiers = [
+    ...(Array.isArray(doc?.isbn) ? doc.isbn : []),
+    ...(Array.isArray(source.identifiers) ? source.identifiers : []),
+  ]
+    .map((value) => normalizeText(String(value ?? '')))
+    .filter(Boolean);
+
+  return [...new Set(identifiers)];
+};
+
+const buildOpenLibraryRecoveredProfiles = async ({ item }) => {
+  if (!getOpenLibraryRecoveryEnabled()) {
+    return [];
+  }
+
+  const terms = [];
+
+  if (item.source.title && item.source.author) {
+    terms.push(`${item.source.title} ${item.source.author}`);
+    terms.push(`${item.source.author} ${item.source.title}`);
+  } else if (item.source.title) {
+    terms.push(item.source.title);
+  }
+
+  for (const identifier of item.source.identifiers ?? []) {
+    terms.push(...lookupTermVariants(identifier));
+  }
+
+  const profiles = [];
+  const seenTerms = new Set();
+  const seenProfiles = new Set();
+  const lookupLimit = getRecoveryLookupLimit();
+
+  for (const term of terms) {
+    if (seenTerms.size >= lookupLimit) {
+      break;
+    }
+
+    const normalizedTerm = normalizeText(term);
+
+    if (!normalizedTerm || seenTerms.has(normalizedTerm)) {
+      continue;
+    }
+
+    seenTerms.add(normalizedTerm);
+
+    const url = new URL('/search.json', getOpenLibraryBaseUrl());
+    url.searchParams.set('q', normalizedTerm);
+    url.searchParams.set('limit', '10');
+
+    const response = await fetchJson(url).catch(() => undefined);
+    const docs = Array.isArray(response?.docs) ? response.docs : [];
+
+    for (const doc of docs) {
+      const title = normalizeText(doc?.title ?? item.source.title);
+      const authors = Array.isArray(doc?.author_name)
+        ? doc.author_name.map(normalizeText).filter(Boolean)
+        : [];
+
+      if (!title || !authors.length) {
+        continue;
+      }
+
+      for (const author of authors.slice(0, 3)) {
+        const identifiers = identifiersFromOpenLibraryDoc(doc, item.source);
+        const key = `${normalizeComparableText(title)}:${normalizeComparableText(author)}:${identifiers.join(',')}`;
+
+        if (seenProfiles.has(key)) {
+          continue;
+        }
+
+        seenProfiles.add(key);
+        profiles.push({
+          title,
+          author,
+          identifiers,
+          recoveredFrom: 'openlibrary',
+          openLibraryLookupTerm: normalizedTerm,
+          openLibraryWorkKey: normalizeText(doc?.key),
+          openLibraryEditionKeys: Array.isArray(doc?.edition_key)
+            ? doc.edition_key.map(normalizeText).filter(Boolean)
+            : [],
+        });
+      }
+    }
+  }
+
+  return profiles;
 };
 
 const buildSoftcoverRecoveredProfiles = async ({ item, job }) => {
@@ -1077,6 +1245,81 @@ const buildSoftcoverRecoveredProfiles = async ({ item, job }) => {
   return profiles;
 };
 
+const recoverUnmatchedWithOpenLibrary = async ({
+  migrationDir,
+  lookupCache,
+  job,
+  entries,
+}) => {
+  const recovered = [];
+  const remaining = [];
+
+  for (const entry of entries) {
+    if (!entry?.source || !getOpenLibraryRecoveryEnabled()) {
+      remaining.push(entry);
+      continue;
+    }
+
+    const profiles = await buildOpenLibraryRecoveredProfiles({
+      item: {
+        source: entry.source,
+      },
+    });
+
+    if (!profiles.length) {
+      remaining.push(entry);
+      continue;
+    }
+
+    const candidates = await lookupBookCandidates({
+      migrationDir,
+      lookupCache,
+      serviceType: entry.source.serviceType,
+      baseUrl: job.baseUrl,
+      apiKey: job.apiKey,
+      source: entry.source,
+      profiles,
+      includeSource: false,
+    }).catch(() => []);
+
+    let match;
+
+    for (const { candidate, lookupTerm, profile } of candidates) {
+      const decision = chooseStrictMatch({
+        source: {
+          ...entry.source,
+          title: profile?.title ?? entry.source.title,
+          author: profile?.author ?? entry.source.author,
+          identifiers: profile?.identifiers ?? entry.source.identifiers,
+        },
+        candidates: [candidate],
+        identifier:
+          lookupTerm !== `${entry.source.title} ${entry.source.author}`,
+      });
+
+      if (decision.status === 'matched') {
+        match = {
+          source: entry.source,
+          lookupTerm,
+          reason: 'openlibrary_recovery',
+          hardcover: decision.result,
+          recoveredFrom: profile?.recoveredFrom,
+          openLibraryLookupTerm: profile?.openLibraryLookupTerm,
+        };
+        break;
+      }
+    }
+
+    if (match) {
+      recovered.push(match);
+    } else {
+      remaining.push(entry);
+    }
+  }
+
+  return { recovered, remaining };
+};
+
 const buildApplyFailureSummary = (failed) => {
   const byCategory = new Map();
 
@@ -1093,10 +1336,7 @@ const buildApplyFailureSummary = (failed) => {
 
     existing.count++;
 
-    if (
-      attemptedValue &&
-      !existing.attemptedValues.includes(attemptedValue)
-    ) {
+    if (attemptedValue && !existing.attemptedValues.includes(attemptedValue)) {
       existing.attemptedValues.push(attemptedValue);
     }
 
@@ -1226,7 +1466,11 @@ const relaxedTitleVariants = (value) => {
 
   // With both article stripped AND apostrophes stripped
   const noArtNoApos = stripApostrophes(noArticle);
-  if (noArtNoApos !== base && noArtNoApos !== noApos && noArtNoApos !== noArticle) {
+  if (
+    noArtNoApos !== base &&
+    noArtNoApos !== noApos &&
+    noArtNoApos !== noArticle
+  ) {
     forms.add(noArtNoApos);
   }
 
@@ -1317,11 +1561,7 @@ export const chooseStrictMatch = ({ source, candidates, identifier }) => {
       if (!sv) continue;
       for (const cv of candidateVariants) {
         if (!cv) continue;
-        if (
-          sv === cv ||
-          isPrefixMatch(sv, cv) ||
-          isContainedMatch(sv, cv)
-        ) {
+        if (sv === cv || isPrefixMatch(sv, cv) || isContainedMatch(sv, cv)) {
           return true;
         }
       }
@@ -1468,7 +1708,11 @@ const checkpointProcessedKeys = (checkpoint) => {
   return keys;
 };
 
-const writeMatchCheckpoint = async ({ migrationDir, serviceType, checkpoint }) => {
+const writeMatchCheckpoint = async ({
+  migrationDir,
+  serviceType,
+  checkpoint,
+}) => {
   await writeJson(
     matchCheckpointPath({ migrationDir, serviceType }),
     checkpoint
@@ -1513,7 +1757,7 @@ const matchInventory = async ({
     if (batchSize > 0 && requestCount > 0 && requestCount % batchSize === 0) {
       console.error(
         `[match] Batch limit reached (${requestCount} requests). ` +
-        `Pausing ${delayMs}ms before next batch...`
+          `Pausing ${delayMs}ms before next batch...`
       );
       await sleep(delayMs);
     }
@@ -1521,12 +1765,14 @@ const matchInventory = async ({
 
   const logProgress = () => {
     processedCount++;
-    if (processedCount % Math.max(1, Math.floor(totalBooks / 10)) === 0 ||
-        processedCount === totalBooks) {
+    if (
+      processedCount % Math.max(1, Math.floor(totalBooks / 10)) === 0 ||
+      processedCount === totalBooks
+    ) {
       const pct = Math.round((processedCount / totalBooks) * 100);
       console.error(
         `[match] Progress: ${processedCount}/${totalBooks} books (${pct}%) - ` +
-        `matched=${matched.length}, unmatched=${unmatched.length}, ambiguous=${ambiguous.length}`
+          `matched=${matched.length}, unmatched=${unmatched.length}, ambiguous=${ambiguous.length}`
       );
     }
   };
@@ -1582,7 +1828,10 @@ const matchInventory = async ({
           apiKey,
           term: lookupTerm,
         });
-        decision = chooseStrictMatch({ source, candidates: titleAuthorCandidates });
+        decision = chooseStrictMatch({
+          source,
+          candidates: titleAuthorCandidates,
+        });
       } catch (error) {
         decision = {
           status: 'unmatched',
@@ -1802,14 +2051,19 @@ const directInsertLocalBook = async ({ item, job, targetIds, tags }) => {
   const authorForeignId = `local:${item.serviceType}:${slugifyLocal(authorName)}`;
   const bookForeignId = `local:${item.serviceType}:${normalizeId(source.id) ?? slugifyLocal(`${title}-${authorName}`)}`;
   const editionForeignId = `${bookForeignId}:edition`;
-  const isbn13 = source.identifiers?.find((id) => ISBN13_REGEX.test(stripIsbnHyphens(id)));
+  const isbn13 = source.identifiers?.find((id) =>
+    ISBN13_REGEX.test(stripIsbnHyphens(id))
+  );
   const authorPath = path.posix.join(
     normalizeText(source.rootFolderPath) || '/data/books',
     authorName.replace(/[\\/]+/g, ' ').trim()
   );
   const monitored = boolFromSource(source.monitored, true) ? 1 : 0;
   const tagJson = JSON.stringify(tags ?? []);
-  const addOptions = JSON.stringify({ monitor: 'none', searchForMissingBooks: false });
+  const addOptions = JSON.stringify({
+    monitor: 'none',
+    searchForMissingBooks: false,
+  });
   const ratings = JSON.stringify({ votes: 0, value: 0, popularity: 0 });
 
   const sql = `
@@ -1891,7 +2145,10 @@ const directInsertLocalBook = async ({ item, job, targetIds, tags }) => {
 
   const { stdout } = await execFileAsync(
     'sqlite3',
-    [dbPath, `select Id from Books where ForeignBookId = ${sqliteQuote(bookForeignId)} limit 1;`],
+    [
+      dbPath,
+      `select Id from Books where ForeignBookId = ${sqliteQuote(bookForeignId)} limit 1;`,
+    ],
     { timeout: 30000 }
   );
   const id = Number(stdout.trim());
@@ -1907,6 +2164,170 @@ const directInsertLocalBook = async ({ item, job, targetIds, tags }) => {
     foreignEditionId: editionForeignId,
     localDbImport: true,
     localEntry: local,
+  };
+};
+
+const sqliteScalar = async ({ dbPath, sql }) => {
+  const { stdout } = await execFileAsync('sqlite3', [dbPath, sql], {
+    timeout: 30000,
+  });
+
+  return normalizeText(stdout.trim().split('\n')[0]);
+};
+
+const localBookForeignIdForSource = (source) =>
+  `local:${source.serviceType}:${normalizeId(source.id) ?? slugifyLocal(`${source.title}-${source.author}`)}`;
+
+const localAuthorForeignIdForSource = (source) =>
+  `local:${source.serviceType}:${slugifyLocal(source.author)}`;
+
+const reconcileLocalBookInDb = async ({ job, applied, hardcover }) => {
+  if (!job.configDir) {
+    return {
+      ok: false,
+      reason: 'target_config_dir_not_provided',
+    };
+  }
+
+  const dbPath = path.join(job.configDir, 'readarr.db');
+  await fs.access(dbPath);
+
+  const source = applied.source;
+  const localBookForeignId = localBookForeignIdForSource(source);
+  const localAuthorForeignId = localAuthorForeignIdForSource(source);
+  const nativeBookForeignId = normalizeId(hardcover.foreignBookId);
+  const nativeAuthorForeignId = normalizeId(hardcover.author?.foreignAuthorId);
+  const nativeEditionForeignId = normalizeId(
+    hardcover.editions?.[0]?.foreignEditionId
+  );
+
+  if (
+    !nativeBookForeignId ||
+    !nativeAuthorForeignId ||
+    !nativeEditionForeignId
+  ) {
+    return {
+      ok: false,
+      reason: 'native_candidate_missing_required_ids',
+    };
+  }
+
+  const localBookId = Number(
+    await sqliteScalar({
+      dbPath,
+      sql: `select Id from Books where ForeignBookId = ${sqliteQuote(localBookForeignId)} limit 1;`,
+    })
+  );
+
+  if (!Number.isInteger(localBookId) || localBookId <= 0) {
+    return {
+      ok: false,
+      reason: 'local_shadow_book_not_found',
+      localBookForeignId,
+    };
+  }
+
+  const duplicateBookId = Number(
+    await sqliteScalar({
+      dbPath,
+      sql: `select Id from Books where ForeignBookId = ${sqliteQuote(nativeBookForeignId)} and Id <> ${Number(localBookId)} limit 1;`,
+    })
+  );
+
+  if (Number.isInteger(duplicateBookId) && duplicateBookId > 0) {
+    return {
+      ok: false,
+      reason: 'native_duplicate_book_exists',
+      duplicateBookId,
+      nativeBookForeignId,
+    };
+  }
+
+  const nativeAuthorMetadataId = Number(
+    await sqliteScalar({
+      dbPath,
+      sql: `select Id from AuthorMetadata where ForeignAuthorId = ${sqliteQuote(nativeAuthorForeignId)} limit 1;`,
+    })
+  );
+  const localAuthorMetadataId = Number(
+    await sqliteScalar({
+      dbPath,
+      sql: `select Id from AuthorMetadata where ForeignAuthorId = ${sqliteQuote(localAuthorForeignId)} limit 1;`,
+    })
+  );
+  const targetAuthorMetadataId =
+    Number.isInteger(nativeAuthorMetadataId) && nativeAuthorMetadataId > 0
+      ? nativeAuthorMetadataId
+      : localAuthorMetadataId;
+
+  if (
+    !Number.isInteger(targetAuthorMetadataId) ||
+    targetAuthorMetadataId <= 0
+  ) {
+    return {
+      ok: false,
+      reason: 'local_author_metadata_not_found',
+      localAuthorForeignId,
+    };
+  }
+
+  const edition = hardcover.editions?.[0] ?? {};
+  const isbn13 = normalizeText(edition.isbn13 ?? edition.ISBN13);
+  const title = normalizeText(hardcover.title ?? source.title);
+  const authorName = normalizeText(
+    hardcover.author?.authorName ?? hardcover.author?.name ?? source.author
+  );
+  const authorSlug = `hardcover-${slugifyLocal(authorName)}`;
+  const bookSlug = `hardcover-${slugifyLocal(title)}-${slugifyLocal(nativeBookForeignId)}`;
+
+  const sql = `
+    BEGIN IMMEDIATE;
+
+    UPDATE AuthorMetadata
+    SET
+      ForeignAuthorId = ${sqliteQuote(nativeAuthorForeignId)},
+      TitleSlug = ${sqliteQuote(authorSlug)},
+      Name = ${sqliteQuote(authorName)},
+      SortName = ${sqliteQuote(normalizeComparableText(authorName))},
+      NameLastFirst = ${sqliteQuote(authorName)},
+      SortNameLastFirst = ${sqliteQuote(normalizeComparableText(authorName))}
+    WHERE Id = ${Number(targetAuthorMetadataId)}
+      AND NOT EXISTS (
+        SELECT 1 FROM AuthorMetadata
+        WHERE ForeignAuthorId = ${sqliteQuote(nativeAuthorForeignId)}
+          AND Id <> ${Number(targetAuthorMetadataId)}
+      );
+
+    UPDATE Books
+    SET
+      AuthorMetadataId = ${Number(targetAuthorMetadataId)},
+      ForeignBookId = ${sqliteQuote(nativeBookForeignId)},
+      TitleSlug = ${sqliteQuote(bookSlug)},
+      Title = ${sqliteQuote(title)},
+      CleanTitle = ${sqliteQuote(normalizeComparableText(title))},
+      LastInfoSync = ${sqliteQuote(new Date().toISOString())}
+    WHERE Id = ${Number(localBookId)};
+
+    UPDATE Editions
+    SET
+      ForeignEditionId = ${sqliteQuote(nativeEditionForeignId)},
+      Isbn13 = ${sqliteQuote(isbn13 || null)},
+      Title = ${sqliteQuote(normalizeText(edition.title ?? title))},
+      TitleSlug = ${sqliteQuote(`${bookSlug}-edition`)}
+    WHERE BookId = ${Number(localBookId)};
+
+    COMMIT;
+  `;
+
+  await execFileAsync('sqlite3', [dbPath, sql], { timeout: 30000 });
+
+  return {
+    ok: true,
+    bookId: localBookId,
+    oldForeignBookId: localBookForeignId,
+    newForeignBookId: nativeBookForeignId,
+    newForeignAuthorId: nativeAuthorForeignId,
+    newForeignEditionId: nativeEditionForeignId,
   };
 };
 
@@ -2012,7 +2433,9 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
   const failed = [];
   const appliedKeys = new Set(
     applied
-      .map((item) => (item?.source ? checkpointKeyForSource(item.source) : undefined))
+      .map((item) =>
+        item?.source ? checkpointKeyForSource(item.source) : undefined
+      )
       .filter(Boolean)
   );
   const monitorUpdates = new Map();
@@ -2027,7 +2450,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     if (batchSize > 0 && requestCount > 0 && requestCount % batchSize === 0) {
       console.error(
         `[apply] Batch limit reached (${requestCount} requests). ` +
-        `Pausing ${delayMs}ms before next batch...`
+          `Pausing ${delayMs}ms before next batch...`
       );
       await sleep(delayMs);
     }
@@ -2035,13 +2458,15 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
 
   const logProgress = (index) => {
     const processedCount = index + 1;
-    if (totalItems <= 1 ||
-        processedCount % Math.max(1, Math.floor(totalItems / 10)) === 0 ||
-        processedCount === totalItems) {
+    if (
+      totalItems <= 1 ||
+      processedCount % Math.max(1, Math.floor(totalItems / 10)) === 0 ||
+      processedCount === totalItems
+    ) {
       const pct = Math.round((processedCount / totalItems) * 100);
       console.error(
         `[apply] Progress: ${processedCount}/${totalItems} books (${pct}%) - ` +
-        `applied=${applied.length}, failed=${failed.length}`
+          `applied=${applied.length}, failed=${failed.length}`
       );
     }
   };
@@ -2050,7 +2475,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     const processedCount = index + 1;
     console.error(
       `[apply] ${message}: ${processedCount}/${totalItems} ` +
-      `${item.serviceType} "${item.source.title}" by ${item.source.author}`
+        `${item.serviceType} "${item.source.title}" by ${item.source.author}`
     );
   };
 
@@ -2095,6 +2520,9 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
   };
 
   const resolveTargetIds = async (item, job, targetConfig) => {
+    const rootFolderPath = normalizeReadarrRootFolderPath(
+      item.addBook.rootFolderPath
+    );
     const qualityProfile = item.source.qualityProfileName
       ? targetConfig.qualityProfiles.find(
           (profile) =>
@@ -2119,7 +2547,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     let rootFolder = targetConfig.rootFolders.find(
       (folder) =>
         normalizePathComparable(folder.path ?? folder.Path) ===
-        normalizePathComparable(item.addBook.rootFolderPath)
+        normalizePathComparable(rootFolderPath)
     );
     const missing = [];
 
@@ -2141,10 +2569,8 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
         apiKey: job.apiKey,
         endpoint: '/rootfolder',
         body: {
-          path: item.addBook.rootFolderPath,
-          name:
-            item.addBook.rootFolderPath.split('/').filter(Boolean).pop() ??
-            'Books',
+          path: rootFolderPath,
+          name: rootFolderPath.split('/').filter(Boolean).pop() ?? 'Books',
           defaultQualityProfileId: Number(
             qualityProfile.id ?? qualityProfile.Id
           ),
@@ -2159,7 +2585,6 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
         },
       });
       targetConfig.rootFolders.push(createdRootFolder);
-      rootFolder = createdRootFolder;
     }
 
     if (missing.length) {
@@ -2169,6 +2594,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     return {
       qualityProfileId: Number(qualityProfile.id ?? qualityProfile.Id),
       metadataProfileId: Number(metadataProfile.id ?? metadataProfile.Id),
+      rootFolderPath,
     };
   };
 
@@ -2259,7 +2685,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       tags,
       author: {
         ...local.author,
-        rootFolderPath: item.addBook.rootFolderPath,
+        rootFolderPath: targetIds.rootFolderPath,
         qualityProfileId: targetIds.qualityProfileId,
         metadataProfileId: targetIds.metadataProfileId,
         monitored: false,
@@ -2320,7 +2746,9 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       endpoint: '/author/lookup',
       searchParams: { term: authorName || foreignAuthorId },
     });
-    const lookupAuthor = (Array.isArray(lookupResults) ? lookupResults : []).find(
+    const lookupAuthor = (
+      Array.isArray(lookupResults) ? lookupResults : []
+    ).find(
       (author) =>
         normalizeId(author.foreignAuthorId ?? author.ForeignAuthorId) ===
         foreignAuthorId
@@ -2334,7 +2762,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       ...lookupAuthor,
       qualityProfileId: targetIds.qualityProfileId,
       metadataProfileId: targetIds.metadataProfileId,
-      rootFolderPath: item.addBook.rootFolderPath,
+      rootFolderPath: targetIds.rootFolderPath,
       monitored: false,
       monitorNewItems: 'none',
       tags: [],
@@ -2356,11 +2784,22 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
     authors.push(created);
   };
 
-  const buildRecoveredAddBook = async ({ item, job, targetIds, tags, rejectedIds }) => {
+  const buildRecoveredAddBook = async ({
+    item,
+    job,
+    targetIds,
+    tags,
+    rejectedIds,
+  }) => {
     const softcoverProfiles = await buildSoftcoverRecoveredProfiles({
       item,
       job,
     });
+    const openLibraryProfiles = softcoverProfiles.length
+      ? []
+      : await buildOpenLibraryRecoveredProfiles({
+          item,
+        });
     const candidates = await lookupBookCandidates({
       migrationDir,
       lookupCache,
@@ -2368,7 +2807,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       baseUrl: job.baseUrl,
       apiKey: job.apiKey,
       source: item.source,
-      profiles: softcoverProfiles,
+      profiles: [...softcoverProfiles, ...openLibraryProfiles],
       includeSource: false,
     });
     const usableCandidates = candidates.filter(({ candidate }) => {
@@ -2407,7 +2846,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
           tags,
           author: {
             ...decision.result.author,
-            rootFolderPath: item.addBook.rootFolderPath,
+            rootFolderPath: targetIds.rootFolderPath,
             qualityProfileId: targetIds.qualityProfileId,
             metadataProfileId: targetIds.metadataProfileId,
             monitored: false,
@@ -2519,27 +2958,31 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
         try {
           result = await postBook();
         } catch (postError) {
-        if (isDuplicateCacheError(postError)) {
-          await dedupeTargetCache(job);
-          result = await postBook();
-        } else if (isMissingForeignAuthorError(postError)) {
-          logItemRetry(i, item, 'recovering missing target author');
-          try {
-            await ensureTargetAuthor({ item, job, targetIds });
+          if (isDuplicateCacheError(postError)) {
+            await dedupeTargetCache(job);
             result = await postBook();
-          } catch (authorRecoveryError) {
-            if (
-              !isInvalidForeignAuthorError(authorRecoveryError) &&
-              !isTargetMetadataFetchError(authorRecoveryError)
-            ) {
-              throw authorRecoveryError;
-            }
+          } else if (isMissingForeignAuthorError(postError)) {
+            logItemRetry(i, item, 'recovering missing target author');
+            try {
+              await ensureTargetAuthor({ item, job, targetIds });
+              result = await postBook();
+            } catch (authorRecoveryError) {
+              if (
+                !isInvalidForeignAuthorError(authorRecoveryError) &&
+                !isTargetMetadataFetchError(authorRecoveryError)
+              ) {
+                throw authorRecoveryError;
+              }
 
-            logItemRetry(i, item, 'recovering missing target author via softcover remap');
-            if (!(await recoverViaSoftcover())) {
-              throw authorRecoveryError;
+              logItemRetry(
+                i,
+                item,
+                'recovering missing target author via softcover remap'
+              );
+              if (!(await recoverViaSoftcover())) {
+                throw authorRecoveryError;
+              }
             }
-          }
           } else if (
             isInvalidForeignBookError(postError) ||
             isTargetMetadataFetchError(postError)
@@ -2569,7 +3012,9 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
             localPostError instanceof Error
               ? localPostError.message
               : String(localPostError);
-          throw new Error(`${originalReason}\nLocal fallback failed: ${localReason}`);
+          throw new Error(
+            `${originalReason}\nLocal fallback failed: ${localReason}`
+          );
         }
       }
       postSucceeded = true;
@@ -2581,7 +3026,12 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
       if (!isRecoverableConstraintError(postError)) {
         if (getLocalDbImportEnabled() && targetIds && tags) {
           try {
-            result = await directInsertLocalBook({ item, job, targetIds, tags });
+            result = await directInsertLocalBook({
+              item,
+              job,
+              targetIds,
+              tags,
+            });
             postSucceeded = true;
           } catch (localDbError) {
             failed.push({
@@ -2590,21 +3040,25 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
               reason:
                 `${postError instanceof Error ? postError.message : String(postError)}\n` +
                 `Local DB import failed: ${
-                  localDbError instanceof Error ? localDbError.message : String(localDbError)
+                  localDbError instanceof Error
+                    ? localDbError.message
+                    : String(localDbError)
                 }`,
             });
             logProgress(i);
             continue;
           }
         } else {
-        failed.push({
-          source: item.source,
-          serviceType: item.serviceType,
-          reason:
-            postError instanceof Error ? postError.message : String(postError),
-        });
-        logProgress(i);
-        continue;
+          failed.push({
+            source: item.source,
+            serviceType: item.serviceType,
+            reason:
+              postError instanceof Error
+                ? postError.message
+                : String(postError),
+          });
+          logProgress(i);
+          continue;
         }
       }
     }
@@ -2627,9 +3081,7 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
           apiKey: job.apiKey,
           endpoint: '/book',
         });
-        const targetBook = (
-          Array.isArray(targetBooks) ? targetBooks : []
-        ).find(
+        const targetBook = (Array.isArray(targetBooks) ? targetBooks : []).find(
           (book) =>
             normalizeId(book.foreignBookId ?? book.ForeignBookId) ===
               normalizeId(item.addBook.foreignBookId) ||
@@ -2660,7 +3112,10 @@ const applyRebuildPayload = async ({ migrationDir, jobs }) => {
           serviceType: item.serviceType,
           hardcoverBookId: targetBookId,
           title: result?.title ?? item.addBook.title,
-          foreignBookId: result?.foreignBookId ?? result?.ForeignBookId ?? addBook?.foreignBookId,
+          foreignBookId:
+            result?.foreignBookId ??
+            result?.ForeignBookId ??
+            addBook?.foreignBookId,
           localDbImport: result?.localDbImport === true,
         });
         appliedKeys.add(appliedKey);
@@ -2889,6 +3344,132 @@ const validateTarget = async ({ migrationDir, jobs }) => {
   await writeJson(path.join(migrationDir, 'migration-report.json'), report);
 };
 
+const reconcileLocalImports = async ({ migrationDir, jobs }) => {
+  const applied = await readJsonIfExists(
+    path.join(migrationDir, 'applied-books.json'),
+    []
+  );
+  const lookupCache = await readLookupCache(migrationDir);
+  const report = [];
+
+  for (const item of applied.filter((entry) => entry?.localDbImport === true)) {
+    const job = jobs.find(
+      (candidate) => candidate.serviceType === item.serviceType
+    );
+
+    if (!job?.apiKey) {
+      report.push({
+        source: item.source,
+        serviceType: item.serviceType,
+        ok: false,
+        reason: 'hardcover_api_key_not_provided',
+      });
+      continue;
+    }
+
+    const softcoverProfiles = await buildSoftcoverRecoveredProfiles({
+      item,
+      job,
+    });
+    const openLibraryProfiles = softcoverProfiles.length
+      ? []
+      : await buildOpenLibraryRecoveredProfiles({ item });
+    const candidates = await lookupBookCandidates({
+      migrationDir,
+      lookupCache,
+      serviceType: item.serviceType,
+      baseUrl: job.baseUrl,
+      apiKey: job.apiKey,
+      source: item.source,
+      profiles: [item.source, ...softcoverProfiles, ...openLibraryProfiles],
+      includeSource: false,
+    }).catch((error) => {
+      report.push({
+        source: item.source,
+        serviceType: item.serviceType,
+        ok: false,
+        reason: 'lookup_failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      return [];
+    });
+
+    let match;
+
+    for (const { candidate, lookupTerm, profile } of candidates) {
+      const decision = chooseStrictMatch({
+        source: {
+          ...item.source,
+          title: profile?.title ?? item.source.title,
+          author: profile?.author ?? item.source.author,
+          identifiers: profile?.identifiers ?? item.source.identifiers,
+        },
+        candidates: [candidate],
+        identifier: lookupTerm !== `${item.source.title} ${item.source.author}`,
+      });
+
+      if (decision.status === 'matched') {
+        match = {
+          lookupTerm,
+          hardcover: decision.result,
+          recoveredFrom: profile?.recoveredFrom,
+        };
+        break;
+      }
+    }
+
+    if (!match) {
+      report.push({
+        source: item.source,
+        serviceType: item.serviceType,
+        ok: false,
+        reason: 'native_match_not_found',
+      });
+      continue;
+    }
+
+    const result = await reconcileLocalBookInDb({
+      job,
+      applied: item,
+      hardcover: match.hardcover,
+    }).catch((error) => ({
+      ok: false,
+      reason: 'db_reconcile_failed',
+      error: error instanceof Error ? error.message : String(error),
+    }));
+
+    report.push({
+      source: item.source,
+      serviceType: item.serviceType,
+      lookupTerm: match.lookupTerm,
+      recoveredFrom: match.recoveredFrom,
+      ...result,
+    });
+  }
+
+  await writeJson(
+    path.join(migrationDir, 'local-reconciliation-report.json'),
+    report
+  );
+
+  const reconciled = new Set(
+    report
+      .filter((entry) => entry.ok)
+      .map((entry) => checkpointKeyForSource(entry.source))
+  );
+  const nextApplied = applied.map((entry) =>
+    reconciled.has(checkpointKeyForSource(entry.source))
+      ? { ...entry, localDbImport: false, reconciledFromLocal: true }
+      : entry
+  );
+
+  await writeJson(path.join(migrationDir, 'applied-books.json'), nextApplied);
+  console.log(
+    `Local reconciliation: reconciled=${report.filter((entry) => entry.ok).length}, remaining=${report.filter((entry) => !entry.ok).length}`
+  );
+};
+
 const checkCutoverReadiness = async ({ migrationDir }) => {
   const [report, applyFailures, validation] = await Promise.all([
     readJson(path.join(migrationDir, 'migration-report.json')),
@@ -2986,6 +3567,7 @@ const main = async () => {
   const validate = args.includes('--validate');
   const cutoverCheck = args.includes('--cutover-check');
   const summary = args.includes('--summary');
+  const reconcileLocal = args.includes('--reconcile-local');
   const localDbImport = args.includes('--local-db-import');
   const migrationDir = args.find(
     (arg) =>
@@ -2993,12 +3575,13 @@ const main = async () => {
       arg !== '--validate' &&
       arg !== '--cutover-check' &&
       arg !== '--summary' &&
+      arg !== '--reconcile-local' &&
       arg !== '--local-db-import'
   );
 
   if (!migrationDir) {
     throw new Error(
-      'Usage: bookshelf-hardcover-migration.mjs [--apply|--validate|--cutover-check|--summary] [--local-db-import] <migration-dir>'
+      'Usage: bookshelf-hardcover-migration.mjs [--apply|--validate|--cutover-check|--summary|--reconcile-local] [--local-db-import] <migration-dir>'
     );
   }
 
@@ -3071,6 +3654,11 @@ const main = async () => {
     return;
   }
 
+  if (reconcileLocal) {
+    await reconcileLocalImports({ migrationDir, jobs });
+    return;
+  }
+
   const allMatched = [];
   const allUnmatched = [];
   const allAmbiguous = [];
@@ -3091,10 +3679,14 @@ const main = async () => {
       );
       const processedKeys = checkpointProcessedKeys(checkpoint);
       checkpoint.unmatched.push(
-        ...buildInventorySources(inventory).map((source) => ({
-          source,
-          reason: 'hardcover_api_key_not_provided',
-        })).filter((entry) => !processedKeys.has(checkpointKeyForSource(entry.source)))
+        ...buildInventorySources(inventory)
+          .map((source) => ({
+            source,
+            reason: 'hardcover_api_key_not_provided',
+          }))
+          .filter(
+            (entry) => !processedKeys.has(checkpointKeyForSource(entry.source))
+          )
       );
       await writeMatchCheckpoint({ migrationDir, serviceType, checkpoint });
       allMatched.push(...checkpoint.matched);
@@ -3111,8 +3703,15 @@ const main = async () => {
       lookupCache,
     });
 
-    allMatched.push(...result.matched);
-    allUnmatched.push(...result.unmatched);
+    const openLibraryRecovery = await recoverUnmatchedWithOpenLibrary({
+      migrationDir,
+      lookupCache,
+      job,
+      entries: result.unmatched,
+    });
+
+    allMatched.push(...result.matched, ...openLibraryRecovery.recovered);
+    allUnmatched.push(...openLibraryRecovery.remaining);
     allAmbiguous.push(...result.ambiguous);
   }
 
@@ -3170,20 +3769,24 @@ const main = async () => {
     rebuildBlocked: rebuildBlocked.length,
   };
   report.matchingPolicy =
-    'Layered matching: exact title+author first; optional ISBN/ASIN fallback with ISBN-10/13 conversion; relaxed prefix/subtitle/colon/containment matching only when author agrees; resumable checkpoints and lookup cache are preserved across runs. Apply recovery preserves prior successes, retries transient target failures, pre-creates missing target authors, can synthesize local API entries for unmatched books when HARDCOVER_LOCAL_IMPORT is enabled, and can use deterministic direct DB local records as a final opt-in fallback when HARDCOVER_LOCAL_DB_IMPORT is enabled.';
+    'Layered matching: exact title+author first; optional ISBN/ASIN fallback with ISBN-10/13 conversion; relaxed prefix/subtitle/colon/containment matching only when author agrees; resumable checkpoints and lookup cache are preserved across runs. Apply recovery preserves prior successes, retries transient target failures, pre-creates missing target authors, remaps rejected records through optional softcover and OpenLibrary recovery profiles, can synthesize local API entries for unmatched books when HARDCOVER_LOCAL_IMPORT is enabled, and can use deterministic direct DB local records as a final opt-in fallback when HARDCOVER_LOCAL_DB_IMPORT is enabled.';
   await writeJson(path.join(migrationDir, 'migration-report.json'), report);
-  await readJsonIfExists(path.join(migrationDir, 'applied-books.json'), null)
-    .then((existing) =>
-      existing === null
-        ? writeJson(path.join(migrationDir, 'applied-books.json'), [])
-        : undefined
-    );
-  await readJsonIfExists(path.join(migrationDir, 'apply-failures.json'), null)
-    .then((existing) =>
-      existing === null
-        ? writeJson(path.join(migrationDir, 'apply-failures.json'), [])
-        : undefined
-    );
+  await readJsonIfExists(
+    path.join(migrationDir, 'applied-books.json'),
+    null
+  ).then((existing) =>
+    existing === null
+      ? writeJson(path.join(migrationDir, 'applied-books.json'), [])
+      : undefined
+  );
+  await readJsonIfExists(
+    path.join(migrationDir, 'apply-failures.json'),
+    null
+  ).then((existing) =>
+    existing === null
+      ? writeJson(path.join(migrationDir, 'apply-failures.json'), [])
+      : undefined
+  );
   await writeJson(path.join(migrationDir, 'validation-report.json'), []);
   await writeJson(path.join(migrationDir, 'cutover-decision.json'), {
     ok: false,

@@ -63,9 +63,9 @@ describe('WebhookAgent', () => {
       types: Notification.TEST_NOTIFICATION,
       options: {
         webhookUrl: 'http://127.0.0.1/webhook',
-        jsonPayload: Buffer.from(JSON.stringify(JSON.stringify(nested))).toString(
-          'base64'
-        ),
+        jsonPayload: Buffer.from(
+          JSON.stringify(JSON.stringify(nested))
+        ).toString('base64'),
         customHeaders: [],
         supportVariables: false,
       },

@@ -16,6 +16,11 @@ import MediaIdentifier, {
 } from '@server/entity/MediaIdentifier';
 import OverrideRule from '@server/entity/OverrideRule';
 import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryEditionId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
@@ -72,7 +77,7 @@ const resolveMusicReleaseGroupId = async (
   let listenBrainzError: unknown;
 
   try {
-    const album = await listenbrainz.getAlbum(mediaId);
+    const album = await listenbrainz.getAlbum(normalizeMusicBrainzId(mediaId));
 
     if (album.release_group_mbid) {
       return album.release_group_mbid;
@@ -89,10 +94,10 @@ const resolveMusicReleaseGroupId = async (
 
   try {
     const album = await musicbrainz.getReleaseGroupDetails({
-      releaseGroupId: mediaId,
+      releaseGroupId: normalizeMusicBrainzId(mediaId),
     });
 
-    return album.id;
+    return normalizeMusicBrainzId(album.id);
   } catch (releaseGroupError) {
     logger.warn(
       'MusicBrainz release group lookup failed during music request',
@@ -113,7 +118,7 @@ const resolveMusicReleaseGroupId = async (
 
   const resolvedReleaseGroupId = await musicbrainz
     .getReleaseGroup({
-      releaseId: mediaId,
+      releaseId: normalizeMusicBrainzId(mediaId),
     })
     .catch((error) => {
       if (listenBrainzError) {
@@ -127,7 +132,7 @@ const resolveMusicReleaseGroupId = async (
     throw new Error('MusicBrainz ID did not resolve to a release group.');
   }
 
-  return resolvedReleaseGroupId;
+  return normalizeMusicBrainzId(resolvedReleaseGroupId);
 };
 
 @Entity()
@@ -246,10 +251,12 @@ export class MediaRequest {
     }
 
     if (requestBody.mediaType === MediaType.MUSIC) {
-      const musicMbId = await resolveMusicReleaseGroupId(
-        requestBody.mediaId.toString(),
-        listenbrainz,
-        musicbrainz
+      const musicMbId = normalizeMusicBrainzId(
+        await resolveMusicReleaseGroupId(
+          requestBody.mediaId.toString(),
+          listenbrainz,
+          musicbrainz
+        )
       );
       const blocklistedAlbum = await getRepository(Blocklist).findOne({
         where: {
@@ -411,9 +418,9 @@ export class MediaRequest {
     }
 
     if (requestBody.mediaType === MediaType.BOOK) {
-      const openLibraryId = requestBody.mediaId
-        .toString()
-        .replace(/^\/?works\//, '');
+      const openLibraryId = normalizeOpenLibraryWorkId(
+        requestBody.mediaId.toString()
+      );
       const [, editions] = await Promise.all([
         openLibrary.getWork(openLibraryId),
         openLibrary.getWorkEditions(openLibraryId).catch(() => ({
@@ -432,8 +439,8 @@ export class MediaRequest {
           .map((isbn) => normalizeValidIsbn(isbn))
           .find((isbn): isbn is string => !!isbn);
       const openLibraryEditionId = requestBody.editionId
-        ?.toString()
-        .replace(/^\/?books\//, '');
+        ? normalizeOpenLibraryEditionId(requestBody.editionId.toString())
+        : undefined;
       const identifierCandidates = [
         {
           provider: MediaIdentifierProvider.OPENLIBRARY,

@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { ipKeyGenerator } from 'express-rate-limit';
-import { timingSafeEqual } from 'node:crypto';
 import net from 'net';
+import { timingSafeEqual } from 'node:crypto';
 import dns from 'node:dns/promises';
 
 const SECRET_KEY_PATTERN =

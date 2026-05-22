@@ -133,18 +133,14 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     discoverRegion,
     originalLanguage,
   }: { discoverRegion?: string; originalLanguage?: string } = {}) {
-    super(
-      'https://api.themoviedb.org/3',
-      getTmdbAuthParams(),
-      {
-        headers: getTmdbAuthHeaders(),
-        nodeCache: cacheManager.getCache('tmdb').data,
-        rateLimit: {
-          maxRequests: 20,
-          maxRPS: 50,
-        },
-      }
-    );
+    super('https://api.themoviedb.org/3', getTmdbAuthParams(), {
+      headers: getTmdbAuthHeaders(),
+      nodeCache: cacheManager.getCache('tmdb').data,
+      rateLimit: {
+        maxRequests: 20,
+        maxRPS: 50,
+      },
+    });
     this.locale = getSettings().main?.locale || 'en';
     this.discoverRegion = discoverRegion;
     this.originalLanguage = originalLanguage;

@@ -11,6 +11,10 @@ import { QueryFailedError } from 'typeorm';
 
 import { MediaType } from '@server/constants/media';
 import { watchlistCreate } from '@server/interfaces/api/watchlistCreate';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 
 const watchlistRoutes = Router();
 const maxWatchlistId = 1_000_000_000;
@@ -47,7 +51,15 @@ watchlistRoutes.post<never, Watchlist, Watchlist>(
       if (!parsedBody.success) {
         return next({ status: 400, message: 'Invalid watchlist payload.' });
       }
-      const values = parsedBody.data;
+      const values = {
+        ...parsedBody.data,
+        mbId: parsedBody.data.mbId
+          ? normalizeMusicBrainzId(parsedBody.data.mbId)
+          : undefined,
+        externalId: parsedBody.data.externalId
+          ? normalizeOpenLibraryWorkId(parsedBody.data.externalId)
+          : undefined,
+      };
       logPayload = {
         mediaType: values.mediaType,
         tmdbId: values.tmdbId,
@@ -101,14 +113,21 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
       });
     }
 
-    const mediaId =
+    const parsedMediaId =
       mediaType === MediaType.MUSIC || mediaType === MediaType.BOOK
         ? parseWatchlistExternalId(req.params.mediaId)
         : parseWatchlistNumericId(req.params.mediaId);
 
-    if (mediaId === undefined) {
+    if (parsedMediaId === undefined) {
       return next({ status: 400, message: 'Invalid mediaId parameter.' });
     }
+
+    const mediaId =
+      mediaType === MediaType.MUSIC
+        ? normalizeMusicBrainzId(parsedMediaId as string)
+        : mediaType === MediaType.BOOK
+          ? normalizeOpenLibraryWorkId(parsedMediaId as string)
+          : parsedMediaId;
 
     await Watchlist.deleteWatchlist(mediaId, mediaType, req.user);
     return res.status(204).send();

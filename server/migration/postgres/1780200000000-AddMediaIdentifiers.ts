@@ -34,7 +34,9 @@ export class AddMediaIdentifiers1780200000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "media_identifier" DROP CONSTRAINT "FK_media_identifier_media"`
     );
-    await queryRunner.query(`DROP INDEX "public"."IDX_media_identifier_mediaId"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_media_identifier_mediaId"`
+    );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_media_identifier_provider_value"`
     );

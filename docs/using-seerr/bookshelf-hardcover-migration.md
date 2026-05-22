@@ -18,6 +18,20 @@ run, most books imported through the normal Hardcover API path. The final `42`
 records required the explicit `HARDCOVER_LOCAL_DB_IMPORT=true` fallback because
 Hardcover metadata rejected every API-safe candidate.
 
+## Record States
+
+The migration reports separate the record state from the Bookshelf backend:
+
+| State | Meaning | Typical source |
+| --- | --- | --- |
+| Native Hardcover | The target row uses Hardcover-provided book, author, and edition IDs. | Direct Hardcover lookup, softcover remap, or OpenLibrary remap. |
+| Shadow local | The target row is shaped like a Hardcover-backed Bookshelf row, but uses stable `local:*` IDs. | `HARDCOVER_LOCAL_DB_IMPORT=true` after all native recovery paths fail. |
+| Reconciled | A former shadow row was promoted in place to native Hardcover IDs. | `--reconcile-local` after Hardcover adds or fixes metadata. |
+
+Shadow local rows are intentionally deterministic. The same source book gets the
+same local foreign IDs on repeated runs, so reruns and later reconciliation can
+target the existing row instead of creating another book.
+
 ## What "100%" Means
 
 The migration can reach 100% of the source inventory in a Bookshelf Hardcover
@@ -32,9 +46,11 @@ local:audiobook:4905
 ```
 
 Those records are visible through the Bookshelf API and are included in
-validation/cutover checks, but they are not Hardcover metadata records. They are
-the deterministic last-resort layer for users who want their library represented
-without requiring an LLM or manual data cleanup.
+validation/cutover checks, but they are not Hardcover metadata records yet.
+They are the deterministic last-resort layer for users who want their library
+represented without requiring an LLM or manual data cleanup. Later, if Hardcover
+adds an acceptable record, run local reconciliation to promote the shadow row to
+the native Hardcover IDs in place.
 
 ## Compatibility Layers
 
@@ -49,11 +65,14 @@ The migration keeps earlier recovery layers. It does not replace them.
 7. Alternate Hardcover candidates are tried when the first target ID is bad.
 8. Optional softcover fallback recovers title/author/edition metadata from a
    softcover Bookshelf endpoint, then remaps back through Hardcover.
-9. Optional local DB fallback inserts deterministic local records for anything
+9. OpenLibrary recovery finds alternate title/author/ISBN profiles, then remaps
+   those profiles back through Hardcover for a native target record.
+10. Optional local DB fallback inserts deterministic local records for anything
    still rejected by the target API.
 
-The local DB fallback is opt-in. Leave it off when you only want native
-Hardcover-backed books.
+The local DB fallback is opt-in. Leave it off when you only want current native
+Hardcover metadata. Enable it when complete library representation matters more
+than waiting for Hardcover to fill every metadata gap.
 
 ## Required Inputs
 
@@ -135,7 +154,7 @@ are skipped.
 ## 100% Fallback Run
 
 Enable the final fallback only after reviewing failures and deciding that local
-records are acceptable for non-Hardcover metadata gaps:
+shadow records are acceptable for non-Hardcover metadata gaps:
 
 ```bash
 APPLY_HARDCOVER_REBUILD=true \
@@ -159,14 +178,102 @@ deploy/install-bookshelf-backend.sh --migrate-to-hardcover --allow-local-db-impo
 ```
 
 `HARDCOVER_LOCAL_DB_IMPORT=true` requires `sqlite3` and direct access to the
-target `readarr.db` files. It inserts only after the API path and softcover
-recovery path fail.
+target `readarr.db` files. It inserts only after the API path, softcover
+recovery path, and OpenLibrary recovery path fail.
 
 To apply the final fallback directly to an existing migration directory:
 
 ```bash
 node deploy/bookshelf-hardcover-migration.mjs --apply --local-db-import \
   /opt/bookshelf-backend/backups/20260520-082024/hardcover-migration
+```
+
+## Local Reconciliation
+
+If local shadow records were imported, periodically try to promote them to
+native Hardcover IDs:
+
+```bash
+HARDCOVER_EBOOK_CONFIG_DIR=/path/to/hardcover-ebook-config \
+HARDCOVER_AUDIOBOOK_CONFIG_DIR=/path/to/hardcover-audiobook-config \
+node deploy/bookshelf-hardcover-migration.mjs --reconcile-local \
+  /opt/bookshelf-backend/backups/20260520-082024/hardcover-migration
+```
+
+The reconciliation command looks up each `localDbImport` record through
+Hardcover, softcover recovery, and OpenLibrary recovery. When it finds a strict
+native match, it updates the existing local book, author metadata, and edition
+foreign IDs in place. If a native duplicate already exists, it skips the record
+and reports `native_duplicate_book_exists` instead of creating another book.
+Results are written to `local-reconciliation-report.json`.
+
+Reconciliation mutates only rows that were previously recorded in
+`applied-books.json` with `localDbImport: true`. Successful rows are marked as:
+
+```json
+{
+  "localDbImport": false,
+  "reconciledFromLocal": true
+}
+```
+
+The report uses these common statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `ok: true` | The shadow row was promoted to native Hardcover IDs. |
+| `native_match_not_found` | Hardcover still does not have a strict usable candidate. |
+| `native_duplicate_book_exists` | A native row already exists; no duplicate was created. |
+| `target_config_dir_not_provided` | Set `HARDCOVER_EBOOK_CONFIG_DIR` or `HARDCOVER_AUDIOBOOK_CONFIG_DIR`. |
+| `local_shadow_book_not_found` | The migration record exists but the matching `local:*` row is not in the target DB. |
+| `db_reconcile_failed` | SQLite rejected the in-place update; inspect the error in the report. |
+
+Run validation again after reconciliation:
+
+```bash
+node deploy/bookshelf-hardcover-migration.mjs --validate \
+  /opt/bookshelf-backend/backups/20260520-082024/hardcover-migration
+```
+
+## Output Files
+
+| File | Written by | Purpose |
+| --- | --- | --- |
+| `matched-books.json` | Report run | Strict native matches and native recovery matches ready for rebuild. |
+| `unmatched-books.json` | Report run | Source books still lacking a native candidate. |
+| `ambiguous-books.json` | Report run | Books with multiple plausible candidates that require inspection. |
+| `rebuild-payload.json` | Report run | Books that can be applied to the Hardcover target through the API. |
+| `rebuild-blocked.json` | Report run | Matches missing required fields such as root folder or profile IDs. |
+| `applied-books.json` | Apply/reconcile | Applied source records, target IDs, local shadow flags, and reconciliation flags. |
+| `apply-failures.json` | Apply run | Records that failed API import and, if enabled, direct DB fallback. |
+| `apply-failure-summary.json` | Apply run | Grouped failure categories and recommended next action. |
+| `validation-report.json` | Validate run | Per-target provider, lookup, and applied-record checks. |
+| `cutover-decision.json` | Validate/cutover check | Boolean cutover gate plus blocking reasons. |
+| `lookup-cache.json` | Report/apply/reconcile | Cached Hardcover lookup responses for resumability and rate-limit control. |
+| `local-reconciliation-report.json` | Reconcile run | Promotion results for shadow local records. |
+
+## Command Reference
+
+```bash
+# Generate inventory and reports without importing.
+deploy/install-bookshelf-backend.sh --migrate-to-hardcover
+
+# Apply native API-safe records.
+APPLY_HARDCOVER_REBUILD=true \
+deploy/install-bookshelf-backend.sh --migrate-to-hardcover
+
+# Apply native records and shadow local rows for remaining gaps.
+APPLY_HARDCOVER_REBUILD=true \
+HARDCOVER_LOCAL_DB_IMPORT=true \
+deploy/install-bookshelf-backend.sh --migrate-to-hardcover
+
+# Promote shadow rows later when native Hardcover entries exist.
+node deploy/bookshelf-hardcover-migration.mjs --reconcile-local \
+  /path/to/hardcover-migration
+
+# Validate and gate cutover.
+node deploy/bookshelf-hardcover-migration.mjs --validate /path/to/hardcover-migration
+node deploy/bookshelf-hardcover-migration.mjs --cutover-check /path/to/hardcover-migration
 ```
 
 ## Useful Tuning
@@ -184,6 +291,7 @@ HARDCOVER_DEDUPE_TARGET_CACHE=true
 HARDCOVER_IDENTIFIER_FALLBACK=false
 HARDCOVER_VALIDATION_LOOKUP_RETRIES=3
 HARDCOVER_VALIDATION_LOOKUP_RETRY_DELAY_MS=10000
+HARDCOVER_OPENLIBRARY_RECOVERY=true
 ```
 
 ## Validation and Cutover

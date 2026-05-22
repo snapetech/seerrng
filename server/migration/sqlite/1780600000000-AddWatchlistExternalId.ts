@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddWatchlistExternalId1780600000000
-  implements MigrationInterface
-{
+export class AddWatchlistExternalId1780600000000 implements MigrationInterface {
   name = 'AddWatchlistExternalId1780600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

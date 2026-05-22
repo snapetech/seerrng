@@ -29,9 +29,7 @@ const RecentlyAddedSlider = () => {
   const recentlyAddedCards = useMemo(
     () =>
       (media?.results ?? [])
-        .filter(
-          (item) => item.mediaType === 'movie' || item.mediaType === 'tv'
-        )
+        .filter((item) => item.mediaType === 'movie' || item.mediaType === 'tv')
         .map((item) => (
           <TmdbTitleCard
             key={`media-slider-item-${item.id}`}

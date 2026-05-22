@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddRequestMetadataProfile1780700000000
-  implements MigrationInterface
-{
+export class AddRequestMetadataProfile1780700000000 implements MigrationInterface {
   name = 'AddRequestMetadataProfile1780700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

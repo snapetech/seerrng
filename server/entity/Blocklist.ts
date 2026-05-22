@@ -6,6 +6,7 @@ import MediaIdentifier, {
 } from '@server/entity/MediaIdentifier';
 import { User } from '@server/entity/User';
 import type { BlocklistItem } from '@server/interfaces/api/blocklistInterfaces';
+import { normalizeExternalMediaId } from '@server/lib/externalIds';
 import { DbAwareColumn } from '@server/utils/DbColumnHelper';
 import type { EntityManager } from 'typeorm';
 import {
@@ -82,6 +83,16 @@ export class Blocklist implements BlocklistItem {
   ): Promise<void> {
     const em = entityManager ?? dataSource;
     const tmdbId = blocklistRequest.tmdbId ?? 0;
+    blocklistRequest = {
+      ...blocklistRequest,
+      externalId: blocklistRequest.externalId
+        ? normalizeExternalMediaId(
+            blocklistRequest.externalId,
+            blocklistRequest.mediaType,
+            blocklistRequest.externalProvider
+          )
+        : undefined,
+    };
     const blocklist = new this({
       ...blocklistRequest,
       tmdbId,

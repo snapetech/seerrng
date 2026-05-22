@@ -3,6 +3,8 @@
 dist/
 config/
 cache/config.json
+.bookshelf-migration-lab
+.bookshelf-migration-lab/**
 pnpm-lock.yaml
 cypress/config/settings.cypress.json
 .github

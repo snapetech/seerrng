@@ -129,7 +129,8 @@ const MusicDetails = () => {
     canRequest &&
     (!data.mediaInfo?.status ||
       data.mediaInfo.status === MediaStatus.UNKNOWN ||
-      data.mediaInfo.status === MediaStatus.DELETED);
+      data.mediaInfo.status === MediaStatus.DELETED ||
+      data.mediaInfo.status === MediaStatus.PROCESSING);
   const activeMusicRequests =
     data.mediaInfo?.requests?.filter(
       (request) =>

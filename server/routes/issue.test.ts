@@ -16,8 +16,8 @@ import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
 import authRoutes from './auth';
-import issueCommentRoutes from './issueComment';
 import issueRoutes from './issue';
+import issueCommentRoutes from './issueComment';
 
 let app: Express;
 
@@ -109,7 +109,9 @@ async function createIssue() {
 describe('Issue route validation', () => {
   it('rejects malformed issue list query filters', async () => {
     const agent = await login();
-    const res = await agent.get('/issue').query({ filter: ['open', 'resolved'] });
+    const res = await agent
+      .get('/issue')
+      .query({ filter: ['open', 'resolved'] });
 
     assert.strictEqual(res.status, 400);
     assert.match(res.body.message, /Filter must be a string/);
