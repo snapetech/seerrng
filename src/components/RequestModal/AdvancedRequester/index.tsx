@@ -8,11 +8,11 @@ import defineMessages from '@app/utils/defineMessages';
 import { formatBytes } from '@app/utils/numberHelpers';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
+import type { PaginatedResponse } from '@server/interfaces/api/common';
 import type {
   ServiceCommonServer,
   ServiceCommonServerWithDetails,
 } from '@server/interfaces/api/serviceInterfaces';
-import type { PaginatedResponse } from '@server/interfaces/api/common';
 import { hasPermission } from '@server/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';

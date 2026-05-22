@@ -4,7 +4,7 @@ import type {
   UserSettingsCardTextResponse,
 } from '@server/interfaces/api/userSettingsInterfaces';
 import type { PermissionCheckOptions } from '@server/lib/permissions';
-import { hasPermission, Permission } from '@server/lib/permissions';
+import { Permission, hasPermission } from '@server/lib/permissions';
 import type { NotificationAgentKey } from '@server/lib/settings';
 import { useRouter } from 'next/router';
 import type { MutatorCallback } from 'swr';

@@ -7,20 +7,24 @@ workflow:
 stages:
   - build
   - scan
+  - deploy
   - promote
   - post_release_validate
 
 variables:
-  DOCKER_BUILDKIT: "1"
-  IMAGE_TAG: "$CI_REGISTRY_IMAGE:${CI_COMMIT_REF_SLUG}"
-  IMAGE_SHA_TAG: "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}"
+  DOCKER_BUILDKIT: '1'
+  IMAGE_TAG: 'seerrng:${CI_COMMIT_REF_SLUG}'
+  IMAGE_SHA_TAG: 'seerrng:${CI_COMMIT_SHORT_SHA}'
 
 docker:seerrng:
   stage: build
   image: docker:27.5.1
+  tags:
+    - kspls0
+    - amd64
+    - docker
   before_script:
     - docker info
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
     - docker buildx use default
   script:
     - >
@@ -30,37 +34,89 @@ docker:seerrng:
       --build-arg BUILD_VERSION="${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}"
       --tag "$IMAGE_TAG"
       --tag "$IMAGE_SHA_TAG"
-      --push
+      --load
       .
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        docker buildx imagetools create --tag "$CI_REGISTRY_IMAGE:latest" "$IMAGE_SHA_TAG"
-      fi
-    - |
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        docker buildx imagetools create --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" "$IMAGE_SHA_TAG"
-      fi
 
 .trivy_scan:
   stage: scan
   image:
     name: aquasec/trivy:0.58.2
-    entrypoint: [""]
+    entrypoint: ['']
   script:
     - trivy image --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" --exit-code 0 --severity HIGH,CRITICAL "$CS_IMAGE"
 
 container_scanning:
   extends: .trivy_scan
-  needs: ["docker:seerrng"]
+  needs: ['docker:seerrng']
   variables:
-    CS_IMAGE: "$IMAGE_SHA_TAG"
+    CS_IMAGE: '$IMAGE_SHA_TAG'
   rules:
-    - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG'
+
+deploy:seerr.home:
+  stage: deploy
+  image: docker:27.5.1
+  needs: ['docker:seerrng']
+  tags:
+    - kspls0
+    - amd64
+    - docker
+  variables:
+    SEERRNG_DEPLOY_HOST: 'kspls0'
+    SEERRNG_DEPLOY_CONTAINER: 'seerr-host'
+    SEERRNG_DEPLOY_CONFIG_DIR: '/mnt/datapool_lvm_media/seerrng-config'
+    SEERRNG_DEPLOY_HEALTH_URL: 'http://192.168.50.85:5055/api/v1/status'
+    SEERRNG_DEPLOY_IMAGE: 'seerrng:hardcover-current'
+    SEERRNG_DEPLOY_PORT: '5055'
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - |
+      if docker image inspect "$IMAGE_SHA_TAG" >/dev/null 2>&1; then
+        docker tag "$IMAGE_SHA_TAG" "$SEERRNG_DEPLOY_IMAGE"
+      else
+        docker buildx use default
+        docker buildx build --network host \
+          --file Dockerfile \
+          --build-arg COMMIT_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}" \
+          --build-arg BUILD_VERSION="${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}" \
+          --tag "$SEERRNG_DEPLOY_IMAGE" \
+          --load \
+          .
+      fi
+    - |
+      set -eu
+      docker rm -f "$SEERRNG_DEPLOY_CONTAINER" >/dev/null 2>&1 || true
+      docker run -d \
+        --name "$SEERRNG_DEPLOY_CONTAINER" \
+        --network host \
+        --restart unless-stopped \
+        -e CONFIG_DIRECTORY=/app/config \
+        -e LOG_LEVEL=info \
+        -e TZ=America/Regina \
+        -e PORT="$SEERRNG_DEPLOY_PORT" \
+        -v "$SEERRNG_DEPLOY_CONFIG_DIR":/app/config \
+        "$SEERRNG_DEPLOY_IMAGE"
+    - |
+      set -eu
+      for attempt in $(seq 1 30); do
+        if curl -fsS "$SEERRNG_DEPLOY_HEALTH_URL" | grep -F "$CI_COMMIT_SHORT_SHA"; then
+          exit 0
+        fi
+        sleep 2
+      done
+      docker logs --tail 100 "$SEERRNG_DEPLOY_CONTAINER" >&2 || true
+      exit 1
+  environment:
+    name: seerr.home
+    url: https://request.snape.tech
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 .github_publication_defaults:
   variables:
-    GITHUB_MIRROR_URL: "git@github.com:snapetech/seerrng.git"
-    GITHUB_REPOSITORY: "snapetech/seerrng"
+    GITHUB_MIRROR_URL: 'git@github.com:snapetech/seerrng.git'
+    GITHUB_REPOSITORY: 'snapetech/seerrng'
 
 # External publication is intentionally gated on all earlier GitLab stages.
 # Set GITHUB_MIRROR_SSH_KEY, GITHUB_TOKEN, and GHCR_TOKEN in GitLab CI as needed.
@@ -84,15 +140,15 @@ github:mirror:
         git push github-mirror "HEAD:$CI_COMMIT_REF_NAME"
       fi
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG'
 
 github:release:
   extends: .github_publication_defaults
   stage: promote
   image:
     name: ghcr.io/cli/cli:2.63.2
-    entrypoint: [""]
-  needs: ["github:mirror"]
+    entrypoint: ['']
+  needs: ['github:mirror']
   script:
     - test -n "$GITHUB_TOKEN"
     - test -n "$GITHUB_REPOSITORY"
@@ -112,7 +168,7 @@ ghcr:promote:
   stage: promote
   image:
     name: quay.io/skopeo/stable:v1.17.0
-    entrypoint: [""]
+    entrypoint: ['']
   script:
     - test -n "$GHCR_TOKEN"
     - test -n "$GITHUB_REPOSITORY"
@@ -126,13 +182,13 @@ ghcr:promote:
         skopeo copy "docker://${IMAGE_SHA_TAG}" "docker://$GHCR_REPOSITORY:$CI_COMMIT_TAG"
       fi
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG'
 
 dockerhub:promote:
   stage: promote
   image:
     name: quay.io/skopeo/stable:v1.17.0
-    entrypoint: [""]
+    entrypoint: ['']
   script:
     - test -n "$DOCKERHUB_USERNAME"
     - test -n "$DOCKERHUB_TOKEN"
@@ -145,7 +201,7 @@ dockerhub:promote:
         skopeo copy "docker://${IMAGE_SHA_TAG}" "docker://docker.io/snapetech/seerrng:latest"
       fi
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG'
 
 .package_smoke_defaults:
   stage: post_release_validate
@@ -157,7 +213,7 @@ dockerhub:promote:
     - job: dockerhub:promote
       optional: true
   variables:
-    PACKAGE_SMOKE_ARTIFACT_DIR: "$CI_PROJECT_DIR/artifacts/package-smoke/$SMOKE_PROJECT/$SMOKE_CHANNEL/$SMOKE_ARCH"
+    PACKAGE_SMOKE_ARTIFACT_DIR: '$CI_PROJECT_DIR/artifacts/package-smoke/$SMOKE_PROJECT/$SMOKE_CHANNEL/$SMOKE_ARCH'
   rules:
     - if: '$CI_COMMIT_TAG'
   artifacts:
@@ -237,7 +293,7 @@ package-smoke:arch:
   before_script:
     - pacman -Sy --noconfirm --needed bash ca-certificates curl git sudo
     - useradd -m package-smoke
-    - printf 'package-smoke ALL=(ALL) NOPASSWD: ALL\n' >/etc/sudoers.d/package-smoke
+    - "printf 'package-smoke ALL=(ALL) NOPASSWD: ALL\n' >/etc/sudoers.d/package-smoke"
     - chown -R package-smoke:package-smoke "$CI_PROJECT_DIR"
   script:
     - sudo -u package-smoke env PACKAGE_SMOKE_ARTIFACT_DIR="$PACKAGE_SMOKE_ARTIFACT_DIR" packaging/smoke/package-smoke "$SMOKE_PROJECT" "$SMOKE_CHANNEL" "$CI_COMMIT_TAG" --arch "$SMOKE_ARCH"

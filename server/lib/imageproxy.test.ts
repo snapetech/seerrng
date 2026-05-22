@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  MAX_IMAGE_CACHE_MAX_AGE,
   getImageCacheLastModified,
   getImageResponseContentType,
-  MAX_IMAGE_CACHE_MAX_AGE,
-  parseImageCacheFileMetadata,
   parseCacheControlMaxAge,
+  parseImageCacheFileMetadata,
 } from './imageproxy';
 
 describe('parseCacheControlMaxAge', () => {

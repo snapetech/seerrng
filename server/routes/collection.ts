@@ -3,10 +3,8 @@ import { MediaType } from '@server/constants/media';
 import Media from '@server/entity/Media';
 import logger from '@server/logger';
 import { mapCollection } from '@server/models/Collection';
-import {
-  parseOptionalLanguage,
-} from '@server/utils/validation';
 import { parsePositiveRouteId } from '@server/utils/routeId';
+import { parseOptionalLanguage } from '@server/utils/validation';
 import { Router } from 'express';
 
 const collectionRoutes = Router();

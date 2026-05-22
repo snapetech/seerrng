@@ -16,6 +16,10 @@ import {
   RequestPermissionError,
 } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
+import {
+  normalizeMusicBrainzId,
+  normalizeOpenLibraryWorkId,
+} from '@server/lib/externalIds';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -112,6 +116,15 @@ export class Watchlist {
     const watchlistRepository = getRepository(this);
     const mediaRepository = getRepository(Media);
     const tmdb = new TheMovieDb();
+    watchlistRequest = {
+      ...watchlistRequest,
+      mbId: watchlistRequest.mbId
+        ? normalizeMusicBrainzId(watchlistRequest.mbId)
+        : undefined,
+      externalId: watchlistRequest.externalId
+        ? normalizeOpenLibraryWorkId(watchlistRequest.externalId)
+        : undefined,
+    };
 
     if (watchlistRequest.mediaType === MediaType.MUSIC) {
       if (!watchlistRequest.mbId) {

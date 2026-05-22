@@ -149,6 +149,25 @@ describe('GET /search', () => {
         ],
         posterPath: undefined,
       },
+      {
+        id: 'ALBUM-1',
+        media_type: 'album',
+        title: 'Global Album',
+        score: 94,
+        'primary-type': 'Album',
+        'first-release-date': '2026-02-01',
+        'artist-credit': [
+          {
+            name: 'Global Artist',
+            artist: {
+              id: 'artist-1',
+              name: 'Global Artist',
+              'sort-name': 'Artist, Global',
+            },
+          },
+        ],
+        posterPath: undefined,
+      },
     ]);
     mock.method(MusicBrainz.prototype, 'searchArtist', async () => [
       {
@@ -202,6 +221,15 @@ describe('GET /search', () => {
               cover_i: 123,
               isbn: ['9780000000002'],
               edition_key: ['OL123M'],
+            },
+            {
+              key: '/works/OL124W',
+              title: 'Global Book',
+              author_name: ['Book Author'],
+              first_publish_year: 2026,
+              cover_i: 124,
+              isbn: ['9780000000004'],
+              edition_key: ['OL124M'],
             },
           ],
         };

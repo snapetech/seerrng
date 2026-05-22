@@ -134,9 +134,11 @@ const parseOptionalPort = (
 
 const parseOptionalMediaServerType = (
   value: unknown
-): { value: MediaServerType.JELLYFIN | MediaServerType.EMBY | undefined } | {
-  error: string;
-} => {
+):
+  | { value: MediaServerType.JELLYFIN | MediaServerType.EMBY | undefined }
+  | {
+      error: string;
+    } => {
   if (value === undefined || value === null || value === '') {
     return { value: undefined };
   }

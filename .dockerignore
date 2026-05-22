@@ -12,6 +12,7 @@
 .next
 .prettierignore
 .vscode
+.bookshelf-migration-lab
 charts
 config/db/*
 config/logs/*

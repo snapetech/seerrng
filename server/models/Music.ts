@@ -93,17 +93,17 @@ export const mapMusicDetails = (
     },
     tracks: (album.mediums ?? []).flatMap((medium) =>
       (medium.tracks ?? []).map((track) => ({
-      name: track.name,
-      position: track.position,
-      length: track.length,
-      recordingMbid: track.recording_mbid,
-      totalListenCount: track.total_listen_count,
-      totalUserCount: track.total_user_count,
-      artists: (track.artists ?? []).map((artist) => ({
-        name: artist.artist_credit_name,
-        mbid: artist.artist_mbid,
-      })),
-    }))
+        name: track.name,
+        position: track.position,
+        length: track.length,
+        recordingMbid: track.recording_mbid,
+        totalListenCount: track.total_listen_count,
+        totalUserCount: track.total_user_count,
+        artists: (track.artists ?? []).map((artist) => ({
+          name: artist.artist_credit_name,
+          mbid: artist.artist_mbid,
+        })),
+      }))
     ),
     tags: {
       artist: (album.release_group_metadata?.tag?.artist ?? []).map((tag) => ({
@@ -111,13 +111,13 @@ export const mapMusicDetails = (
         count: tag.count,
         tag: tag.tag,
       })),
-      releaseGroup: (album.release_group_metadata?.tag?.release_group ?? []).map(
-        (tag) => ({
-          count: tag.count,
-          genreMbid: tag.genre_mbid,
-          tag: tag.tag,
-        })
-      ),
+      releaseGroup: (
+        album.release_group_metadata?.tag?.release_group ?? []
+      ).map((tag) => ({
+        count: tag.count,
+        genreMbid: tag.genre_mbid,
+        tag: tag.tag,
+      })),
     },
     stats: {
       totalListenCount: album.listening_stats?.total_listen_count ?? 0,

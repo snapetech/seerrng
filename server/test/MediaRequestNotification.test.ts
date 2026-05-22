@@ -250,7 +250,10 @@ describe('notification media URLs', () => {
       getNotificationMediaUrl({ mediaUrl: 'https://evil.example/movie/1' }),
       undefined
     );
-    assert.equal(getNotificationMediaUrl({ mediaUrl: '//evil.example' }), undefined);
+    assert.equal(
+      getNotificationMediaUrl({ mediaUrl: '//evil.example' }),
+      undefined
+    );
     assert.equal(
       getNotificationMediaUrl({ mediaUrl: '/movie/1\r\nX-Test: yes' }),
       undefined

@@ -18,9 +18,7 @@ const TvCast = () => {
   const router = useRouter();
   const intl = useIntl();
   const tvId = typeof router.query.tvId === 'string' ? router.query.tvId : '';
-  const { data, error } = useSWR<TvDetails>(
-    tvId ? `/api/v1/tv/${tvId}` : null
-  );
+  const { data, error } = useSWR<TvDetails>(tvId ? `/api/v1/tv/${tvId}` : null);
 
   if (!data && !error) {
     return <LoadingSpinner />;

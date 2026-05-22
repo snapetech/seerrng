@@ -14,6 +14,28 @@ import { User } from '@server/entity/User';
 import logger from '@server/logger';
 import { Permission } from './permissions';
 
+type PlexWatchlistItem = Awaited<
+  ReturnType<PlexTvAPI['getWatchlist']>
+>['items'][number];
+
+const dedupePlexWatchlistItems = (
+  items: PlexWatchlistItem[]
+): PlexWatchlistItem[] => {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const mediaType = item.type === 'show' ? MediaType.TV : MediaType.MOVIE;
+    const key = `${mediaType}:${item.tmdbId}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+};
+
 class WatchlistSync {
   public async syncWatchlist() {
     const userRepository = getRepository(User);
@@ -68,16 +90,17 @@ class WatchlistSync {
     const plexTvApi = new PlexTvAPI(user.plexToken);
 
     const response = await plexTvApi.getWatchlist({ size: 20 });
+    const watchlistItems = dedupePlexWatchlistItems(response.items);
 
     const mediaItems = await Media.getRelatedMedia(
       user,
-      response.items.map((i) => ({
+      watchlistItems.map((i) => ({
         tmdbId: i.tmdbId,
         mediaType: i.type === 'show' ? MediaType.TV : MediaType.MOVIE,
       }))
     );
 
-    const watchlistTmdbIds = response.items.map((i) => i.tmdbId);
+    const watchlistTmdbIds = watchlistItems.map((i) => i.tmdbId);
 
     const requestRepository = getRepository(MediaRequest);
     const existingAutoRequests: MediaRequest[] =
@@ -99,7 +122,7 @@ class WatchlistSync {
         .map((r) => `${r.media.mediaType}:${r.media.tmdbId}`)
     );
 
-    const unavailableItems = response.items.filter((i) => {
+    const unavailableItems = watchlistItems.filter((i) => {
       const itemMediaType = i.type === 'show' ? MediaType.TV : MediaType.MOVIE;
 
       return (

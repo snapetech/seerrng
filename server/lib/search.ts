@@ -63,6 +63,58 @@ const searchProviders: SearchProvider[] = [];
 const MUSICBRAINZ_MID_PATTERN =
   /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/;
 
+const normalizeProviderSearchText = (value?: string) =>
+  (value ?? '')
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const dedupeProviderAlbums = (albums: MbAlbumResult[]): MbAlbumResult[] => {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return albums.filter((album) => {
+    const idKey = album.id.toLocaleLowerCase();
+    const titleKey = [
+      normalizeProviderSearchText(album.title),
+      normalizeProviderSearchText(album['artist-credit']?.[0]?.name),
+      album['first-release-date']?.slice(0, 4) ?? '',
+      normalizeProviderSearchText(album['primary-type']),
+    ].join('|');
+
+    if (seenIds.has(idKey) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenIds.add(idKey);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
+const dedupeProviderBooks = (books: BookResult[]): BookResult[] => {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  return books.filter((book) => {
+    const idKey = book.id.toLocaleLowerCase();
+    const titleKey = [
+      normalizeProviderSearchText(book.title),
+      normalizeProviderSearchText(book.author),
+    ].join('|');
+
+    if (seenIds.has(idKey) || seenTitles.has(titleKey)) {
+      return false;
+    }
+
+    seenIds.add(idKey);
+    seenTitles.add(titleKey);
+    return true;
+  });
+};
+
 export const findSearchProvider = (
   query: string
 ): SearchProvider | undefined => {
@@ -308,10 +360,12 @@ searchProviders.push({
 
     try {
       const searchQuery = query?.replace(/^musicbrainz:/i, '') ?? '';
-      const albumResults = await musicbrainz.searchAlbum({
-        query: searchQuery,
-        limit: 20,
-      });
+      const albumResults = dedupeProviderAlbums(
+        await musicbrainz.searchAlbum({
+          query: searchQuery,
+          limit: 20,
+        })
+      );
 
       const results: CombinedSearchResponse['results'] = albumResults.map(
         (album) =>
@@ -382,12 +436,14 @@ searchProviders.push({
         page: 1,
         limit: 20,
       });
-      const results = books.docs.map((doc) => mapOpenLibrarySearchDoc(doc));
+      const results = dedupeProviderBooks(
+        books.docs.map((doc) => mapOpenLibrarySearchDoc(doc))
+      );
 
       return {
         page: 1,
-        total_pages: Math.max(Math.ceil(books.numFound / 20), 1),
-        total_results: books.numFound,
+        total_pages: Math.max(Math.ceil(results.length / 20), 1),
+        total_results: results.length,
         results,
       };
     } catch {

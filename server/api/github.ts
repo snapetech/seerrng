@@ -84,14 +84,11 @@ class GithubAPI extends ExternalAPI {
     take?: number;
   } = {}): Promise<GitHubRelease[]> {
     try {
-      const data = await this.get<GitHubRelease[]>(
-        `${SEERR_REPO}/releases`,
-        {
-          params: {
-            per_page: take,
-          },
-        }
-      );
+      const data = await this.get<GitHubRelease[]>(`${SEERR_REPO}/releases`, {
+        params: {
+          per_page: take,
+        },
+      });
 
       return data;
     } catch (e) {
@@ -111,15 +108,12 @@ class GithubAPI extends ExternalAPI {
     branch?: string;
   } = {}): Promise<GithubCommit[]> {
     try {
-      const data = await this.get<GithubCommit[]>(
-        `${SEERR_REPO}/commits`,
-        {
-          params: {
-            per_page: take,
-            branch,
-          },
-        }
-      );
+      const data = await this.get<GithubCommit[]>(`${SEERR_REPO}/commits`, {
+        params: {
+          per_page: take,
+          branch,
+        },
+      });
 
       return data;
     } catch (e) {

@@ -16,7 +16,9 @@ function getTestResultString(testValue: number): string {
 
 const metadataRoutes = Router();
 
-const isMetadataProviderType = (value: unknown): value is MetadataProviderType =>
+const isMetadataProviderType = (
+  value: unknown
+): value is MetadataProviderType =>
   value === MetadataProviderType.TMDB || value === MetadataProviderType.TVDB;
 
 const parseMetadataSettings = (
