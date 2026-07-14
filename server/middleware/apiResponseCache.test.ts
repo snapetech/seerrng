@@ -37,6 +37,17 @@ describe('apiResponseCache', () => {
     assert.equal(res.headers.vary, 'Cookie, Accept-Encoding');
   });
 
+  it('preserves body-derived conditional ETags for unchanged discover rows', async () => {
+    const app = createApp();
+    const first = await request(app).get('/discover/books');
+    const unchanged = await request(app)
+      .get('/discover/books')
+      .set('If-None-Match', first.headers.etag);
+
+    assert.ok(first.headers.etag);
+    assert.equal(unchanged.status, 304);
+  });
+
   it('uses a shorter private cache for media details', async () => {
     const res = await request(createApp()).get('/book/OL1W');
 

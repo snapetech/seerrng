@@ -2544,6 +2544,107 @@ components:
         - enabled
         - title
         - data
+    DiscoverHomeManifest:
+      type: object
+      required:
+        - version
+        - layoutRevision
+        - userStateRevision
+        - generatedAt
+        - freshness
+        - rows
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        layoutRevision:
+          type: string
+        userStateRevision:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        freshness:
+          type: object
+          required:
+            - manifestMaxAgeSeconds
+            - rowMaxAgeSeconds
+            - stateMaxAgeSeconds
+          properties:
+            manifestMaxAgeSeconds:
+              type: integer
+            rowMaxAgeSeconds:
+              type: integer
+            stateMaxAgeSeconds:
+              type: integer
+        rows:
+          type: array
+          items:
+            type: object
+            required:
+              - key
+              - sliderId
+              - type
+              - descriptorRevision
+            properties:
+              key:
+                type: string
+              sliderId:
+                type: integer
+              type:
+                type: integer
+              title:
+                type: string
+              data:
+                type: string
+              endpoint:
+                type: string
+              descriptorRevision:
+                type: string
+                description: Tracks row configuration only; use the row response ETag and freshness policy for catalog content.
+    DiscoverHomeState:
+      type: object
+      required:
+        - revision
+        - generatedAt
+        - items
+      properties:
+        revision:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              - key
+              - mediaType
+              - id
+              - media
+              - request
+              - watchlisted
+            properties:
+              key:
+                type: string
+              mediaType:
+                type: string
+                enum: [movie, tv, music, book]
+              id:
+                oneOf:
+                  - type: integer
+                  - type: string
+              media:
+                type: object
+                nullable: true
+                additionalProperties: true
+              request:
+                type: object
+                nullable: true
+                additionalProperties: true
+              watchlisted:
+                type: boolean
     WatchProviderRegion:
       type: object
       properties:
@@ -5972,6 +6073,73 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Company'
+  /discover/home/manifest:
+    get:
+      summary: Get the Discover homepage synchronization manifest
+      description: Returns stable layout and personalized-state revisions. Row descriptor revisions do not track upstream catalog content.
+      tags:
+        - discover
+      responses:
+        '200':
+          description: Discover homepage manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverHomeManifest'
+        '304':
+          description: Manifest revisions are unchanged
+  /discover/home/state:
+    post:
+      summary: Get personalized state for a bounded set of Discover items
+      tags:
+        - discover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - items
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    oneOf:
+                      - type: object
+                        additionalProperties: false
+                        required: [mediaType, id]
+                        properties:
+                          mediaType:
+                            type: string
+                            enum: [movie, tv]
+                          id:
+                            type: integer
+                            minimum: 1
+                            maximum: 1000000000
+                      - type: object
+                        additionalProperties: false
+                        required: [mediaType, id]
+                        properties:
+                          mediaType:
+                            type: string
+                            enum: [music, book]
+                          id:
+                            type: string
+                            minLength: 1
+                            maxLength: 128
+      responses:
+        '200':
+          description: Personalized media, request, and watchlist state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverHomeState'
+        '400':
+          description: Invalid item list
   /discover/movies:
     get:
       summary: Discover movies

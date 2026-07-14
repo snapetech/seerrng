@@ -68,6 +68,7 @@ import { Router } from 'express';
 import { sortBy } from 'lodash';
 import { In } from 'typeorm';
 import { z } from 'zod';
+import discoverHomeRoutes from './discoverHome';
 
 export const createTmdbWithRegionLanguage = (user?: User): TheMovieDb => {
   const settings = getSettings();
@@ -106,6 +107,8 @@ const MAX_DISCOVER_QUERY_LENGTH = 256;
 const MAX_DISCOVER_FILTER_LENGTH = 512;
 const trendingMediaTypes = ['all', 'movie', 'tv'] as const;
 const trendingTimeWindows = ['day', 'week'] as const;
+
+discoverRoutes.use('/home', discoverHomeRoutes);
 
 const parseOptionalDiscoverString = (
   value: unknown,
