@@ -3,7 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
   canRegisterServiceWorker,
+  createCacheUserMessage,
+  postCacheUserToWorker,
   shouldVerifyPushSubscription,
+  syncRegistrationCacheUser,
 } from './registration';
 
 describe('canRegisterServiceWorker', () => {
@@ -48,5 +51,39 @@ describe('shouldVerifyPushSubscription', () => {
       }),
       false
     );
+  });
+});
+
+describe('service worker cache user partition', () => {
+  it('uses an explicit null partition when no user is authenticated', () => {
+    assert.deepEqual(createCacheUserMessage(undefined), {
+      type: 'SET_CACHE_USER',
+      userId: null,
+    });
+  });
+
+  it('posts the current user to each worker lifecycle state', () => {
+    const messages: unknown[] = [];
+    const worker = {
+      postMessage: (message: unknown) => messages.push(message),
+    } as Pick<ServiceWorker, 'postMessage'>;
+
+    syncRegistrationCacheUser(
+      {
+        active: worker as ServiceWorker,
+        waiting: worker as ServiceWorker,
+        installing: null,
+      },
+      42
+    );
+
+    assert.deepEqual(messages, [
+      { type: 'SET_CACHE_USER', userId: 42 },
+      { type: 'SET_CACHE_USER', userId: 42 },
+    ]);
+  });
+
+  it('does nothing when there is no controlling worker', () => {
+    assert.equal(postCacheUserToWorker(null, 42), undefined);
   });
 });

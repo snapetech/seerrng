@@ -8,7 +8,9 @@ import { useEffect, useMemo } from 'react';
 
 import {
   canRegisterServiceWorker,
+  postCacheUserToWorker,
   shouldVerifyPushSubscription,
+  syncRegistrationCacheUser,
 } from './registration';
 
 const ServiceWorkerSetup = () => {
@@ -28,6 +30,15 @@ const ServiceWorkerSetup = () => {
       return;
     }
 
+    const syncControllerCacheUser = () =>
+      postCacheUserToWorker(navigator.serviceWorker.controller, userId);
+
+    navigator.serviceWorker.addEventListener(
+      'controllerchange',
+      syncControllerCacheUser
+    );
+    syncControllerCacheUser();
+
     const registerServiceWorker = () => {
       navigator.serviceWorker
         .register(versionedAsset('/sw.js'))
@@ -36,6 +47,8 @@ const ServiceWorkerSetup = () => {
             '[SW] Registration successful, scope is:',
             registration.scope
           );
+
+          syncRegistrationCacheUser(registration, userId);
 
           const pushNotificationsEnabled =
             localStorage.getItem('pushNotificationsEnabled') === 'true';
@@ -94,12 +107,24 @@ const ServiceWorkerSetup = () => {
         timeout: 5000,
       });
 
-      return () => window.cancelIdleCallback(idleCallback);
+      return () => {
+        window.cancelIdleCallback(idleCallback);
+        navigator.serviceWorker.removeEventListener(
+          'controllerchange',
+          syncControllerCacheUser
+        );
+      };
     }
 
     const timeout = globalThis.setTimeout(registerServiceWorker, 2000);
 
-    return () => globalThis.clearTimeout(timeout);
+    return () => {
+      globalThis.clearTimeout(timeout);
+      navigator.serviceWorker.removeEventListener(
+        'controllerchange',
+        syncControllerCacheUser
+      );
+    };
   }, [pushSettings, userId]);
   return null;
 };
