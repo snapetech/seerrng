@@ -1,10 +1,10 @@
+import { JSDOM } from 'jsdom';
+import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
+import type { NextRouter } from 'next/router';
 import { strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
-import type { NextRouter } from 'next/router';
-import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { JSDOM } from 'jsdom';
 import useSearchInput from './useSearchInput';
 import {
   getSearchQuery,
@@ -32,7 +32,11 @@ const createRouter = (overrides: Partial<NextRouter>): NextRouter =>
     back: () => undefined,
     defaultLocale: undefined,
     domainLocales: undefined,
-    events: { emit: () => undefined, off: () => undefined, on: () => undefined },
+    events: {
+      emit: () => undefined,
+      off: () => undefined,
+      on: () => undefined,
+    },
     isFallback: false,
     isLocaleDomain: false,
     isPreview: false,
@@ -113,7 +117,9 @@ describe('shouldSyncSearchInput', () => {
 
 describe('useSearchInput routing', () => {
   it('preserves newer typing through a stale route update and navigates once', async () => {
-    dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/search' });
+    dom = new JSDOM('<div id="root"></div>', {
+      url: 'http://localhost/search',
+    });
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: dom.window,
@@ -122,8 +128,9 @@ describe('useSearchInput routing', () => {
       configurable: true,
       value: dom.window.document,
     });
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-      .IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
 
     const replacements: unknown[] = [];
     const router = createRouter({
@@ -139,11 +146,7 @@ describe('useSearchInput routing', () => {
     };
     const render = () =>
       root?.render(
-        createElement(
-          RouterProvider,
-          { router },
-          createElement(Probe)
-        )
+        createElement(RouterProvider, { router }, createElement(Probe))
       );
 
     root = createRoot(dom.window.document.getElementById('root')!);

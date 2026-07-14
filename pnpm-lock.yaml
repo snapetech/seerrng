@@ -11,7 +11,7 @@ overrides:
   axios: 1.16.1
   bn.js: 4.12.3
   brace-expansion: 5.0.6
-  dompurify: 3.4.10
+  dompurify: 3.4.11
   fast-uri: 3.1.2
   flatted: 3.4.2
   form-data: 4.0.6
@@ -22,8 +22,11 @@ overrides:
   lodash-es: 4.18.1
   mailparser: 3.9.8
   minimatch: 9.0.7
-  eslint-plugin-jsx-a11y>minimatch: 3.1.2
-  nodemailer: 8.0.9
+  eslint-plugin-jsx-a11y>minimatch: 3.1.5
+  undici@>=6 <7: 6.27.0
+  linkify-it: 5.0.1
+  multer: 2.2.0
+  nodemailer: 9.0.1
   picomatch: 2.3.2
   postcss: 8.5.10
   qs: 6.15.2
@@ -100,7 +103,7 @@ importers:
         version: 1.8.1
       connect-typeorm:
         specifier: 2.0.0
-        version: 2.0.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5)))
+        version: 2.0.0(typeorm@0.3.29(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5)))
       cookie-parser:
         specifier: 1.4.7
         version: 1.4.7
@@ -117,8 +120,8 @@ importers:
         specifier: ^0.2.9
         version: 0.2.9
       dompurify:
-        specifier: 3.4.10
-        version: 3.4.10
+        specifier: 3.4.11
+        version: 3.4.11
       email-templates:
         specifier: 13.0.1
         version: 13.0.1(@babel/core@7.29.7)(handlebars@4.7.9)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)
@@ -177,8 +180,8 @@ importers:
         specifier: 2.1.1
         version: 2.1.1
       nodemailer:
-        specifier: 8.0.9
-        version: 8.0.9
+        specifier: 9.0.1
+        version: 9.0.1
       openpgp:
         specifier: 6.3.0
         version: 6.3.0
@@ -255,14 +258,14 @@ importers:
         specifier: ^2.6.1
         version: 2.6.1
       typeorm:
-        specifier: 0.3.28
-        version: 0.3.28(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))
+        specifier: 0.3.29
+        version: 0.3.29(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))
       ua-parser-js:
         specifier: 2.0.10
         version: 2.0.10
       undici:
-        specifier: ^8.1.0
-        version: 8.1.0
+        specifier: ^8.5.0
+        version: 8.7.0
       validator:
         specifier: ^13.15.35
         version: 13.15.35
@@ -4139,8 +4142,8 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.4.10:
-    resolution: {integrity: sha512-0xzNv0e7oYC6yyuOGZIABPM4qtg3QxLFniDNPP4ZP90wR8Yq3zgwpRbrNiT4N3IKqDbbYFEJLV+JWEs19aZ//w==}
+  dompurify@3.4.11:
+    resolution: {integrity: sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -5650,8 +5653,8 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
-  linkify-it@5.0.0:
-    resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
+  linkify-it@5.0.1:
+    resolution: {integrity: sha512-wVoTjP4Q6R0NW5hiZkVJaFZPWgtXfoGF+6LucL3/FtiNjmcHhYjEr5f1Kqjirc1nBW07J/ZuRFumqr2oqccEWg==}
 
   lint-staged@16.4.0:
     resolution: {integrity: sha512-lBWt8hujh/Cjysw5GYVmZpFHXDCgZzhrOm8vbcUdobADZNOK/bRshr2kM3DfgrrtR1DQhfupW9gnIXOfiFi+bw==}
@@ -6000,8 +6003,8 @@ packages:
   minimalistic-assert@1.0.1:
     resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}
 
-  minimatch@3.1.2:
-    resolution: {integrity: sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw==}
+  minimatch@3.1.5:
+    resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
 
   minimatch@9.0.7:
     resolution: {integrity: sha512-MOwgjc8tfrpn5QQEvjijjmDVtMw2oL88ugTevzxQnzRLm6l3fVEF2gzU0kYeYYKD8C66+IdGX6peJ4MyUlUnPg==}
@@ -6081,8 +6084,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  multer@2.1.1:
-    resolution: {integrity: sha512-mo+QTzKlx8R7E5ylSXxWzGoXoZbOsRMpyitcht8By2KHvMbf3tjwosZ/Mu/XYU6UuJ3VZnODIrak5ZrPiPyB6A==}
+  multer@2.2.0:
+    resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
     engines: {node: '>= 10.16.0'}
 
   multimatch@5.0.0:
@@ -6214,8 +6217,8 @@ packages:
     resolution: {integrity: sha512-OXdegQq03OmXEjt2hZP33W2YPs/E5BcFQks46+G2gAxs4gHOIVD1u7EqlYLYSKsaIpyKCK9Gbk0ta1/gjRSMRQ==}
     engines: {node: '>=6'}
 
-  nodemailer@8.0.9:
-    resolution: {integrity: sha512-5ofa7BUN8+C+Hckh5V2GjeeOGRQBx0CJQA6KxrvuZfC8iU4/q7sLn8XrtEEhJkjV6HdyIiQs7Bba6bTao8JhkA==}
+  nodemailer@9.0.1:
+    resolution: {integrity: sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw==}
     engines: {node: '>=6.0.0'}
 
   nodemon@3.1.14:
@@ -7781,8 +7784,8 @@ packages:
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
 
-  typeorm@0.3.28:
-    resolution: {integrity: sha512-6GH7wXhtfq2D33ZuRXYwIsl/qM5685WZcODZb7noOOcRMteM9KF2x2ap3H0EBjnSV0VO4gNAfJT5Ukp0PkOlvg==}
+  typeorm@0.3.29:
+    resolution: {integrity: sha512-wwPEX/df4l72gCmOsrs0otJZYLGA9lLQkUZCkukbsymEycV4zXv2KM7wU7v2r8L01TaCgY9ApSSqHQWBOUhEoQ==}
     engines: {node: '>=16.13.0'}
     hasBin: true
     peerDependencies:
@@ -7891,12 +7894,12 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@6.25.0:
-    resolution: {integrity: sha512-ZgpWDC5gmNiuY9CnLVXEH8rl50xhRCuLNA97fAUnKi8RRuV4E6KG31pDTsLVUKnohJE0I3XDrTeEydAXRw47xg==}
+  undici@6.27.0:
+    resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
     engines: {node: '>=18.17'}
 
-  undici@8.1.0:
-    resolution: {integrity: sha512-E9MkTS4xXLnRPYqxH2e6Hr2/49e7WFDKczKcCaFH4VaZs2iNvHMqeIkyUAD9vM8kujy9TjVrRlQ5KkdEJxB2pw==}
+  undici@8.7.0:
+    resolution: {integrity: sha512-N7iQtfyLhIMOFgQubvmLV26svHpO0bqKnAiWotTQCVKCmWrcGbBotPuW1x+xwYZ2VHdSTVUfPQQnlEt1/LouTQ==}
     engines: {node: '>=22.19.0'}
 
   unicode-canonical-property-names-ecmascript@2.0.0:
@@ -11763,7 +11766,7 @@ snapshots:
       parse5: 7.1.2
       parse5-htmlparser2-tree-adapter: 7.0.0
       parse5-parser-stream: 7.1.2
-      undici: 6.25.0
+      undici: 6.27.0
       whatwg-mimetype: 4.0.0
 
   cheerio@1.0.0-rc.10:
@@ -11968,13 +11971,13 @@ snapshots:
       readable-stream: 3.6.2
       typedarray: 0.0.6
 
-  connect-typeorm@2.0.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))):
+  connect-typeorm@2.0.0(typeorm@0.3.29(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))):
     dependencies:
       '@types/debug': 0.0.31
       '@types/express-session': 1.18.2
       debug: 4.4.3(supports-color@5.5.0)
       express-session: 1.19.0
-      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))
+      typeorm: 0.3.29(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5))
     transitivePeerDependencies:
       - supports-color
 
@@ -12428,7 +12431,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.4.10:
+  dompurify@3.4.11:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -12484,7 +12487,7 @@ snapshots:
       html-to-text: 9.0.5
       juice: 11.1.1
       lodash: 4.18.1
-      nodemailer: 8.0.9
+      nodemailer: 9.0.1
     optionalDependencies:
       preview-email: 3.1.0
     transitivePeerDependencies:
@@ -12825,7 +12828,7 @@ snapshots:
       hasown: 2.0.2
       jsx-ast-utils: 3.3.5
       language-tags: 1.0.9
-      minimatch: 3.1.2
+      minimatch: 3.1.5
       object.fromentries: 2.0.8
       safe-regex-test: 1.1.0
       string.prototype.includes: 2.0.1
@@ -13032,7 +13035,7 @@ snapshots:
       lodash.clonedeep: 4.5.0
       lodash.get: 4.4.2
       media-typer: 1.1.0
-      multer: 2.1.1
+      multer: 2.2.0
       ono: 7.1.3
       path-to-regexp: 8.4.2
       qs: 6.15.2
@@ -14549,7 +14552,7 @@ snapshots:
 
   lines-and-columns@1.2.4: {}
 
-  linkify-it@5.0.0:
+  linkify-it@5.0.1:
     dependencies:
       uc.micro: 2.1.0
     optional: true
@@ -14697,8 +14700,8 @@ snapshots:
       html-to-text: 9.0.5
       iconv-lite: 0.7.2
       libmime: 5.3.8
-      linkify-it: 5.0.0
-      nodemailer: 8.0.9
+      linkify-it: 5.0.1
+      nodemailer: 9.0.1
       punycode.js: 2.3.1
       tlds: 1.261.0
     optional: true
@@ -15044,7 +15047,7 @@ snapshots:
 
   minimalistic-assert@1.0.1: {}
 
-  minimatch@3.1.2:
+  minimatch@3.1.5:
     dependencies:
       brace-expansion: 5.0.6
 
@@ -15127,7 +15130,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  multer@2.1.1:
+  multer@2.2.0:
     dependencies:
       append-field: 1.0.0
       busboy: 1.6.0
@@ -15273,7 +15276,7 @@ snapshots:
       long-timeout: 0.1.1
       sorted-array-functions: 1.3.0
 
-  nodemailer@8.0.9: {}
+  nodemailer@9.0.1: {}
 
   nodemon@3.1.14:
     dependencies:
@@ -15724,7 +15727,7 @@ snapshots:
       fixpack: 4.0.0
       get-port: 5.1.1
       mailparser: 3.9.8
-      nodemailer: 8.0.9
+      nodemailer: 9.0.1
       open: 7.4.2
       p-event: 4.2.0
       p-wait-for: 3.2.0
@@ -17099,7 +17102,7 @@ snapshots:
 
   typedarray@0.0.6: {}
 
-  typeorm@0.3.28(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5)):
+  typeorm@0.3.29(babel-plugin-macros@3.1.0)(pg@8.20.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.15))(@types/node@22.19.0)(typescript@5.4.5)):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.2.0
@@ -17174,9 +17177,9 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@6.25.0: {}
+  undici@6.27.0: {}
 
-  undici@8.1.0: {}
+  undici@8.7.0: {}
 
   unicode-canonical-property-names-ecmascript@2.0.0: {}
 

@@ -12,6 +12,7 @@ overrides:
   copy-webpack-plugin: 14.0.0
   fast-uri: 3.1.2
   follow-redirects: 1.16.0
+  http-proxy-middleware: 2.0.10
   joi: 17.13.4
   js-yaml: 4.2.0
   launch-editor: 2.14.1
@@ -25,10 +26,10 @@ overrides:
   shell-quote: 1.8.4
   svgo: 3.3.3
   terser-webpack-plugin: 5.6.1
-  undici: 7.24.0
+  undici: 7.28.0
   uuid: 11.1.1
   webpack: 5.104.1
-  webpack-dev-server: 5.2.4
+  webpack-dev-server: 5.2.5
   ws: 8.21.0
   yaml: 2.8.3
 
@@ -3331,8 +3332,8 @@ packages:
   http-parser-js@0.5.10:
     resolution: {integrity: sha512-Pysuw9XpUq5dVc/2SMHpuTY01RFl8fttgcyunjL7eEMhGM3cI4eOmiCycJDVCo/7O7ClfQD3SaI6ftDzqOXYMA==}
 
-  http-proxy-middleware@2.0.9:
-    resolution: {integrity: sha512-c1IyJYLYppU574+YI7R4QyX2ystMtVXZwIdzazUIPIJsHuWNd+mho2j+bKoHftndicGj9yh+xjd+l0yj7VeT1Q==}
+  http-proxy-middleware@2.0.10:
+    resolution: {integrity: sha512-RKzRWNPxUZqbuk3BC5mGVJbBnWgr+diEnjJexIOytFbBzDy88Fbh/YvBr3DsNrl1jYAfjWfpATEv0NO35FDuPQ==}
     engines: {node: '>=12.0.0'}
     peerDependencies:
       '@types/express': ^4.17.13
@@ -5620,8 +5621,8 @@ packages:
   undici-types@7.12.0:
     resolution: {integrity: sha512-goOacqME2GYyOZZfb5Lgtu+1IDmAlAEu5xnD3+xTzS10hT0vzpf0SPjkXwAw9Jm+4n/mQGDP3LO8CPbYROeBfQ==}
 
-  undici@7.24.0:
-    resolution: {integrity: sha512-jxytwMHhsbdpBXxLAcuu0fzlQeXCNnWdDyRHpvWsUl8vd98UwYdl9YTyn8/HcpcJPC3pwUveefsa3zTxyD/ERg==}
+  undici@7.28.0:
+    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
 
   unicode-canonical-property-names-ecmascript@2.0.1:
@@ -5796,8 +5797,8 @@ packages:
       webpack:
         optional: true
 
-  webpack-dev-server@5.2.4:
-    resolution: {integrity: sha512-GqDPGZN9bRqKBTkp4aWkobDDHMsrXKoGSdOH56smIri8qR0JG8gfL8/v/f/OZR3/OKXjG8uwJbFVhKm/FNU/UA==}
+  webpack-dev-server@5.2.5:
+    resolution: {integrity: sha512-4wZtCquSuv9CKX8oybo+mqxtxZqWz47uM1Ch94lxowBztOhWCbhqvRbfC/mODOwxgV2brY+JGZpHq58/SuVFYg==}
     engines: {node: '>= 18.12.0'}
     hasBin: true
     peerDependencies:
@@ -7331,7 +7332,7 @@ snapshots:
       update-notifier: 6.0.2
       webpack: 5.104.1(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.10))(html-minifier-terser@7.2.0)(postcss@8.5.10)
       webpack-bundle-analyzer: 4.10.2
-      webpack-dev-server: 5.2.4(debug@4.4.3)(webpack@5.104.1(postcss@8.5.10))
+      webpack-dev-server: 5.2.5(debug@4.4.3)(webpack@5.104.1(postcss@8.5.10))
       webpack-merge: 6.0.1
     transitivePeerDependencies:
       - '@minify-html/node'
@@ -9359,7 +9360,7 @@ snapshots:
       parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 7.1.0
       parse5-parser-stream: 7.1.2
-      undici: 7.24.0
+      undici: 7.28.0
       whatwg-mimetype: 4.0.0
 
   chokidar@3.6.0:
@@ -10079,7 +10080,7 @@ snapshots:
       etag: 1.8.1
       finalhandler: 1.3.1
       fresh: 0.5.2
-      http-errors: 2.0.0
+      http-errors: 2.0.1
       merge-descriptors: 1.0.3
       methods: 1.1.2
       on-finished: 2.4.1
@@ -10092,7 +10093,7 @@ snapshots:
       send: 0.19.0
       serve-static: 1.16.2
       setprototypeof: 1.2.0
-      statuses: 2.0.1
+      statuses: 2.0.2
       type-is: 1.6.18
       utils-merge: 1.0.1
       vary: 1.1.2
@@ -10531,7 +10532,7 @@ snapshots:
 
   http-parser-js@0.5.10: {}
 
-  http-proxy-middleware@2.0.9(@types/express@4.17.25)(debug@4.4.3):
+  http-proxy-middleware@2.0.10(@types/express@4.17.25)(debug@4.4.3):
     dependencies:
       '@types/http-proxy': 1.17.16
       http-proxy: 1.18.1(debug@4.4.3)
@@ -13187,7 +13188,7 @@ snapshots:
 
   undici-types@7.12.0: {}
 
-  undici@7.24.0: {}
+  undici@7.28.0: {}
 
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
@@ -13384,11 +13385,11 @@ snapshots:
       mime-types: 3.0.1
       on-finished: 2.4.1
       range-parser: 1.2.1
-      schema-utils: 4.3.2
+      schema-utils: 4.3.3
     optionalDependencies:
       webpack: 5.104.1(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.10))(html-minifier-terser@7.2.0)(postcss@8.5.10)
 
-  webpack-dev-server@5.2.4(debug@4.4.3)(webpack@5.104.1(postcss@8.5.10)):
+  webpack-dev-server@5.2.5(debug@4.4.3)(webpack@5.104.1(postcss@8.5.10)):
     dependencies:
       '@types/bonjour': 3.5.13
       '@types/connect-history-api-fallback': 1.5.4
@@ -13406,12 +13407,12 @@ snapshots:
       connect-history-api-fallback: 2.0.0
       express: 4.22.2
       graceful-fs: 4.2.11
-      http-proxy-middleware: 2.0.9(@types/express@4.17.25)(debug@4.4.3)
+      http-proxy-middleware: 2.0.10(@types/express@4.17.25)(debug@4.4.3)
       ipaddr.js: 2.2.0
       launch-editor: 2.14.1
       open: 10.2.0
       p-retry: 6.2.1
-      schema-utils: 4.3.2
+      schema-utils: 4.3.3
       selfsigned: 5.5.0
       serve-index: 1.9.1
       sockjs: 0.3.24
