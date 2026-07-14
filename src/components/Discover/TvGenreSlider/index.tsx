@@ -1,6 +1,7 @@
 import { genreColorMap } from '@app/components/Discover/constants';
 import GenreCard from '@app/components/GenreCard';
 import Slider from '@app/components/Slider';
+import useDiscoverRowSnapshot from '@app/hooks/useDiscoverRowSnapshot';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { GenreSliderItem } from '@server/interfaces/api/discoverInterfaces';
@@ -8,7 +9,8 @@ import Link from 'next/link';
 import React from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+
+const TV_GENRES_URL = '/api/v1/discover/genreslider/tv';
 
 const messages = defineMessages('components.Discover.TvGenreSlider', {
   tvgenres: 'Series Genres',
@@ -20,13 +22,11 @@ const TvGenreSlider = () => {
     rootMargin: '450px 0px',
     triggerOnce: true,
   });
-  const { data, error } = useSWR<GenreSliderItem[]>(
-    inView ? `/api/v1/discover/genreslider/tv` : null,
-    {
-      refreshInterval: 0,
-      revalidateOnFocus: false,
-    }
-  );
+  const { data, error, isLoading } = useDiscoverRowSnapshot<GenreSliderItem[]>({
+    enabled: inView,
+    rowKey: 'tv-genres',
+    url: TV_GENRES_URL,
+  });
 
   return (
     <div ref={ref}>
@@ -38,7 +38,7 @@ const TvGenreSlider = () => {
       </div>
       <Slider
         sliderKey="tv-genres"
-        isLoading={inView && !data && !error}
+        isLoading={isLoading && !error}
         isEmpty={false}
         items={(data ?? []).map((genre, index) => (
           <GenreCard

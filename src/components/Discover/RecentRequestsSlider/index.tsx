@@ -1,6 +1,7 @@
 import { sliderTitles } from '@app/components/Discover/constants';
 import RequestCard from '@app/components/RequestCard';
 import Slider from '@app/components/Slider';
+import useDiscoverRowSnapshot from '@app/hooks/useDiscoverRowSnapshot';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import {
@@ -11,7 +12,8 @@ import type { RequestResultsResponse } from '@server/interfaces/api/requestInter
 import Link from 'next/link';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+
+const REQUESTS_URL = '/api/v1/request?filter=all&take=10&sort=modified&skip=0';
 
 const messages = defineMessages('components.Discover.RecentRequestsSlider', {
   unableToConnect:
@@ -25,13 +27,15 @@ const RecentRequestsSlider = () => {
     rootMargin: '450px 0px',
     triggerOnce: true,
   });
-  const { data: requests, error: requestError } =
-    useSWR<RequestResultsResponse>(
-      inView ? '/api/v1/request?filter=all&take=10&sort=modified&skip=0' : null,
-      {
-        revalidateOnFocus: false,
-      }
-    );
+  const {
+    data: requests,
+    error: requestError,
+    isLoading,
+  } = useDiscoverRowSnapshot<RequestResultsResponse>({
+    enabled: inView,
+    rowKey: 'recent-requests',
+    url: REQUESTS_URL,
+  });
 
   const hasServiceErrors =
     requests?.serviceErrors &&
@@ -69,7 +73,7 @@ const RecentRequestsSlider = () => {
 
       <Slider
         sliderKey="requests"
-        isLoading={inView && !requests}
+        isLoading={isLoading}
         isEmpty={!!requests && requests.results.length === 0 && !requestError}
         items={(requests?.results ?? []).map((request) => (
           <RequestCard

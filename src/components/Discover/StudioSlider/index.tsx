@@ -1,7 +1,6 @@
 import CompanyCard from '@app/components/CompanyCard';
 import Slider from '@app/components/Slider';
 import defineMessages from '@app/utils/defineMessages';
-import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.StudioSlider', {
@@ -85,13 +84,8 @@ const studios: Studio[] = [
 
 const StudioSlider = () => {
   const intl = useIntl();
-  const { ref, inView } = useInView({
-    rootMargin: '450px 0px',
-    triggerOnce: true,
-  });
-
   return (
-    <div ref={ref}>
+    <div>
       <div className="slider-header">
         <div className="slider-title">
           <span>{intl.formatMessage(messages.studios)}</span>
@@ -99,20 +93,16 @@ const StudioSlider = () => {
       </div>
       <Slider
         sliderKey="studios"
-        isLoading={!inView}
+        isLoading={false}
         isEmpty={false}
-        items={
-          inView
-            ? studios.map((studio, index) => (
-                <CompanyCard
-                  key={`studio-${index}`}
-                  name={studio.name}
-                  image={studio.image}
-                  url={studio.url}
-                />
-              ))
-            : []
-        }
+        items={studios.map((studio, index) => (
+          <CompanyCard
+            key={`studio-${index}`}
+            name={studio.name}
+            image={studio.image}
+            url={studio.url}
+          />
+        ))}
         placeholder={<CompanyCardPlaceholder />}
         emptyMessage=""
       />

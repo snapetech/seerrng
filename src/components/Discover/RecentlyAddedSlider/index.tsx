@@ -1,12 +1,15 @@
 import Slider from '@app/components/Slider';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
+import useDiscoverRowSnapshot from '@app/hooks/useDiscoverRowSnapshot';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import type { MediaResultsResponse } from '@server/interfaces/api/mediaInterfaces';
 import { useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+
+const RECENTLY_ADDED_URL =
+  '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded&mediaType=movie%2Ctv';
 
 const messages = defineMessages('components.Discover.RecentlyAddedSlider', {
   recentlyAdded: 'Recently Added',
@@ -19,12 +22,15 @@ const RecentlyAddedSlider = () => {
     rootMargin: '450px 0px',
     triggerOnce: true,
   });
-  const { data: media, error: mediaError } = useSWR<MediaResultsResponse>(
-    inView
-      ? '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded&mediaType=movie%2Ctv'
-      : null,
-    { revalidateOnFocus: false }
-  );
+  const {
+    data: media,
+    error: mediaError,
+    isLoading,
+  } = useDiscoverRowSnapshot<MediaResultsResponse>({
+    enabled: inView,
+    rowKey: 'recently-added',
+    url: RECENTLY_ADDED_URL,
+  });
 
   const recentlyAddedCards = useMemo(
     () =>
@@ -59,7 +65,7 @@ const RecentlyAddedSlider = () => {
       </div>
       <Slider
         sliderKey="media"
-        isLoading={inView && !media}
+        isLoading={isLoading}
         isEmpty={!!media && !recentlyAddedCards.length && !mediaError}
         items={recentlyAddedCards}
       />

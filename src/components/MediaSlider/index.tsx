@@ -7,9 +7,13 @@ import useCardTextVisibility from '@app/hooks/useCardTextVisibility';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import {
-  setPersistentResponse,
-  usePersistentResponse,
-} from '@app/utils/swrCache';
+  buildDiscoverCacheContextKey,
+  buildDiscoverSnapshotKey,
+  createDiscoverSnapshot,
+  isDiscoverSnapshotFresh,
+  setDiscoverSnapshot,
+  useDiscoverSnapshot,
+} from '@app/utils/discoverSnapshot';
 import {
   ArrowPathIcon,
   ArrowRightCircleIcon,
@@ -25,6 +29,7 @@ import type {
   TvResult,
 } from '@server/models/Search';
 import { appendDiscoverQueryString } from '@server/utils/discoverQuery';
+import axios from 'axios';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
@@ -85,16 +90,54 @@ const MediaSlider = ({
     rootMargin: '450px 0px',
     triggerOnce: true,
   });
-  const shouldLoad = isEditingSafe() || inView;
-  const [shuffleSeed, setShuffleSeed] = useState(() =>
+  const [initialShuffleSeed] = useState(() =>
     Math.random().toString(36).slice(2)
   );
-  const fallbackCacheKey = useMemo(
+  const cacheContextKey = useMemo(
     () =>
-      `discover-slider:${user?.id ?? 'anonymous'}:${sliderKey}:${url}:${extraParams ?? ''}`,
-    [extraParams, sliderKey, url, user?.id]
+      user
+        ? buildDiscoverCacheContextKey({
+            userId: user.id,
+            permissions: user.permissions,
+            discoverRegion:
+              user.settings?.discoverRegion ??
+              settings.currentSettings.discoverRegion,
+            streamingRegion:
+              user.settings?.streamingRegion ??
+              settings.currentSettings.streamingRegion,
+            originalLanguage:
+              user.settings?.originalLanguage ??
+              settings.currentSettings.originalLanguage,
+          })
+        : undefined,
+    [
+      settings.currentSettings.discoverRegion,
+      settings.currentSettings.originalLanguage,
+      settings.currentSettings.streamingRegion,
+      user,
+    ]
   );
-  const fallbackData = usePersistentResponse<MixedResult[]>(fallbackCacheKey);
+  const snapshotKey = useMemo(
+    () =>
+      cacheContextKey
+        ? buildDiscoverSnapshotKey(cacheContextKey, sliderKey, url, extraParams)
+        : undefined,
+    [cacheContextKey, extraParams, sliderKey, url]
+  );
+  const { hydrated: snapshotHydrated, snapshot } = useDiscoverSnapshot<
+    MixedResult[]
+  >(snapshotKey, cacheContextKey);
+  const [seedOverride, setSeedOverride] = useState<{
+    snapshotKey?: string;
+    seed: string;
+  }>();
+  const shuffleSeed =
+    (seedOverride?.snapshotKey === snapshotKey
+      ? seedOverride?.seed
+      : snapshot?.metadata.seed) ?? initialShuffleSeed;
+  const fallbackData = snapshot?.data;
+  const shouldLoad =
+    !!user && snapshotHydrated && (!!fallbackData || isEditingSafe() || inView);
   const getKey = useCallback(
     (pageIndex: number, previousPageData: MixedResult | null) => {
       if (!shouldLoad) {
@@ -105,15 +148,18 @@ const MediaSlider = ({
         return null;
       }
 
-      return `${url}?${appendDiscoverQueryString(
-        {
-          page: pageIndex + 1,
-          shuffleSeed: randomizeOrder ? shuffleSeed : undefined,
-        },
-        extraParams
-      )}`;
+      return [
+        `${url}?${appendDiscoverQueryString(
+          {
+            page: pageIndex + 1,
+            shuffleSeed: randomizeOrder ? shuffleSeed : undefined,
+          },
+          extraParams
+        )}`,
+        cacheContextKey,
+      ] as const;
     },
-    [extraParams, randomizeOrder, shouldLoad, shuffleSeed, url]
+    [cacheContextKey, extraParams, randomizeOrder, shouldLoad, shuffleSeed, url]
   );
 
   const {
@@ -124,17 +170,20 @@ const MediaSlider = ({
     mutate: revalidate,
   } = useSWRInfinite<MixedResult>(getKey, {
     initialSize: 1,
-    revalidateFirstPage: true,
+    revalidateFirstPage: false,
+    revalidateOnMount: !fallbackData,
     dedupingInterval: 30000,
+    fetcher: ([requestUrl]: [string, string]) =>
+      axios.get<MixedResult>(requestUrl).then((response) => response.data),
     revalidateOnFocus: false,
     fallbackData,
   });
 
   useEffect(() => {
-    if (fallbackData) {
+    if (shouldLoad && snapshot && !isDiscoverSnapshotFresh(snapshot)) {
       void revalidate();
     }
-  }, [fallbackData, revalidate]);
+  }, [revalidate, shouldLoad, snapshot]);
 
   const refreshRandomizedOrder = useCallback(() => {
     if (!randomizeOrder) {
@@ -142,10 +191,11 @@ const MediaSlider = ({
     }
 
     setSize(1);
-    setShuffleSeed(
-      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-    );
-  }, [randomizeOrder, setSize]);
+    setSeedOverride({
+      snapshotKey,
+      seed: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+    });
+  }, [randomizeOrder, setSize, snapshotKey]);
 
   const titles = useMemo(() => {
     const filteredTitles: SliderTitle[] = [];
@@ -225,10 +275,27 @@ const MediaSlider = ({
   }, [setSize, shouldLoadMore]);
 
   useEffect(() => {
-    if (data?.length && renderableTitles.length) {
-      setPersistentResponse(fallbackCacheKey, data);
+    if (
+      cacheContextKey &&
+      snapshotKey &&
+      data?.length &&
+      data !== fallbackData
+    ) {
+      setDiscoverSnapshot(
+        snapshotKey,
+        createDiscoverSnapshot(cacheContextKey, data, {
+          seed: randomizeOrder ? shuffleSeed : undefined,
+        })
+      );
     }
-  }, [data, fallbackCacheKey, renderableTitles.length]);
+  }, [
+    cacheContextKey,
+    data,
+    fallbackData,
+    randomizeOrder,
+    shuffleSeed,
+    snapshotKey,
+  ]);
 
   useEffect(() => {
     if (onNewTitles) {
@@ -410,7 +477,7 @@ const MediaSlider = ({
       </div>
       <Slider
         sliderKey={sliderKey}
-        isLoading={!data && !error}
+        isLoading={snapshotHydrated && shouldLoad && !data && !error}
         isEmpty={!!data && hasReachedEnd && !renderableTitles.length}
         items={finalTitles}
       />

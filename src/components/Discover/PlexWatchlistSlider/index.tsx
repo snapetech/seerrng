@@ -1,6 +1,7 @@
 import Slider from '@app/components/Slider';
 import LibraryTitleCard from '@app/components/TitleCard/LibraryTitleCard';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
+import useDiscoverRowSnapshot from '@app/hooks/useDiscoverRowSnapshot';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
@@ -9,7 +10,8 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+
+const WATCHLIST_URL = '/api/v1/discover/watchlist';
 
 const messages = defineMessages('components.Discover.PlexWatchlistSlider', {
   plexwatchlist: 'Your Watchlist',
@@ -24,13 +26,19 @@ const PlexWatchlistSlider = () => {
     triggerOnce: true,
   });
 
-  const { data: watchlistItems, error: watchlistError } = useSWR<{
+  const {
+    data: watchlistItems,
+    error: watchlistError,
+    isLoading,
+  } = useDiscoverRowSnapshot<{
     page: number;
     totalPages: number;
     totalResults: number;
     results: WatchlistItem[];
-  }>(inView ? '/api/v1/discover/watchlist' : null, {
-    revalidateOnFocus: false,
+  }>({
+    enabled: inView,
+    rowKey: 'watchlist',
+    url: WATCHLIST_URL,
   });
 
   const watchlistCards = useMemo(
@@ -89,7 +97,7 @@ const PlexWatchlistSlider = () => {
       </div>
       <Slider
         sliderKey="watchlist"
-        isLoading={inView && !watchlistItems}
+        isLoading={isLoading}
         isEmpty={isWatchlistEmpty}
         emptyMessage={intl.formatMessage(messages.emptywatchlist)}
         items={watchlistCards}
