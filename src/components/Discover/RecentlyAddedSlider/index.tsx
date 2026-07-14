@@ -28,6 +28,7 @@ const RecentlyAddedSlider = () => {
     isLoading,
   } = useDiscoverRowSnapshot<MediaResultsResponse>({
     enabled: inView,
+    personalized: true,
     rowKey: 'recently-added',
     url: RECENTLY_ADDED_URL,
   });

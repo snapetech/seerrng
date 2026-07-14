@@ -1,3 +1,4 @@
+import useDiscoverHomeManifest from '@app/hooks/useDiscoverHomeManifest';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import {
@@ -14,12 +15,14 @@ import useSWR from 'swr';
 
 interface DiscoverRowSnapshotOptions {
   enabled: boolean;
+  personalized?: boolean;
   rowKey: string;
   url: string;
 }
 
 const useDiscoverRowSnapshot = <T>({
   enabled,
+  personalized = false,
   rowKey,
   url,
 }: DiscoverRowSnapshotOptions) => {
@@ -60,6 +63,7 @@ const useDiscoverRowSnapshot = <T>({
     snapshotKey,
     contextKey
   );
+  const { manifest } = useDiscoverHomeManifest(contextKey);
   const fallbackData = snapshot?.data;
   const shouldLoad =
     !!user && hydrated && (fallbackData !== undefined || enabled);
@@ -75,10 +79,22 @@ const useDiscoverRowSnapshot = <T>({
   );
 
   useEffect(() => {
-    if (shouldLoad && snapshot && !isDiscoverSnapshotFresh(snapshot)) {
+    const layoutChanged =
+      !!manifest &&
+      snapshot?.metadata.layoutRevision !== manifest.layoutRevision;
+    const userStateChanged =
+      personalized &&
+      !!manifest &&
+      snapshot?.metadata.userStateRevision !== manifest.userStateRevision;
+
+    if (
+      shouldLoad &&
+      snapshot &&
+      (!isDiscoverSnapshotFresh(snapshot) || layoutChanged || userStateChanged)
+    ) {
       void mutate();
     }
-  }, [mutate, shouldLoad, snapshot]);
+  }, [manifest, mutate, personalized, shouldLoad, snapshot]);
 
   useEffect(() => {
     if (
@@ -87,12 +103,17 @@ const useDiscoverRowSnapshot = <T>({
       data !== undefined &&
       data !== fallbackData
     ) {
-      setDiscoverSnapshot(
+      void setDiscoverSnapshot(
         snapshotKey,
-        createDiscoverSnapshot(contextKey, data)
+        createDiscoverSnapshot(contextKey, data, {
+          freshAgeMs: (manifest?.freshness.rowMaxAgeSeconds ?? 300) * 1000,
+          manifestVersion: manifest?.version,
+          layoutRevision: manifest?.layoutRevision,
+          userStateRevision: manifest?.userStateRevision,
+        })
       );
     }
-  }, [contextKey, data, fallbackData, snapshotKey]);
+  }, [contextKey, data, fallbackData, manifest, snapshotKey]);
 
   return {
     data,

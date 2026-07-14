@@ -33,6 +33,7 @@ const RecentRequestsSlider = () => {
     isLoading,
   } = useDiscoverRowSnapshot<RequestResultsResponse>({
     enabled: inView,
+    personalized: true,
     rowKey: 'recent-requests',
     url: REQUESTS_URL,
   });

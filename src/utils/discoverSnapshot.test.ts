@@ -27,6 +27,22 @@ class MemoryStorage {
   }
 }
 
+class MemoryPayloadStore {
+  private values = new Map<string, unknown>();
+
+  async delete(key: string) {
+    this.values.delete(key);
+  }
+
+  async get<T>(key: string) {
+    return this.values.get(key) as T | undefined;
+  }
+
+  async set<T>(key: string, value: T) {
+    this.values.set(key, value);
+  }
+}
+
 const context = {
   userId: 12,
   permissions: 32,
@@ -55,8 +71,9 @@ describe('discover snapshots', () => {
     );
   });
 
-  it('preserves data and the randomized seed for the snapshot lifetime', () => {
+  it('keeps large payloads out of localStorage and preserves snapshot metadata', async () => {
     const storage = new MemoryStorage();
+    const payloadStore = new MemoryPayloadStore();
     const contextKey = buildDiscoverCacheContextKey(context);
     const key = buildDiscoverSnapshotKey(
       contextKey,
@@ -66,24 +83,26 @@ describe('discover snapshots', () => {
     const snapshot = createDiscoverSnapshot(contextKey, [{ id: 1 }], {
       now: 1_000,
       seed: 'stable-seed',
-      manifestVersion: 'manifest-1',
+      manifestVersion: 1,
       layoutRevision: 'layout-2',
       userStateRevision: 'state-3',
     });
 
-    writeDiscoverSnapshot(storage, key, snapshot);
+    await writeDiscoverSnapshot(storage, payloadStore, key, snapshot);
 
     assert.deepEqual(
-      readDiscoverSnapshot<{ id: number }[]>(
+      await readDiscoverSnapshot<{ id: number }[]>(
         storage,
+        payloadStore,
         key,
         contextKey,
         1_000 + DISCOVER_SNAPSHOT_MAX_AGE - 1
       ),
       snapshot
     );
+    assert.equal(storage.getItem(key), null);
     assert.equal(snapshot.metadata.seed, 'stable-seed');
-    assert.equal(snapshot.metadata.manifestVersion, 'manifest-1');
+    assert.equal(snapshot.metadata.manifestVersion, 1);
   });
 
   it('distinguishes fresh snapshots from stale fallbacks', () => {
@@ -102,27 +121,77 @@ describe('discover snapshots', () => {
     );
   });
 
-  it('rejects expired and mismatched-context snapshots', () => {
+  it('migrates legacy localStorage payloads into the payload store', async () => {
     const storage = new MemoryStorage();
+    const payloadStore = new MemoryPayloadStore();
+    const contextKey = buildDiscoverCacheContextKey(context);
+    const key = buildDiscoverSnapshotKey(
+      contextKey,
+      'popular',
+      '/api/v1/discover/movies'
+    );
+    const legacyKey = key.replace(
+      'seerr-discover-snapshot-v2:',
+      'seerr-discover-snapshot-v1:'
+    );
+    storage.setItem(
+      legacyKey,
+      JSON.stringify({
+        metadata: {
+          schemaVersion: 1,
+          contextKey,
+          createdAt: 1_000,
+          freshUntil: 2_000,
+          expiresAt: 10_000,
+          seed: 'legacy-seed',
+        },
+        data: [{ id: 1 }],
+      })
+    );
+
+    const migrated = await readDiscoverSnapshot<{ id: number }[]>(
+      storage,
+      payloadStore,
+      key,
+      contextKey,
+      1_500
+    );
+
+    assert.deepEqual(migrated?.data, [{ id: 1 }]);
+    assert.equal(migrated?.metadata.seed, 'legacy-seed');
+    assert.equal(storage.getItem(legacyKey), null);
+    assert.deepEqual(await payloadStore.get(key), [{ id: 1 }]);
+  });
+
+  it('rejects expired and mismatched-context snapshots', async () => {
+    const storage = new MemoryStorage();
+    const payloadStore = new MemoryPayloadStore();
     const snapshot = createDiscoverSnapshot('user-1', ['cached'], { now: 0 });
 
-    writeDiscoverSnapshot(storage, 'expired', snapshot);
+    await writeDiscoverSnapshot(storage, payloadStore, 'expired', snapshot);
     assert.equal(
-      readDiscoverSnapshot(
+      await readDiscoverSnapshot(
         storage,
+        payloadStore,
         'expired',
         'user-1',
         DISCOVER_SNAPSHOT_MAX_AGE
       ),
       undefined
     );
-    assert.equal(storage.getItem('expired'), null);
+    assert.equal(await payloadStore.get('expired'), undefined);
 
-    writeDiscoverSnapshot(storage, 'wrong-user', snapshot);
+    await writeDiscoverSnapshot(storage, payloadStore, 'wrong-user', snapshot);
     assert.equal(
-      readDiscoverSnapshot(storage, 'wrong-user', 'user-2', 1),
+      await readDiscoverSnapshot(
+        storage,
+        payloadStore,
+        'wrong-user',
+        'user-2',
+        1
+      ),
       undefined
     );
-    assert.equal(storage.getItem('wrong-user'), null);
+    assert.equal(await payloadStore.get('wrong-user'), undefined);
   });
 });

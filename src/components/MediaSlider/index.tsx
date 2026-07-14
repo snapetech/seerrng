@@ -4,6 +4,7 @@ import PersonCard from '@app/components/PersonCard';
 import Slider from '@app/components/Slider';
 import TitleCard from '@app/components/TitleCard';
 import useCardTextVisibility from '@app/hooks/useCardTextVisibility';
+import useDiscoverHomeManifest from '@app/hooks/useDiscoverHomeManifest';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import {
@@ -15,10 +16,15 @@ import {
   useDiscoverSnapshot,
 } from '@app/utils/discoverSnapshot';
 import {
+  applyDiscoverStateOverlay,
+  getDiscoverStateInputs,
+} from '@app/utils/discoverStateOverlay';
+import {
   ArrowPathIcon,
   ArrowRightCircleIcon,
 } from '@heroicons/react/24/outline';
 import { MediaStatus } from '@server/constants/media';
+import type { DiscoverHomeStateResponse } from '@server/interfaces/api/discoverHomeInterfaces';
 import { Permission } from '@server/lib/permissions';
 import type {
   AlbumResult,
@@ -31,7 +37,7 @@ import type {
 import { appendDiscoverQueryString } from '@server/utils/discoverQuery';
 import axios from 'axios';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import useSWRInfinite from 'swr/infinite';
 
@@ -127,6 +133,8 @@ const MediaSlider = ({
   const { hydrated: snapshotHydrated, snapshot } = useDiscoverSnapshot<
     MixedResult[]
   >(snapshotKey, cacheContextKey);
+  const { manifest } = useDiscoverHomeManifest(cacheContextKey);
+  const appliedUserStateRevision = useRef<string | undefined>(undefined);
   const [seedOverride, setSeedOverride] = useState<{
     snapshotKey?: string;
     seed: string;
@@ -180,10 +188,70 @@ const MediaSlider = ({
   });
 
   useEffect(() => {
-    if (shouldLoad && snapshot && !isDiscoverSnapshotFresh(snapshot)) {
+    const layoutChanged =
+      !!manifest &&
+      snapshot?.metadata.layoutRevision !== manifest.layoutRevision;
+
+    if (
+      shouldLoad &&
+      snapshot &&
+      (!isDiscoverSnapshotFresh(snapshot) || layoutChanged)
+    ) {
       void revalidate();
     }
-  }, [revalidate, shouldLoad, snapshot]);
+  }, [manifest, revalidate, shouldLoad, snapshot]);
+
+  useEffect(() => {
+    if (
+      !data?.length ||
+      !manifest ||
+      !cacheContextKey ||
+      !snapshotKey ||
+      snapshot?.metadata.userStateRevision === manifest.userStateRevision ||
+      appliedUserStateRevision.current === manifest.userStateRevision
+    ) {
+      return;
+    }
+
+    const inputs = getDiscoverStateInputs(data);
+
+    if (!inputs.length) {
+      appliedUserStateRevision.current = manifest.userStateRevision;
+      return;
+    }
+
+    appliedUserStateRevision.current = manifest.userStateRevision;
+    void axios
+      .post<DiscoverHomeStateResponse>('/api/v1/discover/home/state', {
+        items: inputs,
+      })
+      .then(async (response) => {
+        const updatedData = applyDiscoverStateOverlay(data, response.data);
+        await revalidate(updatedData, false);
+        await setDiscoverSnapshot(
+          snapshotKey,
+          createDiscoverSnapshot(cacheContextKey, updatedData, {
+            freshAgeMs: manifest.freshness.rowMaxAgeSeconds * 1000,
+            seed: randomizeOrder ? shuffleSeed : undefined,
+            manifestVersion: manifest.version,
+            layoutRevision: manifest.layoutRevision,
+            userStateRevision: manifest.userStateRevision,
+          })
+        );
+      })
+      .catch(() => {
+        appliedUserStateRevision.current = undefined;
+      });
+  }, [
+    cacheContextKey,
+    data,
+    manifest,
+    randomizeOrder,
+    revalidate,
+    shuffleSeed,
+    snapshot?.metadata.userStateRevision,
+    snapshotKey,
+  ]);
 
   const refreshRandomizedOrder = useCallback(() => {
     if (!randomizeOrder) {
@@ -281,10 +349,14 @@ const MediaSlider = ({
       data?.length &&
       data !== fallbackData
     ) {
-      setDiscoverSnapshot(
+      void setDiscoverSnapshot(
         snapshotKey,
         createDiscoverSnapshot(cacheContextKey, data, {
+          freshAgeMs: (manifest?.freshness.rowMaxAgeSeconds ?? 300) * 1000,
           seed: randomizeOrder ? shuffleSeed : undefined,
+          manifestVersion: manifest?.version,
+          layoutRevision: manifest?.layoutRevision,
+          userStateRevision: manifest?.userStateRevision,
         })
       );
     }
@@ -292,6 +364,7 @@ const MediaSlider = ({
     cacheContextKey,
     data,
     fallbackData,
+    manifest,
     randomizeOrder,
     shuffleSeed,
     snapshotKey,
