@@ -327,7 +327,11 @@ const staleWhileRevalidate = async (request, cacheRequest, cacheType) => {
 };
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type !== 'SET_CACHE_USER' || !event.source?.id) {
+  if (
+    event.origin !== self.location.origin ||
+    event.data?.type !== 'SET_CACHE_USER' ||
+    !event.source?.id
+  ) {
     return;
   }
 
