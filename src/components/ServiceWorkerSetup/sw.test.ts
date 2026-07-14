@@ -150,6 +150,31 @@ describe('service worker runtime cache', () => {
     assert.equal(response, undefined);
   });
 
+  it('does not cache public settings with a no-store contract', async () => {
+    const harness = createHarness();
+    const response = await harness.fetchRequest(
+      new Request('https://seerr.test/api/v1/settings/public')
+    );
+
+    assert.equal(response, undefined);
+  });
+
+  it('honors Discover freshness headers before using cached data', async () => {
+    const harness = createHarness();
+    const request = new Request(
+      'https://seerr.test/api/v1/discover/home/manifest'
+    );
+
+    await harness.setUser(1);
+    harness.networkResponses.push(
+      new Response('first', { headers: { 'X-Discover-Freshness': '0' } })
+    );
+    assert.equal(await (await harness.fetchRequest(request))?.text(), 'first');
+
+    harness.networkResponses.push(new Response('second'));
+    assert.equal(await (await harness.fetchRequest(request))?.text(), 'second');
+  });
+
   it('isolates personalized data and retains stale data on network failure', async () => {
     const harness = createHarness();
     const request = new Request(

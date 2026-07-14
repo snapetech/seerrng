@@ -20,7 +20,7 @@ const MANAGED_CACHE_PREFIXES = [
 const LEGACY_CACHE_NAMES = ['offline'];
 const DATA_CACHE_MAX_ENTRIES = 300;
 const STATIC_CACHE_MAX_ENTRIES = 200;
-const DATA_CACHE_FRESH_MS = 15 * 60 * 1000;
+const DATA_CACHE_FRESH_MS = 5 * 60 * 1000;
 const DATA_CACHE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const STATIC_CACHE_FRESH_MS = 24 * 60 * 60 * 1000;
 const STATIC_CACHE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,8 +54,6 @@ const CACHEABLE_API_PATHS = [
   /^\/api\/v1\/artist\/[^/]+/,
 ];
 
-const CACHEABLE_PUBLIC_API_PATHS = [/^\/api\/v1\/settings\/public$/];
-
 const CACHEABLE_STATIC_PATHS = [
   /^\/imageproxy\//,
   /^\/avatarproxy\//,
@@ -81,12 +79,6 @@ const getRuntimeCacheType = (request) => {
     return undefined;
   }
 
-  if (
-    CACHEABLE_PUBLIC_API_PATHS.some((pattern) => pattern.test(url.pathname))
-  ) {
-    return 'public-data';
-  }
-
   if (CACHEABLE_API_PATHS.some((pattern) => pattern.test(url.pathname))) {
     return 'user-data';
   }
@@ -109,8 +101,17 @@ const getCachedAt = (response) => {
   return Number.isFinite(cachedAt) ? cachedAt : 0;
 };
 
-const isFresh = (response, maxAgeMs) =>
-  Date.now() - getCachedAt(response) <= maxAgeMs;
+const isFresh = (response, maxAgeMs) => {
+  const discoverFreshnessSeconds = Number(
+    response?.headers.get('x-discover-freshness')
+  );
+  const effectiveMaxAge =
+    Number.isFinite(discoverFreshnessSeconds) && discoverFreshnessSeconds >= 0
+      ? discoverFreshnessSeconds * 1000
+      : maxAgeMs;
+
+  return Date.now() - getCachedAt(response) < effectiveMaxAge;
+};
 
 const addCacheTimestamp = (response) => {
   const headers = new Headers(response.headers);

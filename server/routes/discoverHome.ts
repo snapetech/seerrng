@@ -36,18 +36,17 @@ const hashRevision = (value: unknown): string =>
 
 const rowEndpoints: Partial<Record<number, string>> = {
   [DiscoverSliderType.RECENTLY_ADDED]:
-    '/api/v1/media?filter=available&sort=mediaAdded',
-  [DiscoverSliderType.RECENT_REQUESTS]: '/api/v1/request?sort=modified',
+    '/api/v1/media?filter=allavailable&take=20&sort=mediaAdded&mediaType=movie%2Ctv',
+  [DiscoverSliderType.RECENT_REQUESTS]:
+    '/api/v1/request?filter=all&take=10&sort=modified&skip=0',
   [DiscoverSliderType.PLEX_WATCHLIST]: '/api/v1/discover/watchlist',
   [DiscoverSliderType.TRENDING]: '/api/v1/discover/trending',
   [DiscoverSliderType.POPULAR_MOVIES]: '/api/v1/discover/movies',
-  [DiscoverSliderType.MOVIE_GENRES]: '/api/v1/genres/movie',
+  [DiscoverSliderType.MOVIE_GENRES]: '/api/v1/discover/genreslider/movie',
   [DiscoverSliderType.UPCOMING_MOVIES]: '/api/v1/discover/movies',
-  [DiscoverSliderType.STUDIOS]: '/api/v1/studios',
   [DiscoverSliderType.POPULAR_TV]: '/api/v1/discover/tv',
-  [DiscoverSliderType.TV_GENRES]: '/api/v1/genres/tv',
+  [DiscoverSliderType.TV_GENRES]: '/api/v1/discover/genreslider/tv',
   [DiscoverSliderType.UPCOMING_TV]: '/api/v1/discover/tv',
-  [DiscoverSliderType.NETWORKS]: '/api/v1/networks',
   [DiscoverSliderType.POPULAR_MUSIC]: '/api/v1/discover/music?sortBy=ranked',
   [DiscoverSliderType.POPULAR_BOOKS]: '/api/v1/discover/books?sortBy=ranked',
 };
