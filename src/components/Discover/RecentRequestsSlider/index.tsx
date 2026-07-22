@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
 
-const REQUESTS_URL = '/api/v1/request?filter=all&take=10&sort=modified&skip=0';
+const REQUESTS_URL = '/api/v1/request?filter=all&take=10&sort=added&skip=0';
 
 const messages = defineMessages('components.Discover.RecentRequestsSlider', {
   unableToConnect:
