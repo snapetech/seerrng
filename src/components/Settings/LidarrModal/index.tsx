@@ -276,6 +276,7 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
               activeProfileName: profileName,
               activeDirectory: values.rootFolder,
               tags: values.tags,
+              is4k: false,
               isDefault: values.isDefault,
               externalUrl: values.externalUrl,
               syncEnabled: values.syncEnabled,
