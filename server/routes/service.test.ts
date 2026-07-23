@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
+import axios from 'axios';
+import LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import ReadarrAPI from '@server/api/servarr/readarr';
 import SonarrAPI, { type SonarrSeries } from '@server/api/servarr/sonarr';
@@ -123,6 +125,9 @@ function createOpenApiApp() {
       validateSecurity: false,
     })
   );
+  app.use('/api/v1/settings/radarr', radarrRoutes);
+  app.use('/api/v1/settings/sonarr', sonarrRoutes);
+  app.use('/api/v1/settings/lidarr', lidarrRoutes);
   app.use('/api/v1/settings/readarr', readarrRoutes);
   app.use(
     (
@@ -196,6 +201,24 @@ function makeReadarr(
     serviceType: 'ebook',
     ...overrides,
   };
+}
+
+// `getTags` is an instance-bound arrow-function class field (see
+// ServarrBase#getTags), not a prototype method, so it can't be replaced with
+// `mock.method(SomeAPI.prototype, 'getTags', ...)`. Instead, intercept the
+// underlying `/tag` HTTP call on the real axios instance each Servarr client
+// creates, leaving everything else (e.g. `defaults.params.apikey`) untouched.
+function mockServarrTagsEndpoint(tags: { id: number; label: string }[]) {
+  const realCreate = axios.create.bind(axios);
+  mock.method(axios, 'create', (config?: Parameters<typeof axios.create>[0]) => {
+    const instance = realCreate(config);
+    const realGet = instance.get.bind(instance);
+    instance.get = ((url: string, requestConfig?: unknown) =>
+      url === '/tag'
+        ? Promise.resolve({ data: tags })
+        : realGet(url, requestConfig as never)) as typeof instance.get;
+    return instance;
+  });
 }
 
 before(() => {
@@ -764,6 +787,73 @@ describe('Radarr settings routes', () => {
     assert.strictEqual(settings.radarr[0].name, 'Updated Radarr');
     assert.strictEqual(settings.radarr[0].apiKey, 'rotated-key');
   });
+
+  it('tests a Radarr connection before the add form is complete', async () => {
+    mock.method(RadarrAPI.prototype, 'getSystemStatus', async () => ({
+      appName: 'Radarr',
+      version: '5.0.0.0',
+      urlBase: '/radarr',
+    }));
+    mock.method(RadarrAPI.prototype, 'getProfiles', async () => [
+      { id: 1, name: 'HD-1080p' },
+    ]);
+    mock.method(RadarrAPI.prototype, 'getRootFolders', async () => [
+      {
+        id: 3,
+        path: '/movies',
+        freeSpace: 1,
+        totalSpace: 1,
+        unmappedFolders: [],
+      },
+    ]);
+    mockServarrTagsEndpoint([{ id: 4, label: 'requested' }]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/radarr/test')
+      .send({
+        hostname: 'radarr.local',
+        port: 7878,
+        apiKey: 'test-key',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.urlBase, '/radarr');
+    assert.deepStrictEqual(res.body.profiles, [{ id: 1, name: 'HD-1080p' }]);
+    assert.deepStrictEqual(res.body.rootFolders, [{ id: 3, path: '/movies' }]);
+  });
+
+  it('uses the stored API key when testing an existing Radarr', async () => {
+    let apiKeyUsed: string | undefined;
+    getSettings().radarr = [makeRadarr({ id: 7, apiKey: 'stored-key' })];
+    mock.method(
+      RadarrAPI.prototype,
+      'getSystemStatus',
+      async function (this: RadarrAPI) {
+        const client = Reflect.get(this, 'axios') as {
+          defaults: { params?: Record<string, string> };
+        };
+        apiKeyUsed = client.defaults.params?.apikey;
+        return { appName: 'Radarr', version: '5.0.0.0', urlBase: '' };
+      }
+    );
+    mock.method(RadarrAPI.prototype, 'getProfiles', async () => []);
+    mock.method(RadarrAPI.prototype, 'getRootFolders', async () => []);
+    mockServarrTagsEndpoint([]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/radarr/test')
+      .send({
+        id: 7,
+        hostname: 'radarr.local',
+        port: 7878,
+        apiKey: '[REDACTED]',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(apiKeyUsed, 'stored-key');
+  });
 });
 
 describe('Sonarr settings routes', () => {
@@ -842,6 +932,73 @@ describe('Sonarr settings routes', () => {
 
     assert.strictEqual(res.status, 200);
     assert.strictEqual(getSettings().sonarr[0].name, 'Updated Sonarr');
+  });
+
+  it('tests a Sonarr connection before the add form is complete', async () => {
+    mock.method(SonarrAPI.prototype, 'getSystemStatus', async () => ({
+      appName: 'Sonarr',
+      version: '4.0.0.0',
+      urlBase: '/sonarr',
+    }));
+    mock.method(SonarrAPI.prototype, 'getProfiles', async () => [
+      { id: 1, name: 'HD-1080p' },
+    ]);
+    mock.method(SonarrAPI.prototype, 'getRootFolders', async () => [
+      {
+        id: 3,
+        path: '/tv',
+        freeSpace: 1,
+        totalSpace: 1,
+        unmappedFolders: [],
+      },
+    ]);
+    mockServarrTagsEndpoint([{ id: 4, label: 'requested' }]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/sonarr/test')
+      .send({
+        hostname: 'sonarr.local',
+        port: 8989,
+        apiKey: 'test-key',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.urlBase, '/sonarr');
+    assert.deepStrictEqual(res.body.profiles, [{ id: 1, name: 'HD-1080p' }]);
+    assert.deepStrictEqual(res.body.rootFolders, [{ id: 3, path: '/tv' }]);
+  });
+
+  it('uses the stored API key when testing an existing Sonarr', async () => {
+    let apiKeyUsed: string | undefined;
+    getSettings().sonarr = [makeSonarr({ id: 7, apiKey: 'stored-key' })];
+    mock.method(
+      SonarrAPI.prototype,
+      'getSystemStatus',
+      async function (this: SonarrAPI) {
+        const client = Reflect.get(this, 'axios') as {
+          defaults: { params?: Record<string, string> };
+        };
+        apiKeyUsed = client.defaults.params?.apikey;
+        return { appName: 'Sonarr', version: '4.0.0.0', urlBase: '' };
+      }
+    );
+    mock.method(SonarrAPI.prototype, 'getProfiles', async () => []);
+    mock.method(SonarrAPI.prototype, 'getRootFolders', async () => []);
+    mockServarrTagsEndpoint([]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/sonarr/test')
+      .send({
+        id: 7,
+        hostname: 'sonarr.local',
+        port: 8989,
+        apiKey: '[REDACTED]',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(apiKeyUsed, 'stored-key');
   });
 });
 
@@ -994,6 +1151,80 @@ describe('Lidarr settings routes', () => {
         isDefault: true,
       },
     ]);
+  });
+
+  it('tests a Lidarr connection before the add form is complete', async () => {
+    mock.method(LidarrAPI.prototype, 'getSystemStatus', async () => ({
+      appName: 'Lidarr',
+      version: '2.0.0.0',
+      urlBase: '/lidarr',
+    }));
+    mock.method(LidarrAPI.prototype, 'getProfiles', async () => [
+      { id: 1, name: 'Standard' },
+    ]);
+    mock.method(LidarrAPI.prototype, 'getMetadataProfiles', async () => [
+      { id: 2, name: 'Standard' },
+    ]);
+    mock.method(LidarrAPI.prototype, 'getRootFolders', async () => [
+      {
+        id: 3,
+        path: '/music',
+        freeSpace: 1,
+        totalSpace: 1,
+        unmappedFolders: [],
+      },
+    ]);
+    mockServarrTagsEndpoint([{ id: 4, label: 'requested' }]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/lidarr/test')
+      .send({
+        hostname: 'lidarr.local',
+        port: 8686,
+        apiKey: 'test-key',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.urlBase, '/lidarr');
+    assert.deepStrictEqual(res.body.profiles, [{ id: 1, name: 'Standard' }]);
+    assert.deepStrictEqual(res.body.metadataProfiles, [
+      { id: 2, name: 'Standard' },
+    ]);
+    assert.deepStrictEqual(res.body.rootFolders, [{ id: 3, path: '/music' }]);
+  });
+
+  it('uses the stored API key when testing an existing Lidarr', async () => {
+    let apiKeyUsed: string | undefined;
+    getSettings().lidarr = [makeLidarr({ id: 7, apiKey: 'stored-key' })];
+    mock.method(
+      LidarrAPI.prototype,
+      'getSystemStatus',
+      async function (this: LidarrAPI) {
+        const client = Reflect.get(this, 'axios') as {
+          defaults: { params?: Record<string, string> };
+        };
+        apiKeyUsed = client.defaults.params?.apikey;
+        return { appName: 'Lidarr', version: '2.0.0.0', urlBase: '' };
+      }
+    );
+    mock.method(LidarrAPI.prototype, 'getProfiles', async () => []);
+    mock.method(LidarrAPI.prototype, 'getMetadataProfiles', async () => []);
+    mock.method(LidarrAPI.prototype, 'getRootFolders', async () => []);
+    mockServarrTagsEndpoint([]);
+
+    const res = await request(createOpenApiApp())
+      .post('/api/v1/settings/lidarr/test')
+      .send({
+        id: 7,
+        hostname: 'lidarr.local',
+        port: 8686,
+        apiKey: '[REDACTED]',
+        useSsl: false,
+      });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(apiKeyUsed, 'stored-key');
   });
 });
 

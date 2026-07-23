@@ -15,9 +15,11 @@ import { parseNonNegativeRouteId } from '@server/utils/routeId';
 import { REDACTED_SECRET, redactSecrets } from '@server/utils/security';
 import {
   assertServarrInstanceCapacity,
+  parseServarrConnectionSettings,
   parseSonarrSettings,
   preserveServarrApiKey,
   preserveServarrConnectionSecret,
+  type ServarrConnectionSettings,
 } from '@server/utils/servarrSettings';
 import { Router } from 'express';
 
@@ -71,11 +73,19 @@ sonarrRoutes.post(
   })
 );
 
-sonarrRoutes.post(
+sonarrRoutes.post<
+  undefined,
+  Record<string, unknown>,
+  ServarrConnectionSettings
+>(
   '/test',
-  authorizedMutation(Permission.ADMIN, async (req, res, next) => {
+  authorizedMutation<
+    undefined,
+    Record<string, unknown>,
+    ServarrConnectionSettings
+  >(Permission.ADMIN, async (req, res, next) => {
     try {
-      const parsedSonarr = parseSonarrSettings(
+      const parsedSonarr = parseServarrConnectionSettings(
         preserveServarrConnectionSecret(req.body, getSettings().sonarr)
       );
 

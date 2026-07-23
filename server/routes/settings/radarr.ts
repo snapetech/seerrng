@@ -19,8 +19,10 @@ import { REDACTED_SECRET, redactSecrets } from '@server/utils/security';
 import {
   assertServarrInstanceCapacity,
   parseRadarrSettings,
+  parseServarrConnectionSettings,
   preserveServarrApiKey,
   preserveServarrConnectionSecret,
+  type ServarrConnectionSettings,
 } from '@server/utils/servarrSettings';
 import { Router } from 'express';
 
@@ -77,16 +79,16 @@ radarrRoutes.post(
 radarrRoutes.post<
   undefined,
   Record<string, unknown>,
-  RadarrSettings & { tagLabel?: string }
+  ServarrConnectionSettings
 >(
   '/test',
   authorizedMutation<
     undefined,
     Record<string, unknown>,
-    RadarrSettings & { tagLabel?: string }
+    ServarrConnectionSettings
   >(Permission.ADMIN, async (req, res, next) => {
     try {
-      const parsedRadarr = parseRadarrSettings(
+      const parsedRadarr = parseServarrConnectionSettings(
         preserveServarrConnectionSecret(req.body, getSettings().radarr)
       );
 
