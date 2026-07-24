@@ -80,13 +80,25 @@ describe('PullToRefreshController', () => {
           })
         )
       );
+      assert.strictEqual(document.body.style.touchAction, 'pan-x');
+      assert.strictEqual(document.body.style.overscrollBehavior, 'contain');
       await act(async () => {
         dom.window.dispatchEvent(
           createTouchEvent(dom.window.document, 'touchstart', 10)
         );
       });
-      assert.strictEqual(document.body.style.touchAction, 'none');
-      assert.strictEqual(document.body.style.overscrollBehavior, 'none');
+      assert.strictEqual(document.body.style.touchAction, 'pan-x');
+      assert.strictEqual(document.body.style.overscrollBehavior, 'contain');
+      await act(async () => {
+        assert.strictEqual(
+          dom.window.dispatchEvent(
+            createTouchEvent(dom.window.document, 'touchmove', 0)
+          ),
+          true
+        );
+      });
+      assert.strictEqual(document.body.style.touchAction, 'pan-x');
+      assert.strictEqual(document.body.style.overscrollBehavior, 'contain');
       const releaseModalTouchLock = acquireInlineStyleLease(
         document.body,
         'touchAction',

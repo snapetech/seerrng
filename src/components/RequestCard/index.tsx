@@ -200,7 +200,7 @@ const getRequestMediaStatus = (
 
 const RequestCardPlaceholder = () => {
   return (
-    <div className="relative w-72 animate-pulse rounded-xl bg-gray-700 p-4 sm:w-96">
+    <div className="relative min-h-[17rem] w-72 animate-pulse rounded-xl bg-gray-700 p-4 sm:w-96">
       <div className="w-20 sm:w-28">
         <div className="w-full" style={{ paddingBottom: '150%' }} />
       </div>
@@ -524,7 +524,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         />
       )}
       <div
-        className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
+        className="relative flex min-h-[17rem] w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
         data-testid="request-card"
       >
         {!isMusic(title) && !isBook(title) && title.backdropPath && (

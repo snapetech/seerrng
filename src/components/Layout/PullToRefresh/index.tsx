@@ -89,7 +89,6 @@ export const PullToRefreshController = ({
       currentPull = 0;
       setPullChange(0);
       setVisible(true);
-      lockStyles();
     };
 
     const pullDown = (event: TouchEvent) => {
@@ -98,8 +97,16 @@ export const PullToRefreshController = ({
         return;
       }
 
-      event.preventDefault();
       currentPull = Math.max(0, touch.screenY - startPoint);
+      if (currentPull <= 0) {
+        resetPull();
+        return;
+      }
+
+      event.preventDefault();
+      if (currentPull > PULL_INITIAL_THRESHOLD) {
+        lockStyles();
+      }
       setPullChange(currentPull);
     };
 

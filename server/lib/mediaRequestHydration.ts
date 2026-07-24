@@ -21,9 +21,9 @@ export const hydrateMediaRequestRelations = async (
       modifiedBy: true,
       requestedBy: true,
     },
-    // Seasons and media identifiers are independent one-to-many relations.
-    // Loading them separately avoids multiplying their row counts.
-    relationLoadStrategy: 'query',
+    // This helper receives an explicit id list without pagination, so the join
+    // strategy safely loads nested media identifiers. TypeORM's query strategy
+    // does not reliably load media.identifiers for this nested relation.
   });
   const hydratedById = new Map(
     hydrated.map((request) => [request.id, request])
