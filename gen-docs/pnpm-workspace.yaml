@@ -2,14 +2,15 @@ overrides:
   '@babel/core': 7.29.7
   '@babel/plugin-transform-modules-systemjs': 7.29.4
   ajv: 8.18.0
-  'ajv-keywords@3.5.2>ajv': 6.12.6
-  'schema-utils@3.3.0>ajv': 6.12.6
+  'ajv-keywords@3.5.2>ajv': 6.14.0
+  'schema-utils@3.3.0>ajv': 6.14.0
   body-parser: 1.20.6
   brace-expansion: 1.1.16
   copy-webpack-plugin: 14.0.0
   fast-uri: 3.1.4
   follow-redirects: 1.16.0
   http-proxy-middleware: 2.0.10
+  immutable: 5.1.8
   joi: 17.13.4
   js-yaml: 4.3.0
   launch-editor: 2.14.1
