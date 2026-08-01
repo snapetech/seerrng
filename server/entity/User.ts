@@ -25,7 +25,6 @@ import {
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
-  RelationCount,
   UpdateDateColumn,
   type Repository,
 } from 'typeorm';
@@ -46,6 +45,34 @@ const permissionColumnTransformer = {
   unique: true,
 })
 export class User {
+  public static async populateRequestCounts(users: User[]): Promise<void> {
+    const uniqueUsers = [
+      ...new Map(users.map((user) => [user.id, user])).values(),
+    ].filter((user) => Number.isSafeInteger(user.id) && user.id > 0);
+
+    if (uniqueUsers.length === 0) {
+      return;
+    }
+
+    const counts = await getRepository(MediaRequest)
+      .createQueryBuilder('request')
+      .select('request.requestedBy', 'userId')
+      .addSelect('COUNT(*)', 'requestCount')
+      .where('request.requestedBy IN (:...userIds)', {
+        userIds: uniqueUsers.map((user) => user.id),
+      })
+      .groupBy('request.requestedBy')
+      .getRawMany<{ userId: number | string; requestCount: number | string }>();
+
+    const countsByUserId = new Map(
+      counts.map((row) => [Number(row.userId), Number(row.requestCount)])
+    );
+
+    for (const user of uniqueUsers) {
+      user.requestCount = countsByUserId.get(user.id) ?? 0;
+    }
+  }
+
   public static filterMany(
     users: User[],
     showFiltered?: boolean
@@ -168,8 +195,7 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   public avatarVersion?: string | null;
 
-  @RelationCount((user: User) => user.requests)
-  public requestCount: number;
+  public requestCount?: number;
 
   @OneToMany(() => MediaRequest, (request) => request.requestedBy)
   public requests: MediaRequest[];

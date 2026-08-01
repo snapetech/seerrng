@@ -114,6 +114,31 @@ describe('isImageCacheWarmUrl', () => {
 });
 
 describe('enqueueImageCacheWarm', () => {
+  it('skips external cache warming in E2E test mode', () => {
+    const settings = getSettings();
+    const previousCacheImages = settings.main.cacheImages;
+    const previousE2eFlag = process.env.E2E_TESTS;
+    settings.main.cacheImages = true;
+    process.env.E2E_TESTS = 'true';
+
+    try {
+      assert.strictEqual(
+        enqueueImageCacheWarm([
+          'https://image.tmdb.org/t/p/w300/e2e-isolation.jpg',
+        ]),
+        0
+      );
+      assert.strictEqual(getQueuedImageCacheWarmCount(), 0);
+    } finally {
+      settings.main.cacheImages = previousCacheImages;
+      if (previousE2eFlag === undefined) {
+        delete process.env.E2E_TESTS;
+      } else {
+        process.env.E2E_TESTS = previousE2eFlag;
+      }
+    }
+  });
+
   it('registers cache writes for graceful shutdown draining', async () => {
     const settings = getSettings();
     const previousCacheImages = settings.main.cacheImages;

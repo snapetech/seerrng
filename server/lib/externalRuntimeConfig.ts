@@ -1,4 +1,8 @@
-import type { AllSettings, NotificationAgentKey } from '@server/lib/settings';
+import {
+  getSettings,
+  type AllSettings,
+  type NotificationAgentKey,
+} from '@server/lib/settings';
 
 /**
  * Configuration required by integrations that make outbound requests.
@@ -8,6 +12,7 @@ import type { AllSettings, NotificationAgentKey } from '@server/lib/settings';
  */
 export type ExternalRuntimeConfig = Pick<
   AllSettings,
+  | 'clientId'
   | 'vapidPublic'
   | 'vapidPrivate'
   | 'main'
@@ -20,6 +25,7 @@ export type ExternalRuntimeConfig = Pick<
   | 'lidarr'
   | 'readarr'
   | 'notifications'
+  | 'network'
 >;
 
 const MAX_EXTERNAL_CONFIG_BYTES = 2 * 1024 * 1024;
@@ -41,6 +47,11 @@ const assertRecord = (
 
 const validate = (value: unknown): ExternalRuntimeConfig => {
   const root = assertRecord(value, 'root');
+  if (typeof root.clientId !== 'string' || root.clientId.length === 0) {
+    throw new Error(
+      'SEERR_EXTERNAL_CONFIG.clientId must be a non-empty string'
+    );
+  }
   for (const section of [
     'main',
     'plex',
@@ -48,6 +59,7 @@ const validate = (value: unknown): ExternalRuntimeConfig => {
     'oidc',
     'tautulli',
     'notifications',
+    'network',
   ]) {
     assertRecord(root[section], section);
   }
@@ -62,9 +74,37 @@ const validate = (value: unknown): ExternalRuntimeConfig => {
   return value as ExternalRuntimeConfig;
 };
 
+const getTestRuntimeConfig = (): ExternalRuntimeConfig => {
+  const settings = getSettings();
+
+  return validate({
+    clientId: settings.clientId,
+    vapidPublic: settings.vapidPublic,
+    vapidPrivate: settings.vapidPrivate,
+    main: settings.main,
+    plex: settings.plex,
+    jellyfin: settings.jellyfin,
+    oidc: settings.oidc,
+    tautulli: settings.tautulli,
+    radarr: settings.radarr,
+    sonarr: settings.sonarr,
+    lidarr: settings.lidarr,
+    readarr: settings.readarr,
+    notifications: settings.notifications,
+    network: settings.network,
+  });
+};
+
 export const loadExternalRuntimeConfig = (): ExternalRuntimeConfig => {
   const source = process.env.SEERR_EXTERNAL_CONFIG;
   if (!source) {
+    if (process.env.NODE_ENV === 'test') {
+      // Tests mutate the in-memory settings object to exercise integration
+      // behavior. The adapter validates the same typed runtime shape used by
+      // injected production configuration and is never available in a
+      // production process.
+      return getTestRuntimeConfig();
+    }
     throw new Error(
       'SEERR_EXTERNAL_CONFIG is required for outbound integrations. Run scripts/export-external-config.mjs to migrate existing settings.'
     );

@@ -4,7 +4,11 @@ import { assertNoSymlinkDirectoryComponents } from './pathSecurity';
 
 export const PRIVATE_LOG_DIRECTORY_MODE = 0o700;
 export const PRIVATE_LOG_FILE_MODE = 0o600;
-const MANAGED_LOG_SYMLINKS = new Set(['seerr.log', '.machinelogs.json']);
+const MANAGED_LOG_SYMLINKS = new Set([
+  'seerr.log',
+  'overseerr.log',
+  '.machinelogs.json',
+]);
 
 const assertManagedLogSymlink = (directory: string, file: string): void => {
   if (!MANAGED_LOG_SYMLINKS.has(file)) {

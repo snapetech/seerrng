@@ -2188,6 +2188,32 @@ describe('Settings route input validation', () => {
     job.cancel();
   });
 
+  it('toggles a scheduled job enabled setting', async () => {
+    let cancelled = false;
+    scheduledJobs.push({
+      id: 'download-recovery',
+      name: 'Download Recovery',
+      type: 'process',
+      interval: 'minutes',
+      cronSchedule: '0 */5 * * * *',
+      job: {
+        cancel: () => {
+          cancelled = true;
+        },
+        nextInvocation: () => null,
+      } as never,
+    });
+
+    const res = await request(app)
+      .post('/settings/jobs/download-recovery/enabled')
+      .send({ enabled: false });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.enabled, false);
+    assert.strictEqual(cancelled, true);
+    assert.strictEqual(getSettings().jobs['download-recovery'].enabled, false);
+  });
+
   it('rejects oversized cache IDs before lookup', async () => {
     const res = await request(app).post(
       `/settings/cache/${'x'.repeat(129)}/flush`

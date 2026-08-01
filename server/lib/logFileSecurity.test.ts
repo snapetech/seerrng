@@ -100,6 +100,23 @@ describe('log file permissions', () => {
     assert.equal((await fs.stat(datedLog)).mode & 0o777, PRIVATE_LOG_FILE_MODE);
   });
 
+  it('allows the legacy Overseerr logger-managed symlink', async () => {
+    const logDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'seerr-logs-')
+    );
+    temporaryDirectories.push(logDirectory);
+    const datedLog = path.join(logDirectory, 'overseerr-2026-07-15.log');
+    await fs.writeFile(datedLog, 'log', { mode: 0o644 });
+    await fs.symlink(
+      path.basename(datedLog),
+      path.join(logDirectory, 'overseerr.log')
+    );
+
+    secureLogDirectory(logDirectory);
+
+    assert.equal((await fs.stat(datedLog)).mode & 0o777, PRIVATE_LOG_FILE_MODE);
+  });
+
   it('rejects escaping and unexpected log symlinks', async () => {
     const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'seerr-logs-'));
     temporaryDirectories.push(parent);

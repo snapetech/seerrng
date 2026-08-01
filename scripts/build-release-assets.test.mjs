@@ -34,13 +34,18 @@ const createFixture = async () => {
   const script = path.join(root, 'build-release-assets.sh');
   await fs.copyFile(sourceScript, script);
   await fs.chmod(script, 0o755);
-  for (const command of ['corepack', 'pnpm']) {
-    await fs.writeFile(
-      path.join(executableDirectory, command),
-      '#!/bin/sh\nexit 0\n',
-      { mode: 0o755 }
-    );
-  }
+  await fs.writeFile(
+    path.join(executableDirectory, 'corepack'),
+    '#!/bin/sh\nexit 0\n',
+    {
+      mode: 0o755,
+    }
+  );
+  await fs.writeFile(
+    path.join(executableDirectory, 'pnpm'),
+    '#!/bin/sh\nif [ "$1" = install ] && [ "$2" = --prod ]; then\n  ln -s "$PWD/public/asset.txt" "$PWD/public/internal-link"\nfi\nexit 0\n',
+    { mode: 0o755 }
+  );
   return { executableDirectory, root, script };
 };
 
@@ -159,5 +164,22 @@ describe('release asset construction', () => {
       fs.stat(path.join(distribution, 'seerrng-v1.2.3-linux-x64.tar.gz')),
       { code: 'ENOENT' }
     );
+  });
+
+  it('normalizes absolute symlinks that remain inside staged runtime content', async () => {
+    const fixture = await createFixture();
+    const distribution = path.join(fixture.root, 'dist-release');
+    const asset = 'seerrng-v1.2.3-linux-x64';
+    const archive = path.join(distribution, `${asset}.tar.gz`);
+    await fs.mkdir(distribution);
+    const result = await run(fixture, ['v1.2.3', distribution]);
+
+    assert.equal(result.code, 0, result.output);
+    const extracted = path.join(fixture.root, 'extracted');
+    await fs.mkdir(extracted);
+    await extractArchive(archive, extracted);
+    const link = path.join(extracted, asset, 'public', 'internal-link');
+    assert.equal(path.isAbsolute(await fs.readlink(link)), false);
+    assert.equal(await fs.readFile(link, 'utf8'), 'public\n');
   });
 });

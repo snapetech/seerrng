@@ -92,7 +92,7 @@ function createApp() {
   app.use(
     session({
       secret: 'test-secret',
-      cookie: { secure: true },
+      cookie: { secure: 'auto' },
       resave: false,
       saveUninitialized: false,
     })

@@ -18,6 +18,7 @@ import {
   runWithConfigurationSnapshot,
   type ConfigurationAuthoritySnapshot,
 } from '@server/lib/configurationAdmission';
+import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { getJellyfinAuthAuthorityKey } from '@server/lib/mediaServerAuthority';
 import {
   captureMediaServerUserAuthority,
@@ -394,7 +395,7 @@ const PLEX_OAUTH_HTTP_OPTIONS = {
 const getPlexOAuthHeaders = () => ({
   Accept: 'application/json',
   'X-Plex-Product': 'Seerr',
-  'X-Plex-Client-Identifier': getSettings().clientId,
+  'X-Plex-Client-Identifier': getExternalRuntimeConfig().clientId,
 });
 
 const plexLoginEnabled = (): boolean => {
@@ -447,6 +448,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
   const user = await userRepository.findOneOrFail({
     where: { id: req.user.id },
   });
+  await User.populateRequestCounts([user]);
 
   // check if email is required in settings and if user has an valid email
   const settings = await getSettings();

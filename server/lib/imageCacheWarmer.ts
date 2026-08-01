@@ -141,7 +141,7 @@ const warmUrl = async (rawUrl: string) => {
 export const getQueuedImageCacheWarmCount = (): number => queuedWarmUrls.size;
 
 export const enqueueImageCacheWarm = (urls: string[]): number => {
-  if (!getSettings().main.cacheImages) {
+  if (process.env.E2E_TESTS === 'true' || !getSettings().main.cacheImages) {
     return 0;
   }
 

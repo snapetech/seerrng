@@ -33,6 +33,7 @@ import {
   isUserSessionCredentialVersionCurrent,
   runAuthorizedUserSecurityMutation,
   runUserSecurityMutationWithActor,
+  runUserSecurityReadWithActor,
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -584,7 +585,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -822,7 +823,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsCardTextResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -932,7 +933,7 @@ userSettingsRoutes.get<{ id: string }, { hasPassword: boolean }>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1489,7 +1490,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsLinkedAccountResponse>(
     }
 
     try {
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1617,7 +1618,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsNotificationsResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1778,7 +1779,7 @@ userSettingsRoutes.get<{ id: string }, { permissions?: number }>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runAuthorizedUserSecurityMutation(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,

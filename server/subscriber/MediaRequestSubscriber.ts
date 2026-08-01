@@ -80,6 +80,7 @@ const READARR_APPROVED_RETRY_BATCH_SIZE = 1;
 const READARR_MIN_PROVIDER_RETRY_DELAY_MS = 1_000;
 const READARR_MAX_PROVIDER_RETRY_DELAY_MS = 3_600_000;
 const READARR_MAX_RECONCILIATION_BATCH_SIZE = 100;
+export const READARR_FAILED_RETRY_DELAY_MS = 6 * 60 * 60 * 1_000;
 export const READARR_MAX_LOOKUP_RESULTS = 50;
 export const READARR_LOOKUP_HYDRATION_CONCURRENCY = 5;
 const activeReadarrDispatches = new Map<number, Promise<number | undefined>>();
@@ -547,7 +548,14 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         const request = await getRepository(MediaRequest).findOne({
           where: { id: requestId },
         });
-        if (!request || request.status !== MediaRequestStatus.APPROVED) {
+        const isRetryableFailedBook =
+          request?.type === MediaType.BOOK &&
+          request.status === MediaRequestStatus.FAILED;
+        if (
+          !request ||
+          (request.status !== MediaRequestStatus.APPROVED &&
+            !isRetryableFailedBook)
+        ) {
           return { delivered: true };
         }
 
@@ -1408,7 +1416,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       return;
     }
 
-    if (entity.status !== MediaRequestStatus.APPROVED) {
+    if (
+      entity.status !== MediaRequestStatus.APPROVED &&
+      entity.status !== MediaRequestStatus.FAILED
+    ) {
       return;
     }
 
@@ -1938,29 +1949,38 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         return this.getReadarrDispatchRetryDelay(entity, e);
       }
 
+      const wasAlreadyFailed = entity.status === MediaRequestStatus.FAILED;
       const requestRepository = getRepository(MediaRequest);
       const mediaRepository = getRepository(Media);
       const media = await mediaRepository.findOne({
         where: { id: entity.media.id },
       });
 
-      entity.status = MediaRequestStatus.FAILED;
-      await requestRepository.save(entity);
+      if (!wasAlreadyFailed) {
+        entity.status = MediaRequestStatus.FAILED;
+        await requestRepository.save(entity);
+      }
 
-      logger.warn('Something went wrong sending book request to Bookshelf', {
-        label: 'Media Request',
-        requestId: entity.id,
-        mediaId: entity.media.id,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
+      logger.warn(
+        'Something went wrong sending book request to Bookshelf; retaining the failed request in the durable dispatch queue.',
+        {
+          label: 'Media Request',
+          requestId: entity.id,
+          mediaId: entity.media.id,
+          retryAfterMs: READARR_FAILED_RETRY_DELAY_MS,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        }
+      );
 
-      if (media) {
+      if (media && !wasAlreadyFailed) {
         await MediaRequest.sendNotification(
           entity,
           media,
           Notification.MEDIA_FAILED
         );
       }
+
+      return READARR_FAILED_RETRY_DELAY_MS;
     }
   }
 

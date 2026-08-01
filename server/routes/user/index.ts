@@ -48,11 +48,12 @@ import {
   runAuthorizedUserSecurityMutation,
   runUserSecurityMutation,
   runUserSecurityMutationWithActor,
+  runUserSecurityReadWithActor,
 } from '@server/lib/userSecurityMutation';
 import { getCombinedWatchlist } from '@server/lib/watchlist';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { authorizedRouteScope } from '@server/middleware/authorizedMutation';
+import { authorizedRouteAccess } from '@server/middleware/authorizedMutation';
 import AsyncLock from '@server/utils/asyncLock';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import { getHostname } from '@server/utils/getHostname';
@@ -535,7 +536,7 @@ router.get(
   isAuthenticated([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS], {
     type: 'or',
   }),
-  authorizedRouteScope([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS]),
+  authorizedRouteAccess([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS]),
   async (req, res, next) => {
     try {
       const parsedIncludeIds = parseOptionalIncludeUserIds(
@@ -709,6 +710,10 @@ router.get(
         .skip(skip)
         .distinct(true)
         .getManyAndCount();
+
+      if (canManageUsers) {
+        await User.populateRequestCounts(users);
+      }
 
       return res.status(200).json({
         pageInfo: {
@@ -1073,7 +1078,7 @@ router.get<{ id: string }>(
         return next({ status: 404, message: 'User subscriptions not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1113,7 +1118,7 @@ router.get<{ id: string; endpoint: string }>(
         return next({ status: 400, message: endpoint.error });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1221,13 +1226,16 @@ router.get<{ id: string }>('/:id', async (req, res, next) => {
       const user = await userRepository.findOneOrFail({
         where: { id: userId },
       });
+      if (showPrivateFields) {
+        await User.populateRequestCounts([user]);
+      }
       return res
         .status(200)
         .json(showPrivateFields ? user.filter(true) : user.publicFilter(true));
     };
 
     if (req.user?.id === userId) {
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user.id,
         userId,
         Permission.MANAGE_USERS,
@@ -1236,7 +1244,7 @@ router.get<{ id: string }>('/:id', async (req, res, next) => {
     }
     if (req.user?.hasPermission(Permission.MANAGE_USERS)) {
       try {
-        return await runAuthorizedUserSecurityMutation(
+        return await runUserSecurityReadWithActor(
           req.user.id,
           userId,
           Permission.MANAGE_USERS,
@@ -1266,7 +1274,7 @@ router.get<{ jellyfinUserId: string }>(
         return next({ status: 400, message: 'Invalid Jellyfin User ID.' });
       }
 
-      return await runAuthorizedUserSecurityMutation(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         req.user!.id,
         Permission.MANAGE_USERS,
@@ -1274,6 +1282,7 @@ router.get<{ jellyfinUserId: string }>(
           const user = await userRepository.findOneOrFail({
             where: { jellyfinUserId },
           });
+          await User.populateRequestCounts([user]);
           return res.status(200).json(user.filter(true));
         }
       );
@@ -1302,7 +1311,7 @@ router.get<{ id: string }, UserRequestsResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
@@ -2064,24 +2073,18 @@ router.get<{ id: string }, QuotaResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      return await runUserSecurityMutation([req.user!.id, userId], async () => {
-        const actor = await userRepository.findOneBy({ id: req.user!.id });
-        if (
-          !actor ||
-          (userId !== actor.id &&
-            !actor.hasPermission(
-              [Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS],
-              { type: 'and' }
-            ))
-        ) {
-          throw new UserMutationActorUnauthorizedError();
-        }
-
-        const user = await userRepository.findOneOrFail({
-          where: { id: userId },
-        });
-        return res.status(200).json(await user.getQuota());
-      });
+      return await runUserSecurityReadWithActor(
+        req.user!.id,
+        userId,
+        [Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS],
+        async () => {
+          const user = await userRepository.findOneOrFail({
+            where: { id: userId },
+          });
+          return res.status(200).json(await user.getQuota());
+        },
+        { permissionCheckOptions: { type: 'and' } }
+      );
     } catch (e) {
       if (e instanceof UserMutationActorUnauthorizedError) {
         return next({ status: 403, message: 'Access denied.' });
@@ -2110,7 +2113,7 @@ router.get<{ id: string }, UserWatchDataResponse>(
     }
 
     try {
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         Permission.ADMIN,
@@ -2236,7 +2239,7 @@ router.get<{ id: string }, WatchlistResponse>(
     const page = parsePositiveInt(req.query.page, 1, MAX_WATCHLIST_PAGE);
 
     try {
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         req.user!.id,
         userId,
         [Permission.MANAGE_REQUESTS, Permission.WATCHLIST_VIEW],

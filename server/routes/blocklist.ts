@@ -17,7 +17,7 @@ import {
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { authorizedRouteScope } from '@server/middleware/authorizedMutation';
+import { authorizedRouteAccess } from '@server/middleware/authorizedMutation';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import { MAX_PAGINATION_OFFSET } from '@server/utils/pagination';
 import { parsePositiveRouteId } from '@server/utils/routeId';
@@ -144,7 +144,7 @@ blocklistRoutes.get(
   isAuthenticated([Permission.MANAGE_BLOCKLIST, Permission.VIEW_BLOCKLIST], {
     type: 'or',
   }),
-  authorizedRouteScope([
+  authorizedRouteAccess([
     Permission.MANAGE_BLOCKLIST,
     Permission.VIEW_BLOCKLIST,
   ]),
@@ -215,7 +215,7 @@ blocklistRoutes.get<{ id: string }>(
   isAuthenticated([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
   }),
-  authorizedRouteScope(Permission.MANAGE_BLOCKLIST),
+  authorizedRouteAccess(Permission.MANAGE_BLOCKLIST),
   async (req, res, next) => {
     const mediaType = req.query.mediaType;
     if (!isSupportedBlocklistType(mediaType)) {

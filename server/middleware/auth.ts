@@ -21,7 +21,8 @@ const authenticatedRouteRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getRateLimitKey,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () =>
+    process.env.NODE_ENV === 'test' || process.env.E2E_TESTS === 'true',
 });
 
 export const matchesApiKey = (
@@ -41,15 +42,17 @@ const checkUserImplementation: Middleware = async (req, res, next) => {
   let user: User | undefined | null;
 
   const apiKey = req.header('X-API-Key');
-  const apiKeyAuthenticated =
+  const apiKeyProvided = apiKey !== undefined;
+  const isApiKeyCurrent = () =>
     apiKey !== undefined && matchesApiKey(apiKey, settings.main.apiKey);
+  const apiKeyAuthenticated = isApiKeyCurrent();
   if (apiKeyAuthenticated) {
     const userRepository = getRepository(User);
 
     // API key access is a service-level credential. Keep it bound to the
     // owner account instead of allowing callers to impersonate arbitrary users.
     user = await userRepository.findOne({ where: { id: 1 } });
-  } else if (req.session?.userId) {
+  } else if (!apiKeyProvided && req.session?.userId) {
     const userRepository = getRepository(User);
 
     user = await userRepository.findOne({
@@ -94,7 +97,7 @@ const checkUserImplementation: Middleware = async (req, res, next) => {
     res.once('close', deactivateCredentialContext);
     return runWithUserApiKeyAuthorityContext(
       user.id,
-      () => apiKeyAuthenticated,
+      isApiKeyCurrent,
       next,
       () => credentialContextActive
     );

@@ -9,7 +9,7 @@ import {
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { authorizedRouteScope } from '@server/middleware/authorizedMutation';
+import { authorizedRouteAccess } from '@server/middleware/authorizedMutation';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import { parsePositiveRouteId } from '@server/utils/routeId';
 import { parseBoundedString } from '@server/utils/validation';
@@ -43,7 +43,7 @@ issueCommentRoutes.get<{ commentId: string }, IssueComment>(
       type: 'or',
     }
   ),
-  authorizedRouteScope([
+  authorizedRouteAccess([
     Permission.MANAGE_ISSUES,
     Permission.VIEW_ISSUES,
     Permission.CREATE_ISSUES,

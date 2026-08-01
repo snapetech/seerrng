@@ -366,6 +366,36 @@ describe('Readarr Scanner', () => {
     assert.strictEqual(identifiers[0].media.mediaType, MediaType.BOOK);
   });
 
+  it('replaces an orphaned identifier instead of failing the book scan', async () => {
+    await getRepository(MediaIdentifier).save(
+      new MediaIdentifier({
+        provider: MediaIdentifierProvider.READARR,
+        value: 'orphaned-readarr-book',
+        canonical: false,
+      })
+    );
+    configureReadarr([{ syncEnabled: true }]);
+    getBooksImpl = async () => [
+      fakeReadarrBook({
+        foreignBookId: 'orphaned-readarr-book',
+        editions: [],
+      }),
+    ];
+
+    await readarrScanner.run();
+
+    const identifiers = await getRepository(MediaIdentifier).find({
+      where: {
+        provider: MediaIdentifierProvider.READARR,
+        value: 'orphaned-readarr-book',
+      },
+      relations: { media: true },
+    });
+
+    assert.strictEqual(identifiers.length, 1);
+    assert.strictEqual(identifiers[0].media.mediaType, MediaType.BOOK);
+  });
+
   it('does not attach a secondary Bookshelf identifier already linked to another book', async () => {
     const isbnMedia = await seedBook('9780000000009');
     const readarrMedia = await getRepository(Media).save(
