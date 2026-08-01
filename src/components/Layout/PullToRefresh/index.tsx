@@ -171,15 +171,15 @@ export const PullToRefreshController = ({
       }}
     >
       <div
-        className={`${
+        className={`relative -top-28 h-9 w-9 rounded-full border-4 border-gray-800 bg-gray-800 shadow-md shadow-black ring-1 ring-gray-700 ${
           loading ? 'animate-spin' : ''
-        }relative -top-28 h-9 w-9 rounded-full border-4 border-gray-800 bg-gray-800 shadow-md shadow-black ring-1 ring-gray-700`}
+        }`}
         style={{ animationDirection: 'reverse' }}
       >
         <ArrowPathIcon
-          className={`rounded-full${
+          className={`rounded-full text-indigo-500 transition-all duration-300 ${
             passedReloadThreshold ? 'rotate-180' : ''
-          } text-indigo-500 transition-all duration-300`}
+          }`}
         />
       </div>
     </div>

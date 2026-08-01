@@ -9,7 +9,7 @@ import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import {
   authorizedMutation,
-  authorizedRouteScope,
+  authorizedRouteAccess,
 } from '@server/middleware/authorizedMutation';
 import { parsePositiveRouteId } from '@server/utils/routeId';
 import {
@@ -364,7 +364,7 @@ const parseOverrideRuleBody = (
 overrideRuleRoutes.get(
   '/',
   isAuthenticated(Permission.ADMIN),
-  authorizedRouteScope(Permission.ADMIN),
+  authorizedRouteAccess(Permission.ADMIN),
   async (req, res, next) => {
     const overrideRuleRepository = getRepository(OverrideRule);
 

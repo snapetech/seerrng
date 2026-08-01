@@ -1,6 +1,9 @@
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
-import type { Permission } from '@server/lib/permissions';
+import type {
+  Permission,
+  PermissionCheckOptions,
+} from '@server/lib/permissions';
 import requestAdmissionCoordinator from '@server/lib/requestAdmission';
 import AsyncLock from '@server/utils/asyncLock';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -176,6 +179,56 @@ export const runAuthorizedUserSecurityMutation = <Result>(
       return callback(actor);
     }
   );
+
+export interface AuthorizedUserSecurityReadOptions extends UserCredentialVersionOptions {
+  permissionCheckOptions?: PermissionCheckOptions;
+  requirePermission?: boolean;
+}
+
+/**
+ * Revalidates read authorization without holding the mutation lock while the
+ * response is being prepared. Reads must observe current authority, but they
+ * do not mutate credentials or permissions and must not block those mutations
+ * for the lifetime of an HTTP response.
+ */
+export const runUserSecurityReadWithActor = async <Result>(
+  actorId: number,
+  targetIds: number | number[],
+  permissionForOtherUsers: Permission | Permission[],
+  callback: (actor: User) => Promise<Result>,
+  options: AuthorizedUserSecurityReadOptions = {}
+): Promise<Result> => {
+  const targets = Array.isArray(targetIds) ? targetIds : [targetIds];
+  const ids = [actorId, ...targets];
+  if (
+    ids.some((id) => !Number.isSafeInteger(id) || id <= 0) ||
+    targets.length === 0
+  ) {
+    throw new Error('A valid user ID is required for a security read.');
+  }
+
+  const actor = await getRepository(User).findOneBy({ id: actorId });
+  if (
+    !actor ||
+    !isRequestCredentialAuthorityCurrent(
+      actorId,
+      actor,
+      options.expectedCredentialVersion
+    ) ||
+    ((options.requirePermission ||
+      targets.some((targetId) => targetId !== actorId)) &&
+      !actor.hasPermission(
+        permissionForOtherUsers,
+        options.permissionCheckOptions ?? { type: 'or' }
+      ))
+  ) {
+    throw new UserMutationActorUnauthorizedError(
+      'User read authority changed before access.'
+    );
+  }
+
+  return callback(actor);
+};
 
 export const acquireAuthorizedUserSecurityMutation = async (
   actorId: number,

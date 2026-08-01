@@ -4,10 +4,10 @@ import useAssociations, {
   toAssociationMediaType,
 } from '@app/hooks/useAssociations';
 import defineMessages from '@app/utils/defineMessages';
-import { useMemo, useState } from 'react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useIntl } from 'react-intl';
-import { usePopperTooltip } from 'react-popper-tooltip';
 import AssociationPopover from './AssociationPopover';
 
 const messages = defineMessages('components.Association', {
@@ -32,19 +32,6 @@ const AssociationBadge = ({
   const [isOpen, setIsOpen] = useState(false);
   const associationType: AssociationMediaType | null =
     toAssociationMediaType(mediaType);
-  const popperConfig = useMemo(
-    () => ({
-      interactive: true,
-      offset: [0, 8] as [number, number],
-      placement: 'auto-end' as const,
-      trigger: 'click' as const,
-      visible: isOpen,
-      onVisibleChange: setIsOpen,
-    }),
-    [isOpen]
-  );
-  const { getTooltipProps, setTooltipRef, setTriggerRef } =
-    usePopperTooltip(popperConfig);
   const { isLoading: isChecking, hasStrongEdges } = useAssociations(
     associationType,
     id,
@@ -53,6 +40,21 @@ const AssociationBadge = ({
       includeWeak: false,
     }
   );
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isOpen]);
 
   if (!associationType || id == null || id === '') {
     return null;
@@ -70,7 +72,6 @@ const AssociationBadge = ({
   return (
     <>
       <button
-        ref={setTriggerRef}
         type="button"
         data-testid="association-badge"
         aria-label={intl.formatMessage(messages.associations)}
@@ -94,15 +95,31 @@ const AssociationBadge = ({
       {isOpen &&
         ReactDOM.createPortal(
           <div
-            ref={setTooltipRef}
-            {...getTooltipProps({
-              className: 'z-50 max-w-[calc(100vw-2rem)] sm:max-w-none',
-            })}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
             data-testid="association-popover"
-            role="dialog"
-            aria-label={intl.formatMessage(messages.associations)}
           >
-            <AssociationPopover mediaType={associationType} id={id} />
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default"
+              aria-label="Close associations"
+              onClick={() => setIsOpen(false)}
+            />
+            <div
+              className="relative z-10 max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)]"
+              role="dialog"
+              aria-modal="true"
+              aria-label={intl.formatMessage(messages.associations)}
+            >
+              <button
+                type="button"
+                className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-gray-950/80 text-gray-300 transition hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                aria-label="Close associations"
+                onClick={() => setIsOpen(false)}
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+              <AssociationPopover mediaType={associationType} id={id} />
+            </div>
           </div>,
           document.body
         )}

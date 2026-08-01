@@ -73,6 +73,9 @@ extensions:
       pack: codeql/javascript-all
       extensible: barrierModel
     data:
+      - ['@server/api/externalapi', 'Member[normalizeExternalApiRequestTarget].ReturnValue', 'request-forgery']
+      - ['@server/lib/externalRuntimeConfig', 'Member[getExternalRuntimeConfig].ReturnValue', 'file-access-to-http']
+      - ['@server/lib/externalRuntimeConfig', 'Member[getExternalRuntimeConfig].ReturnValue.Fuzzy', 'file-access-to-http']
       # Settings.data is the private, typed application-configuration store.
       # Values leave this boundary only through validated settings accessors.
       - ['@server/lib/settings.Settings', 'Member[data]', 'file-access-to-http']

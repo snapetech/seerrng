@@ -83,7 +83,8 @@ const API_RATE_LIMIT = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getRateLimitKey,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () =>
+    process.env.NODE_ENV === 'test' || process.env.E2E_TESTS === 'true',
 });
 const SHUTDOWN_CONNECTION_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TASK_TIMEOUT_MS = 15_000;
@@ -191,6 +192,8 @@ app
       );
     }
 
+    const isE2eTest = isTruthyEnv(process.env.E2E_TESTS);
+
     // Migrate library types
     if (
       settings.plex.libraries.length > 1 &&
@@ -237,16 +240,26 @@ app
       new WebhookAgent(),
       new WebPushAgent(),
     ]);
-    await notificationManager.resumePendingNotifications();
-    notificationManager.startOutboxRetryLoop();
-    await requestDispatchManager.resume();
-    requestDispatchManager.start();
-    await resumePendingPasswordResetDeliveries();
+    if (isE2eTest) {
+      logger.info('Skipping background delivery loops in E2E test mode', {
+        label: 'Server',
+      });
+    } else {
+      await notificationManager.resumePendingNotifications();
+      notificationManager.startOutboxRetryLoop();
+      await requestDispatchManager.resume();
+      requestDispatchManager.start();
+      await resumePendingPasswordResetDeliveries();
+    }
 
     const userRepository = getRepository(User);
     const totalUsers = await userRepository.count();
-    if (totalUsers > 0) {
+    if (totalUsers > 0 && !isE2eTest) {
       startJobs();
+    } else if (isE2eTest) {
+      logger.info('Skipping scheduled jobs in E2E test mode', {
+        label: 'Server',
+      });
     } else {
       logger.info(
         `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
@@ -296,6 +309,15 @@ app
       dev,
       settings.network.csrfProtection
     );
+    // Cypress drives many concurrent API requests through one SQLite session
+    // row. Keep E2E session state process-local so those requests cannot queue
+    // behind TypeORM session touches. Production retains durable sessions.
+    const sessionStore = isE2eTest
+      ? undefined
+      : (new TypeormStore({
+          cleanupLimit: 2,
+          ttl: 60 * 60 * 24 * 30,
+        }).connect(sessionRespository) as Store);
     server.use(
       '/api',
       session({
@@ -303,10 +325,7 @@ app
         resave: false,
         saveUninitialized: false,
         ...sessionTransportOptions,
-        store: new TypeormStore({
-          cleanupLimit: 2,
-          ttl: 60 * 60 * 24 * 30,
-        }).connect(sessionRespository) as Store,
+        ...(sessionStore ? { store: sessionStore } : {}),
       })
     );
     const apiSpecContent = await fs.readFile(API_SPEC_PATH, 'utf-8');

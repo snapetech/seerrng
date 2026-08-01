@@ -13,12 +13,12 @@ import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
   UserMutationActorUnauthorizedError,
-  runUserSecurityMutationWithActor,
+  runUserSecurityReadWithActor,
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
 import { apiResponseCache } from '@server/middleware/apiResponseCache';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
-import { authorizedRouteScope } from '@server/middleware/authorizedMutation';
+import { authorizedRouteAccess } from '@server/middleware/authorizedMutation';
 import deprecatedRoute from '@server/middleware/deprecation';
 import { mapProductionCompany } from '@server/models/Movie';
 import { mapNetwork } from '@server/models/Tv';
@@ -198,7 +198,7 @@ router.get<Record<string, never>, StatusResponse>(
 router.get(
   '/status/appdata',
   isAuthenticated(Permission.ADMIN),
-  authorizedRouteScope(Permission.ADMIN),
+  authorizedRouteAccess(Permission.ADMIN),
   (_req, res) => {
     return res.status(200).json({
       appData: appDataStatus(),
@@ -240,7 +240,7 @@ router.get(
         return next({ status: 400, message: 'Invalid user ID.' });
       }
       const actorId = req.user!.id;
-      return await runUserSecurityMutationWithActor(
+      return await runUserSecurityReadWithActor(
         actorId,
         requestedUserId ?? actorId,
         Permission.ADMIN,
