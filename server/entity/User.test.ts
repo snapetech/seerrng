@@ -34,6 +34,37 @@ test('User persistence canonicalizes valid Jellyfin GUIDs', async () => {
   assert.strictEqual(raw?.jellyfinUserId, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
 });
 
+test('populates request counts explicitly instead of on every user load', async () => {
+  const userRepository = getRepository(User);
+  const requestRepository = getRepository(MediaRequest);
+  const user = await userRepository.findOneByOrFail({ id: 2 });
+  const media = await getRepository(Media).save(
+    new Media({
+      mediaType: MediaType.MOVIE,
+      tmdbId: 991_001,
+      status: MediaStatus.UNKNOWN,
+      status4k: MediaStatus.UNKNOWN,
+    })
+  );
+
+  await requestRepository.save(
+    new MediaRequest({
+      type: MediaType.MOVIE,
+      status: MediaRequestStatus.PENDING,
+      media,
+      requestedBy: user,
+      is4k: false,
+    })
+  );
+
+  const loadedUser = await userRepository.findOneByOrFail({ id: user.id });
+  assert.strictEqual(loadedUser.requestCount, undefined);
+
+  await User.populateRequestCounts([loadedUser]);
+
+  assert.strictEqual(loadedUser.requestCount, 1);
+});
+
 test('failed and declined requests do not consume retry quota', async () => {
   const userRepository = getRepository(User);
   const user = await userRepository.findOneByOrFail({ id: 2 });

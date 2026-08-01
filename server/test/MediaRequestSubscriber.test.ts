@@ -36,6 +36,7 @@ import { runWithServarrServiceMutationAdmission } from '@server/lib/serviceAdmis
 import { getSettings } from '@server/lib/settings';
 import {
   MediaRequestSubscriber,
+  READARR_FAILED_RETRY_DELAY_MS,
   READARR_LOOKUP_HYDRATION_CONCURRENCY,
   READARR_MAX_LOOKUP_RESULTS,
   clampReadarrProviderRetryDelay,
@@ -1039,7 +1040,6 @@ describe('MediaRequestSubscriber service dispatch', () => {
         serviceType: 'ebook',
       },
     ];
-
     const requestedBy = await getRequester();
     const media = await getRepository(Media).save(
       new Media({
@@ -1101,13 +1101,23 @@ describe('MediaRequestSubscriber service dispatch', () => {
 
     mock.method(notificationManager, 'sendNotification', () => undefined);
 
-    await new MediaRequestSubscriber().sendToReadarr(request);
+    const subscriber = new MediaRequestSubscriber();
+    const retryAfterMs = await subscriber.sendToReadarr(request);
 
     assert.equal(addBook.mock.callCount(), 0);
-    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
-      id: request.id,
+    const savedRequest = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: request.id },
+      relations: { media: true, requestedBy: true },
     });
     assert.equal(savedRequest.status, MediaRequestStatus.FAILED);
+    assert.equal(retryAfterMs, READARR_FAILED_RETRY_DELAY_MS);
+
+    const failedRetry = await subscriber.dispatchRequestById(savedRequest.id);
+    assert.deepEqual(failedRetry, {
+      delivered: false,
+      retryAfterMs: READARR_FAILED_RETRY_DELAY_MS,
+    });
+    assert.equal(addBook.mock.callCount(), 0);
   });
 
   it('resolves no-ISBN translated OpenLibrary works through Wikidata canonical title terms', async () => {

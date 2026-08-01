@@ -25,15 +25,23 @@ it('propagates API key rotation authority into admitted mutations', async () => 
   const response = new EventEmitter() as Response & EventEmitter;
   let mutation: Promise<void> | undefined;
 
-  await checkUser(request, response, (() => {
-    settings.main.apiKey = 'rotated-service-api-key';
-    mutation = runAuthorizedUserSecurityMutation(
-      1,
-      1,
-      Permission.ADMIN,
-      async () => undefined
-    );
-  }) as NextFunction);
+  await new Promise<void>((resolve, reject) => {
+    void checkUser(request, response, ((error?: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      settings.main.apiKey = 'rotated-service-api-key';
+      mutation = runAuthorizedUserSecurityMutation(
+        1,
+        1,
+        Permission.ADMIN,
+        async () => undefined
+      );
+      resolve();
+    }) as NextFunction);
+  });
 
   assert.ok(mutation);
   await assert.rejects(mutation, UserMutationActorUnauthorizedError);

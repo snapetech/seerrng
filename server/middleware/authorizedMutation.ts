@@ -3,6 +3,7 @@ import {
   UserMutationActorUnauthorizedError,
   acquireAuthorizedUserSecurityMutation,
   runAuthorizedUserSecurityMutation,
+  runUserSecurityReadWithActor,
 } from '@server/lib/userSecurityMutation';
 import { trackBackgroundTask } from '@server/utils/backgroundTasks';
 import type { Request, RequestHandler } from 'express';
@@ -45,6 +46,41 @@ export const authorizedRouteScope =
       };
       res.once('finish', release);
       res.once('close', release);
+      next();
+    } catch (error) {
+      if (error instanceof UserMutationActorUnauthorizedError) {
+        return next({
+          status: 403,
+          message: 'Your permission changed before the operation was applied.',
+        });
+      }
+      return next(error);
+    }
+  };
+
+export const authorizedRouteAccess =
+  (permission: Permission | Permission[]): RequestHandler =>
+  async (req, _res, next) => {
+    const actorId = req.user?.id;
+    if (!actorId) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+
+    try {
+      const actor = await runUserSecurityReadWithActor(
+        actorId,
+        actorId,
+        permission,
+        async (currentActor) => currentActor,
+        {
+          requirePermission: true,
+          expectedCredentialVersion:
+            req.session?.userId === actorId
+              ? (req.session.credentialVersion ?? 0)
+              : undefined,
+        }
+      );
+      req.user = actor;
       next();
     } catch (error) {
       if (error instanceof UserMutationActorUnauthorizedError) {

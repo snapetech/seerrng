@@ -18,7 +18,7 @@ import {
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { authorizedRouteScope } from '@server/middleware/authorizedMutation';
+import { authorizedRouteAccess } from '@server/middleware/authorizedMutation';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import {
   parseOptionalPositiveInt,
@@ -96,7 +96,7 @@ issueRoutes.get<
     ],
     { type: 'or' }
   ),
-  authorizedRouteScope([
+  authorizedRouteAccess([
     Permission.MANAGE_ISSUES,
     Permission.VIEW_ISSUES,
     Permission.CREATE_ISSUES,
@@ -307,7 +307,7 @@ issueRoutes.get(
     ],
     { type: 'or' }
   ),
-  authorizedRouteScope([
+  authorizedRouteAccess([
     Permission.MANAGE_ISSUES,
     Permission.VIEW_ISSUES,
     Permission.CREATE_ISSUES,
@@ -381,7 +381,7 @@ issueRoutes.get<{ issueId: string }>(
     ],
     { type: 'or' }
   ),
-  authorizedRouteScope([
+  authorizedRouteAccess([
     Permission.MANAGE_ISSUES,
     Permission.VIEW_ISSUES,
     Permission.CREATE_ISSUES,

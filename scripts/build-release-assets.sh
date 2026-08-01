@@ -30,6 +30,7 @@ esac
 
 asset="seerrng-${tag}-${os}-${arch}"
 work_dir="$(mktemp -d)"
+work_dir="$(cd "$work_dir" && pwd -P)"
 archive_temporary=""
 checksum_temporary=""
 cleanup() {
@@ -58,15 +59,32 @@ touch "$stage/config/.gitkeep"
 
 while IFS= read -r -d '' link; do
   target="$(readlink "$link")"
-  [[ "$target" != /* ]] || {
-    echo "Refusing absolute archive symlink: $link -> $target" >&2
-    exit 1
-  }
-  resolved="$(realpath -m -- "$(dirname -- "$link")/$target")"
+  link_dir="$(dirname -- "$link")"
+  if [[ "$target" == /* ]]; then
+    resolved="$(realpath "$target")" || {
+      echo "Refusing broken archive symlink: $link -> $target" >&2
+      exit 1
+    }
+  else
+    resolved="$(realpath "$link_dir/$target")" || {
+      echo "Refusing broken archive symlink: $link -> $target" >&2
+      exit 1
+    }
+  fi
   [[ "$resolved" == "$stage"/* ]] || {
-    echo "Refusing escaping archive symlink: $link -> $target" >&2
+    if [[ "$target" == /* ]]; then
+      echo "Refusing absolute archive symlink: $link -> $target" >&2
+    else
+      echo "Refusing escaping archive symlink: $link -> $target" >&2
+    fi
     exit 1
   }
+
+  if [[ "$target" == /* ]]; then
+    relative_target="$(node -e 'const path = require("node:path"); process.stdout.write(path.posix.relative(process.argv[1], process.argv[2]));' "$link_dir" "$resolved")"
+    rm -- "$link"
+    ln -s -- "$relative_target" "$link"
+  fi
 done < <(find "$stage" -type l -print0)
 
 cat > "$stage/start.sh" <<'EOF'
@@ -131,9 +149,9 @@ else
   tar -C "$work_dir" -czf "$archive_temporary" "$asset"
 fi
 
-chmod 0644 -- "$archive_temporary"
+chmod 0644 "$archive_temporary"
 mv -f -- "$archive_temporary" "${dist_abs}/${archive_name}"
 checksum_temporary="$(mktemp "${dist_abs}/.${asset}.sha256.tmp.XXXXXX")"
 (cd "$dist_abs" && sha256sum "$archive_name" >"$checksum_temporary")
-chmod 0644 -- "$checksum_temporary"
+chmod 0644 "$checksum_temporary"
 mv -f -- "$checksum_temporary" "${dist_abs}/${asset}.sha256"

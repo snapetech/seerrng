@@ -255,21 +255,44 @@ jobs:
 
       - name: Resolve manifest digest
         id: digests
+        shell: bash
         run: |
-          DIGEST=$(docker buildx imagetools inspect "${{ env.DOCKER_HUB }}:${{ env.VERSION }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
-          echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "Resolving release manifest digest (attempt ${attempt}/5)"
+            if DIGEST=$(docker buildx imagetools inspect "${{ env.DOCKER_HUB }}:${{ env.VERSION }}" --format '{{json .Manifest.Digest}}' | tr -d '"') &&
+              [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo 'Unable to resolve the release manifest digest after 5 attempts.' >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
 
       - name: Also tag :latest (non-pre-release only)
         shell: bash
         if: ${{ !contains(env.VERSION, '-') }}
         run: |
-          docker buildx imagetools create \
-            -t ${{ env.DOCKER_HUB }}:latest \
-            ${{ env.DOCKER_HUB }}:${{ env.VERSION }}
-
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository }}:latest \
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "Tagging release images as latest (attempt ${attempt}/5)"
+            if docker buildx imagetools create \
+                -t "${{ env.DOCKER_HUB }}:latest" \
+                "${{ env.DOCKER_HUB }}:${{ env.VERSION }}" &&
+              docker buildx imagetools create \
+                -t "ghcr.io/${{ github.repository }}:latest" \
+                "ghcr.io/${{ github.repository }}:${{ env.VERSION }}"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo 'Unable to tag release images as latest after 5 attempts.' >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
 
   sign:
     name: Sign images and create SBOM attestations

@@ -14,7 +14,17 @@ const isBoundedString = (value, maxLength) =>
   typeof value === 'string' && value.length <= maxLength;
 
 export function loadIndex(path) {
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let descriptor;
+  try {
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (error) {
+    if (error?.code === 'ELOOP') {
+      throw new Error('Issue index is not a bounded private regular file', {
+        cause: error,
+      });
+    }
+    throw error;
+  }
   try {
     const metadata = fstatSync(descriptor);
     if (

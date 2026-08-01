@@ -149,6 +149,10 @@ const AdvancedRequester = ({
       ),
     [bookServiceType, data, is4k, type]
   );
+  const availableServers = useMemo(
+    () => (data ?? []).filter((server) => server.is4k === is4k),
+    [data, is4k]
+  );
 
   const { data: userData } = useSWR<ClientUserResultsResponse>(
     currentHasPermission([Permission.MANAGE_REQUESTS, Permission.MANAGE_USERS])
@@ -379,7 +383,7 @@ const AdvancedRequester = ({
   const serviceOptionsHidden =
     !serviceOverridesEnabled ||
     selectedServer === null ||
-    (serviceServers.length < 2 &&
+    (availableServers.length < 2 &&
       (!serverData ||
         (serverData.profiles.length < 2 &&
           (serverData.metadataProfiles ?? []).length < 2 &&

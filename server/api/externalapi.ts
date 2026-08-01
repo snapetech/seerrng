@@ -109,6 +109,36 @@ const isAbsoluteUrl = (value: string): boolean => {
   }
 };
 
+export const normalizeExternalApiRequestTarget = (
+  endpoint: string,
+  baseUrl: string,
+  allowedOrigins: ReadonlySet<string>
+): string => {
+  let requestUrl: URL;
+  try {
+    requestUrl = new URL(endpoint, baseUrl);
+  } catch {
+    // Preserve the legacy delayed failure for incomplete administrator
+    // configuration, but never let an absolute target bypass the origin
+    // policy when URL parsing succeeds for the endpoint itself.
+    if (isAbsoluteUrl(endpoint)) {
+      throw new Error('External API request target is not allowed.');
+    }
+    return endpoint;
+  }
+
+  if (
+    !['http:', 'https:'].includes(requestUrl.protocol) ||
+    requestUrl.username ||
+    requestUrl.password ||
+    !allowedOrigins.has(requestUrl.origin)
+  ) {
+    throw new Error('External API request target is not allowed.');
+  }
+
+  return endpoint;
+};
+
 export const createExternalApiCacheKeySuffix = (
   options?: Record<string, unknown>
 ) => {
@@ -224,6 +254,7 @@ export const createExternalApiCacheKeySuffix = (
 class ExternalAPI {
   protected axios: AxiosInstance;
   private baseUrl: string;
+  private allowedOrigins: ReadonlySet<string>;
   private cacheScope: string;
   private cache?: NodeCache;
   private backgroundCacheRefreshEnabled: boolean;
@@ -293,6 +324,7 @@ class ExternalAPI {
     }
 
     this.baseUrl = baseUrl;
+    this.allowedOrigins = allowedOrigins;
     // Shared caches and the process-wide in-flight map must not coalesce
     // requests made with different credentials or constructor-level params.
     // Keep only a digest in cache keys so API secrets are not retained there.
@@ -316,6 +348,11 @@ class ExternalAPI {
     ttl?: number,
     isUsableResponse?: (data: T) => boolean
   ): Promise<T> {
+    const requestEndpoint = normalizeExternalApiRequestTarget(
+      endpoint,
+      config?.baseURL ?? this.baseUrl,
+      this.allowedOrigins
+    );
     const cacheKey = this.serializeCacheKey(endpoint, {
       params: config?.params,
       headers: config?.headers,
@@ -334,7 +371,7 @@ class ExternalAPI {
     const response = await this.fetchAndCache(
       'GET',
       cacheKey,
-      () => this.axios.get<T>(endpoint, config),
+      () => this.axios.get<T>(requestEndpoint, config),
       ttl,
       isUsableResponse
     );
@@ -343,7 +380,7 @@ class ExternalAPI {
       return this.fetchAndCache(
         'GET',
         cacheKey,
-        () => this.axios.get<T>(endpoint, config),
+        () => this.axios.get<T>(requestEndpoint, config),
         0,
         isUsableResponse
       );
@@ -358,6 +395,11 @@ class ExternalAPI {
     config?: AxiosRequestConfig,
     ttl?: number
   ): Promise<T> {
+    const requestEndpoint = normalizeExternalApiRequestTarget(
+      endpoint,
+      config?.baseURL ?? this.baseUrl,
+      this.allowedOrigins
+    );
     const cacheable = typeof ttl === 'number' && ttl > 0;
     const cacheKey = this.serializeCacheKey(endpoint, {
       params: config?.params,
@@ -376,7 +418,7 @@ class ExternalAPI {
     return this.fetchAndCache(
       'POST',
       cacheKey,
-      () => this.axios.post<T>(endpoint, data, config),
+      () => this.axios.post<T>(requestEndpoint, data, config),
       ttl
     );
   }
@@ -386,6 +428,11 @@ class ExternalAPI {
     config?: AxiosRequestConfig,
     ttl?: number
   ): Promise<T> {
+    const requestEndpoint = normalizeExternalApiRequestTarget(
+      endpoint,
+      config?.baseURL ?? this.baseUrl,
+      this.allowedOrigins
+    );
     const cacheKey = this.serializeCacheKey(endpoint, {
       params: config?.params,
       headers: config?.headers,
@@ -410,7 +457,7 @@ class ExternalAPI {
           this.fetchAndCache(
             'GET',
             cacheKey,
-            () => this.axios.get<T>(endpoint, config),
+            () => this.axios.get<T>(requestEndpoint, config),
             ttl
           )
         );
@@ -421,7 +468,7 @@ class ExternalAPI {
     return this.fetchAndCache(
       'GET',
       cacheKey,
-      () => this.axios.get<T>(endpoint, config),
+      () => this.axios.get<T>(requestEndpoint, config),
       ttl
     );
   }

@@ -498,14 +498,29 @@ class BaseScanner<T> {
                   relations: { media: true },
                   order: { id: 'ASC' },
                 });
+                const orphanedIdentifiers = existingIdentifiers.filter(
+                  (identifier) => !identifier.media
+                );
+
+                if (orphanedIdentifiers.length > 0) {
+                  await identifierRepository.remove(orphanedIdentifiers);
+                  this.log(
+                    `Removed ${orphanedIdentifiers.length} orphaned identifier(s) while processing book: ${title}`,
+                    'warn'
+                  );
+                }
+
+                const linkedIdentifiers = existingIdentifiers.filter(
+                  (identifier) => !!identifier.media
+                );
                 const existingIdentifier =
-                  existingIdentifiers.find(
+                  linkedIdentifiers.find(
                     (identifier) =>
                       identifier.provider === provider &&
                       identifier.value === normalizedValue &&
                       identifier.media.mediaType === MediaType.BOOK
                   ) ??
-                  existingIdentifiers.find(
+                  linkedIdentifiers.find(
                     (identifier) =>
                       identifier.media.mediaType === MediaType.BOOK
                   );
@@ -622,10 +637,11 @@ class BaseScanner<T> {
                     )
                       .filter(
                         (identifier) =>
-                          identifier.media.id !== existing.id ||
-                          candidateKeys.has(
-                            `${identifier.provider}:${identifier.value}`
-                          )
+                          !!identifier.media &&
+                          (identifier.media.id !== existing.id ||
+                            candidateKeys.has(
+                              `${identifier.provider}:${identifier.value}`
+                            ))
                       )
                       .map(
                         (identifier) =>
