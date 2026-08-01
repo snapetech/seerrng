@@ -107,8 +107,17 @@ describe('PullToRefreshController', () => {
 
       await act(async () => {
         dom.window.dispatchEvent(
+          createTouchEvent(dom.window.document, 'touchstart', 10)
+        );
+        dom.window.dispatchEvent(
           createTouchEvent(dom.window.document, 'touchmove', 400)
         );
+      });
+      const refreshIcon = document.getElementById('refreshIcon');
+      assert.ok(
+        refreshIcon?.querySelector('svg')?.classList.contains('rotate-180')
+      );
+      await act(async () => {
         dom.window.dispatchEvent(
           createTouchEvent(dom.window.document, 'touchend')
         );
@@ -121,12 +130,16 @@ describe('PullToRefreshController', () => {
       );
       assert.strictEqual(timers.size, 1);
       assert.strictEqual(reloads, 0);
+      assert.ok(refreshIcon?.firstElementChild?.classList.contains('relative'));
+      assert.ok(
+        refreshIcon?.firstElementChild?.classList.contains('animate-spin')
+      );
 
       releaseModalTouchLock();
       assert.strictEqual(document.body.style.touchAction, 'pan-x');
 
       await act(async () => root.unmount());
-      assert.deepStrictEqual(cleared, [1]);
+      assert.deepStrictEqual(cleared, [1, 2]);
       assert.strictEqual(timers.size, 0);
       assert.strictEqual(reloads, 0);
     } finally {

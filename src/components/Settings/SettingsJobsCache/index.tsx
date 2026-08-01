@@ -13,8 +13,13 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { formatBytes } from '@app/utils/numberHelpers';
 import { Transition } from '@headlessui/react';
-import { PlayIcon, StopIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { PencilIcon } from '@heroicons/react/24/solid';
+import {
+  NoSymbolIcon,
+  PlayIcon,
+  StopIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
+import { CheckIcon, PencilIcon } from '@heroicons/react/24/solid';
 import { MediaServerType } from '@server/constants/server';
 import type {
   CacheItem,
@@ -41,6 +46,12 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     nextexecution: 'Next Execution',
     runnow: 'Run Now',
     canceljob: 'Cancel Job',
+    enablejob: 'Enable',
+    disablejob: 'Disable',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    jobenabled: '{jobname} enabled.',
+    jobdisabled: '{jobname} disabled.',
     jobstarted: '{jobname} started.',
     jobcancelled: '{jobname} canceled.',
     process: 'Process',
@@ -86,7 +97,11 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'availability-sync': 'Media Availability Sync',
     'radarr-scan': 'Radarr Scan',
     'sonarr-scan': 'Sonarr Scan',
+    'lidarr-scan': 'Lidarr Scan',
+    'readarr-scan': 'Bookshelf Scan',
+    'readarr-request-retry': 'Bookshelf Request Retry',
     'download-sync': 'Download Sync',
+    'download-recovery': 'Download Recovery',
     'download-sync-reset': 'Download Sync Reset',
     'image-cache-cleanup': 'Image Cache Cleanup',
     'process-blocklisted-tags': 'Process Blocklisted Tags',
@@ -118,7 +133,8 @@ interface Job {
   type: 'process' | 'command';
   interval: 'seconds' | 'minutes' | 'hours' | 'days' | 'fixed';
   cronSchedule: string;
-  nextExecutionTime: string;
+  enabled: boolean;
+  nextExecutionTime: string | null;
   running: boolean;
 }
 
@@ -245,6 +261,24 @@ const SettingsJobs = () => {
       }),
       {
         appearance: 'error',
+        autoDismiss: true,
+      }
+    );
+    revalidate();
+  };
+
+  const toggleJob = async (job: Job) => {
+    const enabled = !job.enabled;
+
+    await axios.post(`/api/v1/settings/jobs/${job.id}/enabled`, {
+      enabled,
+    });
+    addToast(
+      intl.formatMessage(enabled ? messages.jobenabled : messages.jobdisabled, {
+        jobname: intl.formatMessage(messages[job.id] ?? messages.unknownJob),
+      }),
+      {
+        appearance: enabled ? 'success' : 'warning',
         autoDismiss: true,
       }
     );
@@ -504,6 +538,11 @@ const SettingsJobs = () => {
                         messages[job.id] ?? messages.unknownJob
                       )}
                     </span>
+                    {!job.enabled && (
+                      <Badge badgeType="danger" className="ml-2 uppercase">
+                        {intl.formatMessage(messages.disabled)}
+                      </Badge>
+                    )}
                     {job.running && <Spinner className="ml-2 h-5 w-5" />}
                   </div>
                 </Table.TD>
@@ -519,18 +558,34 @@ const SettingsJobs = () => {
                 </Table.TD>
                 <Table.TD>
                   <div className="text-sm leading-5 text-white">
-                    <FormattedRelativeTime
-                      value={Math.floor(
-                        (new Date(job.nextExecutionTime).getTime() -
-                          Date.now()) /
-                          1000
-                      )}
-                      updateIntervalInSeconds={1}
-                      numeric="auto"
-                    />
+                    {job.enabled && job.nextExecutionTime ? (
+                      <FormattedRelativeTime
+                        value={Math.floor(
+                          (new Date(job.nextExecutionTime).getTime() -
+                            Date.now()) /
+                            1000
+                        )}
+                        updateIntervalInSeconds={1}
+                        numeric="auto"
+                      />
+                    ) : (
+                      intl.formatMessage(messages.disabled)
+                    )}
                   </div>
                 </Table.TD>
                 <Table.TD alignText="right">
+                  <Button
+                    className="mr-2"
+                    buttonType={job.enabled ? 'danger' : 'success'}
+                    onClick={() => toggleJob(job)}
+                  >
+                    {job.enabled ? <NoSymbolIcon /> : <CheckIcon />}
+                    <span>
+                      {intl.formatMessage(
+                        job.enabled ? messages.disablejob : messages.enablejob
+                      )}
+                    </span>
+                  </Button>
                   {job.interval !== 'fixed' && (
                     <Button
                       className="mr-2"

@@ -356,6 +356,26 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
       throw new Error(`[Readarr] Failed to remove book: ${e.message}`);
     }
   }
+
+  public async searchBook(bookId: number): Promise<void> {
+    logger.info('Executing book search command.', {
+      label: 'Readarr API',
+      bookId,
+    });
+
+    try {
+      await this.runCommand('BookSearch', { bookIds: [bookId] });
+    } catch (e) {
+      logger.error(
+        'Something went wrong while executing Bookshelf/Readarr book search.',
+        {
+          label: 'Readarr API',
+          errorMessage: getReadarrErrorMessage(e),
+          bookId,
+        }
+      );
+    }
+  }
 }
 
 export default ReadarrAPI;

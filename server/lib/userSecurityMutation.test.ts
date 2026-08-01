@@ -6,14 +6,15 @@ import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import requestAdmissionCoordinator from './requestAdmission';
 import {
+  UserMutationActorUnauthorizedError,
   acquireAuthorizedUserSecurityMutation,
   getUserSecurityMutationResource,
   runAuthorizedUserSecurityMutation,
   runUserSecurityMutation,
   runUserSecurityMutationWithActor,
+  runUserSecurityReadWithActor,
   runWithUserApiKeyAuthorityContext,
   runWithUserCredentialVersionContext,
-  UserMutationActorUnauthorizedError,
 } from './userSecurityMutation';
 
 describe('runUserSecurityMutation', () => {
@@ -71,6 +72,47 @@ describe('runUserSecurityMutation', () => {
     releaseFirst();
     await Promise.all([first, second]);
     assert.deepStrictEqual(events, ['first-start', 'first-end', 'second']);
+  });
+
+  it('does not block reads behind an active mutation', async () => {
+    mock.method(datasource, 'getRepository', () => ({
+      findOneBy: async () =>
+        new User({ id: 12, permissions: Permission.MANAGE_USERS }),
+    }));
+
+    let releaseFirst!: () => void;
+    let firstStarted!: () => void;
+    const firstStartedPromise = new Promise<void>((resolve) => {
+      firstStarted = resolve;
+    });
+    const releaseFirstPromise = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const first = runUserSecurityMutation(12, async () => {
+      firstStarted();
+      await releaseFirstPromise;
+    });
+    await firstStartedPromise;
+
+    const read = runUserSecurityReadWithActor(
+      12,
+      12,
+      Permission.MANAGE_USERS,
+      async (actor) => actor.id
+    );
+    const observed = await Promise.race([
+      read,
+      new Promise<'timed-out'>((resolve) =>
+        setTimeout(() => resolve('timed-out'), 100)
+      ),
+    ]);
+
+    releaseFirst();
+    await first;
+    assert.strictEqual(observed, 12);
+    await read;
+    mock.restoreAll();
   });
 
   it('reloads the actor before admitting an authorized mutation', async () => {

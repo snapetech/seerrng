@@ -19,6 +19,22 @@ afterEach(async () => {
 });
 
 describe('scheduled job lifecycle', () => {
+  it('does not start scheduled jobs in E2E test mode', () => {
+    const previousE2eFlag = process.env.E2E_TESTS;
+    process.env.E2E_TESTS = 'true';
+
+    try {
+      startJobs();
+      assert.strictEqual(scheduledJobs.length, 0);
+    } finally {
+      if (previousE2eFlag === undefined) {
+        delete process.env.E2E_TESTS;
+      } else {
+        process.env.E2E_TESTS = previousE2eFlag;
+      }
+    }
+  });
+
   it('does not register duplicate jobs when startup runs twice', () => {
     const job = schedule.scheduleJob(
       new Date(Date.now() + 60_000),

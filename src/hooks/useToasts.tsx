@@ -7,6 +7,12 @@ interface ToastOptions {
   autoDismiss?: boolean;
 }
 
+export const getToastDedupeId = (
+  message: React.ReactNode,
+  appearance: ToastOptions['appearance'] = 'info'
+): string | undefined =>
+  typeof message === 'string' ? `${appearance}:${message}` : undefined;
+
 export const useToasts = () => {
   const addToast = useCallback(
     (
@@ -30,6 +36,7 @@ export const useToasts = () => {
         },
         {
           duration: options?.autoDismiss !== false ? 4000 : Infinity,
+          id: getToastDedupeId(message, options?.appearance),
         }
       );
 

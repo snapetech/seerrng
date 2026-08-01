@@ -345,6 +345,26 @@ class LidarrAPI extends ServarrBase<{ albumId: number }> {
     }
   }
 
+  public async searchExistingAlbum(albumId: number): Promise<void> {
+    logger.info('Executing album search command.', {
+      label: 'Lidarr API',
+      albumId,
+    });
+
+    try {
+      await this.runCommand('AlbumSearch', { albumIds: [albumId] });
+    } catch (e) {
+      logger.error(
+        'Something went wrong while executing Lidarr album search.',
+        {
+          label: 'Lidarr API',
+          errorMessage: e.message,
+          albumId,
+        }
+      );
+    }
+  }
+
   public async addAlbum(options: LidarrAlbumOptions): Promise<LidarrAlbum> {
     try {
       const normalizedOptions = {

@@ -27,7 +27,7 @@ import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import {
   authorizedMutation,
-  authorizedRouteScope,
+  authorizedRouteAccess,
 } from '@server/middleware/authorizedMutation';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import { parsePageParams } from '@server/utils/pagination';
@@ -226,7 +226,7 @@ const parseOptionalMediaStatusBody = (
 mediaRoutes.get(
   '/',
   isAuthenticated(mediaListPermissions, { type: 'or' }),
-  authorizedRouteScope(mediaListPermissions),
+  authorizedRouteAccess(mediaListPermissions),
   async (req, res, next) => {
     const mediaRepository = getRepository(Media);
 
