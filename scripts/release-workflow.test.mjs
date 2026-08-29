@@ -24,13 +24,27 @@ test('release package channels wait for the reusable release asset build', () =>
 
   assert.equal(assetBuild.uses, './.github/workflows/release-assets.yml');
   assert.equal(assetBuild.needs, 'publish-release');
-  assert.equal(assetBuild.with.tag, '${{ github.ref_name }}');
+  assert.equal(assetBuild.with.tag, '${{ inputs.tag || github.ref_name }}');
   assert.deepEqual(packageDispatch.needs, [
     'publish-release',
     'build-release-assets',
   ]);
   assert.doesNotMatch(dispatchScript, /release-assets\.yml/u);
   assert.match(dispatchScript, /release-linux-packages\.yml/u);
+});
+
+test('release publishing admits only tag pushes and main-branch retries', () => {
+  const release = readWorkflow('release.yml');
+  const validation = release.jobs['validate-main-tag'];
+  const validationScript = validation.steps.find(
+    (step) => step.name === 'Ensure tag is on main'
+  ).run;
+
+  assert.match(validation.if, /github\.event_name != 'workflow_dispatch'/u);
+  assert.match(validation.if, /github\.ref == 'refs\/heads\/main'/u);
+  assert.match(validationScript, /\$GITHUB_EVENT_NAME" == 'push'/u);
+  assert.match(validationScript, /\$GITHUB_REF_TYPE" != 'tag'/u);
+  assert.match(validationScript, /git merge-base --is-ancestor/u);
 });
 
 test('release assets support trusted reuse and main-only manual dispatch', () => {
