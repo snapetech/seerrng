@@ -9,6 +9,7 @@ import {
   prepareFilterValues,
 } from '@app/components/Discover/constants';
 import useDiscover from '@app/hooks/useDiscover';
+import useDiscoverScrollRestoration from '@app/hooks/useDiscoverScrollRestoration';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -72,6 +73,13 @@ const DiscoverTv = () => {
     },
     { randomizeOrder: !preparedFilters.sortBy }
   );
+  useDiscoverScrollRestoration({
+    mediaType: 'tv',
+    itemCount: titles.length,
+    isLoading: isLoadingInitialData || isLoadingMore,
+    isReachingEnd,
+    fetchMore,
+  });
 
   if (error) {
     return <ErrorPage statusCode={500} />;
