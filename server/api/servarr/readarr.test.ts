@@ -826,4 +826,201 @@ describe('ReadarrAPI Chaptarr compatibility', () => {
       await once(server, 'close');
     }
   });
+
+  it('uses addressable native results when an older Chaptarr build has no ebook lookup index', async () => {
+    const requests: {
+      method: string;
+      path: string;
+      query: URLSearchParams;
+      body: unknown;
+    }[] = [];
+    const nativeResult = {
+      title: 'The War of the Worlds',
+      foreignBookId: 'gr:3194841',
+      mediaType: 'audiobook' as const,
+      author: {
+        foreignAuthorId: 'gr:880695',
+        authorName: 'H.G. Wells',
+      },
+      editions: [
+        {
+          foreignEditionId: 'gr:8909',
+          title: 'The War of the Worlds',
+          monitored: true,
+        },
+      ],
+    };
+    let bookState = {
+      ...nativeResult,
+      id: 17,
+      mediaType: 'ebook' as const,
+      monitored: true,
+      ebookMonitored: true,
+      addOptions: { searchForNewBook: false },
+    };
+    const scopedBases = [
+      '/readarr/gr/ebook/api/v1',
+      '/readarr/hc/ebook/api/v1',
+    ];
+    const server = createServer((request, response) => {
+      void (async () => {
+        const parsedUrl = new URL(request.url ?? '/', 'http://localhost');
+        const scopedBase = scopedBases.find((base) =>
+          parsedUrl.pathname.startsWith(base)
+        );
+        const body = await readJsonBody(request);
+        requests.push({
+          method: request.method ?? 'GET',
+          path: parsedUrl.pathname,
+          query: parsedUrl.searchParams,
+          body,
+        });
+
+        if (parsedUrl.pathname === '/api/v1/system/status') {
+          writeJson(response, 200, {
+            appName: 'Chaptarr',
+            version: '0.9.911.0',
+            urlBase: '',
+          });
+          return;
+        }
+
+        if (parsedUrl.pathname === '/api/v1/config/hardcover') {
+          writeJson(response, 200, { enabled: false });
+          return;
+        }
+
+        if (
+          request.method === 'GET' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/book/lookup`
+        ) {
+          writeJson(response, 200, []);
+          return;
+        }
+
+        if (
+          request.method === 'GET' &&
+          parsedUrl.pathname === '/api/v1/book/lookup'
+        ) {
+          writeJson(response, 200, [nativeResult]);
+          return;
+        }
+
+        if (
+          request.method === 'GET' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/book`
+        ) {
+          writeJson(response, 200, []);
+          return;
+        }
+
+        if (
+          request.method === 'POST' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/book`
+        ) {
+          writeJson(response, 201, bookState);
+          return;
+        }
+
+        if (
+          request.method === 'GET' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/book/17`
+        ) {
+          writeJson(response, 200, bookState);
+          return;
+        }
+
+        if (
+          request.method === 'PUT' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/book/17`
+        ) {
+          bookState = {
+            ...bookState,
+            ...(body as Record<string, unknown>),
+            addOptions: { searchForNewBook: true },
+          };
+          writeJson(response, 202, bookState);
+          return;
+        }
+
+        if (
+          request.method === 'POST' &&
+          scopedBase &&
+          parsedUrl.pathname === `${scopedBase}/command`
+        ) {
+          writeJson(response, 201, {});
+          return;
+        }
+
+        writeJson(response, 404, { message: 'not found' });
+      })().catch(() => writeJson(response, 500, { message: 'handler failed' }));
+    });
+
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+
+    try {
+      const api = new ReadarrAPI({
+        url: `http://127.0.0.1:${address.port}/api/v1`,
+        apiKey: 'key',
+        mediaType: 'ebook',
+      });
+
+      const lookup = await api.lookupBook('the war of the worlds');
+      assert.strictEqual(lookup[0].mediaType, 'ebook');
+      assert.strictEqual(lookup[0].foreignBookId, nativeResult.foreignBookId);
+
+      const result = await api.addBook({
+        ...lookup[0],
+        mediaType: 'ebook',
+        monitored: true,
+        qualityProfileId: 1,
+        metadataProfileId: 2,
+        rootFolderPath: '/ebooks',
+        tags: [],
+        addOptions: { searchForNewBook: true },
+      });
+
+      assert.strictEqual(result.id, 17);
+      assert.strictEqual(result.mediaType, 'ebook');
+      const post = requests.find(
+        ({ method, path }) =>
+          method === 'POST' && path === '/readarr/gr/ebook/api/v1/book'
+      );
+      assert.ok(post);
+      assert.strictEqual(post.query.get('mediaType'), 'ebook');
+      assert.strictEqual(
+        (post.body as Record<string, unknown>).ebookMonitored,
+        true
+      );
+      const update = requests.find(
+        ({ method, path }) =>
+          method === 'PUT' && path === '/readarr/gr/ebook/api/v1/book/17'
+      );
+      assert.ok(update);
+      assert.deepStrictEqual(update.body, {
+        id: 17,
+        mediaType: 'ebook',
+        monitored: true,
+        ebookMonitored: true,
+        addOptions: { searchForNewBook: true },
+      });
+      assert.ok(
+        requests.some(
+          ({ method, path }) =>
+            method === 'POST' && path === '/readarr/gr/ebook/api/v1/command'
+        )
+      );
+    } finally {
+      server.close();
+      await once(server, 'close');
+    }
+  });
 });

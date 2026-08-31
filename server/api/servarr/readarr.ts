@@ -736,6 +736,30 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
           );
           return formatResults;
         }
+
+        // Chaptarr 0.9.911 can return only audiobook metadata from its native
+        // lookup even when an ebook facade is configured. The add endpoint
+        // still accepts that provider-backed record when the requested media
+        // type is supplied, so keep the usable identity instead of turning a
+        // valid request into a local "book not found" failure.
+        const crossFormatResults = nativeResults
+          .filter(ReadarrAPI.hasAddressableLookupIdentity)
+          .map((result) => ({ ...result, mediaType: this.mediaType }));
+
+        if (crossFormatResults.length > 0) {
+          logger.warn(
+            'Chaptarr returned no lookup results for the requested format; using addressable native metadata as an add seed.',
+            {
+              label: 'Readarr',
+              requestedMediaType: this.mediaType,
+              nativeMediaType: nativeResults.find((result) => result.mediaType)
+                ?.mediaType,
+              term,
+              resultCount: crossFormatResults.length,
+            }
+          );
+          return crossFormatResults;
+        }
       } catch (error) {
         logger.warn('Chaptarr native lookup fallback failed.', {
           label: 'Readarr',
