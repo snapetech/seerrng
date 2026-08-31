@@ -27,6 +27,29 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.12.9](https://github.com/snapetech/seerrng/compare/v3.12.8..v3.12.9) - 2026-08-31
+
+### User-facing changes
+
+#### Changed
+
+- **Community:** Published SeerrNG community links now point to the current Discord server.
+
+#### Fixed
+
+- **Bookshelf:** Chaptarr Bookshelf connections now use the configured ebook or audiobook provider path, preserve monitoring and automatic-search requests after adding books, and load download queues reliably.
+- **Release Pipeline:** Tagged releases can now be retried through the release workflow, and SBOM generation has a longer analysis window for large container images.
+
+### 🐛 Bug Fixes
+- *(bookshelf)* Make Chaptarr integration compatible - ([ca0784e](https://github.com/snapetech/seerrng/commit/ca0784e1e6a9ca18605fdbffb26411b975f6fdd4))
+- *(release)* Use requested tag for image metadata - ([57276ea](https://github.com/snapetech/seerrng/commit/57276ea65c9750d1e60b2059dde89e582969fb9f))
+- *(release)* Extend SBOM analysis timeout - ([9a9e871](https://github.com/snapetech/seerrng/commit/9a9e8716fb19793c5d167c40eecf3339becca53e))
+
+### 📖 Documentation
+- Update Discord community links - ([650614b](https://github.com/snapetech/seerrng/commit/650614bbbb773bec2efd19d7a85b310a71884eff))
+
 ## [3.12.8](https://github.com/snapetech/seerrng/compare/v3.12.7..v3.12.8) - 2026-08-21
 
 ### User-facing changes
