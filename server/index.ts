@@ -314,12 +314,7 @@ app
         secret: settings.sessionSecret,
         resave: false,
         saveUninitialized: false,
-        cookie: {
-          ...sessionTransportOptions.cookie,
-          // Keep the transport guarantee explicit for security analysis and
-          // for anyone reviewing the session middleware configuration here.
-          secure: true,
-        },
+        cookie: sessionTransportOptions.cookie,
         proxy: sessionTransportOptions.proxy,
         ...(sessionStore ? { store: sessionStore } : {}),
       })
