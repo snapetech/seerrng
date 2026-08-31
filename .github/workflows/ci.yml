@@ -74,7 +74,7 @@ jobs:
           node-version-file: 'package.json'
 
       - name: Pnpm Setup
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Get pnpm store directory
         shell: bash
@@ -112,7 +112,7 @@ jobs:
           persist-credentials: false
 
       - name: Pnpm Setup
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Get pnpm store directory
         shell: sh
@@ -155,7 +155,7 @@ jobs:
           persist-credentials: false
 
       - name: Pnpm Setup
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Get pnpm store directory
         shell: sh
@@ -269,7 +269,7 @@ jobs:
           driver-opts: network=host
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@371161bbe7024a29a25c5e19bfcbc0804fe9ad2c # v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}

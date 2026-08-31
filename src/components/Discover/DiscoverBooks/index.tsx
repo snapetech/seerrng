@@ -8,6 +8,7 @@ import {
   countLibraryFilters,
 } from '@app/components/Discover/LibraryFilterSlideover/filterUtils';
 import useDiscover from '@app/hooks/useDiscover';
+import useDiscoverScrollRestoration from '@app/hooks/useDiscoverScrollRestoration';
 import { useBatchUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import defineMessages from '@app/utils/defineMessages';
 import { BarsArrowDownIcon, FunnelIcon } from '@heroicons/react/24/solid';
@@ -68,6 +69,13 @@ const DiscoverBooks = () => {
     query ? { query, sortBy } : subject ? { subject, sortBy } : { sortBy },
     { randomizeOrder: sortBy === 'ranked' }
   );
+  useDiscoverScrollRestoration({
+    mediaType: 'book',
+    itemCount: titles.length,
+    isLoading: isLoadingInitialData || isLoadingMore,
+    isReachingEnd,
+    fetchMore,
+  });
 
   return (
     <>

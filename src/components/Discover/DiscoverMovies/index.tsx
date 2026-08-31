@@ -9,6 +9,7 @@ import {
   prepareFilterValues,
 } from '@app/components/Discover/constants';
 import useDiscover from '@app/hooks/useDiscover';
+import useDiscoverScrollRestoration from '@app/hooks/useDiscoverScrollRestoration';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -70,6 +71,13 @@ const DiscoverMovies = () => {
     preparedFilters,
     { randomizeOrder: !preparedFilters.sortBy }
   );
+  useDiscoverScrollRestoration({
+    mediaType: 'movie',
+    itemCount: titles.length,
+    isLoading: isLoadingInitialData || isLoadingMore,
+    isReachingEnd,
+    fetchMore,
+  });
   const [showFilters, setShowFilters] = useState(false);
 
   if (error) {
