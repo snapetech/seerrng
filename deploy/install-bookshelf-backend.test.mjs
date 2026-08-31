@@ -285,14 +285,8 @@ describe('Bookshelf backup permissions', () => {
     );
     assert.match(env, /BOOKSHELF_EBOOKS_PORT=9787/);
     assert.match(env, /BOOKSHELF_AUDIOBOOKS_PORT=9788/);
-    assert.match(
-      compose,
-      /BOOKSHELF_EBOOKS_PORT:-8787.*\/ping/s
-    );
-    assert.match(
-      compose,
-      /BOOKSHELF_AUDIOBOOKS_PORT:-8788.*\/ping/s
-    );
+    assert.match(compose, /BOOKSHELF_EBOOKS_PORT:-8787.*\/ping/s);
+    assert.match(compose, /BOOKSHELF_AUDIOBOOKS_PORT:-8788.*\/ping/s);
     assert.match(
       await readFile(
         path.join(environment.BOOKSHELF_EBOOKS_CONFIG_DIR, 'config.xml'),

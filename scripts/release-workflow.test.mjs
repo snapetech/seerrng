@@ -33,6 +33,20 @@ test('release package channels wait for the reusable release asset build', () =>
   assert.match(dispatchScript, /release-linux-packages\.yml/u);
 });
 
+test('release publishing admits only tag pushes and main-branch retries', () => {
+  const release = readWorkflow('release.yml');
+  const validation = release.jobs['validate-main-tag'];
+  const validationScript = validation.steps.find(
+    (step) => step.name === 'Ensure tag is on main'
+  ).run;
+
+  assert.match(validation.if, /github\.event_name != 'workflow_dispatch'/u);
+  assert.match(validation.if, /github\.ref == 'refs\/heads\/main'/u);
+  assert.match(validationScript, /\$GITHUB_EVENT_NAME" == 'push'/u);
+  assert.match(validationScript, /\$GITHUB_REF_TYPE" != 'tag'/u);
+  assert.match(validationScript, /git merge-base --is-ancestor/u);
+});
+
 test('release assets support trusted reuse and main-only manual dispatch', () => {
   const assets = readWorkflow('release-assets.yml');
   const workflowCall = assets.on.workflow_call;
