@@ -1,12 +1,15 @@
 # Release History Audit
 
 The SeerrNG release history was audited against the repository's version tags
-on 2026-08-06.
+on 2026-08-31.
 
 ## Coverage
 
-- `CHANGELOG.md` contains one curated section for each of the 50 `v3.*` tags,
-  from `v3.2.1` through `v3.11.2`.
+- `CHANGELOG.md` contains one section for each of the 65 `v3.*` tags, from
+  `v3.0.0` through `v3.12.8`.
+- The six imported upstream Seerr tags from `v3.0.0` through `v3.4.1` are
+  represented with provenance entries; no separate SeerrNG notes were recorded
+  for those tags.
 - `v3.2.6` is not listed because no such tag exists.
 - Releases that contain only release preparation or CI work are still listed,
   with that scope called out explicitly instead of inventing user-facing

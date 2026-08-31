@@ -24,7 +24,7 @@ test('release package channels wait for the reusable release asset build', () =>
 
   assert.equal(assetBuild.uses, './.github/workflows/release-assets.yml');
   assert.equal(assetBuild.needs, 'publish-release');
-  assert.equal(assetBuild.with.tag, '${{ github.ref_name }}');
+  assert.equal(assetBuild.with.tag, '${{ inputs.tag || github.ref_name }}');
   assert.deepEqual(packageDispatch.needs, [
     'publish-release',
     'build-release-assets',

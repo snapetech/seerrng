@@ -466,6 +466,12 @@ that are not called out here.
 
 - Reliability and release infrastructure were hardened, and the vulnerable WebSocket driver was pinned to a safe override.
 
+## [3.4.1](https://github.com/snapetech/seerrng/compare/v3.4.0...v3.4.1) - 2026-07-30
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
+
 ## [3.4.0](https://github.com/snapetech/seerrng/compare/v3.3.2...v3.4.0) - 2026-07-14
 
 ### Added
@@ -561,6 +567,36 @@ This was the initial SeerrNG release and fork baseline.
 ### Security
 
 - Added broad validation and bounds for route identifiers, pagination, external URLs, image proxies, cache keys, webhook and notification requests, session handling, and outbound HTTP waits.
+
+## [3.2.0](https://github.com/snapetech/seerrng/compare/v3.1.1...v3.2.0) - 2026-04-16
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
+
+## [3.1.1](https://github.com/snapetech/seerrng/compare/v3.1.0...v3.1.1) - 2026-04-13
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
+
+## [3.1.0](https://github.com/snapetech/seerrng/compare/v3.0.1...v3.1.0) - 2026-02-27
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
+
+## [3.0.1](https://github.com/snapetech/seerrng/compare/v3.0.0...v3.0.1) - 2026-02-15
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
+
+## [3.0.0](https://github.com/snapetech/seerrng/compare/v2.7.3...v3.0.0) - 2026-02-14
+
+This imported upstream Seerr tag is retained in the merge history. No separate
+SeerrNG release notes were recorded for it; the linked tag comparison preserves
+the detailed commit history.
 
 ## Historical upstream history
 

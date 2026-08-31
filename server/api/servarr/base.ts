@@ -92,6 +92,7 @@ interface QueueResponse<QueueItemAppendT> {
 
 export const MAX_SERVARR_CONFIGURATION_RESULTS = 1_000;
 export const MAX_SERVARR_QUEUE_RESULTS = 10_000;
+export const MAX_SERVARR_QUEUE_PAGE_SIZE = 1_000;
 export const MAX_SERVARR_LIBRARY_RESULTS = 100_000;
 export const MAX_SERVARR_LOOKUP_RESULTS = 1_000;
 const MAX_SERVARR_TEXT_LENGTH = 10_000;
@@ -377,7 +378,11 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
         'GET',
         `/queue`,
         undefined,
-        this.getRequestConfig({ includeEpisode: true })
+        this.getRequestConfig({
+          includeEpisode: true,
+          page: 1,
+          pageSize: MAX_SERVARR_QUEUE_PAGE_SIZE,
+        })
       );
 
       return sanitizeServarrQueue<QueueItem & QueueItemAppendT>(

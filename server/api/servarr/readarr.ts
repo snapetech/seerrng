@@ -4,6 +4,8 @@ import {
 } from '@server/lib/externalIds';
 import { normalizeIsbn } from '@server/lib/isbn';
 import logger from '@server/logger';
+import { trimTrailingSlashes } from '@server/utils/serviceUrl';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
 import ServarrBase, {
   MAX_SERVARR_CONFIGURATION_RESULTS,
@@ -11,6 +13,8 @@ import ServarrBase, {
   MAX_SERVARR_LOOKUP_RESULTS,
   sanitizeServarrProfiles,
   sanitizeServarrRecordArray,
+  sanitizeServarrSystemStatus,
+  type SystemStatus,
 } from './base';
 
 export interface ReadarrMetadataProfile {
@@ -24,6 +28,8 @@ export interface ReadarrDevelopmentConfig {
 }
 
 export type ReadarrMediaType = 'ebook' | 'audiobook';
+type ChaptarrDialect = 'hc' | 'gr';
+const CHAPTARR_REQUEST_TIMEOUT_MS = 60_000;
 
 export interface ReadarrBookLookupResult {
   id?: number;
@@ -32,6 +38,11 @@ export interface ReadarrBookLookupResult {
   foreignBookId: string;
   foreignEditionId?: string;
   mediaType?: ReadarrMediaType;
+  audiobookMonitored?: boolean;
+  ebookMonitored?: boolean;
+  addOptions?: {
+    searchForNewBook?: boolean;
+  };
   authorId?: number;
   qualityProfileId?: number;
   metadataProfileId?: number;
@@ -139,7 +150,16 @@ const getReadarrErrorMessage = (error: unknown): string => {
 };
 
 class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
+  private readonly nativeApiUrl: string;
+  private readonly mediaType?: ReadarrMediaType;
   private coverBaseUrl: string;
+  private requestBaseUrl?: string;
+  private chaptarrDialect?: ChaptarrDialect;
+  private detectedSystemStatus?: Pick<
+    SystemStatus,
+    'appName' | 'version' | 'urlBase'
+  >;
+  private providerDetection?: Promise<void>;
 
   constructor({
     url,
@@ -157,7 +177,279 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
       apiName: 'Readarr',
       requestParams: mediaType ? { mediaType } : undefined,
     });
+    this.nativeApiUrl = trimTrailingSlashes(url);
+    this.mediaType = mediaType;
     this.coverBaseUrl = ReadarrAPI.buildCoverBaseUrl(url);
+  }
+
+  private static isChaptarrStatus(status: { appName?: string }): boolean {
+    return status.appName?.trim().toLowerCase() === 'chaptarr';
+  }
+
+  private static buildChaptarrFacadeUrl(
+    apiUrl: string,
+    mediaType: ReadarrMediaType,
+    dialect: ChaptarrDialect
+  ): string {
+    try {
+      const parsedUrl = new URL(apiUrl);
+      const apiPath = parsedUrl.pathname.match(/^(.*)\/api\/v\d+\/?$/i);
+
+      if (!apiPath) {
+        return apiUrl;
+      }
+
+      parsedUrl.pathname = `${apiPath[1]}/readarr/${dialect}/${mediaType}/api/v1`;
+      parsedUrl.search = '';
+      parsedUrl.hash = '';
+      return trimTrailingSlashes(parsedUrl.toString());
+    } catch {
+      return apiUrl;
+    }
+  }
+
+  private async detectChaptarrDialect(): Promise<ChaptarrDialect> {
+    try {
+      const response = await super.request<unknown>(
+        'GET',
+        '/config/hardcover',
+        undefined,
+        this.getRequestConfig()
+      );
+
+      if (
+        response.data &&
+        typeof response.data === 'object' &&
+        !Array.isArray(response.data) &&
+        typeof (response.data as Record<string, unknown>).enabled === 'boolean'
+      ) {
+        return (response.data as Record<string, unknown>).enabled ? 'hc' : 'gr';
+      }
+    } catch {
+      // Older Chaptarr builds do not expose the Hardcover config endpoint.
+      // Their native compatibility scope defaults to Hardcover.
+    }
+
+    return 'hc';
+  }
+
+  private async ensureProvider(): Promise<void> {
+    if (!this.mediaType) {
+      return;
+    }
+
+    if (this.providerDetection) {
+      return this.providerDetection;
+    }
+
+    this.providerDetection = (async () => {
+      const response = await super.request<unknown>(
+        'GET',
+        '/system/status',
+        undefined,
+        this.getRequestConfig()
+      );
+      const status = sanitizeServarrSystemStatus(response.data);
+      this.detectedSystemStatus = status;
+
+      if (this.mediaType && ReadarrAPI.isChaptarrStatus(status)) {
+        this.axios.defaults.timeout = Math.max(
+          this.axios.defaults.timeout ?? 0,
+          CHAPTARR_REQUEST_TIMEOUT_MS
+        );
+        this.chaptarrDialect = await this.detectChaptarrDialect();
+        this.requestBaseUrl = ReadarrAPI.buildChaptarrFacadeUrl(
+          this.nativeApiUrl,
+          this.mediaType,
+          this.chaptarrDialect
+        );
+      }
+    })();
+
+    try {
+      await this.providerDetection;
+    } catch (error) {
+      this.providerDetection = undefined;
+      throw error;
+    }
+  }
+
+  public override async getSystemStatus(): Promise<
+    Pick<SystemStatus, 'appName' | 'version' | 'urlBase'>
+  > {
+    if (!this.mediaType) {
+      return super.getSystemStatus();
+    }
+
+    try {
+      await this.ensureProvider();
+      return this.detectedSystemStatus as Pick<
+        SystemStatus,
+        'appName' | 'version' | 'urlBase'
+      >;
+    } catch (e) {
+      throw new Error(
+        `[Readarr] Failed to retrieve system status: ${getReadarrErrorMessage(e)}`,
+        { cause: e }
+      );
+    }
+  }
+
+  protected override async request<T>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    data?: unknown,
+    config?: AxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
+    await this.ensureProvider();
+
+    return super.request(
+      method,
+      endpoint,
+      data,
+      this.requestBaseUrl && !config?.baseURL
+        ? { ...config, baseURL: this.requestBaseUrl }
+        : config
+    );
+  }
+
+  private isChaptarr(): boolean {
+    return ReadarrAPI.isChaptarrStatus(this.detectedSystemStatus ?? {});
+  }
+
+  private static hasAddressableLookupIdentity(
+    result: ReadarrBookLookupResult
+  ): boolean {
+    return (
+      !!result.foreignBookId?.trim() &&
+      !!result.author?.foreignAuthorId?.trim() &&
+      (result.editions ?? []).some(
+        (edition) => !!edition.foreignEditionId?.trim()
+      )
+    );
+  }
+
+  private getMediaMonitoringFields(
+    monitored: boolean
+  ): Record<string, boolean> {
+    if (this.mediaType === 'audiobook') {
+      return { audiobookMonitored: monitored };
+    }
+
+    if (this.mediaType === 'ebook') {
+      return { ebookMonitored: monitored };
+    }
+
+    return {};
+  }
+
+  private isBookMonitored(book: ReadarrBookLookupResult): boolean {
+    const mediaSpecificMonitoring =
+      this.mediaType === 'audiobook'
+        ? book.audiobookMonitored
+        : this.mediaType === 'ebook'
+          ? book.ebookMonitored
+          : undefined;
+
+    return typeof mediaSpecificMonitoring === 'boolean'
+      ? mediaSpecificMonitoring
+      : book.monitored === true;
+  }
+
+  private async resolveBookMutationResult(
+    result: ReadarrBookLookupResult | number,
+    fallback: ReadarrBookLookupResult
+  ): Promise<ReadarrBookLookupResult> {
+    if (typeof result !== 'number') {
+      return result;
+    }
+
+    return this.getFreshBook(result).catch(() => ({
+      ...fallback,
+      id: result,
+    }));
+  }
+
+  private async getFreshBook(bookId: number): Promise<ReadarrBook> {
+    const response = await this.request<ReadarrBook>(
+      'GET',
+      `/book/${bookId}`,
+      undefined,
+      this.getRequestConfig()
+    );
+    return response.data;
+  }
+
+  private async ensureRequestedBookState(
+    addedBook: ReadarrBookLookupResult,
+    options: ReadarrBookOptions
+  ): Promise<ReadarrBookLookupResult> {
+    if (
+      !this.isChaptarr() ||
+      !this.mediaType ||
+      !options.monitored ||
+      !addedBook.id
+    ) {
+      return addedBook;
+    }
+
+    const observedBook = await this.getFreshBook(addedBook.id).catch(
+      () => addedBook
+    );
+    const needsMonitoringRepair = !this.isBookMonitored(observedBook);
+    const needsSearchRepair =
+      options.addOptions?.searchForNewBook === true &&
+      observedBook.addOptions?.searchForNewBook !== true;
+
+    if (!needsMonitoringRepair && !needsSearchRepair) {
+      return observedBook;
+    }
+
+    const updatedBookResponse = await this.request<
+      ReadarrBookLookupResult | number
+    >(
+      'PUT',
+      `/book/${addedBook.id}`,
+      {
+        id: addedBook.id,
+        mediaType: this.mediaType,
+        monitored: true,
+        ...this.getMediaMonitoringFields(true),
+        ...(options.addOptions?.searchForNewBook
+          ? {
+              addOptions: {
+                ...(observedBook.addOptions ?? {}),
+                searchForNewBook: true,
+              },
+            }
+          : {}),
+      },
+      this.getRequestConfig()
+    );
+    const updatedBook = await this.resolveBookMutationResult(
+      updatedBookResponse.data,
+      {
+        ...addedBook,
+        monitored: true,
+        ...this.getMediaMonitoringFields(true),
+        ...(options.addOptions?.searchForNewBook
+          ? { addOptions: options.addOptions }
+          : {}),
+      }
+    );
+
+    if (options.addOptions?.searchForNewBook) {
+      await this.post(
+        '/command',
+        {
+          name: 'BookSearch',
+          bookIds: [updatedBook.id ?? addedBook.id],
+        },
+        this.getRequestConfig()
+      );
+    }
+
+    return updatedBook;
   }
 
   private static buildCoverBaseUrl(url: string): string {
@@ -341,12 +633,119 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
 
   public async lookupBook(term: string): Promise<ReadarrBookLookupResult[]> {
     try {
-      return sanitizeServarrRecordArray<ReadarrBookLookupResult>(
-        await this.get<ReadarrBookLookupResult[]>('/book/lookup', {
-          ...this.getRequestConfig({ term }),
-        }),
-        MAX_SERVARR_LOOKUP_RESULTS
+      let scopedResults: ReadarrBookLookupResult[] = [];
+
+      try {
+        scopedResults = sanitizeServarrRecordArray<ReadarrBookLookupResult>(
+          await this.get<ReadarrBookLookupResult[]>('/book/lookup', {
+            ...this.getRequestConfig({ term }),
+          }),
+          MAX_SERVARR_LOOKUP_RESULTS
+        );
+      } catch (error) {
+        if (!this.isChaptarr()) {
+          throw error;
+        }
+
+        logger.warn(
+          'Chaptarr format facade lookup failed; trying compatible scopes.',
+          {
+            label: 'Readarr',
+            mediaType: this.mediaType,
+            term,
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+
+      if (
+        !this.isChaptarr() ||
+        !this.mediaType ||
+        scopedResults.some(ReadarrAPI.hasAddressableLookupIdentity)
+      ) {
+        return scopedResults;
+      }
+
+      const alternateDialect: ChaptarrDialect =
+        this.chaptarrDialect === 'gr' ? 'hc' : 'gr';
+      const alternateBaseUrl = ReadarrAPI.buildChaptarrFacadeUrl(
+        this.nativeApiUrl,
+        this.mediaType,
+        alternateDialect
       );
+
+      try {
+        const alternateResults =
+          sanitizeServarrRecordArray<ReadarrBookLookupResult>(
+            await this.get<ReadarrBookLookupResult[]>('/book/lookup', {
+              ...this.getRequestConfig({ term }),
+              baseURL: alternateBaseUrl,
+            }),
+            MAX_SERVARR_LOOKUP_RESULTS
+          );
+
+        if (alternateResults.some(ReadarrAPI.hasAddressableLookupIdentity)) {
+          this.chaptarrDialect = alternateDialect;
+          this.requestBaseUrl = alternateBaseUrl;
+          logger.info(
+            'Chaptarr selected an alternate provider facade with addressable lookup results.',
+            {
+              label: 'Readarr',
+              dialect: alternateDialect,
+              mediaType: this.mediaType,
+              term,
+              resultCount: alternateResults.length,
+            }
+          );
+          return alternateResults;
+        }
+      } catch (error) {
+        logger.warn('Chaptarr alternate provider facade lookup failed.', {
+          label: 'Readarr',
+          dialect: alternateDialect,
+          mediaType: this.mediaType,
+          term,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const nativeResults =
+          sanitizeServarrRecordArray<ReadarrBookLookupResult>(
+            await this.get<ReadarrBookLookupResult[]>('/book/lookup', {
+              baseURL: this.nativeApiUrl,
+              params: { term },
+            }),
+            MAX_SERVARR_LOOKUP_RESULTS
+          );
+
+        const formatResults = nativeResults.filter(
+          (result) => result.mediaType === this.mediaType
+        );
+
+        if (formatResults.length > 0) {
+          logger.info(
+            'Chaptarr provider facades returned no addressable lookup results; using native provider lookup results.',
+            {
+              label: 'Readarr',
+              mediaType: this.mediaType,
+              term,
+              resultCount: formatResults.length,
+            }
+          );
+          return formatResults;
+        }
+      } catch (error) {
+        logger.warn('Chaptarr native lookup fallback failed.', {
+          label: 'Readarr',
+          mediaType: this.mediaType,
+          term,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      return scopedResults;
     } catch (e) {
       throw new Error(`[Readarr] Failed to lookup book: ${e.message}`, {
         cause: e,
@@ -419,7 +818,7 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
         });
       });
 
-      if (existingBook?.monitored) {
+      if (existingBook && this.isBookMonitored(existingBook)) {
         logger.info(
           'Book is already monitored in Bookshelf/Readarr. Skipping add and returning success',
           {
@@ -428,6 +827,11 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
             bookTitle: existingBook.title,
           }
         );
+
+        if (this.isChaptarr() && options.addOptions?.searchForNewBook) {
+          await this.searchBook(existingBook.id);
+        }
+
         return existingBook;
       }
 
@@ -441,7 +845,9 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
           }
         );
 
-        const updatedBook = await this.request<ReadarrBook>(
+        const updatedBookResponse = await this.request<
+          ReadarrBookLookupResult | number
+        >(
           'PUT',
           `/book/${existingBook.id}`,
           {
@@ -455,27 +861,54 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
             rootFolderPath:
               options.rootFolderPath ?? existingBook.rootFolderPath,
             tags: options.tags ?? existingBook.tags,
+            ...(this.isChaptarr() ? this.getMediaMonitoringFields(true) : {}),
+            ...(this.isChaptarr() && options.addOptions
+              ? { addOptions: options.addOptions }
+              : {}),
           },
           this.getRequestConfig()
+        );
+        const updatedBook = await this.resolveBookMutationResult(
+          updatedBookResponse.data,
+          {
+            ...existingBook,
+            monitored: true,
+            ...(this.isChaptarr() ? this.getMediaMonitoringFields(true) : {}),
+            ...(this.isChaptarr() && options.addOptions
+              ? { addOptions: options.addOptions }
+              : {}),
+          }
         );
 
         await this.post(
           '/command',
           {
             name: 'BookSearch',
-            bookIds: [updatedBook.data.id],
+            bookIds: [updatedBook.id ?? existingBook.id],
           },
           this.getRequestConfig()
         );
 
-        return updatedBook.data;
+        return updatedBook;
       }
 
-      return await this.post<ReadarrBookLookupResult>(
+      const postedBook = await this.post<ReadarrBookLookupResult | number>(
         '/book',
-        options as unknown as Record<string, unknown>,
+        {
+          ...(options as unknown as Record<string, unknown>),
+          ...(this.isChaptarr()
+            ? this.getMediaMonitoringFields(options.monitored)
+            : {}),
+        },
         this.getRequestConfig()
       );
+
+      const addedBook: ReadarrBookLookupResult =
+        typeof postedBook === 'number'
+          ? { ...options, id: postedBook }
+          : postedBook;
+
+      return await this.ensureRequestedBookState(addedBook, options);
     } catch (e) {
       throw new Error(
         `[Readarr] Failed to add book: ${getReadarrErrorMessage(e)}`,
