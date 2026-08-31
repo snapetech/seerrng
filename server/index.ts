@@ -313,7 +313,12 @@ app
         secret: settings.sessionSecret,
         resave: false,
         saveUninitialized: false,
-        cookie: sessionTransportOptions.cookie,
+        // Keep the transport guarantee explicit at the session boundary so
+        // this cannot regress if the shared option builder changes.
+        cookie: {
+          ...sessionTransportOptions.cookie,
+          secure: true,
+        },
         proxy: sessionTransportOptions.proxy,
         ...(sessionStore ? { store: sessionStore } : {}),
       })

@@ -7,12 +7,17 @@ import { getSessionTransportOptions } from './sessionCookie';
 
 const createApp = (development = false) => {
   const app = express();
+  const sessionTransportOptions = getSessionTransportOptions(development, true);
   app.use(
     session({
       secret: '01234567890123456789012345678901',
       resave: false,
       saveUninitialized: false,
-      ...getSessionTransportOptions(development, true),
+      cookie: {
+        ...sessionTransportOptions.cookie,
+        secure: true,
+      },
+      proxy: sessionTransportOptions.proxy,
     })
   );
   app.get('/', (req, res) => {
