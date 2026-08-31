@@ -16,8 +16,47 @@ import TheMovieDb, {
   sanitizeTmdbTvDetails,
 } from '@server/api/themoviedb';
 import type { TmdbSearchMovieResponse } from '@server/api/themoviedb/interfaces';
+import { getSettings } from '@server/lib/settings';
 
 describe('TMDB response boundaries', () => {
+  it('uses the global adult-content setting for searches and movie discovery', async () => {
+    const settings = getSettings();
+    const originalIncludeAdult = settings.main.includeAdult;
+    const calls: { path: string; params: Record<string, unknown> }[] = [];
+    settings.main.includeAdult = true;
+
+    try {
+      const tmdb = new TheMovieDb();
+      Object.defineProperty(tmdb, 'get', {
+        configurable: true,
+        value: async (
+          path: string,
+          options: { params?: Record<string, unknown> }
+        ) => {
+          calls.push({ path, params: options.params ?? {} });
+          return { page: 1, results: [], total_pages: 1, total_results: 0 };
+        },
+      });
+
+      await tmdb.searchMulti({ query: 'adult' });
+      await tmdb.searchMovies({ query: 'adult' });
+      await tmdb.searchTvShows({ query: 'adult' });
+      await tmdb.getDiscoverMovies();
+
+      assert.deepStrictEqual(
+        calls.map(({ path, params }) => [path, params.include_adult]),
+        [
+          ['/search/multi', true],
+          ['/search/movie', true],
+          ['/search/tv', true],
+          ['/discover/movie', true],
+        ]
+      );
+    } finally {
+      settings.main.includeAdult = originalIncludeAdult;
+    }
+  });
+
   it('normalizes paginated envelopes and caps actual provider results', () => {
     const response = sanitizeTmdbPagedResponse<TmdbSearchMovieResponse>({
       page: -1,

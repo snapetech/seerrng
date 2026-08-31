@@ -114,10 +114,7 @@ const PlaylistImportModal = ({
         </p>
         {error && (
           <div className="mt-4">
-            <Alert
-              title={error || intl.formatMessage(messages.error)}
-              type="warning"
-            />
+            <Alert title={error} type="warning" />
           </div>
         )}
         <label className="mt-5 block" htmlFor="playlist-url">

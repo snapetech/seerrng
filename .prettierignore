@@ -10,6 +10,7 @@ cypress/config/settings.cypress.json
 .github
 .vscode
 next-env.d.ts
+gen-docs/vendor/image-size/dist/
 
 # assets
 src/assets/

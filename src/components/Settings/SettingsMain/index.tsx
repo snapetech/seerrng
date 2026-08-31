@@ -65,6 +65,9 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   cacheImages: 'Enable Image Caching',
   cacheImagesTip:
     'Cache externally sourced images (requires a significant amount of disk space)',
+  includeAdult: 'Include Adult Content',
+  includeAdultTip:
+    'Include adult content in TMDB searches and movie discovery results',
   validationApplicationTitle: 'You must provide an application title',
   validationApplicationUrl: 'You must provide a valid URL',
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
@@ -196,6 +199,7 @@ const SettingsMain = () => {
             partialRequestsEnabled: data?.partialRequestsEnabled,
             enableSpecialEpisodes: data?.enableSpecialEpisodes,
             cacheImages: data?.cacheImages,
+            includeAdult: data?.includeAdult ?? false,
             youtubeUrl: data?.youtubeUrl,
             versionCheck: data?.versionCheck,
             spotifyClientId: data?.spotifyClientId ?? '',
@@ -222,6 +226,7 @@ const SettingsMain = () => {
                 partialRequestsEnabled: values.partialRequestsEnabled,
                 enableSpecialEpisodes: values.enableSpecialEpisodes,
                 cacheImages: values.cacheImages,
+                includeAdult: values.includeAdult,
                 youtubeUrl: values.youtubeUrl,
                 versionCheck: values?.versionCheck,
                 spotifyClientId: values.spotifyClientId,
@@ -380,6 +385,26 @@ const SettingsMain = () => {
                         ))}
                       </Field>
                     </div>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label htmlFor="includeAdult" className="checkbox-label">
+                    <span className="mr-2">
+                      {intl.formatMessage(messages.includeAdult)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.includeAdultTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="includeAdult"
+                      name="includeAdult"
+                      onChange={() => {
+                        setFieldValue('includeAdult', !values.includeAdult);
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="form-row">

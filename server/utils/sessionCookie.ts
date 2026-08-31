@@ -10,9 +10,8 @@ export const getSessionTransportOptions = (
     maxAge: SESSION_MAX_AGE_MS,
     httpOnly: true,
     sameSite: csrfProtection ? 'strict' : 'lax',
-    // Let express-session add Secure for HTTPS requests while preserving
-    // compatibility with direct HTTP/LAN deployments.
-    secure: 'auto',
+    // Browser sessions must never be sent over an unencrypted connection.
+    secure: true,
   },
   // This option is scoped to express-session's transport check. It lets a
   // TLS terminator's X-Forwarded-Proto=https authorize a Secure cookie

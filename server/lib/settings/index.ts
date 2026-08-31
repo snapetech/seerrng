@@ -179,6 +179,7 @@ export interface MainSettings {
   applicationTitle: string;
   applicationUrl: string;
   cacheImages: boolean;
+  includeAdult: boolean;
   defaultPermissions: number;
   defaultQuotas: {
     movie: Quota;
@@ -480,6 +481,7 @@ class Settings {
         applicationTitle: 'Seerr',
         applicationUrl: '',
         cacheImages: true,
+        includeAdult: false,
         defaultPermissions: Permission.REQUEST,
         defaultQuotas: {
           movie: {},
@@ -1204,6 +1206,7 @@ class Settings {
         applicationTitle: 'Seerr',
         applicationUrl: '',
         cacheImages: false,
+        includeAdult: false,
         defaultPermissions: Permission.REQUEST,
         defaultQuotas: {
           movie: {},

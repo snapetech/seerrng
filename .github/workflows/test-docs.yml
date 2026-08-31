@@ -56,6 +56,11 @@ jobs:
           cd gen-docs
           pnpm install --frozen-lockfile
 
+      - name: Test image parser boundaries
+        run: |
+          cd gen-docs
+          pnpm test:security
+
       - name: Build website
         run: |
           cd gen-docs

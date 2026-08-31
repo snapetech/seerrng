@@ -387,6 +387,31 @@ describe('Settings route input validation', () => {
     assert.strictEqual(saveMock.mock.callCount(), 0);
   });
 
+  it('persists and validates the TMDB adult content setting', async () => {
+    const settings = getSettings();
+    const originalIncludeAdult = settings.main.includeAdult;
+
+    try {
+      const response = await request(app)
+        .post('/settings/main')
+        .send({ includeAdult: true });
+      const invalidResponse = await request(app)
+        .post('/settings/main')
+        .send({ includeAdult: 'true' });
+
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.body.includeAdult, true);
+      assert.strictEqual(settings.main.includeAdult, true);
+      assert.strictEqual(invalidResponse.status, 400);
+      assert.match(
+        invalidResponse.body.message,
+        /includeAdult must be a boolean/
+      );
+    } finally {
+      settings.main.includeAdult = originalIncludeAdult;
+    }
+  });
+
   it('rejects malformed main settings values before saving', async () => {
     const settings = getSettings();
     const saveMock = mock.method(settings, 'save', async () => undefined);

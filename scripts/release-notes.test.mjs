@@ -48,6 +48,22 @@ test('release-note fragments reject placeholders and short text', () => {
   assert.match(note.errors.join('\n'), /placeholder/u);
 });
 
+test('release-note fragments reject alternate HTML comment endings', () => {
+  const note = parseReleaseNote(
+    'release-notes/comment-marker.md',
+    `---
+category: changed
+audience: users
+area: metadata
+action: none
+breaking: false
+---
+This body contains --!> and must be rejected as an HTML comment marker.`
+  );
+
+  assert.match(note.errors.join('\n'), /placeholder/u);
+});
+
 test('release-note fragments reject unsupported metadata', () => {
   const note = parseReleaseNote(
     'release-notes/metadata.md',

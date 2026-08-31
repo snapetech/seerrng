@@ -894,6 +894,7 @@ const parseMainSettingsBody = (
     ['partialRequestsEnabled', 'partialRequestsEnabled'],
     ['enableSpecialEpisodes', 'enableSpecialEpisodes'],
     ['cacheImages', 'cacheImages'],
+    ['includeAdult', 'includeAdult'],
   ] as const) {
     const parsed = parseOptionalBooleanSetting(body[key], fieldName);
     if ('error' in parsed) {

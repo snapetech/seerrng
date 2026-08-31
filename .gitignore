@@ -59,6 +59,8 @@ config/anime-list.xml
 # dist files
 dist
 dist-release*
+!gen-docs/vendor/image-size/dist/
+!gen-docs/vendor/image-size/dist/**
 
 # runtime cache
 cache/

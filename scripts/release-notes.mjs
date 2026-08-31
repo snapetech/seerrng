@@ -106,7 +106,7 @@ export function parseReleaseNote(file, content) {
     if (action.length < 5 || action.length > 200) {
       errors.push('action must be 5-200 characters or exactly `none`');
     }
-    if (/<!--|-->|\b(?:todo|tbd|fill in)\b/iu.test(action)) {
+    if (/(?:<!--|--!?>|\b(?:todo|tbd|fill in)\b)/iu.test(action)) {
       errors.push('action contains a placeholder or HTML comment');
     }
   }
@@ -123,7 +123,7 @@ export function parseReleaseNote(file, content) {
   if (body.length < 30 || body.length > 400) {
     errors.push('body must be 30-400 characters and describe the user impact');
   }
-  if (/<!--|-->|\b(?:todo|tbd|fill in)\b/iu.test(body)) {
+  if (/(?:<!--|--!?>|\b(?:todo|tbd|fill in)\b)/iu.test(body)) {
     errors.push('body contains a placeholder or HTML comment');
   }
   if (body && !/^[A-Z0-9`*_]/u.test(body)) {

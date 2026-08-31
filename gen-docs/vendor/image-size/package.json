@@ -1,0 +1,24 @@
+{
+  "name": "image-size",
+  "version": "2.0.3",
+  "description": "Read image dimensions for the documentation build",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./fromFile": {
+      "import": "./dist/fromFile.mjs",
+      "require": "./dist/fromFile.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=16.x"
+  },
+  "license": "MIT"
+}

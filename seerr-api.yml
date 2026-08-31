@@ -295,6 +295,9 @@ components:
         enableSpecialEpisodes:
           type: boolean
           example: false
+        includeAdult:
+          type: boolean
+          example: false
         openIdProviders:
           type: array
           items:
