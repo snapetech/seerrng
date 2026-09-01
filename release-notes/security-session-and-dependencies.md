@@ -2,7 +2,7 @@
 category: security
 audience: users, operators
 area: security
-action: Serve browser traffic through HTTPS before upgrading.
-breaking: true
+action: none
+breaking: false
 ---
-Browser sessions now require HTTPS, and vulnerable runtime and documentation-build dependencies have been updated or patched. Direct HTTP deployments must move behind TLS to keep browser sign-in working.
+Security updates include patched runtime and documentation-build dependencies, while browser session cookies remain Secure on HTTPS deployments. Direct HTTP/LAN deployments continue to work but should be migrated to HTTPS to protect authenticated sessions.
