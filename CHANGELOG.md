@@ -29,6 +29,44 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.13.0](https://github.com/snapetech/seerrng/compare/v3.12.9..v3.13.0) - 2026-09-01
+
+### User-facing changes
+
+#### Added
+
+- **Metadata:** Administrators can now enable adult content in Settings → Main. When enabled, TMDB searches and movie discovery include adult results without requiring a manual source-code change.
+
+#### Fixed
+
+- **Bookshelf:** Ebook requests now work with older Chaptarr releases that expose book metadata only through their audiobook lookup endpoint.
+- **Discovery:** Movie, series, and book discovery lists now return to the previous scroll position after viewing an item's details.
+- **Authentication:** Plex sign-in and other browser sessions work again on direct HTTP/LAN deployments, while HTTPS deployments continue to receive Secure session cookies.
+- **Release Pipeline:** Release retries now require dispatching from `main`, and tag-triggered releases reject non-tag refs before privileged publishing begins.
+
+#### Security
+
+- **Security:** The CodeQL security workflow now runs all of its actions at the same verified version, so security analysis completes instead of failing during workflow setup.
+- **Security:** Security updates include patched runtime and documentation-build dependencies, while browser session cookies remain Secure on HTTPS deployments. Direct HTTP/LAN deployments continue to work but should be migrated to HTTPS to protect authenticated sessions.
+
+### 🚀 Features
+- *(settings)* Add adult content option and harden security - ([317a94b](https://github.com/snapetech/seerrng/commit/317a94b2c82ae7e4c0c9bb7fb81b2b4b5ba55430))
+
+### 🐛 Bug Fixes
+- *(auth)* Restore direct HTTP Plex sessions - ([6a8045d](https://github.com/snapetech/seerrng/commit/6a8045de32f61bef2d3c0c1ececf8794466dd584))
+- *(bookshelf)* Recover Chaptarr ebook requests - ([4873365](https://github.com/snapetech/seerrng/commit/4873365c1caa681f11db89e3d1652540df59e509))
+- *(ci)* Restore baseline pull request checks - ([cf05a00](https://github.com/snapetech/seerrng/commit/cf05a009874621abe0b41b5085b428e5c9061a11))
+- *(ci)* Restore baseline pull request checks - ([4ddccbd](https://github.com/snapetech/seerrng/commit/4ddccbdc8f0ea4beac38771c45052e6bc1c32d6f))
+- *(discover)* Restore list scroll position - ([63ebcf9](https://github.com/snapetech/seerrng/commit/63ebcf923aa5d0a508954237d956d79f8480062f))
+- *(security)* Make session cookie transport explicit - ([a0ac03e](https://github.com/snapetech/seerrng/commit/a0ac03e55df6997c30370997d8591978253de4a9))
+- *(security)* Align CodeQL action versions - ([efc2770](https://github.com/snapetech/seerrng/commit/efc2770ac4c796339ea19cfb3d32978e1191fd33))
+
+### 📖 Documentation
+- *(release)* Reconcile session security note - ([6b952c4](https://github.com/snapetech/seerrng/commit/6b952c4a94fe3f43d458aca9129f357470b0b5fe))
+- *(release)* Note discovery scroll restoration - ([c7e2566](https://github.com/snapetech/seerrng/commit/c7e25668d71d2541bee691c78a6af789936deee1))
+
 ## [3.12.9](https://github.com/snapetech/seerrng/compare/v3.12.8..v3.12.9) - 2026-08-31
 
 ### User-facing changes
