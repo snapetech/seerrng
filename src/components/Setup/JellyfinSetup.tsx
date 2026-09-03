@@ -123,7 +123,7 @@ function JellyfinSetup({
             username: values.username,
             password: values.password,
             hostname: values.hostname,
-            port: values.port,
+            port: Number(values.port),
             useSsl: values.useSsl,
             urlBase: values.urlBase,
             email: values.email,
