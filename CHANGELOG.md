@@ -31,6 +31,19 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.13.1](https://github.com/snapetech/seerrng/compare/v3.13.0..v3.13.1) - 2026-09-03
+
+### User-facing changes
+
+#### Fixed
+
+- **Authentication:** Jellyfin and Emby setup now preserve custom server ports, allowing first-run connections to non-default ports to complete.
+
+### 🐛 Bug Fixes
+- *(setup)* Serialize Jellyfin port as a number - ([91b1c56](https://github.com/snapetech/seerrng/commit/91b1c56f8fb839f84e0d90adaea23b57569c8e57))
+
 ## [3.13.0](https://github.com/snapetech/seerrng/compare/v3.12.9..v3.13.0) - 2026-09-01
 
 ### User-facing changes
