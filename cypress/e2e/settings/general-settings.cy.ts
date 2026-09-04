@@ -3,6 +3,12 @@ describe('General Settings', () => {
     cy.loginAsAdmin();
   });
 
+  // Always restore the process-wide restart flag, even if the test aborts
+  // before it can revert the setting itself.
+  afterEach(() => {
+    cy.request('POST', '/api/v1/settings/network', { trustProxy: false });
+  });
+
   it('opens the settings page from the home page', () => {
     cy.visit('/');
 
