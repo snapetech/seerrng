@@ -49,7 +49,7 @@ CSRF stands for [cross-site request forgery](https://en.wikipedia.org/wiki/Cross
 
 If you do not use Seerr integrations with third-party applications to add/modify/delete requests or users, you can consider enabling this setting to protect against malicious attacks.
 
-The CSRF cookie's transport policy follows the request: it is marked `Secure` on direct HTTPS, or behind a reverse proxy that forwards `X-Forwarded-Proto: https` **and** has [Enable Proxy Support](#enable-proxy-support) turned on; it is left unmarked otherwise. Enabling this setting does not by itself require HTTPS, but if you're behind a reverse proxy you do need Enable Proxy Support turned on too — otherwise Seerr can't distinguish the proxy's header from an untrusted client sending the same header, so it ignores it, which keeps the cookies from being marked `Secure` on a connection that isn't actually HTTPS.
+The CSRF cookie is marked `Secure` on direct HTTPS, or behind a reverse proxy that forwards `X-Forwarded-Proto: https` **and** has [Enable Proxy Support](#enable-proxy-support) turned on. If you're behind a reverse proxy, enable proxy support so Seerr can identify the HTTPS connection safely.
 
 If you enable this setting and find yourself unable to access Seerr, you can disable the setting by modifying `settings.json` in `/app/config`.
 
@@ -73,17 +73,13 @@ Both settings are **disabled** by default.
 
 ## Session cookies and HTTP
 
-Plex sign-in creates a browser session cookie. SeerrNG keeps direct HTTP
-support for LAN deployments by using an automatic cookie policy: HTTPS
-requests receive a `Secure` session cookie, while direct HTTP requests can
-retain the session required to complete Plex sign-in.
+Plex sign-in creates a browser session cookie. SeerrNG now requires HTTPS for
+authenticated browser sessions: session cookies are always marked `Secure` and
+are not issued over direct HTTP.
 
-Direct HTTP is not suitable for untrusted networks because an authenticated
-session can be observed or modified in transit. To protect sessions and clear
-the corresponding security finding, place SeerrNG behind a working HTTPS
-reverse proxy that redirects HTTP to HTTPS. Do not change the application to
-use `Secure` cookies unconditionally before that proxy is deployed; doing so
-breaks Plex sign-in for direct HTTP deployments.
+Before upgrading, place SeerrNG behind a working HTTPS reverse proxy that
+redirects HTTP to HTTPS. Direct HTTP deployments must migrate to HTTPS before
+users sign in again.
 
 ## API Request Timeout
 

@@ -10,9 +10,8 @@ export const getSessionTransportOptions = (
     maxAge: SESSION_MAX_AGE_MS,
     httpOnly: true,
     sameSite: csrfProtection ? 'strict' : 'lax',
-    // Match the cookie transport to the request: HTTPS receives Secure while
-    // trusted direct HTTP/LAN deployments can complete browser sign-in.
-    secure: 'auto',
+    // Session identifiers must never be sent over clear-text HTTP.
+    secure: true,
   },
   // This option is scoped to express-session's transport check. It lets a
   // TLS terminator's X-Forwarded-Proto=https authorize a Secure cookie

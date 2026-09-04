@@ -1,12 +1,15 @@
 overrides:
   '@babel/core': 7.29.7
   '@babel/plugin-transform-modules-systemjs': 7.29.4
+  '@faker-js/faker': 10.6.0
+  '@humanfs/node': 0.16.8
   ajv: 8.18.0
   ajv-keywords@3.5.2>ajv: 6.14.0
   body-parser: 1.20.6
   brace-expansion: 5.0.9
+  browserslist: 4.28.9
   copy-webpack-plugin: 14.0.0
-  fast-uri: 3.1.5
+  fast-uri: 3.1.7
   follow-redirects: 1.16.0
   http-proxy-middleware: 2.0.10
   image-size: file:./vendor/image-size
@@ -20,7 +23,9 @@ overrides:
   node-forge: 1.4.0
   path-to-regexp: 0.1.13
   postcss: 8.5.23
-  qs: 6.15.2
+  postcss-selector-parser@6: 6.1.4
+  postcss-selector-parser@7: 7.1.6
+  qs: 6.16.0
   schema-utils@3.3.0>ajv: 6.14.0
   serialize-javascript: 7.0.5
   shell-quote: 1.9.0
@@ -28,7 +33,7 @@ overrides:
   terser-webpack-plugin: 5.6.1
   undici: 7.29.0
   uuid: 11.1.1
-  webpack: 5.104.1
+  webpack: 5.110.3
   webpack-dev-server: 5.2.6
   websocket-driver: 0.7.5
   ws: 8.21.0
@@ -36,3 +41,4 @@ overrides:
 
 patchedDependencies:
   gray-matter@4.0.3: patches/gray-matter@4.0.3.patch
+  postman-collection@5.3.0: patches/postman-collection@5.3.0.patch

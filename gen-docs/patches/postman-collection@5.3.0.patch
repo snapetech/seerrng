@@ -1,0 +1,76 @@
+diff --git a/lib/superstring/dynamic-variables.js b/lib/superstring/dynamic-variables.js
+index 83424a3b19f797ed0272aceef06f759959440393..c45bd5c99261fbaf55216d8cdc7d6e5357308929 100644
+--- a/lib/superstring/dynamic-variables.js
++++ b/lib/superstring/dynamic-variables.js
+@@ -1,6 +1,14 @@
+-var faker = require('@faker-js/faker/locale/en'),
++var faker = require('@faker-js/faker/locale/en').faker,
+     uuid = require('uuid'),
+-
++
++    // postman-collection 5.3.0 still calls the pre-v8 Faker API. Keep its
++    // dynamic variables working while the workspace resolves Faker to the
++    // patched v10 release.
++    legacyAddress = faker.location,
++    legacyPerson = faker.person,
++    legacyCompany = faker.company,
++    legacyImage = faker.image,
++
+     // locale list generated from: https://github.com/chromium/chromium/blob/master/ui/base/l10n/l10n_util.cc
+     LOCALES = ['af', 'am', 'an', 'ar', 'ast', 'az', 'be', 'bg', 'bh', 'bn', 'br', 'bs', 'ca', 'ceb', 'ckb', 'co', 'cs',
+         'cy', 'da', 'de', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fil', 'fo', 'fr', 'fy', 'ga', 'gd', 'gl',
+@@ -73,10 +81,51 @@ var faker = require('@faker-js/faker/locale/en'),
+         '/var/spool',
+         '/var/tmp',
+         '/var/yp'
+-    ],
++    ];
++
++    // Compatibility aliases for the API used by postman-collection.
++    faker.address = legacyAddress;
++    faker.datatype.number = function (options) {
++        return faker.number.int(options);
++    };
++    faker.datatype.uuid = function () {
++        return faker.string.uuid();
++    };
++    faker.random = {
++        alphaNumeric: function (length) {
++            return faker.string.alphanumeric(length);
++        },
++        arrayElement: function (array) {
++            return faker.helpers.arrayElement(array);
++        },
++        word: function () {
++            return faker.lorem.word();
++        }
++    };
++    faker.phone.phoneNumber = faker.phone.number;
++    faker.phone.phoneNumberFormat = faker.phone.number;
++    faker.finance.account = faker.finance.accountNumber;
++    faker.internet.userName = faker.internet.username;
++    faker.name = legacyPerson;
++    faker.name.findName = faker.person.fullName;
++    faker.company.companyName = legacyCompany.name;
++    faker.company.companySuffix = function () {
++        return faker.helpers.arrayElement(['Inc', 'LLC', 'Group']);
++    };
++    faker.company.bs = legacyCompany.buzzPhrase;
++    faker.company.bsAdjective = legacyCompany.buzzAdjective;
++    faker.company.bsBuzz = legacyCompany.buzzVerb;
++    faker.company.bsNoun = legacyCompany.buzzNoun;
++    [
++        'abstract', 'animals', 'business', 'cats', 'city', 'fashion',
++        'food', 'nature', 'nightlife', 'people', 'sports', 'transport',
++        'imageUrl'
++    ].forEach(function (method) {
++        legacyImage[method] = legacyImage.url;
++    });
+-
++
+     // generators for $random* variables
+-    dynamicGenerators = {
++var dynamicGenerators = {
+         $guid: {
+             description: 'A v4 style guid',
+             generator: function () {
