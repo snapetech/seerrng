@@ -196,6 +196,7 @@ jobs:
       matrix:
         platform:
           - linux/amd64
+          - linux/arm64
     runs-on:
       [self-hosted, seerrng, linux-build, linux-amd64, linux-arm64-cross]
     steps:
@@ -236,6 +237,7 @@ jobs:
             BUILD_VERSION=${{ steps.channel.outputs.CHANNEL }}
             SOURCE_DATE_EPOCH=${{ steps.ts.outputs.TIMESTAMP }}
           cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
           provenance: false
 
   publish:
@@ -262,6 +264,11 @@ jobs:
       - name: Image channel
         id: channel
         run: echo "CHANNEL=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        with:
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -346,12 +353,14 @@ jobs:
 
           build_args=(
             --file ./Dockerfile
-            --platform linux/amd64
+            --platform linux/amd64,linux/arm64
             --push
             --build-arg "COMMIT_TAG=${COMMIT_TAG}"
             --build-arg "BUILD_VERSION=${BUILD_VERSION}"
             --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
             --cache-from type=gha,scope=linux/amd64
+            --cache-from type=gha,scope=linux/arm64
+            --cache-to type=gha,mode=max
             --provenance false
           )
 
@@ -395,6 +404,11 @@ jobs:
           persist-credentials: false
           clean: true
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+        with:
+          driver-opts: network=host
+
       - name: Log in to GitHub Container Registry on seerr.home
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -406,17 +420,29 @@ jobs:
         run: |
           set -euo pipefail
           image_name="ghcr.io/${GITHUB_REPOSITORY}"
-          docker pull "${image_name}:main"
-          mapfile -t digest_refs < <(
-            docker image inspect "${image_name}:main" \
-              --format '{{range .RepoDigests}}{{println .}}{{end}}' |
-              grep -E "^${image_name}@sha256:[0-9a-f]{64}$"
-          )
-          if (( ${#digest_refs[@]} != 1 )); then
-            echo 'Expected exactly one repository digest for the main image.' >&2
-            exit 1
-          fi
-          printf 'SEERRNG_IMAGE_REF=%s\n' "${digest_refs[0]}" >> "$GITHUB_ENV"
+          # ':main' now resolves to a multi-arch manifest list. Resolve its
+          # digest on the registry side with `imagetools inspect` (the same
+          # approach release.yml uses) rather than reading back
+          # `docker image inspect --format '{{.RepoDigests}}'`: once a tag
+          # points at an index, what that local field reports for a pulled
+          # image varies by Docker storage driver (classic image store vs.
+          # containerd image store) and is no longer reliably single-valued.
+          digest=""
+          for attempt in 1 2 3 4 5; do
+            echo "Resolving main image digest (attempt ${attempt}/5)"
+            if digest=$(docker buildx imagetools inspect "${image_name}:main" --format '{{json .Manifest.Digest}}' | tr -d '"') &&
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo 'Unable to resolve the main image digest after 5 attempts.' >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
+          image_ref="${image_name}@${digest}"
+          docker pull "$image_ref"
+          printf 'SEERRNG_IMAGE_REF=%s\n' "$image_ref" >> "$GITHUB_ENV"
 
       - name: Validate deployment inputs
         run: |
