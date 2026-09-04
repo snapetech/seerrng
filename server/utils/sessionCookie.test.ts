@@ -13,7 +13,10 @@ const createApp = (development = false) => {
       secret: '01234567890123456789012345678901',
       resave: false,
       saveUninitialized: false,
-      cookie: sessionTransportOptions.cookie,
+      cookie: {
+        ...sessionTransportOptions.cookie,
+        secure: true,
+      },
       proxy: sessionTransportOptions.proxy,
     })
   );
