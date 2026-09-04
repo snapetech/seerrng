@@ -478,16 +478,22 @@ jobs:
           set -euo pipefail
           external_config_file="$(mktemp)"
           external_env_file="$(mktemp)"
+          external_config_args=()
           trap 'rm -f "$external_config_file" "$external_env_file"' EXIT
-          docker run --rm \
-            --user 1000:1000 \
-            --entrypoint node \
-            -v "$SEERRNG_CONFIG_DIR:/config:ro" \
-            "$SEERRNG_IMAGE_REF" \
-            /app/scripts/export-external-config.mjs /config/settings.json \
-            > "$external_config_file"
-          printf 'SEERR_EXTERNAL_CONFIG=%s\n' "$(cat "$external_config_file")" \
-            > "$external_env_file"
+          if [[ -f "$SEERRNG_CONFIG_DIR/settings.json" ]]; then
+            docker run --rm \
+              --user 1000:1000 \
+              --entrypoint node \
+              -v "$SEERRNG_CONFIG_DIR:/config:ro" \
+              "$SEERRNG_IMAGE_REF" \
+              /app/scripts/export-external-config.mjs /config/settings.json \
+              > "$external_config_file"
+            printf 'SEERR_EXTERNAL_CONFIG=%s\n' "$(cat "$external_config_file")" \
+              > "$external_env_file"
+            external_config_args=(--env-file "$external_env_file")
+          else
+            echo 'No settings.json found; starting SeerrNG so it can initialize the config.'
+          fi
           if [[ ! "$SEERRNG_CONTAINER_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,110}$ ]]; then
             echo 'Invalid deployment container name.' >&2
             exit 1
@@ -518,7 +524,7 @@ jobs:
             --health-retries 12 \
             --health-start-period 20s \
             --network host \
-            --env-file "$external_env_file" \
+            "${external_config_args[@]}" \
             -e TZ="${TZ:-America/Regina}" \
             -e PORT="$SEERRNG_PORT" \
             -e CONFIG_DIRECTORY=/app/config \

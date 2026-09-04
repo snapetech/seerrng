@@ -118,6 +118,11 @@ test('the main deployment runs the pulled digest inside the container boundary',
   assert.match(deployScript, /"\$SEERRNG_IMAGE_REF"/u);
   assert.match(deployScript, /export-external-config\.mjs/u);
   assert.match(deployScript, /--env-file "\$external_env_file"/u);
+  assert.match(deployScript, /-f "\$SEERRNG_CONFIG_DIR\/settings\.json"/u);
+  assert.match(
+    deployScript,
+    /starting SeerrNG so it can initialize the config/u
+  );
   assert.match(deployScript, /docker rename/u);
   assert.match(deployScript, /\/api\/v1\/status\/ready/u);
   assert.match(verifyScript, /\$RUNNER_TEMP\/seerr-main-status\.json/u);
