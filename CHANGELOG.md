@@ -33,6 +33,34 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.13.2](https://github.com/snapetech/seerrng/compare/v3.13.1..v3.13.2) - 2026-09-04
+
+### User-facing changes
+
+#### Fixed
+
+- **Deployment:** Main deployments now start cleanly when the target config directory is empty, allowing SeerrNG to create its initial settings before later upgrades export external configuration.
+- **Release Pipeline:** The `:main` container image on GHCR is now published as a real multi-arch (amd64 + arm64) manifest, fixing "exec format error" crashes on arm64 hosts.
+- **Playlist Requests:** Connecting Spotify and importing Spotify or YouTube playlists no longer fails with a "not found" error — every playlist-import endpoint was missing from the API contract and is now reachable.
+
+#### Security
+
+- **Authentication:** **Breaking:** Session cookies now require HTTPS, and the runtime and documentation dependencies have been updated to address current security advisories.
+  - **Action required:** Serve SeerrNG through HTTPS before upgrading.
+
+### 🐛 Bug Fixes
+- *(ci)* Allow first-start deployments - ([674ffa4](https://github.com/snapetech/seerrng/commit/674ffa449dc82f72c881c1c8d6a2442219f3078f))
+- *(ci)* Publish real multi-arch amd64+arm64 images for :main - ([45c0d84](https://github.com/snapetech/seerrng/commit/45c0d841032fdb23d675ad867a42817e7bcc1473))
+- *(security)* Make secure session cookies explicit - ([126289f](https://github.com/snapetech/seerrng/commit/126289f187cc20b448508de0d92907766b0ed87d))
+- *(security)* Require HTTPS sessions and update advisories - ([b675c55](https://github.com/snapetech/seerrng/commit/b675c559e75921b4b2a9321d602c8e39d25d1c1c))
+- *(server)* Declare playlist/Spotify routes in the OpenAPI spec - ([fe889bb](https://github.com/snapetech/seerrng/commit/fe889bbc691ef87de3bf1bb423c7cc0dcfbf1659))
+
+
+## New Contributors ❤️
+* @TrojanHorsePower made their first contribution
+
 ## [3.13.1](https://github.com/snapetech/seerrng/compare/v3.13.0..v3.13.1) - 2026-09-03
 
 ### User-facing changes
