@@ -42,6 +42,8 @@ tags:
     description: Blocklisted media from discovery page.
   - name: association
     description: Cross-medium related media graph endpoints.
+  - name: playlist
+    description: Endpoints for importing Spotify and YouTube playlists as music requests.
 servers:
   - url: '{server}/api/v1'
     variables:
@@ -2848,6 +2850,72 @@ components:
             - certification: 'PG'
               meaning: 'Some material may not be suitable for children under 10.'
               order: 2
+
+    PlaylistResolutionItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: MusicBrainz release-group ID for a matched item, or a synthetic placeholder ID for an unmatched item.
+          example: 'f5093c06-23e3-404f-aeaa-40f72885ee3a'
+        title:
+          type: string
+        artist:
+          type: string
+        year:
+          type: string
+        image:
+          type: string
+          nullable: true
+        releaseType:
+          type: string
+        sourceTitle:
+          type: string
+          description: The track/video title as read from the source playlist.
+        sourceArtist:
+          type: string
+        sourceUrl:
+          type: string
+        matchStatus:
+          type: string
+          enum:
+            - matched
+            - unmatched
+            - ambiguous
+        matchReason:
+          type: string
+      required:
+        - id
+        - title
+        - sourceTitle
+        - matchStatus
+    PlaylistResolutionResponse:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+            - spotify
+            - youtube
+        name:
+          type: string
+        url:
+          type: string
+        totalItems:
+          type: number
+        matchedItems:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaylistResolutionItem'
+      required:
+        - provider
+        - name
+        - url
+        - totalItems
+        - matchedItems
+        - items
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -10166,6 +10234,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OverrideRule'
+  /playlist/spotify/connect:
+    get:
+      summary: Start the Spotify connection flow
+      description: |
+        Requires an existing SeerrNG browser session (not just an API key).
+        Redirects the browser to Spotify's OAuth authorization page so the
+        signed-in user can grant SeerrNG read access to their playlists.
+      tags:
+        - playlist
+      responses:
+        '302':
+          description: Redirect to Spotify's authorization page.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        '400':
+          description: Spotify playlist integration is not configured, or the SeerrNG application URL is not set.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Spotify playlist integration is not configured by an administrator.'
+        '403':
+          description: The request did not come from an authenticated browser session (e.g. it used an API key instead of a session cookie).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'A browser session is required.'
+  /playlist/spotify/callback:
+    get:
+      summary: Handle the Spotify OAuth callback
+      description: |
+        The redirect target Spotify sends the browser back to after the
+        user approves or denies access. Always redirects back to
+        `/discover/music`, appending `?playlist=connected` on success or
+        `?playlist=error` if the state/code could not be validated or the
+        token exchange failed. Never returns a JSON error body.
+      tags:
+        - playlist
+      parameters:
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          description: Opaque anti-CSRF value echoed back from the authorization request.
+        - in: query
+          name: code
+          required: false
+          schema:
+            type: string
+          description: Authorization code issued by Spotify.
+      responses:
+        '302':
+          description: Redirect back to /discover/music with a playlist=connected or playlist=error query parameter.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+  /playlist/spotify/status:
+    get:
+      summary: Get the current user's Spotify connection status
+      tags:
+        - playlist
+      responses:
+        '200':
+          description: Spotify connection status for the current user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                  displayName:
+                    type: string
+                    nullable: true
+                required:
+                  - connected
+                  - displayName
+  /playlist/spotify/disconnect:
+    post:
+      summary: Disconnect the current user's Spotify account
+      description: Removes the connected account's stored Spotify tokens from SeerrNG.
+      tags:
+        - playlist
+      responses:
+        '204':
+          description: Spotify account disconnected. No response body.
+  /playlist/resolve:
+    post:
+      summary: Resolve a playlist URL into matched music requests
+      description: |
+        Reads a Spotify or YouTube/YouTube Music playlist (at most 200
+        source tracks), matches its tracks to MusicBrainz release groups,
+        and returns matched and unmatched candidates for review before
+        they are submitted as music requests. Rate-limited to 10 requests
+        per minute per client. Resolving a Spotify playlist requires the
+        requesting user to have already connected Spotify via
+        `/playlist/spotify/connect`.
+      tags:
+        - playlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: A Spotify, YouTube, or YouTube Music playlist URL.
+                  example: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M'
+              required:
+                - url
+      responses:
+        '200':
+          description: Playlist read and matched successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistResolutionResponse'
+        '400':
+          description: The URL was not a supported playlist link, or the matching provider (Spotify/YouTube) is not configured, or the playlist had no importable tracks.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Enter a supported Spotify or YouTube playlist URL.'
+        '409':
+          description: The requesting user has not connected Spotify yet.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Connect Spotify before importing a Spotify playlist.'
+        '502':
+          description: The playlist could not be read or matched right now (upstream provider or MusicBrainz failure).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'The playlist could not be read or matched right now.'
 security:
   - cookieAuth: []
   - apiKey: []
