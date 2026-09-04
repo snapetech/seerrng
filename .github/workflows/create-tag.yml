@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Install git-cliff
-        uses: taiki-e/install-action@7f4eb899022d8fe70b20c4f3de697aa85c309026 # v2.85.11
+        uses: taiki-e/install-action@0758d235715de2f3551eacc980d9ae8fce9342c3 # v2.87.3
         with:
           tool: git-cliff
 
@@ -60,7 +60,7 @@ jobs:
       TAG_VERSION: ${{ needs.determine-tag-version.outputs.tag_version }}
     steps:
       - name: Install git-cliff
-        uses: taiki-e/install-action@7f4eb899022d8fe70b20c4f3de697aa85c309026 # v2.85.11
+        uses: taiki-e/install-action@0758d235715de2f3551eacc980d9ae8fce9342c3 # v2.87.3
         with:
           tool: git-cliff
 
