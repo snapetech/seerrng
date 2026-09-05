@@ -5,6 +5,7 @@ import downloadRecovery from '@server/lib/downloadRecovery';
 import downloadTracker from '@server/lib/downloadtracker';
 import ImageProxy from '@server/lib/imageproxy';
 import refreshToken from '@server/lib/refreshToken';
+import { reconcileActiveRequests } from '@server/lib/requestStatus';
 import {
   jellyfinFullScanner,
   jellyfinRecentScanner,
@@ -397,7 +398,10 @@ export const startJobs = (): void => {
       });
       return runTrackedJob(
         'Download Sync',
-        () => downloadTracker.updateDownloads(),
+        async () => {
+          await downloadTracker.updateDownloads();
+          await reconcileActiveRequests();
+        },
         { scope: 'instance' }
       );
     }),
@@ -501,6 +505,13 @@ export const startJobs = (): void => {
       scheduledJob.job.cancel();
     }
   });
+
+  // Seed and repair durable request timelines at startup. Download Sync keeps
+  // live queue progress current afterwards, while this initial pass makes the
+  // status page useful immediately after an upgrade or restart.
+  void runTrackedJob('Request Status Reconciliation', () =>
+    reconcileActiveRequests()
+  );
 
   logger.info('Scheduled jobs loaded', { label: 'Jobs' });
 };

@@ -1,5 +1,9 @@
 import type { MediaType } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
+import type {
+  RequestStatusHistoryItem,
+  RequestStatusSnapshot,
+} from '@server/lib/requestStatus';
 import type { NonFunctionProperties, PaginatedResponse } from './common';
 
 export interface RequestResultsResponse extends PaginatedResponse {
@@ -70,3 +74,25 @@ export type BulkMediaRequestResponse = {
   skipped: BulkMediaRequestResult[];
   failed: BulkMediaRequestResult[];
 };
+
+export interface RequestStatusResultsResponse extends PaginatedResponse {
+  results: {
+    request: NonFunctionProperties<MediaRequest>;
+    status: RequestStatusSnapshot;
+  }[];
+  counts: {
+    total: number;
+    active: number;
+    attention: number;
+    completed: number;
+  };
+}
+
+export interface RequestStatusDetailResponse {
+  request: NonFunctionProperties<MediaRequest>;
+  current: RequestStatusSnapshot;
+  history: {
+    results: RequestStatusHistoryItem[];
+    total: number;
+  };
+}

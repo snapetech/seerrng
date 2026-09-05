@@ -33,6 +33,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browsebooks: 'Books',
   browsetv: 'Series',
   requests: 'Requests',
+  requeststatus: 'Request Status',
   blocklist: 'Blocklist',
   issues: 'Issues',
   users: 'Users',
@@ -91,10 +92,16 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/books$/,
   },
   {
+    href: '/requests/status',
+    messagesKey: 'requeststatus',
+    svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/requests\/status/,
+  },
+  {
     href: '/requests',
     messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/requests/,
+    activeRegExp: /^\/requests\/?$/,
   },
   {
     href: '/blocklist',

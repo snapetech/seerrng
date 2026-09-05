@@ -31,6 +31,8 @@ import type {
   BulkMediaRequestResponse,
   MediaRequestBody,
   RequestResultsResponse,
+  RequestStatusDetailResponse,
+  RequestStatusResultsResponse,
 } from '@server/interfaces/api/requestInterfaces';
 import {
   isValidMusicBrainzResourceId,
@@ -43,6 +45,12 @@ import {
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { hydrateMediaRequestRelations } from '@server/lib/mediaRequestHydration';
 import { Permission } from '@server/lib/permissions';
+import {
+  RequestStatusStage,
+  getRequestStatusHistory,
+  getRequestStatusPage,
+  recordRequestStatus,
+} from '@server/lib/requestStatus';
 import { runWithCurrentServarrService } from '@server/lib/serviceAdmission';
 import {
   UserMutationActorUnauthorizedError,
@@ -51,6 +59,7 @@ import {
   runAuthorizedUserSecurityMutation,
   runUserSecurityMutation,
   runUserSecurityMutationWithActor,
+  runUserSecurityReadWithActor,
   type AuthorizedUserSecurityMutationLease,
 } from '@server/lib/userSecurityMutation';
 import logger from '@server/logger';
@@ -97,6 +106,13 @@ const requestStatusFilters = [
   'completed',
   'available',
   'deleted',
+] as const;
+const requestTimelineStatusFilters = [
+  'all',
+  'active',
+  'attention',
+  'completed',
+  ...Object.values(RequestStatusStage),
 ] as const;
 
 const getExpectedCredentialVersion = (
@@ -2125,6 +2141,147 @@ requestRoutes.get('/count', async (req, res, next) => {
       errorMessage: e.message,
     });
     next({ status: 500, message: 'Unable to retrieve request counts.' });
+  }
+});
+
+requestRoutes.get<
+  Record<string, unknown>,
+  RequestStatusResultsResponse | { status: number; message: string }
+>('/status', async (req, res, next) => {
+  try {
+    const { pageSize, skip } = parsePageParams(req.query, {
+      take: 25,
+      maxTake: 100,
+    });
+    const requestedBy = parseOptionalPositiveInt(req.query.requestedBy);
+    const parsedMediaType = parseOptionalAllowedString(req.query.mediaType, {
+      fieldName: 'Media type',
+      allowedValues: requestMediaTypeFilters,
+      maxLength: 16,
+    });
+    if ('error' in parsedMediaType) {
+      return next({ status: 400, message: parsedMediaType.error });
+    }
+    const parsedFilter = parseOptionalAllowedString(
+      req.query.filter ?? req.query.status,
+      {
+        fieldName: 'Status filter',
+        allowedValues: requestTimelineStatusFilters,
+        maxLength: 32,
+      }
+    );
+    if ('error' in parsedFilter) {
+      return next({ status: 400, message: parsedFilter.error });
+    }
+
+    const actorId = req.user!.id;
+    return await runUserSecurityReadWithActor(
+      actorId,
+      requestedBy ?? actorId,
+      [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+      async (actor) => {
+        const canViewAllRequests = actor.hasPermission(
+          [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+          { type: 'or' }
+        );
+        const page = await getRequestStatusPage({
+          take: pageSize,
+          skip,
+          ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
+          mediaType:
+            parsedMediaType.value === 'all'
+              ? undefined
+              : (parsedMediaType.value as MediaType),
+          filter: parsedFilter.value,
+        });
+
+        return res.status(200).json({
+          ...page,
+          results: page.results.map(({ request, status }) => ({
+            request: filterEntityResponse(request, actor),
+            status,
+          })),
+        });
+      },
+      {
+        expectedCredentialVersion: getExpectedCredentialVersion(req),
+      }
+    );
+  } catch (error) {
+    if (error instanceof UserMutationActorUnauthorizedError) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+    logger.error('Something went wrong retrieving request status', {
+      label: 'API',
+      ...getErrorLogFields(error),
+    });
+    return next({ status: 500, message: 'Unable to retrieve request status.' });
+  }
+});
+
+requestRoutes.get<
+  { requestId: string },
+  RequestStatusDetailResponse | { status: number; message: string }
+>('/status/:requestId', async (req, res, next) => {
+  try {
+    const requestId = parseRequestParamId(req.params.requestId);
+    if (!requestId) {
+      return next({ status: 404, message: 'Request not found.' });
+    }
+
+    const request = await getRepository(MediaRequest).findOne({
+      where: { id: requestId },
+      relations: {
+        requestedBy: true,
+      },
+    });
+    if (!request) {
+      return next({ status: 404, message: 'Request not found.' });
+    }
+
+    return await runUserSecurityReadWithActor(
+      req.user!.id,
+      request.requestedBy.id,
+      [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+      async (actor) => {
+        const canViewAllRequests = actor.hasPermission(
+          [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+          { type: 'or' }
+        );
+        if (!canViewAllRequests && request.requestedBy.id !== actor.id) {
+          return next({
+            status: 403,
+            message: 'You do not have permission to view this request.',
+          });
+        }
+
+        const current = await recordRequestStatus(request.id);
+        if (!current) {
+          return next({ status: 404, message: 'Request not found.' });
+        }
+        const history = await getRequestStatusHistory(request.id);
+        return res.status(200).json({
+          request: filterEntityResponse(request, actor),
+          current,
+          history,
+        });
+      },
+      {
+        expectedCredentialVersion: getExpectedCredentialVersion(req),
+      }
+    );
+  } catch (error) {
+    if (error instanceof UserMutationActorUnauthorizedError) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+    logger.error('Something went wrong retrieving request status history', {
+      label: 'API',
+      ...getErrorLogFields(error),
+    });
+    return next({
+      status: 500,
+      message: 'Unable to retrieve request status history.',
+    });
   }
 });
 

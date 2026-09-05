@@ -43,6 +43,13 @@ import requestDispatchManager, {
   type RequestDispatchOutcome,
 } from '@server/lib/requestDispatch';
 import {
+  RequestStatusStage,
+  hasRequestServiceLink,
+  recordRequestCancellation,
+  recordRequestStatus,
+  recordRequestStatusOverride,
+} from '@server/lib/requestStatus';
+import {
   ServarrServiceAuthorityChangedError,
   runWithServarrServiceAdmission,
   runWithServarrServiceCollectionAdmission,
@@ -610,13 +617,43 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     request: MediaRequest
   ): Promise<RequestDispatchOutcome> {
     if (request.type === MediaType.MOVIE) {
-      return { delivered: await this.sendToRadarr(request) };
+      const delivered = await this.sendToRadarr(request);
+      if (!delivered) {
+        await recordRequestStatusOverride(
+          request.id,
+          RequestStatusStage.UNAVAILABLE,
+          'No usable release is currently available.'
+        );
+      }
+      return { delivered };
     }
     if (request.type === MediaType.TV) {
-      return { delivered: await this.sendToSonarr(request) };
+      const delivered = await this.sendToSonarr(request);
+      if (!delivered) {
+        await recordRequestStatusOverride(
+          request.id,
+          RequestStatusStage.UNAVAILABLE,
+          'No usable release is currently available.'
+        );
+      }
+      return { delivered };
     }
     if (request.type === MediaType.MUSIC) {
       await this.sendToLidarr(request);
+      const updatedMusicRequest = await getRepository(MediaRequest).findOne({
+        where: { id: request.id },
+        relations: { media: true },
+      });
+      if (
+        updatedMusicRequest?.status === MediaRequestStatus.APPROVED &&
+        !hasRequestServiceLink(updatedMusicRequest)
+      ) {
+        await recordRequestStatusOverride(
+          request.id,
+          RequestStatusStage.UNAVAILABLE,
+          'No usable release is currently available.'
+        );
+      }
     } else if (request.type === MediaType.BOOK) {
       const retryAfterMs = await this.sendToReadarr(request);
       if (retryAfterMs !== undefined) {
@@ -2269,6 +2306,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.manager as EntityManager,
       event.entity as MediaRequest
     );
+    await recordRequestStatus((event.entity as MediaRequest).id, {
+      manager: event.manager as EntityManager,
+    });
   }
 
   public async afterInsert(event: InsertEvent<MediaRequest>): Promise<void> {
@@ -2286,6 +2326,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.manager as EntityManager,
       event.entity as MediaRequest
     );
+    await recordRequestStatus((event.entity as MediaRequest).id, {
+      manager: event.manager as EntityManager,
+    });
   }
 
   public async afterRemove(event: RemoveEvent<MediaRequest>): Promise<void> {
@@ -2297,6 +2340,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.manager as EntityManager,
       event.entity as MediaRequest
     );
+    await recordRequestCancellation(event.entity as MediaRequest, {
+      manager: event.manager as EntityManager,
+    });
   }
 
   public afterTransactionCommit(event: TransactionCommitEvent): void {
