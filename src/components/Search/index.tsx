@@ -311,6 +311,7 @@ const Search = () => {
             return (
               <Button
                 key={searchCategory.key}
+                className="w-28"
                 buttonSize="sm"
                 buttonType={isSelected ? 'primary' : 'default'}
                 aria-pressed={isSelected}
@@ -363,6 +364,7 @@ const Search = () => {
             return (
               <Button
                 key={sortOption.field}
+                className="w-32"
                 buttonSize="sm"
                 buttonType={isSelected ? 'primary' : 'default'}
                 aria-pressed={isSelected}
