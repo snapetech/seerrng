@@ -35,6 +35,27 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.13.3](https://github.com/snapetech/seerrng/compare/v3.13.2..v3.13.3) - 2026-09-05
+
+### User-facing changes
+
+#### Fixed
+
+- **Packaging:** The binary AUR package now builds faster and ships runtime files readable by its dedicated service account, allowing the systemd service to start normally.
+  - **Action required:** upgrade
+
+### 🐛 Bug Fixes
+- *(aur)* Make the binary package runnable - ([b003341](https://github.com/snapetech/seerrng/commit/b00334135ce2be5559ed258736fb3e8fc21c6095))
+- *(release)* Publish Linux assets with service-readable modes - ([89cf235](https://github.com/snapetech/seerrng/commit/89cf235dd57bf0ad6909cb15a03c5badafce19c3))
+
+### 📖 Documentation
+- *(release)* Note Linux package permission fix - ([7e7d066](https://github.com/snapetech/seerrng/commit/7e7d066ad1e16e63b1dc88272c4db93fcc913cfc))
+
+### 🧪 Testing
+- *(cypress)* Reset network settings after specs - ([025bc95](https://github.com/snapetech/seerrng/commit/025bc952e1f2a2c735dd8d84ba3e1e6727c98f48))
+
 ## [3.13.2](https://github.com/snapetech/seerrng/compare/v3.13.1..v3.13.2) - 2026-09-04
 
 ### User-facing changes
