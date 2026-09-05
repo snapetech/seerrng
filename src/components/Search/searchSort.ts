@@ -1,4 +1,12 @@
-export type SortField = 'relevance' | 'title' | 'author' | 'date' | 'publisher';
+export type SortField =
+  | 'title'
+  | 'author'
+  | 'artist'
+  | 'date'
+  | 'publisher'
+  | 'rating'
+  | 'writer'
+  | 'director';
 export type SortOrder = 'asc' | 'desc';
 
 const defaultSortOrders: Record<SortField, SortOrder> = {
@@ -6,17 +14,23 @@ const defaultSortOrders: Record<SortField, SortOrder> = {
   title: 'asc',
   publisher: 'asc',
   author: 'asc',
-  relevance: 'desc',
+  artist: 'asc',
+  rating: 'desc',
+  writer: 'asc',
+  director: 'asc',
 };
 
 export const getSortField = (
   value: string | string[] | undefined
 ): SortField =>
-  value === 'relevance' ||
   value === 'title' ||
   value === 'author' ||
+  value === 'artist' ||
   value === 'date' ||
-  value === 'publisher'
+  value === 'publisher' ||
+  value === 'rating' ||
+  value === 'writer' ||
+  value === 'director'
     ? value
     : 'date';
 

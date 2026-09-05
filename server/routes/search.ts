@@ -94,6 +94,41 @@ const normalizeSearchText = (value?: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const WRITING_JOBS = new Set(['Screenplay', 'Story', 'Teleplay', 'Writer']);
+
+const sortedUniqueCreditNames = (values: unknown[]): string[] =>
+  [
+    ...new Set(
+      values
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+
+export const extractSearchCrew = (details: {
+  credits?: { crew?: { job?: string; name?: string }[] };
+  created_by?: { name?: string }[];
+}) => {
+  const crew = details.credits?.crew ?? [];
+  const directors = sortedUniqueCreditNames(
+    crew
+      .filter((credit) => credit.job === 'Director')
+      .map((credit) => credit.name)
+  );
+  const creditedWriters = crew
+    .filter((credit) => credit.job && WRITING_JOBS.has(credit.job))
+    .map((credit) => credit.name);
+  const writers = sortedUniqueCreditNames([
+    ...creditedWriters,
+    ...(creditedWriters.length === 0
+      ? (details.created_by ?? []).map((creator) => creator.name)
+      : []),
+  ]);
+
+  return { directors, writers };
+};
+
 const dedupeAlbumSearchResults = <T extends { id: string }>(
   albums: T[]
 ): T[] => {
@@ -210,6 +245,7 @@ searchRoutes.get('/', async (req, res, next) => {
   }
 
   try {
+    const tmdb = new TheMovieDb();
     const searchProvider = findSearchProvider(queryString.toLowerCase());
     let results: CombinedSearchResponse;
 
@@ -223,7 +259,6 @@ searchRoutes.get('/', async (req, res, next) => {
         query: queryString,
       });
     } else {
-      const tmdb = new TheMovieDb();
       const musicbrainz = new MusicBrainz();
       const openLibrary = new OpenLibraryAPI();
       const theAudioDb = new TheAudioDb();
@@ -624,8 +659,29 @@ searchRoutes.get('/', async (req, res, next) => {
     );
 
     const mappedResults = await mapSearchResults(results.results, media);
+    const creditEnrichedResults =
+      typeFilter === 'movie' || typeFilter === 'tv'
+        ? await Promise.all(
+            mappedResults.map(async (result) => {
+              if (result.mediaType !== typeFilter) {
+                return result;
+              }
 
-    const capabilityResults = mappedResults.filter(
+              try {
+                const details =
+                  result.mediaType === 'movie'
+                    ? await tmdb.getMovie({ movieId: result.id, language })
+                    : await tmdb.getTvShow({ tvId: result.id, language });
+
+                return { ...result, ...extractSearchCrew(details) };
+              } catch {
+                return result;
+              }
+            })
+          )
+        : mappedResults;
+
+    const capabilityResults = creditEnrichedResults.filter(
       (result) =>
         !('mediaType' in result) ||
         (((result.mediaType !== 'album' && result.mediaType !== 'artist') ||
@@ -644,7 +700,7 @@ searchRoutes.get('/', async (req, res, next) => {
       : capabilityResults;
 
     const capabilityFiltered =
-      capabilityResults.length !== mappedResults.length;
+      capabilityResults.length !== creditEnrichedResults.length;
 
     return res.status(200).json({
       page: results.page,

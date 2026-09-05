@@ -36,6 +36,7 @@ import searchRoutes, {
   SEARCH_PROVIDER_TIMEOUT_MS,
   SEARCH_RATE_LIMIT,
   capSearchProviderResults,
+  extractSearchCrew,
 } from './search';
 
 let app: Express;
@@ -63,6 +64,40 @@ describe('search provider result bounds', () => {
       MAX_COMBINED_SEARCH_RESULTS
     );
     assert.deepStrictEqual(capSearchProviderResults({}), []);
+  });
+});
+
+describe('search credit enrichment', () => {
+  it('extracts and alphabetizes movie directors and credited writers', () => {
+    assert.deepStrictEqual(
+      extractSearchCrew({
+        credits: {
+          crew: [
+            { job: 'Director', name: 'Zed Director' },
+            { job: 'Screenplay', name: 'Beth Writer' },
+            { job: 'Writer', name: 'Alex Writer' },
+            { job: 'Producer', name: 'Ignored Producer' },
+          ],
+        },
+      }),
+      {
+        directors: ['Zed Director'],
+        writers: ['Alex Writer', 'Beth Writer'],
+      }
+    );
+  });
+
+  it('uses series creators when no writing credit is present', () => {
+    assert.deepStrictEqual(
+      extractSearchCrew({
+        credits: { crew: [{ job: 'Director', name: 'Series Director' }] },
+        created_by: [{ name: 'Series Creator' }],
+      }),
+      {
+        directors: ['Series Director'],
+        writers: ['Series Creator'],
+      }
+    );
   });
 });
 

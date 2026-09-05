@@ -34,14 +34,16 @@ const messages = defineMessages('components.Search', {
   books: 'Books',
   audiobooks: 'Audiobooks',
   music: 'Music',
-  people: 'People',
   filter: 'Filter',
   sortBy: 'Sort by',
-  relevance: 'Relevance',
   title: 'Title',
   author: 'Author',
+  artist: 'Artist',
   date: 'Date',
   publisher: 'Publisher',
+  rating: 'Rating',
+  writer: 'Writer',
+  director: 'Director',
   ascending: 'Ascending',
   descending: 'Descending',
   noResultsFound: 'No Results Found',
@@ -64,7 +66,6 @@ const searchCategories = [
     message: messages.audiobooks,
   },
   { key: 'music', type: 'music', message: messages.music },
-  { key: 'person', type: 'person', message: messages.people },
 ] as const;
 
 type SearchCategory = (typeof searchCategories)[number];
@@ -78,21 +79,42 @@ type SearchResult =
   | ArtistResult
   | BookResult;
 
-const sortOptions = [
-  { field: 'date', message: messages.date, defaultOrder: 'desc' },
-  { field: 'title', message: messages.title, defaultOrder: 'asc' },
-  { field: 'publisher', message: messages.publisher, defaultOrder: 'asc' },
-  { field: 'author', message: messages.author, defaultOrder: 'asc' },
-  {
-    field: 'relevance',
-    message: messages.relevance,
-    defaultOrder: 'desc',
-  },
-] as const satisfies readonly {
+type SortOption = {
   field: SortField;
   message: (typeof messages)[keyof typeof messages];
   defaultOrder: SortOrder;
-}[];
+};
+
+const sortOptionDefinitions: Record<SortField, SortOption> = {
+  date: { field: 'date', message: messages.date, defaultOrder: 'desc' },
+  title: { field: 'title', message: messages.title, defaultOrder: 'asc' },
+  rating: { field: 'rating', message: messages.rating, defaultOrder: 'desc' },
+  writer: { field: 'writer', message: messages.writer, defaultOrder: 'asc' },
+  director: {
+    field: 'director',
+    message: messages.director,
+    defaultOrder: 'asc',
+  },
+  artist: { field: 'artist', message: messages.artist, defaultOrder: 'asc' },
+  author: { field: 'author', message: messages.author, defaultOrder: 'asc' },
+  publisher: {
+    field: 'publisher',
+    message: messages.publisher,
+    defaultOrder: 'asc',
+  },
+};
+
+const sortFieldsByCategory: Record<
+  SearchCategory['key'],
+  readonly SortField[]
+> = {
+  all: ['date', 'title'],
+  movie: ['date', 'title', 'rating', 'writer', 'director'],
+  tv: ['date', 'title', 'rating', 'writer', 'director'],
+  music: ['date', 'title', 'artist'],
+  book: ['date', 'title', 'author', 'publisher'],
+  audiobook: ['date', 'title', 'author', 'publisher'],
+};
 
 const getSearchCategory = (
   type: string | string[] | undefined,
@@ -142,11 +164,15 @@ const getResultAuthor = (result: SearchResult): string | undefined => {
     return result.author;
   }
 
+  return undefined;
+};
+
+const getResultArtist = (result: SearchResult): string | undefined => {
   if (result.mediaType === 'album') {
     return result['artist-credit']?.[0]?.name;
   }
 
-  if (result.mediaType === 'artist' || result.mediaType === 'person') {
+  if (result.mediaType === 'artist') {
     return result.name;
   }
 
@@ -167,6 +193,22 @@ const getResultDate = (result: SearchResult): number | undefined => {
   const year = typeof value === 'number' ? value : Number(value?.slice(0, 4));
 
   return Number.isFinite(year) ? year : undefined;
+};
+
+const getResultRating = (result: SearchResult): number | undefined =>
+  result.mediaType === 'movie' || result.mediaType === 'tv'
+    ? result.voteAverage
+    : undefined;
+
+const getResultCredit = (
+  result: SearchResult,
+  field: 'writer' | 'director'
+): string | undefined => {
+  if (result.mediaType !== 'movie' && result.mediaType !== 'tv') {
+    return undefined;
+  }
+
+  return (field === 'writer' ? result.writers : result.directors)?.[0];
 };
 
 const compareOptional = <T,>(
@@ -197,7 +239,15 @@ const Search = () => {
   const type = category.type as SearchType | undefined;
   const preferredBookFormat =
     'format' in category ? (category.format as BookFormat) : undefined;
-  const sortField = getSortField(router.query.sort);
+  const sortOptions = sortFieldsByCategory[category.key].map(
+    (field) => sortOptionDefinitions[field]
+  );
+  const requestedSortField = getSortField(router.query.sort);
+  const sortField = sortOptions.some(
+    (option) => option.field === requestedSortField
+  )
+    ? requestedSortField
+    : 'date';
   const sortOrder = getSortOrder(router.query.order, sortField);
   const searchOptions = useMemo(
     () => ({
@@ -236,12 +286,6 @@ const Search = () => {
     [category, error, titles]
   );
   const sortedTitles = useMemo(() => {
-    if (sortField === 'relevance') {
-      return sortOrder === 'desc'
-        ? visibleTitles
-        : [...visibleTitles].reverse();
-    }
-
     const collator = new Intl.Collator(undefined, {
       sensitivity: 'base',
       numeric: true,
@@ -257,22 +301,39 @@ const Search = () => {
         );
       }
 
+      if (sortField === 'rating') {
+        return compareOptional(
+          getResultRating(left),
+          getResultRating(right),
+          (a, b) => a - b,
+          sortOrder
+        );
+      }
+
       const leftValue =
         sortField === 'title'
           ? getResultTitle(left)
           : sortField === 'author'
             ? getResultAuthor(left)
-            : left.mediaType === 'book'
-              ? left.publisher
-              : undefined;
+            : sortField === 'artist'
+              ? getResultArtist(left)
+              : sortField === 'writer' || sortField === 'director'
+                ? getResultCredit(left, sortField)
+                : left.mediaType === 'book'
+                  ? left.publisher
+                  : undefined;
       const rightValue =
         sortField === 'title'
           ? getResultTitle(right)
           : sortField === 'author'
             ? getResultAuthor(right)
-            : right.mediaType === 'book'
-              ? right.publisher
-              : undefined;
+            : sortField === 'artist'
+              ? getResultArtist(right)
+              : sortField === 'writer' || sortField === 'director'
+                ? getResultCredit(right, sortField)
+                : right.mediaType === 'book'
+                  ? right.publisher
+                  : undefined;
 
       return compareOptional(
         leftValue,
@@ -364,7 +425,7 @@ const Search = () => {
             return (
               <Button
                 key={sortOption.field}
-                className="w-32"
+                className="w-28"
                 buttonSize="sm"
                 buttonType={isSelected ? 'primary' : 'default'}
                 aria-pressed={isSelected}
@@ -394,7 +455,7 @@ const Search = () => {
                 }}
               >
                 {intl.formatMessage(sortOption.message)}
-                <SortDirectionIcon className="ml-3 h-4 w-4" />
+                <SortDirectionIcon className="ml-2 h-4 w-4" />
               </Button>
             );
           })}
@@ -404,7 +465,7 @@ const Search = () => {
         items={sortedTitles}
         preferredBookFormat={preferredBookFormat}
         emptyMessage={intl.formatMessage(messages.noResultsFound)}
-        emptyClassName="mt-12"
+        emptyClassName="mt-6"
         isEmpty={isShowingEmptyState || (isSearchReady && isEmpty)}
         isLoading={
           !router.isReady ||
