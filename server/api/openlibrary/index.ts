@@ -93,6 +93,21 @@ export const MAX_OPENLIBRARY_PAGE_SIZE = 100;
 export const MAX_OPENLIBRARY_EDITION_ISBNS = 200;
 export const MAX_OPENLIBRARY_TITLE_LENGTH = 1_000;
 export const MAX_OPENLIBRARY_DESCRIPTION_LENGTH = 20_000;
+export const OPENLIBRARY_SEARCH_FIELDS = [
+  'key',
+  'title',
+  'author_name',
+  'author_key',
+  'first_publish_year',
+  'cover_i',
+  'isbn',
+  'edition_key',
+  'edition_count',
+  'ratings_average',
+  'ratings_count',
+  'want_to_read_count',
+  'publisher',
+].join(',');
 const MAX_OPENLIBRARY_TEXT_LENGTH = 512;
 const MAX_OPENLIBRARY_ARRAY_ITEMS = 200;
 
@@ -423,6 +438,7 @@ class OpenLibraryAPI extends ExternalAPI {
           q: query,
           page: page.toString(),
           limit: boundedLimit.toString(),
+          fields: OPENLIBRARY_SEARCH_FIELDS,
           ...(sort ? { sort } : {}),
         },
       },

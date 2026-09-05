@@ -6730,7 +6730,16 @@ paths:
               - album
               - artist
               - book
+              - music
             description: Filter results by media type. When omitted, all types are returned.
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum:
+              - ebook
+              - audiobook
+            description: Select the configured book service format. Valid only when type is book.
       responses:
         '200':
           description: Results

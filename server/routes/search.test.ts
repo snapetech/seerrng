@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import ExternalAPI from '@server/api/externalapi';
@@ -24,6 +25,7 @@ import { setupTestDb } from '@server/test/db';
 import { waitForBackgroundTasks } from '@server/utils/backgroundTasks';
 import type { Express } from 'express';
 import express from 'express';
+import * as OpenApiValidator from 'express-openapi-validator';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import request from 'supertest';
@@ -856,5 +858,65 @@ describe('GET /search', () => {
         { mediaType: 'artist', name: 'Unmapped Singer' },
       ]
     );
+  });
+});
+
+describe('search filters behind the OpenAPI validator', () => {
+  function createValidatedApp(): Express {
+    const validatedApp = express();
+    validatedApp.use(express.json());
+    validatedApp.use((req, _res, next) => {
+      req.user = { id: 1 } as Express.Request['user'];
+      next();
+    });
+    validatedApp.use(
+      OpenApiValidator.middleware({
+        apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
+        validateRequests: true,
+        validateSecurity: false,
+      })
+    );
+    validatedApp.use('/api/v1/search', searchRoutes);
+    validatedApp.use(
+      (
+        err: { status?: number; message?: string; errors?: unknown[] },
+        _req: express.Request,
+        res: express.Response,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _next: express.NextFunction
+      ) => {
+        res.status(err.status ?? 500).json({
+          status: err.status ?? 500,
+          message: err.message,
+          errors: err.errors,
+        });
+      }
+    );
+    return validatedApp;
+  }
+
+  it('admits the music type and both book formats', async () => {
+    const validatedApp = createValidatedApp();
+    getSettings().lidarr = [];
+    getSettings().readarr = [{ serviceType: 'ebook' } as ReadarrSettings];
+
+    const music = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'music' });
+    const audiobook = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'book', format: 'audiobook' });
+
+    getSettings().readarr = [{ serviceType: 'audiobook' } as ReadarrSettings];
+    const ebook = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'book', format: 'ebook' });
+
+    assert.strictEqual(music.status, 200);
+    assert.strictEqual(audiobook.status, 200);
+    assert.strictEqual(ebook.status, 200);
+    assert.deepStrictEqual(music.body.results, []);
+    assert.deepStrictEqual(audiobook.body.results, []);
+    assert.deepStrictEqual(ebook.body.results, []);
   });
 });

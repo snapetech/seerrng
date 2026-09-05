@@ -40,6 +40,7 @@ interface BaseMedia {
 interface DiscoverResult<T, S> {
   isLoadingInitialData: boolean;
   isLoadingMore: boolean;
+  isValidating: boolean;
   fetchMore: () => void;
   isEmpty: boolean;
   isReachingEnd: boolean;
@@ -348,6 +349,7 @@ const useDiscover = <
   return {
     isLoadingInitialData,
     isLoadingMore,
+    isValidating,
     fetchMore,
     isEmpty,
     isReachingEnd,

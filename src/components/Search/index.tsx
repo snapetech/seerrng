@@ -4,6 +4,7 @@ import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
 import useDiscover from '@app/hooks/useDiscover';
+import { setSearchActivity } from '@app/hooks/useSearchActivity';
 import defineMessages from '@app/utils/defineMessages';
 import { BarsArrowDownIcon, BarsArrowUpIcon } from '@heroicons/react/24/solid';
 import type {
@@ -15,8 +16,14 @@ import type {
   TvResult,
 } from '@server/models/Search';
 import { useRouter } from 'next/router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
+import {
+  getSortField,
+  getSortOrder,
+  type SortField,
+  type SortOrder,
+} from './searchSort';
 
 const messages = defineMessages('components.Search', {
   search: 'Search',
@@ -63,8 +70,6 @@ const searchCategories = [
 type SearchCategory = (typeof searchCategories)[number];
 type SearchType = Exclude<SearchCategory['type'], undefined>;
 type BookFormat = 'ebook' | 'audiobook';
-type SortField = 'relevance' | 'title' | 'author' | 'date' | 'publisher';
-type SortOrder = 'asc' | 'desc';
 type SearchResult =
   | MovieResult
   | TvResult
@@ -107,23 +112,6 @@ const getSearchCategory = (
     ) ?? searchCategories[0]
   );
 };
-
-const getSortField = (value: string | string[] | undefined): SortField =>
-  value === 'title' ||
-  value === 'author' ||
-  value === 'date' ||
-  value === 'publisher'
-    ? value
-    : 'date';
-
-const getDefaultSortOrder = (field: SortField): SortOrder =>
-  sortOptions.find((option) => option.field === field)?.defaultOrder ?? 'asc';
-
-const getSortOrder = (
-  value: string | string[] | undefined,
-  field: SortField
-): SortOrder =>
-  value === 'asc' || value === 'desc' ? value : getDefaultSortOrder(field);
 
 const matchesCategory = (result: SearchResult, category: SearchCategory) => {
   if (!category.type) {
@@ -225,6 +213,7 @@ const Search = () => {
     isLoadingInitialData,
     isEmpty,
     isLoadingMore,
+    isValidating,
     isReachingEnd,
     titles,
     fetchMore,
@@ -236,6 +225,11 @@ const Search = () => {
     showErrorToast: false,
     shouldRetryOnError: false,
   });
+  useEffect(() => {
+    setSearchActivity(isSearchReady && (isLoadingInitialData || isValidating));
+
+    return () => setSearchActivity(false);
+  }, [isLoadingInitialData, isSearchReady, isValidating]);
   const visibleTitles = useMemo(
     () =>
       error ? [] : titles.filter((title) => matchesCategory(title, category)),
@@ -305,9 +299,12 @@ const Search = () => {
           {intl.formatMessage(messages.filter)}
         </div>
         <div
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap items-center gap-2"
           aria-label={intl.formatMessage(messages.filter)}
         >
+          <CardTextVisibilityToggle
+            mediaType={['movie', 'tv', 'album', 'book']}
+          />
           {searchCategories.map((searchCategory) => {
             const isSelected = category.key === searchCategory.key;
 
@@ -395,13 +392,10 @@ const Search = () => {
                 }}
               >
                 {intl.formatMessage(sortOption.message)}
-                <SortDirectionIcon className="ml-1.5 h-4 w-4" />
+                <SortDirectionIcon className="ml-3 h-4 w-4" />
               </Button>
             );
           })}
-          <CardTextVisibilityToggle
-            mediaType={['movie', 'tv', 'album', 'book']}
-          />
         </div>
       </div>
       <ListView
