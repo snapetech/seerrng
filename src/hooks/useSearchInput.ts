@@ -110,9 +110,9 @@ const useSearchInput = (): SearchObject => {
     if (
       searchValue === '' &&
       router.pathname.startsWith('/search') &&
-      !searchOpen
+      !searchOpen &&
+      closingSearch.current
     ) {
-      closingSearch.current = true;
       pendingSearchQuery.current = null;
 
       if (lastRoute) {
@@ -139,6 +139,12 @@ const useSearchInput = (): SearchObject => {
    * is on /search
    */
   useEffect(() => {
+    const restoringSearchRoute =
+      router.pathname.startsWith('/search') &&
+      !searchOpen &&
+      !closingSearch.current &&
+      routeQuery !== '';
+
     if (!router.pathname.startsWith('/search')) {
       closingSearch.current = false;
     }
@@ -148,6 +154,7 @@ const useSearchInput = (): SearchObject => {
         pendingSearchQuery.current = null;
       }
     } else if (
+      restoringSearchRoute ||
       shouldSyncSearchInput(
         router.pathname,
         routeQuery,

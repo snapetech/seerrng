@@ -237,8 +237,9 @@ describe('useSearchInput routing', () => {
         return true;
       },
     });
+    let search: ReturnType<typeof useSearchInput> | undefined;
     const Probe = () => {
-      useSearchInput();
+      search = useSearchInput();
       return null;
     };
     const render = () =>
@@ -257,6 +258,24 @@ describe('useSearchInput routing', () => {
     await act(async () => render());
 
     strictEqual(pushes.length, 0);
+
+    routeChangeStart?.();
+    router.pathname = '/search';
+    router.route = '/search';
+    router.asPath =
+      '/search?query=alien&type=book&format=ebook&sort=date&order=desc';
+    router.query = {
+      query: 'alien',
+      type: 'book',
+      format: 'ebook',
+      sort: 'date',
+      order: 'desc',
+    };
+    await act(async () => render());
+
+    strictEqual(pushes.length, 0);
+    strictEqual(search?.searchValue, 'alien');
+    strictEqual(search?.searchOpen, true);
   });
 
   it('preserves newer typing through a stale route update and navigates once', async () => {
