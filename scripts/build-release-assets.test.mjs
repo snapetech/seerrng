@@ -37,6 +37,21 @@ const createFixture = async () => {
   ]) {
     await fs.writeFile(path.join(root, file), '{}\n');
   }
+  await Promise.all([
+    ...['.next', 'dist', 'public'].map((directory) =>
+      fs.chmod(path.join(root, directory), 0o700)
+    ),
+    ...[
+      'dist/index.js',
+      'public/asset.txt',
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'next.config.ts',
+      'seerr-api.yml',
+      'LICENSE',
+    ].map((file) => fs.chmod(path.join(root, file), 0o600)),
+  ]);
   const script = path.join(root, 'build-release-assets.sh');
   await fs.copyFile(sourceScript, script);
   await fs.chmod(script, 0o755);
@@ -125,6 +140,15 @@ describe('release asset construction', () => {
     await assert.rejects(fs.stat(path.join(root, '.next', 'dev')), {
       code: 'ENOENT',
     });
+    assert.equal((await fs.stat(root)).mode & 0o777, 0o755);
+    assert.equal(
+      (await fs.stat(path.join(root, 'dist'))).mode & 0o777,
+      0o755
+    );
+    assert.equal(
+      (await fs.stat(path.join(root, 'dist', 'index.js'))).mode & 0o777,
+      0o644
+    );
 
     const invocation = path.join(fixture.root, 'node-invocation');
     await fs.writeFile(

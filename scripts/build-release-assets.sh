@@ -118,6 +118,11 @@ EOF
 chmod 0755 "$stage/seerrng"
 cp "$stage/start.cmd" "$stage/seerrng.cmd"
 
+# The runtime bundle is installed by package managers and may run as a
+# dedicated service account. The build uses a restrictive umask for temporary
+# files, so normalize the non-secret application tree before archiving it.
+chmod -R u=rwX,go=rX "$stage"
+
 if [[ "$os" == "windows" ]]; then
   archive_name="${asset}.zip"
   archive_temporary="$(mktemp "${dist_abs}/.${archive_name}.tmp.XXXXXX.zip")"
