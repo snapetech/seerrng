@@ -1,6 +1,9 @@
 export const getSearchQuery = (query: string | string[] | undefined): string =>
   typeof query === 'string' ? query : '';
 
+export const getDefaultSearchType = (pathname: string): string | undefined =>
+  pathname === '/discover/books' ? 'book' : undefined;
+
 export const shouldNavigateToSearch = (
   pathname: string,
   currentQuery: string,
