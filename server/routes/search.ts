@@ -77,6 +77,8 @@ const searchTypes = [
   'music',
 ] as const;
 type SearchType = (typeof searchTypes)[number];
+const bookFormats = ['ebook', 'audiobook'] as const;
+type BookFormat = (typeof bookFormats)[number];
 
 const parseSearchQuery = (value: unknown) =>
   parseBoundedString(value, {
@@ -159,9 +161,30 @@ searchRoutes.get('/', async (req, res, next) => {
     return res.status(400).json({ status: 400, message: parsedType.error });
   }
   const typeFilter = parsedType.value;
+  const parsedFormat = req.query.format
+    ? parseOptionalAllowedString(req.query.format, {
+        fieldName: 'Format',
+        allowedValues: bookFormats,
+        maxLength: 16,
+      })
+    : ({ value: undefined } as { value?: BookFormat });
+  if ('error' in parsedFormat) {
+    return res.status(400).json({ status: 400, message: parsedFormat.error });
+  }
+  const bookFormat = parsedFormat.value;
+  if (bookFormat && typeFilter !== 'book') {
+    return res.status(400).json({
+      status: 400,
+      message: 'Format can only be used with book searches.',
+    });
+  }
   const settings = getExternalRuntimeConfig();
   const musicEnabled = settings.lidarr.length > 0;
-  const booksEnabled = settings.readarr.length > 0;
+  const booksEnabled = bookFormat
+    ? settings.readarr.some(
+        (server) => (server.serviceType ?? 'ebook') === bookFormat
+      )
+    : settings.readarr.length > 0;
 
   if (
     (typeFilter === 'album' ||

@@ -1,10 +1,11 @@
 import Button from '@app/components/Common/Button';
+import CardTextVisibilityToggle from '@app/components/Common/CardTextVisibilityToggle';
 import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
 import useDiscover from '@app/hooks/useDiscover';
-import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { BarsArrowDownIcon, BarsArrowUpIcon } from '@heroicons/react/24/solid';
 import type {
   AlbumResult,
   ArtistResult,
@@ -27,15 +28,16 @@ const messages = defineMessages('components.Search', {
   audiobooks: 'Audiobooks',
   music: 'Music',
   people: 'People',
+  filter: 'Filter',
   sortBy: 'Sort by',
   relevance: 'Relevance',
   title: 'Title',
   author: 'Author',
   date: 'Date',
   publisher: 'Publisher',
-  order: 'Order',
   ascending: 'Ascending',
   descending: 'Descending',
+  noResultsFound: 'No Results Found',
 });
 
 const searchCategories = [
@@ -71,6 +73,22 @@ type SearchResult =
   | ArtistResult
   | BookResult;
 
+const sortOptions = [
+  { field: 'date', message: messages.date, defaultOrder: 'desc' },
+  { field: 'title', message: messages.title, defaultOrder: 'asc' },
+  { field: 'publisher', message: messages.publisher, defaultOrder: 'asc' },
+  { field: 'author', message: messages.author, defaultOrder: 'asc' },
+  {
+    field: 'relevance',
+    message: messages.relevance,
+    defaultOrder: 'desc',
+  },
+] as const satisfies readonly {
+  field: SortField;
+  message: (typeof messages)[keyof typeof messages];
+  defaultOrder: SortOrder;
+}[];
+
 const getSearchCategory = (
   type: string | string[] | undefined,
   format: string | string[] | undefined
@@ -96,10 +114,28 @@ const getSortField = (value: string | string[] | undefined): SortField =>
   value === 'date' ||
   value === 'publisher'
     ? value
-    : 'relevance';
+    : 'date';
 
-const getSortOrder = (value: string | string[] | undefined): SortOrder =>
-  value === 'desc' ? 'desc' : 'asc';
+const getDefaultSortOrder = (field: SortField): SortOrder =>
+  sortOptions.find((option) => option.field === field)?.defaultOrder ?? 'asc';
+
+const getSortOrder = (
+  value: string | string[] | undefined,
+  field: SortField
+): SortOrder =>
+  value === 'asc' || value === 'desc' ? value : getDefaultSortOrder(field);
+
+const matchesCategory = (result: SearchResult, category: SearchCategory) => {
+  if (!category.type) {
+    return true;
+  }
+
+  if (category.type === 'music') {
+    return result.mediaType === 'album' || result.mediaType === 'artist';
+  }
+
+  return result.mediaType === category.type;
+};
 
 const getResultTitle = (result: SearchResult): string | undefined => {
   if (result.mediaType === 'tv') {
@@ -174,13 +210,14 @@ const Search = () => {
   const preferredBookFormat =
     'format' in category ? (category.format as BookFormat) : undefined;
   const sortField = getSortField(router.query.sort);
-  const sortOrder = getSortOrder(router.query.order);
+  const sortOrder = getSortOrder(router.query.order, sortField);
   const searchOptions = useMemo(
     () => ({
       query,
       ...(type ? { type } : {}),
+      ...(preferredBookFormat ? { format: preferredBookFormat } : {}),
     }),
-    [query, type]
+    [preferredBookFormat, query, type]
   );
   const isSearchReady = router.isReady && !!query;
 
@@ -196,10 +233,19 @@ const Search = () => {
     enabled: isSearchReady,
     hideAvailable: false,
     hideBlocklisted: false,
+    showErrorToast: false,
+    shouldRetryOnError: false,
   });
+  const visibleTitles = useMemo(
+    () =>
+      error ? [] : titles.filter((title) => matchesCategory(title, category)),
+    [category, error, titles]
+  );
   const sortedTitles = useMemo(() => {
     if (sortField === 'relevance') {
-      return titles;
+      return sortOrder === 'desc'
+        ? visibleTitles
+        : [...visibleTitles].reverse();
     }
 
     const collator = new Intl.Collator(undefined, {
@@ -207,7 +253,7 @@ const Search = () => {
       numeric: true,
     });
 
-    return [...titles].sort((left, right) => {
+    return [...visibleTitles].sort((left, right) => {
       if (sortField === 'date') {
         return compareOptional(
           getResultDate(left),
@@ -241,11 +287,12 @@ const Search = () => {
         sortOrder
       );
     });
-  }, [sortField, sortOrder, titles]);
-
-  if (error) {
-    return <ErrorPage statusCode={500} />;
-  }
+  }, [sortField, sortOrder, visibleTitles]);
+  const isShowingEmptyState =
+    isSearchReady &&
+    !isLoadingInitialData &&
+    !isLoadingMore &&
+    (Boolean(error) || sortedTitles.length === 0);
 
   return (
     <>
@@ -253,115 +300,116 @@ const Search = () => {
       <div className="mb-5 mt-1">
         <Header>{intl.formatMessage(messages.searchresults)}</Header>
       </div>
-      <div
-        className="mb-6 flex flex-wrap gap-2"
-        aria-label={intl.formatMessage(messages.searchresults)}
-      >
-        {searchCategories.map((searchCategory) => {
-          const isSelected = category.key === searchCategory.key;
+      <div className="mb-6">
+        <div className="mb-1 text-sm text-gray-300">
+          {intl.formatMessage(messages.filter)}
+        </div>
+        <div
+          className="flex flex-wrap gap-2"
+          aria-label={intl.formatMessage(messages.filter)}
+        >
+          {searchCategories.map((searchCategory) => {
+            const isSelected = category.key === searchCategory.key;
 
-          return (
-            <Button
-              key={searchCategory.key}
-              buttonSize="sm"
-              buttonType={isSelected ? 'primary' : 'default'}
-              aria-pressed={isSelected}
-              onClick={() => {
-                const nextQuery = { ...router.query };
+            return (
+              <Button
+                key={searchCategory.key}
+                buttonSize="sm"
+                buttonType={isSelected ? 'primary' : 'default'}
+                aria-pressed={isSelected}
+                onClick={() => {
+                  const nextQuery = { ...router.query };
 
-                delete nextQuery.format;
+                  delete nextQuery.format;
 
-                if (searchCategory.type) {
-                  nextQuery.type = searchCategory.type;
-                } else {
-                  delete nextQuery.type;
-                }
+                  if (searchCategory.type) {
+                    nextQuery.type = searchCategory.type;
+                  } else {
+                    delete nextQuery.type;
+                  }
 
-                if ('format' in searchCategory) {
-                  nextQuery.format = searchCategory.format;
-                }
+                  if ('format' in searchCategory) {
+                    nextQuery.format = searchCategory.format;
+                  }
 
-                void router.replace(
-                  { pathname: router.pathname, query: nextQuery },
-                  undefined,
-                  { shallow: true, scroll: false }
-                );
-              }}
-            >
-              {intl.formatMessage(searchCategory.message)}
-            </Button>
-          );
-        })}
+                  void router.replace(
+                    { pathname: router.pathname, query: nextQuery },
+                    undefined,
+                    { shallow: true, scroll: false }
+                  );
+                }}
+              >
+                {intl.formatMessage(searchCategory.message)}
+              </Button>
+            );
+          })}
+        </div>
       </div>
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-40 flex-col gap-1 text-sm text-gray-300">
+      <div className="mb-6">
+        <div className="mb-1 text-sm text-gray-300">
           {intl.formatMessage(messages.sortBy)}
-          <select
-            value={sortField}
-            onChange={(event) => {
-              const nextQuery = { ...router.query };
-              const value = event.target.value as SortField;
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {sortOptions.map((sortOption) => {
+            const isSelected = sortField === sortOption.field;
+            const displayedOrder = isSelected
+              ? sortOrder
+              : sortOption.defaultOrder;
+            const directionLabel = intl.formatMessage(
+              displayedOrder === 'asc'
+                ? messages.ascending
+                : messages.descending
+            );
+            const SortDirectionIcon =
+              displayedOrder === 'asc' ? BarsArrowUpIcon : BarsArrowDownIcon;
 
-              if (value === 'relevance') {
-                delete nextQuery.sort;
-                delete nextQuery.order;
-              } else {
-                nextQuery.sort = value;
-                nextQuery.order = sortOrder;
-              }
+            return (
+              <Button
+                key={sortOption.field}
+                buttonSize="sm"
+                buttonType={isSelected ? 'primary' : 'default'}
+                aria-pressed={isSelected}
+                aria-label={`${intl.formatMessage(
+                  sortOption.message
+                )}: ${directionLabel}`}
+                title={directionLabel}
+                onClick={() => {
+                  const nextOrder = isSelected
+                    ? sortOrder === 'asc'
+                      ? 'desc'
+                      : 'asc'
+                    : sortOption.defaultOrder;
 
-              void router.replace(
-                { pathname: router.pathname, query: nextQuery },
-                undefined,
-                { shallow: true, scroll: false }
-              );
-            }}
-            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white"
-          >
-            <option value="relevance">
-              {intl.formatMessage(messages.relevance)}
-            </option>
-            <option value="title">{intl.formatMessage(messages.title)}</option>
-            <option value="author">
-              {intl.formatMessage(messages.author)}
-            </option>
-            <option value="date">{intl.formatMessage(messages.date)}</option>
-            <option value="publisher">
-              {intl.formatMessage(messages.publisher)}
-            </option>
-          </select>
-        </label>
-        {sortField !== 'relevance' && (
-          <label className="flex min-w-40 flex-col gap-1 text-sm text-gray-300">
-            {intl.formatMessage(messages.order)}
-            <select
-              value={sortOrder}
-              onChange={(event) => {
-                void router.replace(
-                  {
-                    pathname: router.pathname,
-                    query: { ...router.query, order: event.target.value },
-                  },
-                  undefined,
-                  { shallow: true, scroll: false }
-                );
-              }}
-              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white"
-            >
-              <option value="asc">
-                {intl.formatMessage(messages.ascending)}
-              </option>
-              <option value="desc">
-                {intl.formatMessage(messages.descending)}
-              </option>
-            </select>
-          </label>
-        )}
+                  void router.replace(
+                    {
+                      pathname: router.pathname,
+                      query: {
+                        ...router.query,
+                        sort: sortOption.field,
+                        order: nextOrder,
+                      },
+                    },
+                    undefined,
+                    { shallow: true, scroll: false }
+                  );
+                }}
+              >
+                {intl.formatMessage(sortOption.message)}
+                <SortDirectionIcon className="ml-1.5 h-4 w-4" />
+              </Button>
+            );
+          })}
+          <CardTextVisibilityToggle
+            mediaType={['movie', 'tv', 'album', 'book']}
+          />
+        </div>
       </div>
       <ListView
         items={sortedTitles}
         preferredBookFormat={preferredBookFormat}
-        isEmpty={isSearchReady && isEmpty}
+        emptyMessage={intl.formatMessage(messages.noResultsFound)}
+        emptyClassName="mt-12"
+        isEmpty={isShowingEmptyState || (isSearchReady && isEmpty)}
         isLoading={
           !router.isReady ||
           (isSearchReady &&

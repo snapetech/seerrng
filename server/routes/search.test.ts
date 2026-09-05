@@ -201,6 +201,34 @@ describe('GET /search', () => {
     assert.match(res.body.message, /Language must be a string/);
   });
 
+  it('does not return ebook catalog results for an unavailable audiobook service', async () => {
+    getSettings().readarr = [{ serviceType: 'ebook' } as ReadarrSettings];
+    const bookSearch = mock.method(OpenLibraryAPI.prototype, 'searchBooks');
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get('/search').query({
+      query: 'microsoft',
+      type: 'book',
+      format: 'audiobook',
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body.results, []);
+    assert.strictEqual(res.body.totalResults, 0);
+    assert.strictEqual(bookSearch.mock.callCount(), 0);
+  });
+
+  it('rejects book formats on non-book searches', async () => {
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get('/search').query({
+      query: 'microsoft',
+      type: 'music',
+      format: 'ebook',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /only be used with book searches/);
+  });
+
   it('rejects blank keyword searches', async () => {
     const agent = await loginAs('friend@seerr.dev', 'test1234');
     const res = await agent.get('/search/keyword').query({ query: '   ' });

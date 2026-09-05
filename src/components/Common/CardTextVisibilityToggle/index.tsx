@@ -12,15 +12,20 @@ const messages = defineMessages('components.Common.CardTextVisibilityToggle', {
 });
 
 interface CardTextVisibilityToggleProps {
-  mediaType: keyof UserSettingsCardTextResponse;
+  mediaType:
+    | keyof UserSettingsCardTextResponse
+    | (keyof UserSettingsCardTextResponse)[];
 }
 
 const CardTextVisibilityToggle = ({
   mediaType,
 }: CardTextVisibilityToggleProps) => {
   const intl = useIntl();
-  const { visibility, toggleVisibility } = useCardTextVisibility();
-  const isAlwaysVisible = visibility[mediaType] === 'always';
+  const { visibility, setVisibility } = useCardTextVisibility();
+  const mediaTypes = Array.isArray(mediaType) ? mediaType : [mediaType];
+  const isAlwaysVisible = mediaTypes.every(
+    (currentMediaType) => visibility[currentMediaType] === 'always'
+  );
   const label = intl.formatMessage(
     isAlwaysVisible ? messages.hideText : messages.showText
   );
@@ -34,7 +39,13 @@ const CardTextVisibilityToggle = ({
         aria-label={label}
         onClick={(e) => {
           e.preventDefault();
-          void toggleVisibility(mediaType);
+          void (async () => {
+            const nextVisibility = isAlwaysVisible ? 'hover' : 'always';
+
+            for (const currentMediaType of mediaTypes) {
+              await setVisibility(currentMediaType, nextVisibility);
+            }
+          })();
         }}
       >
         {isAlwaysVisible ? (
