@@ -41,6 +41,7 @@ type ListViewProps = {
   isReachingEnd?: boolean;
   onScrollBottom: () => void;
   mutateParent?: () => void;
+  preferredBookFormat?: 'ebook' | 'audiobook';
 };
 
 const ListView = ({
@@ -51,6 +52,7 @@ const ListView = ({
   isReachingEnd,
   plexItems,
   mutateParent,
+  preferredBookFormat,
 }: ListViewProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
@@ -240,6 +242,7 @@ const ListView = ({
                 canRequestAdditionalFormat={canRequestMissingBookFormat(title)}
                 canExpand
                 showText={visibility.book === 'always'}
+                preferredBookFormat={preferredBookFormat}
               />
             );
             break;
@@ -255,6 +258,7 @@ const ListView = ({
       visibility.book,
       visibility.movie,
       visibility.tv,
+      preferredBookFormat,
     ]
   );
   const hasRenderableItems =

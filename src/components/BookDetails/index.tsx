@@ -100,6 +100,10 @@ const BookDetails = () => {
   const normalizedRouteBookId = bookId
     ? normalizeOpenLibraryWorkId(bookId)
     : undefined;
+  const preferredBookFormat =
+    getQueryParamString(router.query.format) === 'audiobook'
+      ? 'audiobook'
+      : 'ebook';
 
   const {
     data,
@@ -351,6 +355,7 @@ const BookDetails = () => {
       {showRequestModal && (
         <RequestModal
           bookId={openLibraryWorkId}
+          initialBookFormat={preferredBookFormat}
           editRequest={editRequest}
           show={showRequestModal}
           type="book"

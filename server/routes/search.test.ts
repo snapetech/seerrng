@@ -369,6 +369,18 @@ describe('GET /search', () => {
     assert.equal(book.isbn13, '9780000000002');
     assert.equal(book.mediaInfo.id, bookMedia.id);
     assert.equal(book.mediaInfo.status, MediaStatus.AVAILABLE);
+
+    const musicOnly = await agent
+      .get('/search')
+      .query({ query: 'global', type: 'music' });
+
+    assert.strictEqual(musicOnly.status, 200);
+    assert.deepStrictEqual(
+      musicOnly.body.results.map(
+        (result: { mediaType: string }) => result.mediaType
+      ),
+      ['album', 'artist']
+    );
   });
 
   it('returns completed provider results when another provider exceeds the deadline', async () => {

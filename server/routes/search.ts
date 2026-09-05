@@ -74,6 +74,7 @@ const searchTypes = [
   'album',
   'artist',
   'book',
+  'music',
 ] as const;
 type SearchType = (typeof searchTypes)[number];
 
@@ -162,7 +163,12 @@ searchRoutes.get('/', async (req, res, next) => {
   const musicEnabled = settings.lidarr.length > 0;
   const booksEnabled = settings.readarr.length > 0;
 
-  if ((typeFilter === 'album' || typeFilter === 'artist') && !musicEnabled) {
+  if (
+    (typeFilter === 'album' ||
+      typeFilter === 'artist' ||
+      typeFilter === 'music') &&
+    !musicEnabled
+  ) {
     return res.status(200).json({
       page,
       totalPages: 1,
@@ -208,7 +214,10 @@ searchRoutes.get('/', async (req, res, next) => {
         typeFilter === 'tv' ||
         typeFilter === 'person';
       const shouldSearchMusic =
-        !typeFilter || typeFilter === 'album' || typeFilter === 'artist';
+        !typeFilter ||
+        typeFilter === 'album' ||
+        typeFilter === 'artist' ||
+        typeFilter === 'music';
       const shouldSearchBooks = !typeFilter || typeFilter === 'book';
       const providerPromises: Promise<unknown>[] = [
         shouldSearchVideo
@@ -603,7 +612,11 @@ searchRoutes.get('/', async (req, res, next) => {
 
     const filteredResults = typeFilter
       ? capabilityResults.filter(
-          (result) => 'mediaType' in result && result.mediaType === typeFilter
+          (result) =>
+            'mediaType' in result &&
+            (typeFilter === 'music'
+              ? result.mediaType === 'album' || result.mediaType === 'artist'
+              : result.mediaType === typeFilter)
         )
       : capabilityResults;
 

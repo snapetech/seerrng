@@ -4,6 +4,11 @@ export const getSearchQuery = (query: string | string[] | undefined): string =>
 export const getDefaultSearchType = (pathname: string): string | undefined =>
   pathname === '/discover/books' ? 'book' : undefined;
 
+export const getDefaultSearchFormat = (
+  pathname: string
+): 'ebook' | undefined =>
+  pathname === '/discover/books' ? 'ebook' : undefined;
+
 export const shouldNavigateToSearch = (
   pathname: string,
   currentQuery: string,

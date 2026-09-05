@@ -20,6 +20,7 @@ export interface OpenLibrarySearchDoc {
   ratings_average?: number;
   ratings_count?: number;
   want_to_read_count?: number;
+  publisher?: string[];
 }
 
 interface OpenLibrarySearchResponse {
@@ -231,6 +232,7 @@ const sanitizeSearchDoc = (
       Number.isSafeInteger(value.want_to_read_count)
         ? value.want_to_read_count
         : undefined,
+    publisher: boundedStrings(value.publisher, 100, 512),
   };
 };
 

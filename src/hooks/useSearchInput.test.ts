@@ -7,6 +7,7 @@ import { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import useSearchInput from './useSearchInput';
 import {
+  getDefaultSearchFormat,
   getDefaultSearchType,
   getSearchQuery,
   shouldNavigateToSearch,
@@ -74,6 +75,13 @@ describe('getDefaultSearchType', () => {
   it('starts searches from book discovery with the book filter', () => {
     strictEqual(getDefaultSearchType('/discover/books'), 'book');
     strictEqual(getDefaultSearchType('/discover/movies'), undefined);
+  });
+});
+
+describe('getDefaultSearchFormat', () => {
+  it('starts searches from book discovery with the ebook format', () => {
+    strictEqual(getDefaultSearchFormat('/discover/books'), 'ebook');
+    strictEqual(getDefaultSearchFormat('/discover/movies'), undefined);
   });
 });
 
@@ -187,7 +195,7 @@ describe('useSearchInput routing', () => {
     deepStrictEqual(pushes[0], [
       {
         pathname: '/search',
-        query: { query: 'linux', type: 'book' },
+        query: { query: 'linux', type: 'book', format: 'ebook' },
       },
     ]);
   });

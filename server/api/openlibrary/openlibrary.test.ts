@@ -72,6 +72,7 @@ describe('OpenLibraryAPI response bounds', () => {
               { length: MAX_OPENLIBRARY_EDITION_ISBNS + 100 },
               (_, index) => String(index)
             ),
+            publisher: ['Example Press', 42, 'Second Publisher'],
           },
         ],
       }),
@@ -90,6 +91,10 @@ describe('OpenLibraryAPI response bounds', () => {
       response.docs[0].isbn?.length,
       MAX_OPENLIBRARY_EDITION_ISBNS
     );
+    assert.deepStrictEqual(response.docs[0].publisher, [
+      'Example Press',
+      'Second Publisher',
+    ]);
   });
 
   it('bounds work text and drops malformed nested values', async () => {

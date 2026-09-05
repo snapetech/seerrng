@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UrlObject } from 'url';
 import useDebouncedState from './useDebouncedState';
 import {
+  getDefaultSearchFormat,
   getDefaultSearchType,
   getSearchQuery,
   shouldNavigateToSearch,
@@ -84,12 +85,14 @@ const useSearchInput = (): SearchObject => {
       } else {
         setLastRoute(router.asPath);
         const defaultSearchType = getDefaultSearchType(router.pathname);
+        const defaultSearchFormat = getDefaultSearchFormat(router.pathname);
         void router
           .push({
             pathname: '/search',
             query: {
               query: debouncedValue,
               ...(defaultSearchType ? { type: defaultSearchType } : {}),
+              ...(defaultSearchFormat ? { format: defaultSearchFormat } : {}),
             },
           })
           .then(() => window.scrollTo(0, 0));
