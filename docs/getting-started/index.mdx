@@ -4,7 +4,11 @@ title: Getting Started
 import DocCardList from '@theme/DocCardList';
 
 :::info
-After running Seerr for the first time, configure it by visiting the web UI at `http://[address]:5055` and completing the setup steps.
+After running Seerr for the first time, configure it by visiting the web UI at
+the configured address and completing the setup steps. Direct HTTP installs
+keep session cookies HTTPS-only by default; use an HTTPS reverse proxy, or
+configure [built-in HTTPS for a direct LAN deployment](/using-seerr/advanced/built-in-tls),
+before signing in.
 :::
 
 <DocCardList />

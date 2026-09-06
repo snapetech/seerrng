@@ -28,6 +28,14 @@ All official Seerr images are cryptographically signed and include a verified [S
 To confirm that the container image you are using is authentic and unmodified, please refer to the [Verifying Signed Artifacts](/using-seerr/advanced/verifying-signed-artifacts#verifying-signed-images) guide.
 :::
 
+:::note Authentication transport
+The default container listener on port 5055 serves HTTP, but authenticated
+session cookies remain HTTPS-only. For direct LAN HTTPS without Caddy, Traefik,
+or another proxy, follow the [built-in HTTPS guide](/using-seerr/advanced/built-in-tls)
+and publish port 5056 as well. The explicit `SEERR_ALLOW_HTTP_AUTH=true`
+fallback is available for trusted LANs that cannot use TLS.
+:::
+
 ## Unix (Linux, macOS)
 :::warning
 Be sure to replace `/path/to/appdata/config` in the below examples with a valid host directory path. If this volume mount is not configured correctly, your Seerr settings/data will not be persisted when the container is recreated (e.g., when updating the image or rebooting your machine).
@@ -62,7 +70,7 @@ docker run -d \
   -p 5055:5055 \
   -v /path/to/appdata/config:/app/config \
   --restart unless-stopped \
-  --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1" \
+  --health-cmd "node /app/scripts/healthcheck.mjs" \
   --health-start-period 20s \
   --health-timeout 3s \
   --health-interval 15s \
@@ -117,7 +125,7 @@ services:
     volumes:
       - /path/to/appdata/config:/app/config
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      test: node /app/scripts/healthcheck.mjs
       start_period: 20s
       timeout: 3s
       interval: 15s
@@ -180,7 +188,7 @@ docker run -d `
   -p 5055:5055 `
   -v seerr-data:/app/config `
   --restart unless-stopped `
-  --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1" `
+  --health-cmd "node /app/scripts/healthcheck.mjs" `
   --health-start-period 20s `
   --health-timeout 3s `
   --health-interval 15s `
@@ -218,7 +226,7 @@ docker run -d ^
   -p 5055:5055 ^
   -v seerr-data:/app/config ^
   --restart unless-stopped ^
-  --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1" ^
+  --health-cmd "node /app/scripts/healthcheck.mjs" ^
   --health-start-period 20s ^
   --health-timeout 3s ^
   --health-interval 15s ^
@@ -261,7 +269,7 @@ services:
     volumes:
       - seerr-data:/app/config
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      test: node /app/scripts/healthcheck.mjs
       start_period: 20s
       timeout: 3s
       interval: 15s
@@ -294,5 +302,3 @@ Docker on Windows works differently than it does on Linux; it runs Docker inside
 
 Named volumes, like in the example commands above, are automatically mounted inside the VM. Therefore the warning on the setup about the `/app/config` folder being incorrectly mounted page should be ignored.
 :::
-
-

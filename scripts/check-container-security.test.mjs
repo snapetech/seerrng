@@ -57,10 +57,7 @@ for (const composeFile of composeFiles) {
       'the writable configuration volume is missing'
     );
     assert.equal(service.healthcheck.test[0], 'CMD-SHELL');
-    assert.match(
-      service.healthcheck.test[1],
-      /127\.0\.0\.1:5055\/api\/v1\/status\/ready/
-    );
+    assert.match(service.healthcheck.test[1], /\/app\/scripts\/healthcheck\.mjs/u);
   });
 }
 
@@ -125,7 +122,7 @@ test('the main deployment runs the pulled digest inside the container boundary',
     /starting SeerrNG so it can initialize the config/u
   );
   assert.match(deployScript, /docker rename/u);
-  assert.match(deployScript, /\/api\/v1\/status\/ready/u);
+  assert.match(deployScript, /\/app\/scripts\/healthcheck\.mjs/u);
   assert.match(verifyScript, /\$RUNNER_TEMP\/seerr-main-status\.json/u);
   assert.match(verifyScript, /process\.argv\[1\]/u);
   assert.equal(

@@ -591,7 +591,7 @@ jobs:
             --security-opt no-new-privileges:true \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1000,gid=1000,mode=1777 \
             --tmpfs /app/.next/cache:rw,noexec,nosuid,nodev,size=256m,uid=1000,gid=1000,mode=0700 \
-            --health-cmd "node -e \"fetch('http://127.0.0.1:' + process.env.PORT + '/api/v1/status/ready').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\"" \
+            --health-cmd "node /app/scripts/healthcheck.mjs" \
             --health-interval 10s \
             --health-timeout 5s \
             --health-retries 12 \

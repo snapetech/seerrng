@@ -34,7 +34,11 @@ import TabItem from '@theme/TabItem';
 </Tabs>
 
 :::info
-After installing Seerr, configure it by visiting the web UI at `http://[address]:5055` and completing the setup steps.
+After installing Seerr, configure it by visiting the web UI at
+`http://[address]:5055` and completing the setup steps. Direct HTTP login is
+not persistent by default; use [built-in HTTPS](/using-seerr/advanced/built-in-tls),
+an HTTPS reverse proxy, or explicitly enable `SEERR_ALLOW_HTTP_AUTH=true` for a
+trusted LAN.
 :::
 
 :::tip

@@ -48,6 +48,11 @@ Once installed, access Seerr at:
 http://<your-synology-ip>:5055
 ```
 
+Direct HTTP is suitable for viewing the interface but does not persist login
+sessions by default. Use [built-in HTTPS](/using-seerr/advanced/built-in-tls),
+an HTTPS reverse proxy, or explicitly enable `SEERR_ALLOW_HTTP_AUTH=true` for a
+trusted LAN before signing in.
+
 You can also click the **Open** button in Package Center or find Seerr in the DSM main menu.
 
 ## Configuration

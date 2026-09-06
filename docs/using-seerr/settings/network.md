@@ -71,15 +71,19 @@ If you run your own notification receiver on your LAN or Docker network (a self-
 
 Both settings are **disabled** by default.
 
-## Session cookies and HTTP
+## Session cookies, built-in HTTPS, and HTTP
 
-Plex sign-in creates a browser session cookie. SeerrNG now requires HTTPS for
-authenticated browser sessions: session cookies are always marked `Secure` and
-are not issued over direct HTTP.
+Plex, local, and other browser sign-ins use an `HttpOnly` session cookie. The
+default keeps that cookie HTTPS-only, so direct HTTP can display the interface
+but cannot persist a login. Configure an HTTPS reverse proxy or use SeerrNG's
+built-in local TLS for a direct LAN deployment.
 
-Before upgrading, place SeerrNG behind a working HTTPS reverse proxy that
-redirects HTTP to HTTPS. Direct HTTP deployments must migrate to HTTPS before
-users sign in again.
+SeerrNG also has an explicit `SEERR_ALLOW_HTTP_AUTH=true` fallback for a
+trusted, isolated LAN. It is disabled by default, shows a startup/UI warning,
+and allows anyone observing the LAN traffic to steal a session cookie. It is
+mutually exclusive with `SEERR_TLS_MODE`; SeerrNG refuses to start if both are
+enabled. See [Built-in HTTPS and HTTP authentication modes](/using-seerr/advanced/built-in-tls)
+for the complete configuration and trust procedure.
 
 ## API Request Timeout
 

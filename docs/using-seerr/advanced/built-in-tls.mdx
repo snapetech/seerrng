@@ -1,0 +1,213 @@
+---
+id: built-in-tls
+title: Built-in HTTPS and HTTP authentication modes
+sidebar_label: Built-in HTTPS
+description: Configure direct HTTPS, local certificates, or the explicit HTTP fallback.
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Built-in HTTPS and HTTP authentication modes
+
+SeerrNG can terminate HTTPS itself. This is useful for a direct LAN deployment
+where adding Caddy, Traefik, Nginx, or another reverse proxy would be
+unnecessary. It also provides an explicit HTTP fallback for trusted local
+installations that cannot use TLS.
+
+The default remains compatible with existing installations:
+
+| Mode | Listener | Browser session behavior | Use when |
+| --- | --- | --- | --- |
+| `disabled` | HTTP on `PORT` (5055 by default) | Session cookies are HTTPS-only; direct HTTP login does not persist | A reverse proxy terminates HTTPS, or the interface is being used without authentication |
+| `disabled` + `SEERR_ALLOW_HTTP_AUTH=true` | HTTP on `PORT` | Cookies follow the request transport, including non-Secure cookies on HTTP | A deliberately trusted LAN needs direct HTTP login temporarily |
+| `self-signed` | HTTP redirect on `PORT`; HTTPS on `SEERR_HTTPS_PORT` (5056 by default) | HTTPS-only cookies | A direct LAN deployment needs encryption without an external proxy |
+| `provided` | HTTP redirect on `PORT`; HTTPS on `SEERR_HTTPS_PORT` | HTTPS-only cookies | The operator already has a certificate and private key |
+
+`SEERR_ALLOW_HTTP_AUTH=true` and any enabled TLS mode are mutually exclusive.
+SeerrNG refuses to start if both are configured, so a deployment cannot
+silently choose an insecure session path while the operator expects TLS.
+
+## Recommended direct-LAN configuration
+
+Use the self-signed mode for a new direct installation. Set every hostname and
+IP address that users will enter in the browser in `SEERR_TLS_HOSTS`; the
+certificate is valid only for those subject alternative names.
+
+The following example supports both a DNS name and a LAN IP:
+
+<Tabs groupId="built-in-tls-install" queryString>
+<TabItem value="docker-cli" label="Docker CLI">
+
+```bash
+mkdir -p /path/to/appdata/config
+chown -R 1000:1000 /path/to/appdata/config
+
+docker run -d \
+  --name seerr \
+  --init \
+  -e PORT=5055 \
+  -e SEERR_TLS_MODE=self-signed \
+  -e SEERR_TLS_HOSTS=seerr.home.arpa,192.168.1.20,localhost \
+  -p 5055:5055 \
+  -p 5056:5056 \
+  -v /path/to/appdata/config:/app/config \
+  --restart unless-stopped \
+  ghcr.io/snapetech/seerrng:latest
+```
+
+Open `https://seerr.home.arpa:5056` or
+`https://192.168.1.20:5056`. Do not use the HTTP URL for sign-in; port 5055
+redirects to HTTPS.
+
+</TabItem>
+<TabItem value="docker-compose" label="Docker Compose">
+
+```yaml
+services:
+  seerr:
+    image: ghcr.io/snapetech/seerrng:latest
+    init: true
+    environment:
+      PORT: 5055
+      SEERR_TLS_MODE: self-signed
+      SEERR_TLS_HOSTS: seerr.home.arpa,192.168.1.20,localhost
+    ports:
+      - '5055:5055'
+      - '5056:5056'
+    volumes:
+      - /path/to/appdata/config:/app/config
+    restart: unless-stopped
+```
+
+</TabItem>
+<TabItem value="source" label="Build from source">
+
+```bash
+PORT=5055 \
+SEERR_TLS_MODE=self-signed \
+SEERR_TLS_HOSTS=seerr.home.arpa,192.168.1.20,localhost \
+pnpm start
+```
+
+</TabItem>
+</Tabs>
+
+The generated files are stored in `CONFIG_DIRECTORY/tls`:
+
+- `ca.crt`: the local CA certificate that trusted devices must install.
+- `ca.key`: the private key used to renew the local server certificate. Do not
+  share it.
+- `server.crt` and `server.key`: the HTTPS certificate and private key.
+- `metadata.json`: the generated host list and certificate metadata.
+
+The directory is created with restrictive permissions, and generated private
+keys are written with mode `0600`. The CA and server material persists across
+restarts, so sessions do not become invalid merely because SeerrNG restarted.
+
+## Trusting the generated certificate
+
+On startup SeerrNG logs the HTTPS port, the SHA-256 certificate fingerprint,
+and the path to `ca.crt`. During setup and login, the UI shows the same
+fingerprint and offers a download link at
+`/api/v1/status/tls/ca`. The endpoint returns only the public CA certificate;
+it never exposes `ca.key` or `server.key`.
+
+Verify the fingerprint through a trusted channel before installing the CA. Then
+install `ca.crt` in the trusted root store of every browser/device that will
+use SeerrNG. A browser warning is expected until the CA is trusted. Installing
+the CA on one device does not trust it on another.
+
+For a Docker container, the file can also be copied from the persistent volume:
+
+```bash
+docker cp seerr:/app/config/tls/ca.crt ./seerrng-local-ca.crt
+```
+
+The generated CA is private to this SeerrNG installation. It is not a
+publicly trusted certificate and should not be used as proof of identity on the
+public internet.
+
+## Using a provided certificate
+
+Set `SEERR_TLS_MODE=provided` and provide a matching PEM certificate and
+private-key file:
+
+```yaml
+environment:
+  SEERR_TLS_MODE: provided
+  SEERR_TLS_CERT_FILE: /run/secrets/seerr-fullchain.pem
+  SEERR_TLS_KEY_FILE: /run/secrets/seerr-private-key.pem
+  SEERR_HTTPS_PORT: 5056
+volumes:
+  - ./certs/seerr-fullchain.pem:/run/secrets/seerr-fullchain.pem:ro
+  - ./certs/seerr-private-key.pem:/run/secrets/seerr-private-key.pem:ro
+```
+
+The certificate must contain at least one DNS or IP subject alternative name,
+and the private key must match it. Put the complete served chain in
+`SEERR_TLS_CERT_FILE` when the issuing CA requires intermediates. An optional
+`SEERR_TLS_CA_FILE` can provide a CA bundle to the Node TLS context, but it
+does not replace serving the intermediate chain in the certificate file.
+
+The HTTP listener remains on `PORT` and sends a `308` redirect to HTTPS. The
+HTTPS listener defaults to 5056 and can be changed with
+`SEERR_HTTPS_PORT`; it must differ from `PORT`.
+
+## Explicit HTTP fallback
+
+If TLS is not possible on a trusted, isolated LAN, opt in explicitly:
+
+```yaml
+environment:
+  SEERR_TLS_MODE: disabled
+  SEERR_ALLOW_HTTP_AUTH: 'true'
+  PORT: 5055
+ports:
+  - '5055:5055'
+```
+
+This mode keeps `HttpOnly`, SameSite, CSRF, rate limiting, and the other
+authentication protections, but it permits the session cookie to be sent over
+HTTP. Anyone able to observe the LAN traffic can steal that cookie. The startup
+log and setup/login UI show a prominent warning.
+
+The setting is deliberately not inferred from a client IP address or a proxy
+header. If both `SEERR_ALLOW_HTTP_AUTH=true` and `SEERR_TLS_MODE=self-signed`
+or `provided` are set, startup fails. When the fallback is enabled, HTTPS
+requests still receive Secure cookies when SeerrNG can identify the HTTPS
+transport; configure **Enable Proxy Support** when an HTTPS reverse proxy
+terminates TLS.
+
+## Reverse proxies and health checks
+
+Use either the built-in HTTPS listener or a reverse proxy as the TLS
+terminator. For a reverse proxy, leave `SEERR_TLS_MODE=disabled` and proxy to
+the existing HTTP `PORT`; enable SeerrNG's **Enable Proxy Support** setting so
+the application can safely use the proxy's `X-Forwarded-Proto` value for
+Secure cookies and CSRF transport decisions. Do not enable the HTTP fallback
+just because the proxy talks HTTP to the backend.
+
+In built-in TLS mode, port 5055 is intentionally redirect-only. The official
+container health check automatically switches to the HTTPS listener and uses
+certificate verification disabled only for that local readiness probe. Custom
+health checks should make the same mode-aware choice rather than following the
+HTTP redirect with a browser-style client.
+
+If an HTTP request has a Host header that is not in `SEERR_TLS_HOSTS`, SeerrNG
+returns `421` instead of creating an open redirect. Add every browser-visible
+hostname and IP to the environment variable before starting the server.
+
+## Troubleshooting sign-in
+
+If Plex or local sign-in appears to succeed but the browser immediately returns
+to the login page:
+
+1. Use the HTTPS URL and HTTPS port shown in the startup log or UI.
+2. Trust the local CA when using `self-signed` mode.
+3. Confirm the browser is reaching the same hostname listed in
+   `SEERR_TLS_HOSTS`.
+4. If using a reverse proxy, enable **Enable Proxy Support** and forward
+   `X-Forwarded-Proto: https`.
+5. Use `SEERR_ALLOW_HTTP_AUTH=true` only when the LAN risk is understood and
+   built-in/reverse-proxy HTTPS is not available.

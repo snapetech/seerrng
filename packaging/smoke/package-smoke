@@ -423,8 +423,7 @@ install_container() {
   run docker run -d --name "$started_container" --platform "$platform" -e PORT="$DEFAULT_PORT" "$image:$registry_tag"
   for attempt in {1..30}; do
     if [[ "$(docker inspect --format '{{.State.Running}}' "$started_container" 2>/dev/null || true)" == true ]] &&
-       docker exec "$started_container" node -e \
-         "fetch('http://127.0.0.1:' + process.env.PORT + '/api/v1/status/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+       docker exec "$started_container" node /app/scripts/healthcheck.mjs; then
       endpoint_status="ready"
       break
     fi

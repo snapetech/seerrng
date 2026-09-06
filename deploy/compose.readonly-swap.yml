@@ -16,20 +16,21 @@ services:
     environment:
       TZ: ${TZ:-America/Regina}
       PORT: 5055
+      SEERR_HTTPS_PORT: ${SEERR_HTTPS_PORT:-5056}
+      SEERR_TLS_MODE: ${SEERR_TLS_MODE:-disabled}
+      SEERR_TLS_HOSTS: ${SEERR_TLS_HOSTS:-localhost,127.0.0.1,::1}
+      SEERR_ALLOW_HTTP_AUTH: ${SEERR_ALLOW_HTTP_AUTH:-false}
       CONFIG_DIRECTORY: /app/config
       SEERR_EXTERNAL_READ_ONLY: 'true'
       SEERR_ALLOW_PRODUCTION_EXTERNAL_READ_ONLY: 'true'
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - '${SEERRNG_PORT:-5055}:5055'
+      - '${SEERRNG_HTTPS_PORT:-5056}:5056'
     volumes:
       - ${SEERRNG_CONFIG_DIR:-./config}:/app/config
     healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'node -e "fetch(''http://127.0.0.1:5055/api/v1/status/ready'').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
-        ]
+      test: ['CMD-SHELL', 'node /app/scripts/healthcheck.mjs']
       interval: 10s
       timeout: 5s
       retries: 12
