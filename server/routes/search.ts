@@ -25,7 +25,10 @@ import logger from '@server/logger';
 import { mapOpenLibrarySearchDoc } from '@server/models/Book';
 import { mapSearchResults } from '@server/models/Search';
 import { trackBackgroundTask } from '@server/utils/backgroundTasks';
-import { settlePromisesWithin } from '@server/utils/concurrency';
+import {
+  mapWithConcurrency,
+  settlePromisesWithin,
+} from '@server/utils/concurrency';
 import { parsePositiveInt } from '@server/utils/pagination';
 import {
   parseBoundedString,
@@ -45,6 +48,7 @@ export const SEARCH_RATE_LIMIT = {
 export const MAX_SEARCH_RESULTS_PER_PROVIDER = 20;
 export const MAX_COMBINED_SEARCH_RESULTS = 100;
 export const SEARCH_PROVIDER_TIMEOUT_MS = 5_000;
+export const SEARCH_CREDIT_LOOKUP_CONCURRENCY = 4;
 const searchRateLimit = rateLimit({
   ...SEARCH_RATE_LIMIT,
   standardHeaders: true,
@@ -661,8 +665,10 @@ searchRoutes.get('/', async (req, res, next) => {
     const mappedResults = await mapSearchResults(results.results, media);
     const creditEnrichedResults =
       typeFilter === 'movie' || typeFilter === 'tv'
-        ? await Promise.all(
-            mappedResults.map(async (result) => {
+        ? await mapWithConcurrency(
+            mappedResults,
+            SEARCH_CREDIT_LOOKUP_CONCURRENCY,
+            async (result) => {
               if (result.mediaType !== typeFilter) {
                 return result;
               }
@@ -677,7 +683,7 @@ searchRoutes.get('/', async (req, res, next) => {
               } catch {
                 return result;
               }
-            })
+            }
           )
         : mappedResults;
 

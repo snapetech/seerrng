@@ -532,7 +532,7 @@ const RequestStatusCard = ({
   const { data: detail } = useSWR<RequestStatusDetailResponse>(
     `/api/v1/request/status/${item.request.id}`,
     {
-      refreshInterval: 5000,
+      refreshInterval: 15000,
       revalidateOnFocus: true,
     }
   );
@@ -919,7 +919,7 @@ const RequestStatus = () => {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState<RequestStatusSortField>('added');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('all');
   const [selectedUser, setSelectedUser] = useState<UserSelection | null>(null);
   const [expandedRequestId, setExpandedRequestId] = useState<number | null>(
     null
@@ -964,7 +964,7 @@ const RequestStatus = () => {
     setTimeFrame(
       rawTimeFrame && timeFrameValues.includes(rawTimeFrame as TimeFrame)
         ? (rawTimeFrame as TimeFrame)
-        : '7d'
+        : 'all'
     );
 
     const rawUserId = Array.isArray(router.query.userId)
@@ -1067,7 +1067,7 @@ const RequestStatus = () => {
     timeFrame,
   ]);
   const { data, error, mutate } = useSWR<RequestStatusResultsResponse>(query, {
-    refreshInterval: 5000,
+    refreshInterval: 15000,
     revalidateOnFocus: true,
   });
 
@@ -1094,7 +1094,7 @@ const RequestStatus = () => {
     ...(nextSortDirection !== 'desc'
       ? { sortDirection: nextSortDirection }
       : {}),
-    ...(nextTimeFrame !== '7d' ? { timeFrame: nextTimeFrame } : {}),
+    ...(nextTimeFrame !== 'all' ? { timeFrame: nextTimeFrame } : {}),
     ...(canViewOtherUsers && nextUser !== null
       ? { userId: nextUser === 'all' ? 'all' : String(nextUser) }
       : {}),

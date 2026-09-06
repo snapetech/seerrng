@@ -13,7 +13,10 @@ const createApp = (development = false) => {
       secret: '01234567890123456789012345678901',
       resave: false,
       saveUninitialized: false,
-      cookie: sessionTransportOptions.cookie,
+      cookie: {
+        ...sessionTransportOptions.cookie,
+        secure: true,
+      },
       proxy: sessionTransportOptions.proxy,
     })
   );
@@ -25,17 +28,14 @@ const createApp = (development = false) => {
 };
 
 describe('getSessionTransportOptions', () => {
-  it('uses automatic transport-aware security for session cookies', () => {
-    assert.equal(getSessionTransportOptions(false, true).cookie.secure, 'auto');
-    assert.equal(
-      getSessionTransportOptions(false, false).cookie.secure,
-      'auto'
-    );
+  it('requires HTTPS for session cookies', () => {
+    assert.equal(getSessionTransportOptions(false, true).cookie.secure, true);
+    assert.equal(getSessionTransportOptions(false, false).cookie.secure, true);
     assert.equal(getSessionTransportOptions(false, true).proxy, true);
   });
 
   it('keeps the remaining cookie protections in development and production', () => {
-    assert.equal(getSessionTransportOptions(true, true).cookie.secure, 'auto');
+    assert.equal(getSessionTransportOptions(true, true).cookie.secure, true);
     assert.equal(
       getSessionTransportOptions(true, true).cookie.sameSite,
       'strict'
@@ -52,12 +52,9 @@ describe('getSessionTransportOptions', () => {
     assert.equal(getSessionTransportOptions(true, true).proxy, false);
   });
 
-  it('matches the cookie security to the forwarded request transport', async () => {
+  it('does not issue a session cookie over HTTP', async () => {
     const directResponse = await request(createApp()).get('/');
-    assert.doesNotMatch(
-      directResponse.get('Set-Cookie')?.[0] ?? '',
-      /; Secure(?:;|$)/
-    );
+    assert.equal(directResponse.headers['set-cookie'], undefined);
 
     const response = await request(createApp())
       .get('/')

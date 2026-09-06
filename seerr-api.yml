@@ -8776,11 +8776,11 @@ paths:
             enum: [ebook, audiobook]
         - in: query
           name: timeFrame
-          description: Restrict results to requests created in the selected rolling time window.
+          description: Optionally restrict results to requests created in the selected rolling time window. Defaults to all requests.
           schema:
             type: string
             enum: [7d, 1m, 6m, all]
-            default: 7d
+            default: all
         - in: query
           name: sort
           description: Sort field. Metadata-backed fields are resolved from the configured metadata provider and fall back safely when unavailable.

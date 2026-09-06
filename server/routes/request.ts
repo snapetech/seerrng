@@ -2274,7 +2274,7 @@ requestRoutes.get<
           ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
           mediaType: mediaType === 'all' ? undefined : (mediaType as MediaType),
           bookFormat: parsedBookFormat.value,
-          since: getRequestStatusStartDate(parsedTimeFrame.value ?? '7d'),
+          since: getRequestStatusStartDate(parsedTimeFrame.value),
           filter: parsedFilter.value,
           sort,
           sortDirection,

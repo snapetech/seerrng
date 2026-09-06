@@ -190,9 +190,14 @@ const getResultDate = (result: SearchResult): number | undefined => {
           : result.mediaType === 'book'
             ? result.firstPublishYear
             : undefined;
-  const year = typeof value === 'number' ? value : Number(value?.slice(0, 4));
+  const year =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value.slice(0, 4))
+        : undefined;
 
-  return Number.isFinite(year) ? year : undefined;
+  return year !== undefined && Number.isFinite(year) ? year : undefined;
 };
 
 const getResultRating = (result: SearchResult): number | undefined =>
