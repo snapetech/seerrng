@@ -25,7 +25,10 @@ esac
 case "$(uname -m)" in
   x86_64|amd64) arch=x64 ;;
   arm64|aarch64) arch=arm64 ;;
-  *) arch="$(uname -m)" ;;
+  *)
+    echo "Unsupported release architecture: $(uname -m)" >&2
+    exit 1
+    ;;
 esac
 
 asset="seerrng-${tag}-${os}-${arch}"

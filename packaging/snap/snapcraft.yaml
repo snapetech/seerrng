@@ -2,6 +2,12 @@ name: seerrng
 base: core24
 version: '0.1.0'
 summary: Standalone media request and discovery service
+title: SeerrNG
+license: MIT
+contact: seerrng@proton.me
+website: https://github.com/snapetech/seerrng
+source-code: https://github.com/snapetech/seerrng
+issues: https://github.com/snapetech/seerrng/issues
 description: |
   SeerrNG can be configured to integrate with external Plex, Jellyfin, Emby,
   Sonarr, Radarr, Lidarr, and Readarr-compatible services. Those services are

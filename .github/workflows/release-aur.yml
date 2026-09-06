@@ -24,6 +24,7 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           [[ "$tag" =~ ^v[0-9][0-9A-Za-z._+-]{0,127}$ ]] || { echo "Invalid release tag: $tag" >&2; exit 2; }
+          [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "pkgver=${tag#v}" >> "$GITHUB_OUTPUT"
 
@@ -84,9 +85,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${AUR_SSH_KEY:-}" ]; then
-            echo "AUR_SSH_KEY is not configured; skipping."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "AUR_SSH_KEY is required for a release-channel publication; refusing to report a skipped upload as success." >&2
+            exit 1
           fi
           tmp_key="$(mktemp)"
           trap 'rm -f "$tmp_key"' EXIT
@@ -95,7 +95,6 @@ jobs:
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Push seerrng-bin
-        if: steps.aur-ssh.outputs.configured == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |

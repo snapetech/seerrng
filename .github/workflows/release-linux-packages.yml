@@ -26,6 +26,7 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           [[ "$tag" =~ ^v[0-9][0-9A-Za-z._+-]{0,127}$ ]] || { echo "Invalid release tag: $tag" >&2; exit 2; }
+          [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Install packaging tools
@@ -68,10 +69,13 @@ jobs:
           if [[ ! -f "seerrng_${version}_amd64.deb" ]]; then
             mv seerrng_*_amd64.deb "seerrng_${version}_amd64.deb"
           fi
+          sha256sum "seerrng_${version}_amd64.deb" > "seerrng_${version}_amd64.deb.sha256"
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: seerrng_${{ steps.version.outputs.version }}_amd64.deb
+          files: |
+            seerrng_${{ steps.version.outputs.version }}_amd64.deb
+            seerrng_${{ steps.version.outputs.version }}_amd64.deb.sha256
 
   rpm:
     if: github.ref == 'refs/heads/main'
@@ -89,6 +93,7 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           [[ "$tag" =~ ^v[0-9][0-9A-Za-z._+-]{0,127}$ ]] || { echo "Invalid release tag: $tag" >&2; exit 2; }
+          [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Install packaging tools
@@ -116,10 +121,15 @@ jobs:
           sed -i "s/^Version:.*/Version:        ${version}/" ~/rpmbuild/SPECS/seerrng.spec
           rpmbuild -bb ~/rpmbuild/SPECS/seerrng.spec
           find ~/rpmbuild/RPMS -name '*.rpm' -exec cp {} . \;
+          for package in ./*.rpm; do
+            sha256sum "${package#./}" > "${package#./}.sha256"
+          done
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: '*.rpm'
+          files: |
+            *.rpm
+            *.rpm.sha256
 
   appimage:
     if: github.ref == 'refs/heads/main'
@@ -136,6 +146,7 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           [[ "$tag" =~ ^v[0-9][0-9A-Za-z._+-]{0,127}$ ]] || { echo "Invalid release tag: $tag" >&2; exit 2; }
+          [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Download Linux asset
@@ -154,8 +165,10 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y libfuse2 wget
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          sudo apt-get install -y libfuse2 curl
+          appimagetool_url='https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage'
+          curl -fsSL --retry 5 "$appimagetool_url" -o appimagetool
+          echo 'a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0  appimagetool' | sha256sum -c -
           chmod +x appimagetool packaging/appimage/AppRun
           mkdir -p SeerrNG.AppDir/usr/bin SeerrNG.AppDir/usr/lib/seerrng SeerrNG.AppDir/usr/share/applications SeerrNG.AppDir/usr/share/icons/hicolor/256x256/apps
           tar -xzf "seerrng-${{ steps.version.outputs.tag }}-linux-x64.tar.gz" --strip-components=1 -C SeerrNG.AppDir/usr/lib/seerrng
@@ -166,7 +179,10 @@ jobs:
           cp public/android-chrome-512x512.png SeerrNG.AppDir/seerrng.png
           cp public/android-chrome-512x512.png SeerrNG.AppDir/usr/share/icons/hicolor/256x256/apps/seerrng.png
           ARCH=x86_64 ./appimagetool SeerrNG.AppDir "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage"
+          sha256sum "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage" > "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage.sha256"
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: SeerrNG-*.AppImage
+          files: |
+            SeerrNG-*.AppImage
+            SeerrNG-*.AppImage.sha256

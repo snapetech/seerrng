@@ -90,6 +90,30 @@ jobs:
           node-version: '22.22.2'
           package-manager-cache: false
 
+      - name: Verify runner platform
+        shell: bash
+        env:
+          EXPECTED_OS: ${{ matrix.os }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          actual_platform="$(node -p 'process.platform')"
+          actual_arch="$(node -p 'process.arch')"
+          case "$EXPECTED_OS" in
+            linux) expected_platform=linux ;;
+            macos) expected_platform=darwin ;;
+            windows) expected_platform=win32 ;;
+            *) echo "Unsupported release OS matrix value: $EXPECTED_OS" >&2; exit 1 ;;
+          esac
+          [[ "$actual_platform" == "$expected_platform" ]] || {
+            echo "Release runner platform mismatch: expected $expected_platform, got $actual_platform" >&2
+            exit 1
+          }
+          [[ "$actual_arch" == "$EXPECTED_ARCH" ]] || {
+            echo "Release runner architecture mismatch: expected $EXPECTED_ARCH, got $actual_arch" >&2
+            exit 1
+          }
+
       - name: Build archive
         shell: bash
         run: ./scripts/build-release-assets.sh "${TAG}" dist-release
@@ -114,6 +138,31 @@ jobs:
           pattern: seerrng-*
           path: dist-release
           merge-multiple: true
+
+      - name: Verify archive inventory and checksums
+        shell: bash
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "seerrng-${TAG}-linux-x64.tar.gz"
+            "seerrng-${TAG}-linux-arm64.tar.gz"
+            "seerrng-${TAG}-macos-arm64.tar.gz"
+            "seerrng-${TAG}-windows-x64.zip"
+          )
+          for archive in "${expected[@]}"; do
+            test -f "dist-release/$archive"
+            checksum="dist-release/$archive.sha256"
+            test -f "$checksum"
+            (
+              cd dist-release
+              sha256sum -c "$(basename "$checksum")"
+            )
+          done
+          mapfile -t archives < <(find dist-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -printf '%f\n' | sort)
+          printf '%s\n' "${archives[@]}"
+          diff -u <(printf '%s\n' "${expected[@]}" | sort) <(printf '%s\n' "${archives[@]}")
 
       - name: Upload to release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3

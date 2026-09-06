@@ -187,63 +187,51 @@ jobs:
         with:
           report_paths: 'report.xml'
 
-  build:
-    name: Build cache (${{ matrix.platform }})
-    timeout-minutes: 60
+  preflight-deploy:
+    name: Preflight deployment host
+    timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-    runs-on:
-      [self-hosted, seerrng, linux-build, linux-amd64, linux-arm64-cross]
+    runs-on: [self-hosted, seerrng, linux-build, kspls0]
+    permissions:
+      contents: read
+    env:
+      SEERRNG_CONFIG_DIR: ${{ vars.SEERRNG_CONFIG_DIR || '/mnt/datapool_lvm_media/seerrng-config' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          clean: true
-
-      - name: Commit timestamp
-        id: ts
-        run: echo "TIMESTAMP=$(git log -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
-
-      - name: Image channel
-        id: channel
-        run: echo "CHANNEL=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        if: matrix.platform == 'linux/arm64'
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
-        with:
-          driver-opts: network=host
-
-      - name: Warm cache (no push) — ${{ matrix.platform }}
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
-          push: false
-          build-args: |
-            COMMIT_TAG=${{ github.sha }}
-            BUILD_VERSION=${{ steps.channel.outputs.CHANNEL }}
-            SOURCE_DATE_EPOCH=${{ steps.ts.outputs.TIMESTAMP }}
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          provenance: false
+      - name: Verify deployment storage is mounted read-write
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$SEERRNG_CONFIG_DIR" || {
+            echo "Deployment config directory does not exist: $SEERRNG_CONFIG_DIR" >&2
+            exit 1
+          }
+          mount_options="$(findmnt -T "$SEERRNG_CONFIG_DIR" -no OPTIONS)"
+          echo "Deployment mount options: $mount_options"
+          if [[ ",$mount_options," == *,ro,* || ",$mount_options," == *,emergency_ro,* ]]; then
+            echo 'Deployment storage is read-only; refusing to publish an image that cannot be deployed.' >&2
+            findmnt -T "$SEERRNG_CONFIG_DIR" -o TARGET,SOURCE,FSTYPE,OPTIONS >&2 || true
+            df -hT "$SEERRNG_CONFIG_DIR" >&2 || true
+            sudo -n lvs -o lv_name,vg_name,lv_attr,lv_size,devices >&2 || true
+            exit 1
+          fi
+          [[ ",$mount_options," == *,rw,* ]] || {
+            echo "Deployment storage is not mounted read-write: $mount_options" >&2
+            exit 1
+          }
+          used_percent="$(df -P "$SEERRNG_CONFIG_DIR" | awk 'NR == 2 { gsub(/%/, "", $5); print $5 }')"
+          [[ "$used_percent" =~ ^[0-9]+$ && "$used_percent" -lt 99 ]] || {
+            echo "Deployment storage is ${used_percent:-unknown}% full; refusing release." >&2
+            df -hT "$SEERRNG_CONFIG_DIR" >&2 || true
+            exit 1
+          }
+          probe="$(mktemp "$SEERRNG_CONFIG_DIR/.seerrng-ci-write-test.XXXXXX")"
+          rm -f -- "$probe"
 
   publish:
     name: Publish multi-arch image
     timeout-minutes: 90
-    needs: build
+    if: github.ref == 'refs/heads/main'
+    needs: preflight-deploy
     runs-on:
       [self-hosted, seerrng, linux-build, linux-amd64, linux-arm64-cross]
     permissions:
@@ -361,7 +349,7 @@ jobs:
             --cache-from type=gha,scope=linux/amd64
             --cache-from type=gha,scope=linux/arm64
             --cache-to type=gha,mode=max
-            --provenance false
+            --provenance mode=max
           )
 
           while IFS= read -r tag; do
@@ -383,6 +371,14 @@ jobs:
             fi
             sleep $((attempt * 30))
           done
+
+      - name: Verify published architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_name="ghcr.io/${GITHUB_REPOSITORY}"
+          scripts/verify-container-manifest.sh --require-provenance "${image_name}:main" linux/amd64 linux/arm64
+          scripts/verify-container-manifest.sh --require-provenance "${image_name}:sha-${GITHUB_SHA::7}" linux/amd64 linux/arm64
 
   deploy-main:
     name: Deploy main to seerr.home

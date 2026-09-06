@@ -29,8 +29,63 @@ test('release package channels wait for the reusable release asset build', () =>
     'publish-release',
     'build-release-assets',
   ]);
-  assert.doesNotMatch(dispatchScript, /release-assets\.yml/u);
+  assert.equal(packageDispatch['timeout-minutes'], 120);
+  assert.match(dispatchScript, /--ref main/u);
   assert.match(dispatchScript, /release-linux-packages\.yml/u);
+  assert.match(dispatchScript, /gh run watch/u);
+  assert.match(
+    dispatchScript,
+    /Skipping stable package channels for pre-release/u
+  );
+});
+
+test('multi-architecture publishers perform the real build once and verify the index', () => {
+  const ci = readWorkflow('ci.yml');
+  const preview = readWorkflow('preview.yml');
+  const release = readWorkflow('release.yml');
+
+  assert.equal(ci.jobs.build, undefined);
+  assert.equal(ci.jobs.publish.if, "github.ref == 'refs/heads/main'");
+  assert.equal(ci.jobs.publish.needs, 'preflight-deploy');
+  assert.match(
+    ci.jobs['preflight-deploy'].steps.find(
+      (step) => step.name === 'Verify deployment storage is mounted read-write'
+    ).run,
+    /refusing to publish an image that cannot be deployed/u
+  );
+  assert.match(
+    ci.jobs.publish.steps.find(
+      (step) => step.name === 'Build & Push (multi-arch, single tag)'
+    ).run,
+    /--platform linux\/amd64,linux\/arm64[\s\S]*--provenance mode=max/u
+  );
+  assert.match(
+    ci.jobs.publish.steps.find(
+      (step) => step.name === 'Verify published architectures'
+    ).run,
+    /verify-container-manifest\.sh --require-provenance/u
+  );
+
+  assert.equal(preview.jobs.build, undefined);
+  assert.equal(preview.jobs.publish.needs, 'validate-main-tag');
+  assert.match(
+    preview.jobs.publish.steps.find(
+      (step) => step.name === 'Verify published architectures'
+    ).run,
+    /verify-container-manifest\.sh --require-provenance[\s\S]*linux\/amd64 linux\/arm64/u
+  );
+
+  assert.equal(release.jobs.build, undefined);
+  assert.deepEqual(release.jobs.publish.needs, [
+    'validate-main-tag',
+    'create-draft-release',
+  ]);
+  assert.match(
+    release.jobs.publish.steps.find(
+      (step) => step.name === 'Verify published architectures'
+    ).run,
+    /verify-container-manifest\.sh --require-provenance/u
+  );
 });
 
 test('release publishing admits only tag pushes and main-branch retries', () => {
@@ -102,7 +157,12 @@ test('release notes flow into the draft release and Discord announcement', () =>
     draft.steps.find((step) => step.name === 'Draft Release').env.RELEASE_BODY,
     '${{ needs.changelog.outputs.release_body }}'
   );
-  assert.deepEqual(discord.needs, ['changelog', 'publish', 'publish-release']);
+  assert.deepEqual(discord.needs, [
+    'changelog',
+    'publish',
+    'publish-release',
+    'dispatch-package-channels',
+  ]);
   assert.equal(
     discord.env.RELEASE_BODY,
     '${{ needs.changelog.outputs.release_body }}'

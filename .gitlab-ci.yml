@@ -13,6 +13,7 @@ stages:
 
 variables:
   DOCKER_BUILDKIT: '1'
+  # These names are retained only for the disabled historical jobs below.
   IMAGE_TAG: 'seerrng:${CI_COMMIT_REF_SLUG}'
   IMAGE_SHA_TAG: 'seerrng:${CI_COMMIT_SHORT_SHA}'
 
@@ -26,6 +27,7 @@ docker:seerrng:
   before_script:
     - docker info
     - docker buildx use default
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
@@ -35,9 +37,8 @@ docker:seerrng:
       --file Dockerfile
       --build-arg COMMIT_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
       --build-arg BUILD_VERSION="${CI_COMMIT_TAG:-$CI_COMMIT_REF_SLUG}"
-      --tag "$IMAGE_TAG"
-      --tag "$IMAGE_SHA_TAG"
-      --load
+      --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+      --push
       .
 
 .trivy_scan:
@@ -52,7 +53,7 @@ container_scanning:
   extends: .trivy_scan
   needs: ['docker:seerrng']
   variables:
-    CS_IMAGE: '$IMAGE_SHA_TAG'
+    CS_IMAGE: '$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA'
   rules:
     - if: '$CI_COMMIT_TAG'
 
@@ -116,15 +117,18 @@ deploy:seerr.home:
     name: seerr.home
     url: https://request.snape.tech
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # GitHub Actions is the sole live deployment authority. Keep this job
+    # definition as historical documentation, but never let GitLab replace
+    # the container on seerr.home.
+    - when: never
 
 .github_publication_defaults:
   variables:
     GITHUB_MIRROR_URL: 'git@github.com:snapetech/seerrng.git'
     GITHUB_REPOSITORY: 'snapetech/seerrng'
 
-# External publication is intentionally gated on all earlier GitLab stages.
-# Set GITHUB_MIRROR_SSH_KEY, GITHUB_TOKEN, and GHCR_TOKEN in GitLab CI as needed.
+# Historical external-publication definitions remain for reference only.
+# GitHub Actions is the sole publisher for tags, releases, and public registries.
 github:mirror:
   extends: .github_publication_defaults
   stage: promote
@@ -147,7 +151,8 @@ github:mirror:
         git push github-mirror "HEAD:$CI_COMMIT_REF_NAME"
       fi
   rules:
-    - if: '$CI_COMMIT_TAG'
+    # GitHub's release.yml owns tags, package dispatch, and registry promotion.
+    - when: never
 
 github:release:
   extends: .github_publication_defaults
@@ -170,7 +175,8 @@ github:release:
     - gh workflow run release-ppa.yml --repo "$GITHUB_REPOSITORY" -f tag="$CI_COMMIT_TAG"
     - gh workflow run release-copr.yml --repo "$GITHUB_REPOSITORY" -f tag="$CI_COMMIT_TAG"
   rules:
-    - if: '$CI_COMMIT_TAG'
+    # GitHub's release.yml owns tags, package dispatch, and registry promotion.
+    - when: never
 
 ghcr:promote:
   extends: .github_publication_defaults
@@ -191,7 +197,8 @@ ghcr:promote:
         skopeo copy "docker://${IMAGE_SHA_TAG}" "docker://$GHCR_REPOSITORY:$CI_COMMIT_TAG"
       fi
   rules:
-    - if: '$CI_COMMIT_TAG'
+    # GitHub's release.yml owns tags, package dispatch, and registry promotion.
+    - when: never
 
 dockerhub:promote:
   stage: promote
@@ -210,7 +217,8 @@ dockerhub:promote:
         skopeo copy "docker://${IMAGE_SHA_TAG}" "docker://docker.io/snapetech/seerrng:latest"
       fi
   rules:
-    - if: '$CI_COMMIT_TAG'
+    # GitHub's release.yml owns tags, package dispatch, and registry promotion.
+    - when: never
 
 .package_smoke_defaults:
   stage: post_release_validate
@@ -253,7 +261,10 @@ package-smoke:ubuntu:
   parallel:
     matrix:
       - SMOKE_PROJECT: seerrng
-        SMOKE_CHANNEL: [github-archive, deb]
+        SMOKE_CHANNEL: github-archive
+        SMOKE_ARCH: [amd64, arm64]
+      - SMOKE_PROJECT: seerrng
+        SMOKE_CHANNEL: deb
         SMOKE_ARCH: amd64
   before_script:
     - apt-get update
@@ -264,7 +275,6 @@ package-smoke:ubuntu:
 package-smoke:delayed:
   extends: .package_smoke_defaults
   image: ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982
-  allow_failure: true
   parallel:
     matrix:
       - SMOKE_PROJECT: seerrng
@@ -279,7 +289,6 @@ package-smoke:delayed:
 package-smoke:fedora:
   extends: .package_smoke_defaults
   image: fedora:43@sha256:762d73ba1c455232b0272c5d445a34f36c4b9f421cbc05ce8102552325b6a222
-  allow_failure: true
   parallel:
     matrix:
       - SMOKE_PROJECT: seerrng
@@ -293,7 +302,6 @@ package-smoke:fedora:
 package-smoke:arch:
   extends: .package_smoke_defaults
   image: archlinux:base-devel@sha256:212b1e518e94ee9c52be55e8a32da75fcf11e7b5610b80b49479e67880102406
-  allow_failure: true
   parallel:
     matrix:
       - SMOKE_PROJECT: seerrng

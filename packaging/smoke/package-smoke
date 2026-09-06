@@ -116,13 +116,22 @@ case "$channel" in
   *) die "unsupported channel: $channel" ;;
 esac
 case "$arch" in
-  amd64|x86_64|arm64|aarch64|armv7|arm/v7) ;;
+  amd64|x86_64|arm64|aarch64) ;;
   *) die "unsupported architecture: $arch" ;;
 esac
 [[ ${#version} -le 128 && "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._/+~-]*$ ]] || die "invalid version: $version"
 if [[ "$channel" == container-* ]]; then
   [[ ${#registry_tag} -le 128 && "$registry_tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]] || die "invalid container registry tag: $registry_tag"
 fi
+
+case "$channel" in
+  container-ghcr|container-dockerhub|helm|github-archive|github-binary)
+    ;;
+  deb|rpm|aur|aur-bin|copr|ppa|snap|flatpak)
+    [[ "$arch" == amd64 || "$arch" == x86_64 ]] ||
+      die "$channel is published only for amd64/x86_64"
+    ;;
+esac
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
@@ -131,6 +140,10 @@ source "$script_dir/project.env"
 # PROJECT is required from project.env.
 # shellcheck disable=SC2153
 [[ "$PROJECT" == "$project" ]] || die "manifest PROJECT=$PROJECT does not match requested project=$project"
+case " ${PUBLISHED_CHANNELS:-} " in
+  *" $channel "*) ;;
+  *) die "channel $channel is not published for project $project" ;;
+esac
 version_args=()
 if [[ -n "${VERSION_ARGS:-}" ]]; then
   read -r -a version_args <<<"$VERSION_ARGS"
@@ -244,6 +257,15 @@ wait_for_url() {
   return 1
 }
 
+verify_release_checksum() {
+  local asset="$1" checksum_asset="${1}.sha256"
+  wait_for_url "$(release_url "$checksum_asset")" 30 20 ||
+    die "release checksum unavailable: $checksum_asset"
+  mv "$tmp_dir/download" "$tmp_dir/$checksum_asset"
+  (cd "$tmp_dir" && sha256sum -c "$checksum_asset") ||
+    die "release checksum failed: $asset"
+}
+
 release_url() {
   local asset="$1"
   printf 'https://github.com/%s/releases/download/%s/%s' "$GITHUB_REPOSITORY" "$version" "$asset"
@@ -299,13 +321,32 @@ smoke_http_process() {
 install_github_archive() {
   local asset="$LINUX_ARCHIVE_ASSET"
   case "$(uname -s)" in
-    Darwin) asset="$MACOS_ARCHIVE_ASSET" ;;
-    MINGW*|MSYS*|CYGWIN*) asset="$WINDOWS_ARCHIVE_ASSET" ;;
+    Darwin)
+      if [[ "$arch" == arm64 || "$arch" == aarch64 ]]; then
+        asset="$MACOS_ARCHIVE_ASSET"
+      else
+        asset="${MACOS_X64_ARCHIVE_ASSET:-}"
+      fi
+      ;;
+    Linux)
+      if [[ "$arch" == arm64 || "$arch" == aarch64 ]]; then
+        asset="$LINUX_ARM64_ARCHIVE_ASSET"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      if [[ "$arch" == arm64 || "$arch" == aarch64 ]]; then
+        asset="${WINDOWS_ARM64_ARCHIVE_ASSET:-}"
+      else
+        asset="$WINDOWS_ARCHIVE_ASSET"
+      fi
+      ;;
   esac
+  [[ -n "$asset" ]] || die "no release archive is published for $arch on $(uname -s)"
   local url; url="$(release_url "$asset")"
   wait_for_url "$url" 30 20 || die "release archive unavailable: $url"
   local archive="$tmp_dir/$asset"
   mv "$tmp_dir/download" "$archive"
+  verify_release_checksum "$asset"
   mkdir -p "$tmp_dir/archive"
   case "$asset" in
     *.zip) run unzip -q "$archive" -d "$tmp_dir/archive" ;;
@@ -322,10 +363,14 @@ install_github_archive() {
 
 install_github_binary() {
   local asset="$LINUX_ARCHIVE_ASSET"
+  if [[ "$arch" == arm64 || "$arch" == aarch64 ]]; then
+    asset="$LINUX_ARM64_ARCHIVE_ASSET"
+  fi
   local url; url="$(release_url "$asset")"
   wait_for_url "$url" 30 20 || die "release binary unavailable: $url"
   local bin="$tmp_dir/$asset"
   mv "$tmp_dir/download" "$bin"
+  verify_release_checksum "$asset"
   chmod +x "$bin"
   smoke_binary "$bin"
   uninstall_status="removed downloaded binary"
@@ -338,6 +383,7 @@ install_deb() {
   wait_for_url "$(release_url "$asset")" 30 20 || die ".deb asset unavailable"
   local package_file="$tmp_dir/$asset"
   mv "$tmp_dir/download" "$package_file"
+  verify_release_checksum "$asset"
   run sudo apt-get update
   run sudo apt-get install -y "$package_file"
   cleanup_cmds+=("sudo apt-get remove -y '$PROJECT'")
@@ -352,6 +398,7 @@ install_rpm() {
   wait_for_url "$(release_url "$asset")" 30 20 || die ".rpm asset unavailable"
   local package_file="$tmp_dir/$asset"
   mv "$tmp_dir/download" "$package_file"
+  verify_release_checksum "$asset"
   run sudo dnf install -y "$package_file"
   cleanup_cmds+=("sudo dnf remove -y '$PROJECT'")
   smoke_binary "$BINARY"
@@ -364,7 +411,6 @@ install_container() {
   [[ "$channel" == "container-dockerhub" ]] && image="$DOCKERHUB_IMAGE"
   local platform="linux/amd64"
   [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] && platform="linux/arm64"
-  [[ "$arch" == "arm/v7" || "$arch" == "armv7" ]] && platform="linux/arm/v7"
   run docker pull --platform "$platform" "$image:$registry_tag"
   set +e
   local version_out
@@ -374,20 +420,29 @@ install_container() {
   echo "$version_out"
   [[ $version_rc -eq 0 ]] && assert_version_reported "$version_out"
   started_container="package-smoke-$project-${channel//[^a-zA-Z0-9]/-}-$$"
-  run docker run -d --name "$started_container" --platform "$platform" "$image:$registry_tag"
-  sleep 5
+  run docker run -d --name "$started_container" --platform "$platform" -e PORT="$DEFAULT_PORT" "$image:$registry_tag"
+  for attempt in {1..30}; do
+    if [[ "$(docker inspect --format '{{.State.Running}}' "$started_container" 2>/dev/null || true)" == true ]] &&
+       docker exec "$started_container" node -e \
+         "fetch('http://127.0.0.1:' + process.env.PORT + '/api/v1/status/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+      endpoint_status="ready"
+      break
+    fi
+    if [[ "$attempt" == 30 ]]; then
+      die "container did not become ready"
+    fi
+    sleep 2
+  done
   run docker logs "$started_container"
   resolved_version="$(docker image inspect "$image:$registry_tag" --format '{{index .RepoTags 0}} {{.Id}}')"
-  endpoint_status="container started"
   uninstall_status="container removed by cleanup"
 }
 
 install_aur() {
   have makepkg || die "makepkg is required for AUR smoke"
   have git || die "git is required for AUR smoke"
-  local pkg="$channel"
-  [[ "$channel" == "aur" ]] && pkg="${AUR_PACKAGES%% *}"
-  [[ "$channel" == "aur-bin" ]] && pkg="$(awk '{print $2}' <<<"$AUR_PACKAGES")"
+  local pkg="${AUR_PACKAGES%% *}"
+  [[ "$channel" == "aur-bin" ]] && pkg="${AUR_BIN_PACKAGE:-$pkg}"
   run git clone "https://aur.archlinux.org/$pkg.git" "$tmp_dir/aur"
   pushd "$tmp_dir/aur" >/dev/null
   run makepkg --syncdeps --noconfirm --install
@@ -470,7 +525,7 @@ install_helm() {
   have helm || die "helm is required for Helm smoke"
   have kubectl || die "kubectl is required for Helm smoke"
   local ns="package-smoke-$project"
-  run kubectl create namespace "$ns" --dry-run=client -o yaml
+  run bash -c "kubectl create namespace '$ns' --dry-run=client -o yaml | kubectl apply -f -"
   run helm upgrade --install "$project-smoke" "$repo_root/$HELM_CHART" --namespace "$ns" --set image.tag="$registry_tag" --wait --timeout 5m
   cleanup_cmds+=("helm uninstall '$project-smoke' --namespace '$ns'; kubectl delete namespace '$ns'")
   endpoint_status="helm rollout succeeded"

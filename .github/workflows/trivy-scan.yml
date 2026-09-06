@@ -24,8 +24,16 @@ jobs:
     if: >-
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
-    name: Scan latest container image
+    name: Scan latest container image (${{ matrix.platform }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            suffix: amd64
+          - platform: linux/arm64
+            suffix: arm64
 
     permissions:
       contents: read
@@ -57,15 +65,24 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
-          format: sarif
-          output: trivy.sarif
-          ignore-unfixed: true
+          version: 0.58.2
+
+      - name: Run Trivy image scan
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          trivy image \
+            --platform "$PLATFORM" \
+            --format sarif \
+            --output "trivy-${{ matrix.suffix }}.sarif" \
+            --ignore-unfixed \
+            "ghcr.io/${{ github.repository }}:latest"
 
       - name: Upload SARIF to code scanning
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
-          sarif_file: trivy.sarif
+          sarif_file: trivy-${{ matrix.suffix }}.sarif
+          category: trivy-${{ matrix.suffix }}

@@ -15,7 +15,7 @@ const createFixture = async () => {
   await fs.mkdir(executableDirectory);
   await fs.writeFile(
     path.join(executableDirectory, 'flatpak-builder'),
-    '#!/bin/sh\nexit "${FLATPAK_BUILDER_EXIT:-0}"\n',
+    '#!/bin/sh\nif [ -n "${FLATPAK_BUILDER_COUNT:-}" ]; then printf \'x\' >>"$FLATPAK_BUILDER_COUNT"; fi\nexit "${FLATPAK_BUILDER_EXIT:-0}"\n',
     { mode: 0o755 }
   );
   return { executableDirectory, root };
@@ -94,6 +94,29 @@ describe('package smoke evidence boundaries', () => {
     assert.notEqual(result.code, 0);
     assert.match(result.output, /unsupported architecture/);
     await assert.rejects(fs.stat(escaped), { code: 'ENOENT' });
+  });
+
+  it('rejects an architecture that the selected channel does not publish', async () => {
+    const fixture = await createFixture();
+    const artifacts = path.join(fixture.root, 'artifacts');
+
+    const result = await runSmoke(fixture, artifacts, ['--arch', 'arm64']);
+
+    assert.notEqual(result.code, 0);
+    assert.match(result.output, /flatpak is published only for amd64\/x86_64/);
+  });
+
+  it('executes each smoke command once', async () => {
+    const fixture = await createFixture();
+    const artifacts = path.join(fixture.root, 'artifacts');
+    const countFile = path.join(fixture.root, 'flatpak-builder.count');
+
+    const result = await runSmoke(fixture, artifacts, [], {
+      FLATPAK_BUILDER_COUNT: countFile,
+    });
+
+    assert.equal(result.code, 0, result.output);
+    assert.equal((await fs.readFile(countFile, 'utf8')).length, 1);
   });
 
   it('rejects a symlink in the artifact directory path', async () => {

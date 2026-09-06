@@ -255,7 +255,7 @@ if (!preview) {
     'preview.yml: arbitrary workflow-dispatch refs must not reach self-hosted preview builders'
   );
   const validationJob = preview.jobs?.['validate-main-tag'];
-  const buildJob = preview.jobs?.build;
+  const publishJob = preview.jobs?.publish;
   check(
     Boolean(validationJob),
     'preview.yml: trusted tag validation job is missing'
@@ -265,9 +265,9 @@ if (!preview) {
     'preview.yml: untrusted preview tag validation must run on a hosted runner'
   );
   check(
-    buildJob?.needs === 'validate-main-tag' ||
-      buildJob?.needs?.includes?.('validate-main-tag'),
-    'preview.yml: self-hosted preview builds must depend on tag validation'
+    publishJob?.needs === 'validate-main-tag' ||
+      publishJob?.needs?.includes?.('validate-main-tag'),
+    'preview.yml: self-hosted preview publishing must depend on tag validation'
   );
   const validationScript = validationJob?.steps?.find(
     (step) => step.name === 'Ensure bounded preview tag is on main'

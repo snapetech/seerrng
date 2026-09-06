@@ -26,6 +26,7 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           [[ "$tag" =~ ^v[0-9][0-9A-Za-z._+-]{0,127}$ ]] || { echo "Invalid release tag: $tag" >&2; exit 2; }
+          [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Install Flatpak tooling
@@ -59,7 +60,10 @@ jobs:
           set -euo pipefail
           flatpak-builder --force-clean --repo=flatpak-repo flatpak-build packaging/flatpak/io.github.snapetech.seerrng.yml
           flatpak build-bundle flatpak-repo "SeerrNG-${{ steps.version.outputs.version }}-x86_64.flatpak" io.github.snapetech.seerrng
+          sha256sum "SeerrNG-${{ steps.version.outputs.version }}-x86_64.flatpak" > "SeerrNG-${{ steps.version.outputs.version }}-x86_64.flatpak.sha256"
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: SeerrNG-*.flatpak
+          files: |
+            SeerrNG-*.flatpak
+            SeerrNG-*.flatpak.sha256

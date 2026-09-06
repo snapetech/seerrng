@@ -4,6 +4,10 @@ Release publishing is coordinated by `.github/workflows/release.yml` after a `v*
 tag is published. Package workflows are dispatch-only so a tag release does not
 double-publish.
 
+The authoritative artifact and architecture inventory is [the release support
+matrix](./release-matrix.md). Treat an artifact as supported only when it is
+listed there and its publication workflow verifies it after building.
+
 ## Release Notes
 
 Release notes have two layers:
@@ -83,6 +87,12 @@ The authoritative live deployment path is GitHub Actions:
    serve the new code. If a browser tab was already open, hard refresh so the
    client downloads the new Next.js bundle.
 
+Main CI now performs a deployment-host preflight before publishing `:main`: the
+config filesystem must be mounted read-write, below 99% usage, and must accept
+a temporary write. A read-only or full storage volume is a real deployment
+blocker and intentionally fails the run instead of producing a green build that
+cannot go live.
+
 Local changes, local commits, and a local dev server do not affect
 `request.snape.tech`. A fix is live only after it is committed, pushed to the
 deploying remote, built into the image, and deployed by the workflow above.
@@ -104,16 +114,15 @@ same OCI revision label.
 ## Test Builds and GitLab CI
 
 GitLab CI (`.gitlab-ci.yml`) is available for internal test builds. It builds
-and pushes images to the GitLab container registry using:
+and pushes only `$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA` to the GitLab
+container registry, then scans that exact pushed image. It does not publish a
+branch convenience tag, `latest`, or any public registry tag.
 
-- branch tag: `$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG`
-- commit tag: `$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA`
-- default-branch convenience tag: `$CI_REGISTRY_IMAGE:latest`
-
-The GitLab pipeline can also mirror the branch/tag to GitHub and promote the
-commit image to GHCR by SHA when the required credentials are configured. It
-does not replace the live `seerr.home` container. Use GitLab images for manual
-test deployments or isolated validation, not as an implicit live deployment.
+GitLab does not mirror branches, create releases, promote public registries, or
+replace the live `seerr.home` container. Those jobs remain in the file only as
+historical definitions and are explicitly disabled. Use the GitLab image for
+manual test deployments or isolated validation, not as an implicit public
+release.
 
 Do not run GitHub and GitLab as competing live deployers to the same host. If
 GitLab is ever promoted to deploy `request.snape.tech`, first remove or disable
