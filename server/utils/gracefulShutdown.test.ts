@@ -102,4 +102,23 @@ describe('drainForShutdown', () => {
     assert.strictEqual(result.taskErrors[0].name, 'broken task');
     assert.match(String(result.taskErrors[0].error), /task failed/);
   });
+
+  it('drains both listeners when HTTPS uses an HTTP redirect listener', async () => {
+    const httpServer = new FakeServer();
+    const httpsServer = new FakeServer();
+    const drain = drainForShutdown({
+      server: [httpServer, httpsServer],
+      tasks: [],
+      connectionTimeoutMs: 100,
+      taskTimeoutMs: 100,
+    });
+    httpServer.closeCallback?.();
+    httpsServer.closeCallback?.();
+
+    const result = await drain;
+
+    assert.equal(result.forcedConnections, false);
+    assert.equal(httpServer.idleConnectionsClosed, true);
+    assert.equal(httpsServer.idleConnectionsClosed, true);
+  });
 });

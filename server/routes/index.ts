@@ -35,6 +35,7 @@ import { getAppVersion, getCommitTag } from '@server/utils/appVersion';
 import restartFlag from '@server/utils/restartFlag';
 import { parsePositiveRouteId } from '@server/utils/routeId';
 import { getRateLimitKey } from '@server/utils/security';
+import { getTlsCaCertificate, getTlsRuntimeInfo } from '@server/utils/tls';
 import { isPerson } from '@server/utils/typeHelpers';
 import {
   parseBoundedString,
@@ -150,6 +151,27 @@ router.get('/status/ready', publicStatusRateLimit, async (_req, res) => {
   } catch {
     return res.status(503).send();
   }
+});
+
+router.get('/status/tls', publicStatusRateLimit, (_req, res) => {
+  return res
+    .set('Cache-Control', 'no-store')
+    .status(200)
+    .json(getTlsRuntimeInfo());
+});
+
+router.get('/status/tls/ca', publicStatusRateLimit, (_req, res) => {
+  const caCertificate = getTlsCaCertificate();
+  if (!caCertificate) {
+    return res.status(404).send();
+  }
+
+  res.set({
+    'Cache-Control': 'no-store',
+    'Content-Disposition': 'attachment; filename="seerrng-local-ca.crt"',
+    'Content-Type': 'application/x-pem-file',
+  });
+  return res.status(200).send(caCertificate);
 });
 
 router.get<Record<string, never>, StatusResponse>(

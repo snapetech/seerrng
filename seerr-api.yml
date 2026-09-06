@@ -3215,6 +3215,65 @@ paths:
           description: Application is ready to receive traffic
         '503':
           description: Application database is unavailable
+  /status/tls:
+    get:
+      summary: Get active browser transport configuration
+      description: Returns the configured HTTP/TLS mode, listener ports, allowed TLS hosts, and certificate fingerprint. This endpoint is public so the first-run UI can explain how browser authentication must be performed.
+      security: []
+      tags:
+        - public
+      responses:
+        '200':
+          description: Active transport configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - httpPort
+                  - httpsPort
+                  - httpAuthAllowed
+                  - redirectsHttpToHttps
+                  - hosts
+                  - caDownloadAvailable
+                properties:
+                  mode:
+                    type: string
+                    enum: [disabled, self-signed, provided]
+                  httpPort:
+                    type: integer
+                  httpsPort:
+                    type: integer
+                    nullable: true
+                  httpAuthAllowed:
+                    type: boolean
+                  redirectsHttpToHttps:
+                    type: boolean
+                  hosts:
+                    type: array
+                    items:
+                      type: string
+                  fingerprint:
+                    type: string
+                  caDownloadAvailable:
+                    type: boolean
+  /status/tls/ca:
+    get:
+      summary: Download the generated local CA certificate
+      description: Returns the public CA certificate for self-signed built-in TLS. The private CA and server keys are never exposed.
+      security: []
+      tags:
+        - public
+      responses:
+        '200':
+          description: PEM-encoded local CA certificate
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+        '404':
+          description: Built-in self-signed TLS is not active
   /status/appdata:
     get:
       summary: Get application data volume status

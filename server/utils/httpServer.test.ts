@@ -12,6 +12,7 @@ describe('parseListenPort', () => {
     assert.equal(parseListenPort(), 5055);
     assert.equal(parseListenPort(''), 5055);
     assert.equal(parseListenPort('8080'), 8080);
+    assert.equal(parseListenPort(undefined, 'SEERR_HTTPS_PORT', 5056), 5056);
   });
 
   it('rejects coercible, out-of-range, and malformed values', () => {
@@ -27,6 +28,10 @@ describe('parseListenPort', () => {
     ]) {
       assert.throws(() => parseListenPort(value), /between 1 and 65535/);
     }
+    assert.throws(
+      () => parseListenPort('abc', 'SEERR_HTTPS_PORT', 5056),
+      /SEERR_HTTPS_PORT.*between 1 and 65535/
+    );
   });
 });
 

@@ -11,18 +11,26 @@ export const HTTP_SERVER_LIMITS = {
   maxRequestsPerSocket: 1_000,
 } as const;
 
-export const parseListenPort = (value?: string): number => {
+export const parseListenPort = (
+  value?: string,
+  variableName = 'PORT',
+  defaultValue = DEFAULT_LISTEN_PORT
+): number => {
   if (value === undefined || value === '') {
-    return DEFAULT_LISTEN_PORT;
+    return defaultValue;
   }
 
   if (!/^\d{1,5}$/.test(value)) {
-    throw new Error('PORT must be a decimal integer between 1 and 65535.');
+    throw new Error(
+      `${variableName} must be a decimal integer between 1 and 65535.`
+    );
   }
 
   const port = Number(value);
   if (port < 1 || port > MAX_LISTEN_PORT) {
-    throw new Error('PORT must be a decimal integer between 1 and 65535.');
+    throw new Error(
+      `${variableName} must be a decimal integer between 1 and 65535.`
+    );
   }
 
   return port;

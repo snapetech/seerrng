@@ -84,3 +84,14 @@ export interface StatusResponse {
   commitsBehind?: number;
   restartRequired: boolean;
 }
+
+export interface TlsStatusResponse {
+  mode: 'disabled' | 'self-signed' | 'provided';
+  httpPort: number;
+  httpsPort: number | null;
+  httpAuthAllowed: boolean;
+  redirectsHttpToHttps: boolean;
+  hosts: string[];
+  fingerprint?: string;
+  caDownloadAvailable: boolean;
+}

@@ -9,6 +9,7 @@ import JellyfinLogin from '@app/components/Login/JellyfinLogin';
 import LocalLogin from '@app/components/Login/LocalLogin';
 import OidcLoginButton from '@app/components/Login/OidcLoginButton';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
+import TransportSecurityNotice from '@app/components/TransportSecurityNotice';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
@@ -215,6 +216,9 @@ const Login = ({ initialBackdrops }: { initialBackdrops?: string[] }) => {
             className="object-contain"
           />
         </div>
+      </div>
+      <div className="relative z-50 mt-4 sm:mx-auto sm:w-full sm:max-w-md">
+        <TransportSecurityNotice />
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div

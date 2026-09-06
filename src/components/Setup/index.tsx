@@ -7,6 +7,7 @@ import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
 import SetupSteps from '@app/components/Setup/SetupSteps';
+import TransportSecurityNotice from '@app/components/TransportSecurityNotice';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -272,6 +273,7 @@ const Setup = () => {
             />
           </ul>
         </nav>
+        <TransportSecurityNotice />
         <div className="mt-10 w-full rounded-md border border-gray-600 bg-gray-800/50 p-4 text-white">
           {currentStep === 1 && (
             <div className="flex flex-col items-center pb-6">

@@ -136,6 +136,28 @@ const drainServer = (
     }
   });
 
+const drainServers = async (
+  servers: ShutdownServer[],
+  timeoutMs: number
+): Promise<{ forced: boolean; error?: Error }> => {
+  const results = await Promise.all(
+    servers.map((server) => drainServer(server, timeoutMs))
+  );
+  const errors = results
+    .map((result) => result.error)
+    .filter((error): error is Error => !!error);
+
+  return {
+    forced: results.some((result) => result.forced),
+    error:
+      errors.length === 0
+        ? undefined
+        : errors.length === 1
+          ? errors[0]
+          : new AggregateError(errors, 'One or more servers failed to close.'),
+  };
+};
+
 const drainTasks = async (
   tasks: ShutdownTask[],
   timeoutMs: number
@@ -178,7 +200,7 @@ export const drainForShutdown = async ({
   connectionTimeoutMs = 10_000,
   taskTimeoutMs = 10_000,
 }: {
-  server: ShutdownServer;
+  server: ShutdownServer | ShutdownServer[];
   tasks: ShutdownTask[];
   connectionTimeoutMs?: number;
   taskTimeoutMs?: number;
@@ -187,7 +209,10 @@ export const drainForShutdown = async ({
   // background work. An active handler may enqueue work immediately before it
   // sends its response, so starting the task drain earlier can miss accepted
   // work entirely.
-  const serverResult = await drainServer(server, connectionTimeoutMs);
+  const serverResult = await drainServers(
+    Array.isArray(server) ? server : [server],
+    connectionTimeoutMs
+  );
   const taskResult = await drainTasks(tasks, taskTimeoutMs);
 
   return {
