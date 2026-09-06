@@ -44,7 +44,9 @@ import {
 } from '@server/lib/externalIds';
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { hydrateMediaRequestRelations } from '@server/lib/mediaRequestHydration';
+import { aliasDownloadId } from '@server/lib/mediaResponse';
 import { Permission } from '@server/lib/permissions';
+import requestDispatchManager from '@server/lib/requestDispatch';
 import {
   RequestStatusStage,
   getRequestStatusHistory,
@@ -141,6 +143,15 @@ const getRequestLogBody = (body: Partial<MediaRequestBody> | undefined) => ({
   authorId: body?.authorId,
   userId: body?.userId,
 });
+
+const protectRequestStatusDownloadId = <
+  T extends { downloadId: string | null },
+>(
+  status: T
+): T =>
+  status.downloadId
+    ? { ...status, downloadId: aliasDownloadId(status.downloadId) }
+    : status;
 
 const getBulkRequestLogBody = (
   body: Partial<BulkMediaRequestBody> | undefined
@@ -2199,7 +2210,7 @@ requestRoutes.get<
           ...page,
           results: page.results.map(({ request, status }) => ({
             request: filterEntityResponse(request, actor),
-            status,
+            status: protectRequestStatusDownloadId(status),
           })),
         });
       },
@@ -2262,8 +2273,11 @@ requestRoutes.get<
         const history = await getRequestStatusHistory(request.id);
         return res.status(200).json({
           request: filterEntityResponse(request, actor),
-          current,
-          history,
+          current: protectRequestStatusDownloadId(current),
+          history: {
+            ...history,
+            results: history.results.map(protectRequestStatusDownloadId),
+          },
         });
       },
       {
@@ -2762,78 +2776,109 @@ requestRoutes.delete('/:requestId', async (req, res, next) => {
 
 requestRoutes.post<{
   requestId: string;
-}>(
-  '/:requestId/retry',
-  isAuthenticated(Permission.MANAGE_REQUESTS),
-  async (req, res, next) => {
-    const requestRepository = getRepository(MediaRequest);
+}>('/:requestId/retry', isAuthenticated(), async (req, res, next) => {
+  const requestRepository = getRepository(MediaRequest);
 
-    try {
-      const requestId = parseRequestParamId(req.params.requestId);
-      if (!requestId) {
-        return next({ status: 404, message: 'Request not found.' });
-      }
-
-      return await runAuthorizedUserSecurityMutation(
-        req.user!.id,
-        req.user!.id,
-        Permission.MANAGE_REQUESTS,
-        (actor) =>
-          runWithRequestAdmission(
-            [getRequestMutationAdmissionKey(requestId)],
-            async () => {
-              const request = await requestRepository.findOneOrFail({
-                where: { id: requestId },
-                relations: { requestedBy: true, modifiedBy: true },
-              });
-
-              if (request.status !== MediaRequestStatus.FAILED) {
-                return next({
-                  status: 409,
-                  message: 'Only failed requests can be retried.',
-                });
-              }
-
-              // this also triggers updating the parent media's status & sending to *arr
-              validateExternalServiceConfiguration(
-                request.type,
-                request.serverId,
-                request.bookFormat,
-                request.is4k
-              );
-
-              request.status = MediaRequestStatus.APPROVED;
-              request.modifiedBy = actor;
-              await requestRepository.save(request);
-
-              return res
-                .status(200)
-                .json(filterEntityResponse(request, req.user));
-            }
-          ),
-        {
-          expectedCredentialVersion: getExpectedCredentialVersion(req),
-        }
-      );
-    } catch (e) {
-      if (e instanceof UserMutationActorUnauthorizedError) {
-        return next({
-          status: 403,
-          message: 'You do not have permission to retry this request.',
-        });
-      }
-      if (e instanceof ServiceConfigurationError) {
-        return next({ status: 400, message: e.message });
-      }
-
-      logger.error('Error processing request retry', {
-        label: 'Media Request',
-        message: e.message,
-      });
-      next({ status: 404, message: 'Request not found.' });
+  try {
+    const requestId = parseRequestParamId(req.params.requestId);
+    if (!requestId) {
+      return next({ status: 404, message: 'Request not found.' });
     }
+
+    const initialRequest = await requestRepository.findOne({
+      where: { id: requestId },
+      relations: { requestedBy: true },
+    });
+    if (!initialRequest) {
+      return next({ status: 404, message: 'Request not found.' });
+    }
+
+    return await runUserSecurityMutationWithActor(
+      req.user!.id,
+      initialRequest.requestedBy.id,
+      Permission.MANAGE_REQUESTS,
+      (actor) =>
+        runWithRequestAdmission(
+          [getRequestMutationAdmissionKey(requestId)],
+          async () => {
+            const request = await requestRepository.findOneOrFail({
+              where: { id: requestId },
+              relations: { requestedBy: true, modifiedBy: true },
+            });
+
+            if (
+              !actor.hasPermission(Permission.MANAGE_REQUESTS) &&
+              (request.requestedBy.id !== actor.id ||
+                !hasMediaRequestPermission(actor, request.type, request.is4k))
+            ) {
+              return next({
+                status: 403,
+                message: 'You do not have permission to retry this request.',
+              });
+            }
+
+            const currentStatus = await recordRequestStatus(request.id);
+            if (
+              !currentStatus ||
+              !currentStatus.retryable ||
+              (currentStatus.stage !== RequestStatusStage.FAILED &&
+                currentStatus.stage !== RequestStatusStage.UNAVAILABLE)
+            ) {
+              return next({
+                status: 409,
+                message: 'Only failed or unavailable requests can be retried.',
+              });
+            }
+
+            // this also triggers updating the parent media's status & sending to *arr
+            validateExternalServiceConfiguration(
+              request.type,
+              request.serverId,
+              request.bookFormat,
+              request.is4k
+            );
+
+            if (request.status === MediaRequestStatus.FAILED) {
+              request.status = MediaRequestStatus.APPROVED;
+            } else {
+              // An unavailable request is already APPROVED in the legacy
+              // request model. Refresh its event before re-enqueueing so the
+              // previous terminal observation cannot mask this attempt.
+              await recordRequestStatus(request.id, {
+                resetTerminalOverride: true,
+              });
+              await requestDispatchManager.enqueue(request.id);
+            }
+            request.modifiedBy = actor;
+            await requestRepository.save(request);
+
+            return res
+              .status(200)
+              .json(filterEntityResponse(request, req.user));
+          }
+        ),
+      {
+        expectedCredentialVersion: getExpectedCredentialVersion(req),
+      }
+    );
+  } catch (e) {
+    if (e instanceof UserMutationActorUnauthorizedError) {
+      return next({
+        status: 403,
+        message: 'You do not have permission to retry this request.',
+      });
+    }
+    if (e instanceof ServiceConfigurationError) {
+      return next({ status: 400, message: e.message });
+    }
+
+    logger.error('Error processing request retry', {
+      label: 'Media Request',
+      message: e.message,
+    });
+    next({ status: 404, message: 'Request not found.' });
   }
-);
+});
 
 requestRoutes.post<{
   requestId: string;

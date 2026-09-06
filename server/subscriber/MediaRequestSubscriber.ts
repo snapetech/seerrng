@@ -2308,6 +2308,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     );
     await recordRequestStatus((event.entity as MediaRequest).id, {
       manager: event.manager as EntityManager,
+      resetTerminalOverride:
+        event.databaseEntity?.status === MediaRequestStatus.FAILED &&
+        (event.entity as MediaRequest).status === MediaRequestStatus.APPROVED,
     });
   }
 
@@ -2340,9 +2343,24 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       event.manager as EntityManager,
       event.entity as MediaRequest
     );
-    await recordRequestCancellation(event.entity as MediaRequest, {
-      manager: event.manager as EntityManager,
-    });
+    const requestId = Number.isSafeInteger(event.entityId)
+      ? event.entityId
+      : (event.entity as MediaRequest).id;
+    if (!Number.isSafeInteger(requestId) || requestId <= 0) {
+      logger.warn('Unable to persist request cancellation without request ID', {
+        label: 'Request Status',
+      });
+      return;
+    }
+    await recordRequestCancellation(
+      {
+        ...(event.entity as MediaRequest),
+        id: requestId,
+      },
+      {
+        manager: event.manager as EntityManager,
+      }
+    );
   }
 
   public afterTransactionCommit(event: TransactionCommitEvent): void {

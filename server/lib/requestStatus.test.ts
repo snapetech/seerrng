@@ -4,8 +4,9 @@ import {
   MediaType,
 } from '@server/constants/media';
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import type { DownloadingItem } from './downloadtracker';
+import downloadTracker from './downloadtracker';
 import { RequestStatusStage, getRequestStatus } from './requestStatus';
 
 const date = new Date('2026-01-01T00:00:00.000Z');
@@ -88,6 +89,13 @@ test('request lifecycle uses authoritative queue progress and never invents a pe
   assert.equal(unknownProgress.stage, RequestStatusStage.DOWNLOADING);
   assert.equal(unknownProgress.percent, null);
 
+  const mixedProgress = getRequestStatus(request(), {
+    downloads: [download(), download({ size: 0, sizeLeft: 0 })],
+  });
+  assert.equal(mixedProgress.stage, RequestStatusStage.DOWNLOADING);
+  assert.equal(mixedProgress.percent, null);
+  assert.equal(mixedProgress.size, null);
+
   assert.equal(
     getRequestStatus(request(), {
       downloads: [download({ status: 'importPending' })],
@@ -100,6 +108,47 @@ test('request lifecycle uses authoritative queue progress and never invents a pe
     }).stage,
     RequestStatusStage.FAILED
   );
+});
+
+test('series progress only includes requested seasons', () => {
+  mock.method(downloadTracker, 'getSeriesProgress', () => [
+    download({
+      mediaType: MediaType.TV,
+      episode: {
+        seasonNumber: 1,
+        episodeNumber: 1,
+        absoluteEpisodeNumber: 1,
+        id: 1,
+      },
+    }),
+    download({
+      mediaType: MediaType.TV,
+      episode: {
+        seasonNumber: 2,
+        episodeNumber: 1,
+        absoluteEpisodeNumber: 9,
+        id: 2,
+      },
+    }),
+  ]);
+
+  const status = getRequestStatus(
+    request({
+      type: MediaType.TV,
+      media: {
+        ...request().media,
+        mediaType: MediaType.TV,
+        serviceId: 10,
+        externalServiceId: 20,
+      },
+      seasons: [{ seasonNumber: 1 }],
+    })
+  );
+
+  assert.equal(status.stage, RequestStatusStage.DOWNLOADING);
+  assert.equal(status.downloadCount, 1);
+  assert.equal(status.percent, 75);
+  mock.restoreAll();
 });
 
 test('movie, series, music, ebook, audiobook, and mixed book requests share the same projection', () => {

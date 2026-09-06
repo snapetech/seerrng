@@ -1593,6 +1593,200 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WatchProviders'
+    RequestStatusSnapshot:
+      type: object
+      properties:
+        stage:
+          type: string
+          enum:
+            [
+              requested,
+              approved,
+              searching,
+              downloading,
+              importing,
+              library,
+              available,
+              unavailable,
+              failed,
+              declined,
+              cancelled,
+            ]
+        attempt:
+          type: integer
+          minimum: 0
+        percent:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: Null when the connected download service does not provide complete usable size data.
+        size:
+          type: number
+          nullable: true
+        sizeLeft:
+          type: number
+          nullable: true
+        estimatedCompletionTime:
+          type: string
+          format: date-time
+          nullable: true
+        downloadCount:
+          type: integer
+          minimum: 0
+        downloadId:
+          type: string
+          nullable: true
+          description: Stable opaque identifier for grouping queue observations; it is not the downloader's raw queue ID.
+        service:
+          type: string
+          nullable: true
+        message:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
+        isTerminal:
+          type: boolean
+        needsAttention:
+          type: boolean
+        retryable:
+          type: boolean
+      required:
+        - stage
+        - attempt
+        - percent
+        - size
+        - sizeLeft
+        - estimatedCompletionTime
+        - downloadCount
+        - downloadId
+        - service
+        - message
+        - observedAt
+        - isTerminal
+        - needsAttention
+        - retryable
+    RequestStatusHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        requestId:
+          type: integer
+        requestedById:
+          type: integer
+        mediaId:
+          type: integer
+        mediaType:
+          type: string
+          enum: [movie, tv, music, book]
+        stage:
+          type: string
+        attempt:
+          type: integer
+        format:
+          type: string
+          nullable: true
+        service:
+          type: string
+          nullable: true
+        message:
+          type: string
+          nullable: true
+        percent:
+          type: number
+          nullable: true
+        size:
+          type: number
+          nullable: true
+        sizeLeft:
+          type: number
+          nullable: true
+        estimatedCompletionTime:
+          type: string
+          format: date-time
+          nullable: true
+        downloadCount:
+          type: integer
+        downloadId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - requestId
+        - requestedById
+        - mediaId
+        - mediaType
+        - stage
+        - attempt
+        - downloadCount
+        - createdAt
+    RequestStatusHistoryPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RequestStatusHistoryItem'
+        total:
+          type: integer
+      required:
+        - results
+        - total
+    RequestStatusPage:
+      type: object
+      properties:
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              request:
+                $ref: '#/components/schemas/MediaRequest'
+              status:
+                $ref: '#/components/schemas/RequestStatusSnapshot'
+            required:
+              - request
+              - status
+        counts:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+            attention:
+              type: integer
+            completed:
+              type: integer
+          required:
+            - total
+            - active
+            - attention
+            - completed
+      required:
+        - pageInfo
+        - results
+        - counts
+    RequestStatusDetail:
+      type: object
+      properties:
+        request:
+          $ref: '#/components/schemas/MediaRequest'
+        current:
+          $ref: '#/components/schemas/RequestStatusSnapshot'
+        history:
+          $ref: '#/components/schemas/RequestStatusHistoryPage'
+      required:
+        - request
+        - current
+        - history
     MediaRequest:
       type: object
       properties:
@@ -1889,6 +2083,9 @@ components:
         pages:
           type: number
           example: 10
+        pageSize:
+          type: number
+          example: 25
         results:
           type: number
           example: 100
@@ -8526,6 +8723,91 @@ paths:
                     type: number
                   completed:
                     type: number
+  /request/status:
+    get:
+      summary: Get request lifecycle status
+      description: |
+        Returns request lifecycle projections for the authenticated user. Users with `MANAGE_REQUESTS` or `REQUEST_VIEW` may inspect all users' requests and may narrow the result with `requestedBy`.
+
+        Status filters are evaluated against current media availability and the latest synchronized download queue snapshot, so a request is not hidden by a stale historical stage.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: take
+          schema:
+            type: number
+            minimum: 1
+            maximum: 100
+            default: 25
+        - in: query
+          name: skip
+          schema:
+            type: number
+            minimum: 0
+            default: 0
+        - in: query
+          name: requestedBy
+          schema:
+            type: number
+            minimum: 1
+        - in: query
+          name: mediaType
+          schema:
+            type: string
+            enum: [movie, tv, music, book, all]
+            default: all
+        - in: query
+          name: filter
+          schema:
+            type: string
+            enum:
+              [
+                all,
+                active,
+                attention,
+                requested,
+                approved,
+                searching,
+                downloading,
+                importing,
+                library,
+                available,
+                unavailable,
+                failed,
+                declined,
+                cancelled,
+                completed,
+              ]
+            default: all
+      responses:
+        '200':
+          description: Request lifecycle statuses returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestStatusPage'
+  /request/status/{requestId}:
+    get:
+      summary: Get request lifecycle history
+      description: Returns the current lifecycle projection and durable status history for a request the caller may view.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          description: Request ID
+          schema:
+            type: string
+            example: '1'
+      responses:
+        '200':
+          description: Request lifecycle status and history returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestStatusDetail'
   /request/{requestId}:
     get:
       summary: Get MediaRequest
@@ -8626,11 +8908,10 @@ paths:
           description: Succesfully removed request
   /request/{requestId}/retry:
     post:
-      summary: Retry failed request
+      summary: Retry failed or unavailable request
       description: |
-        Retries a request by resending requests to Sonarr or Radarr.
+        Retries a failed or unavailable request by returning it to the normal dispatch/search flow. The request owner may retry their own request when they still have permission to request that media; users with `MANAGE_REQUESTS` or `ADMIN` may retry any request.
 
-        Requires the `MANAGE_REQUESTS` permission or `ADMIN`.
       tags:
         - request
       parameters:

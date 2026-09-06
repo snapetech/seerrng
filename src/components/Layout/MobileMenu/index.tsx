@@ -136,11 +136,18 @@ const MobileMenu = ({
         activeRegExp: /^\/discover\/books$/,
       },
       {
+        href: '/requests/status',
+        content: intl.formatMessage(menuMessages.requeststatus),
+        svgIcon: <ClockIcon className="h-6 w-6" />,
+        svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
+        activeRegExp: /^\/requests\/status/,
+      },
+      {
         href: '/requests',
         content: intl.formatMessage(menuMessages.requests),
         svgIcon: <ClockIcon className="h-6 w-6" />,
         svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
-        activeRegExp: /^\/requests/,
+        activeRegExp: /^\/requests\/?$/,
       },
       {
         href: '/blocklist',

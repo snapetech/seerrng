@@ -12,7 +12,7 @@ import downloadTracker from '@server/lib/downloadtracker';
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import logger from '@server/logger';
 import type { EntityManager, Repository } from 'typeorm';
-import { In, Not } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 
 export enum RequestStatusStage {
   REQUESTED = 'requested',
@@ -162,6 +162,7 @@ type StatusEventLike = Pick<
 type StatusOptions = {
   downloads?: DownloadingItem[];
   dispatchPending?: boolean;
+  resetTerminalOverride?: boolean;
   latestEvent?: StatusEventLike;
 };
 
@@ -173,6 +174,17 @@ const ACTIVE_STAGES = [
   RequestStatusStage.IMPORTING,
   RequestStatusStage.LIBRARY,
 ];
+const REQUEST_STATUS_RECONCILIATION_BATCH_SIZE = 500;
+const REQUEST_STATUS_RECONCILIATION_STATUSES = [
+  MediaRequestStatus.PENDING,
+  MediaRequestStatus.APPROVED,
+  MediaRequestStatus.FAILED,
+  MediaRequestStatus.COMPLETED,
+  MediaRequestStatus.DECLINED,
+];
+// The synchronizer runs on a schedule and must not starve requests after the
+// first batch when a large installation has more than 500 active requests.
+let requestStatusReconciliationCursor = 0;
 
 const isAvailableStatus = (status: MediaStatus): boolean =>
   status === MediaStatus.AVAILABLE;
@@ -295,13 +307,22 @@ const calculateDownloadMetrics = (downloads: DownloadingItem[]) => {
       Number.isFinite(item.sizeLeft) &&
       item.sizeLeft >= 0
   );
-  const size = sizedDownloads.reduce((total, item) => total + item.size, 0);
+  // An aggregate percentage is only trustworthy when every queue item has a
+  // usable size. Showing the percentage for only the known subset would make
+  // a mixed queue look further along than it really is.
+  const hasCompleteSizeData =
+    downloads.length > 0 && sizedDownloads.length === downloads.length;
+  const size = hasCompleteSizeData
+    ? sizedDownloads.reduce((total, item) => total + item.size, 0)
+    : 0;
   const sizeLeft = sizedDownloads.reduce(
     (total, item) => total + Math.min(item.size, item.sizeLeft),
     0
   );
   const percent =
-    size > 0 ? Math.round(((size - sizeLeft) / size) * 1000) / 10 : null;
+    hasCompleteSizeData && size > 0
+      ? Math.round(((size - sizeLeft) / size) * 1000) / 10
+      : null;
   const completionTimes = downloads
     .map((item) => item.estimatedCompletionTime)
     .filter(
@@ -311,10 +332,10 @@ const calculateDownloadMetrics = (downloads: DownloadingItem[]) => {
 
   return {
     percent,
-    size: size > 0 ? size : null,
-    sizeLeft: size > 0 ? sizeLeft : null,
+    size: hasCompleteSizeData && size > 0 ? size : null,
+    sizeLeft: hasCompleteSizeData && size > 0 ? sizeLeft : null,
     estimatedCompletionTime:
-      completionTimes.length > 0
+      downloads.length > 0 && completionTimes.length === downloads.length
         ? new Date(Math.max(...completionTimes.map((value) => value.getTime())))
         : null,
     downloadId: downloads[0]?.downloadId ?? null,
@@ -344,24 +365,36 @@ const getDownloadItems = (request: RequestLike): DownloadingItem[] => {
         : [];
   }
   if (request.type === MediaType.TV) {
-    return request.is4k &&
+    const downloads =
+      request.is4k &&
       media.serviceId4k !== null &&
       media.serviceId4k !== undefined &&
       media.externalServiceId4k !== null &&
       media.externalServiceId4k !== undefined
-      ? downloadTracker.getSeriesProgress(
-          media.serviceId4k,
-          media.externalServiceId4k
-        )
-      : media.serviceId !== null &&
-          media.serviceId !== undefined &&
-          media.externalServiceId !== null &&
-          media.externalServiceId !== undefined
         ? downloadTracker.getSeriesProgress(
-            media.serviceId,
-            media.externalServiceId
+            media.serviceId4k,
+            media.externalServiceId4k
           )
-        : [];
+        : media.serviceId !== null &&
+            media.serviceId !== undefined &&
+            media.externalServiceId !== null &&
+            media.externalServiceId !== undefined
+          ? downloadTracker.getSeriesProgress(
+              media.serviceId,
+              media.externalServiceId
+            )
+          : [];
+    if (!request.seasons?.length) {
+      return downloads;
+    }
+
+    const requestedSeasons = new Set(
+      request.seasons.map((season) => season.seasonNumber)
+    );
+    return downloads.filter(
+      (download) =>
+        !download.episode || requestedSeasons.has(download.episode.seasonNumber)
+    );
   }
   if (request.type === MediaType.MUSIC) {
     return media.serviceId !== null &&
@@ -542,6 +575,7 @@ const getStageFromRequest = (
     !!options.latestEvent &&
     options.latestEvent.createdAt.getTime() >= request.updatedAt.getTime();
   if (
+    !options.resetTerminalOverride &&
     latestEventIsCurrent &&
     options.latestEvent?.stage === RequestStatusStage.UNAVAILABLE &&
     request.status === MediaRequestStatus.APPROVED &&
@@ -554,6 +588,7 @@ const getStageFromRequest = (
     };
   }
   if (
+    !options.resetTerminalOverride &&
     latestEventIsCurrent &&
     options.latestEvent?.stage === RequestStatusStage.FAILED &&
     request.status === MediaRequestStatus.APPROVED
@@ -644,7 +679,11 @@ export const getRequestStatus = (
       stage === RequestStatusStage.FAILED ||
       stage === RequestStatusStage.DECLINED ||
       stage === RequestStatusStage.CANCELLED,
-    retryable: request.status === MediaRequestStatus.FAILED,
+    retryable:
+      request.status === MediaRequestStatus.FAILED ||
+      (stage === RequestStatusStage.UNAVAILABLE &&
+        request.status === MediaRequestStatus.APPROVED &&
+        !hasRequestedServiceLink(request)),
   };
 };
 
@@ -702,6 +741,7 @@ const makeFingerprint = (status: RequestStatusSnapshot): string =>
     status.sizeLeft === null ? 'unknown' : Math.round(status.sizeLeft),
     status.service ?? 'unknown',
     status.downloadCount,
+    status.downloadId ?? 'unknown',
   ]
     .join(':')
     .slice(0, 255);
@@ -787,7 +827,10 @@ const loadRequest = async (
 
 export const recordRequestStatus = async (
   requestId: number,
-  options: { manager?: EntityManager } = {}
+  options: {
+    manager?: EntityManager;
+    resetTerminalOverride?: boolean;
+  } = {}
 ): Promise<RequestStatusSnapshot | undefined> => {
   const request = await loadRequest(requestId, options.manager);
   if (!request) {
@@ -798,6 +841,7 @@ export const recordRequestStatus = async (
   const status = getRequestStatus(request, {
     latestEvent: latestEvent ?? undefined,
     dispatchPending,
+    resetTerminalOverride: options.resetTerminalOverride,
   });
   await persistStatusEvent(
     request,
@@ -839,6 +883,18 @@ export const recordRequestCancellation = async (
   >,
   options: { manager?: EntityManager } = {}
 ): Promise<void> => {
+  if (!request.requestedBy || !request.media) {
+    logger.warn(
+      'Skipping request cancellation event without request relations',
+      {
+        label: 'Request Status',
+        requestId: request.id,
+        hasRequestedBy: !!request.requestedBy,
+        hasMedia: !!request.media,
+      }
+    );
+    return;
+  }
   const repository = getStatusEventRepository(options.manager);
   const existing = await getLatestStatusEvent(request.id, options.manager);
   const status: RequestStatusSnapshot = {
@@ -873,8 +929,17 @@ export const recordRequestCancellation = async (
         fingerprint,
       })
     );
-  } catch {
-    // A duplicate cancellation event is harmless.
+  } catch (error) {
+    // A duplicate cancellation event is harmless; surface other persistence
+    // failures so operators can repair the history table or migration.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.toLocaleLowerCase().includes('unique')) {
+      logger.warn('Unable to persist request cancellation event', {
+        label: 'Request Status',
+        requestId: request.id,
+        errorMessage: message,
+      });
+    }
   }
 };
 
@@ -899,10 +964,26 @@ const getLatestEvents = async (
   if (requestIds.length === 0) {
     return new Map();
   }
-  const events = await getStatusEventRepository().find({
-    where: { requestId: In(requestIds) },
-    order: { id: 'DESC' },
-  });
+  const events: MediaRequestStatusEvent[] = [];
+  for (
+    let index = 0;
+    index < requestIds.length;
+    index += REQUEST_STATUS_RECONCILIATION_BATCH_SIZE
+  ) {
+    events.push(
+      ...(await getStatusEventRepository().find({
+        where: {
+          requestId: In(
+            requestIds.slice(
+              index,
+              index + REQUEST_STATUS_RECONCILIATION_BATCH_SIZE
+            )
+          ),
+        },
+        order: { id: 'DESC' },
+      }))
+    );
+  }
   const latest = new Map<number, MediaRequestStatusEvent>();
   for (const event of events) {
     if (!latest.has(event.requestId)) {
@@ -918,10 +999,26 @@ const getPendingDispatchRequestIds = async (
   if (requestIds.length === 0) {
     return new Set();
   }
-  const records = await getRepository(RequestDispatchOutbox).find({
-    where: { requestId: In(requestIds) },
-    select: { requestId: true },
-  });
+  const records: RequestDispatchOutbox[] = [];
+  for (
+    let index = 0;
+    index < requestIds.length;
+    index += REQUEST_STATUS_RECONCILIATION_BATCH_SIZE
+  ) {
+    records.push(
+      ...(await getRepository(RequestDispatchOutbox).find({
+        where: {
+          requestId: In(
+            requestIds.slice(
+              index,
+              index + REQUEST_STATUS_RECONCILIATION_BATCH_SIZE
+            )
+          ),
+        },
+        select: { requestId: true },
+      }))
+    );
+  }
   return new Set(records.map((record) => record.requestId));
 };
 
@@ -963,31 +1060,79 @@ const stageMatchesFilter = (
   }
 };
 
-const getStatusFilterStages = (
-  filter: string | undefined
-): RequestStatusStage[] | undefined => {
-  if (!filter || filter === 'all') {
-    return undefined;
+const getRequestStatusCounts = async (options: {
+  ownerId?: number;
+  mediaType?: MediaType;
+}): Promise<RequestStatusPage['counts']> => {
+  const requestRepository = getRepository(MediaRequest);
+  const latestEventQuery = getStatusEventRepository()
+    .createQueryBuilder('statusEventCountFilter')
+    .select('statusEventCountFilter.requestId', 'requestId')
+    .addSelect('MAX(statusEventCountFilter.id)', 'eventId')
+    .groupBy('statusEventCountFilter.requestId');
+  const query = requestRepository
+    .createQueryBuilder('requestCount')
+    .leftJoin('requestCount.requestedBy', 'requestedByCount')
+    .leftJoin(
+      `(${latestEventQuery.getQuery()})`,
+      'latestStatusCountId',
+      'latestStatusCountId.requestId = requestCount.id'
+    )
+    .leftJoin(
+      MediaRequestStatusEvent,
+      'latestStatusCount',
+      'latestStatusCount.id = latestStatusCountId.eventId'
+    )
+    .select('requestCount.status', 'requestStatus')
+    .addSelect('latestStatusCount.stage', 'stage');
+  query.setParameters(latestEventQuery.getParameters());
+  if (options.ownerId) {
+    query.andWhere('requestedByCount.id = :countOwnerId', {
+      countOwnerId: options.ownerId,
+    });
   }
-  if (filter === 'active') {
-    return ACTIVE_STAGES;
+  if (options.mediaType) {
+    query.andWhere('requestCount.type = :countMediaType', {
+      countMediaType: options.mediaType,
+    });
   }
-  if (filter === 'attention') {
-    return [
-      RequestStatusStage.UNAVAILABLE,
-      RequestStatusStage.FAILED,
-      RequestStatusStage.DECLINED,
-      RequestStatusStage.CANCELLED,
-    ];
+
+  const rows = await query.getRawMany<{
+    requestStatus: string | number;
+    stage?: string | null;
+  }>();
+  let active = 0;
+  let attention = 0;
+  let completed = 0;
+  for (const row of rows) {
+    let stage = row.stage as RequestStatusStage | undefined;
+    if (!stage) {
+      const coarseStatus = Number(row.requestStatus);
+      stage =
+        coarseStatus === MediaRequestStatus.PENDING
+          ? RequestStatusStage.REQUESTED
+          : coarseStatus === MediaRequestStatus.DECLINED
+            ? RequestStatusStage.DECLINED
+            : coarseStatus === MediaRequestStatus.FAILED
+              ? RequestStatusStage.FAILED
+              : coarseStatus === MediaRequestStatus.COMPLETED
+                ? RequestStatusStage.AVAILABLE
+                : RequestStatusStage.APPROVED;
+    }
+    if (
+      stage === RequestStatusStage.UNAVAILABLE ||
+      stage === RequestStatusStage.FAILED ||
+      stage === RequestStatusStage.DECLINED ||
+      stage === RequestStatusStage.CANCELLED
+    ) {
+      attention += 1;
+    } else if (stage === RequestStatusStage.AVAILABLE) {
+      completed += 1;
+    } else {
+      active += 1;
+    }
   }
-  if (filter === 'completed' || filter === 'available') {
-    return [RequestStatusStage.AVAILABLE];
-  }
-  return Object.values(RequestStatusStage).includes(
-    filter as RequestStatusStage
-  )
-    ? [filter as RequestStatusStage]
-    : undefined;
+  return { total: rows.length, active, attention, completed };
 };
 
 export const getRequestStatusPage = async (options: {
@@ -998,28 +1143,14 @@ export const getRequestStatusPage = async (options: {
   filter?: string;
 }): Promise<RequestStatusPage> => {
   const requestRepository = getRepository(MediaRequest);
-  const latestEventQuery = getStatusEventRepository()
-    .createQueryBuilder('statusEventFilter')
-    .select('statusEventFilter.requestId', 'requestId')
-    .addSelect('MAX(statusEventFilter.id)', 'eventId')
-    .groupBy('statusEventFilter.requestId');
   const query = requestRepository
     .createQueryBuilder('request')
     .leftJoinAndSelect('request.media', 'media')
+    .leftJoinAndSelect('media.seasons', 'mediaSeasons')
+    .leftJoinAndSelect('media.identifiers', 'identifiers')
     .leftJoinAndSelect('request.requestedBy', 'requestedBy')
     .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
-    .leftJoinAndSelect('request.seasons', 'seasons')
-    .leftJoin(
-      `(${latestEventQuery.getQuery()})`,
-      'latestStatusId',
-      'latestStatusId.requestId = request.id'
-    )
-    .leftJoin(
-      MediaRequestStatusEvent,
-      'latestStatus',
-      'latestStatus.id = latestStatusId.eventId'
-    );
-  query.setParameters(latestEventQuery.getParameters());
+    .leftJoinAndSelect('request.seasons', 'seasons');
 
   if (options.ownerId) {
     query.andWhere('requestedBy.id = :ownerId', { ownerId: options.ownerId });
@@ -1030,133 +1161,115 @@ export const getRequestStatusPage = async (options: {
     });
   }
 
-  const statusStages = getStatusFilterStages(options.filter);
-  if (statusStages) {
-    query.andWhere(
-      '(latestStatus.stage IN (:...statusStages) OR (latestStatus.id IS NULL AND request.status IN (:...legacyStatuses)))',
-      {
-        statusStages,
-        legacyStatuses: [
-          MediaRequestStatus.PENDING,
-          MediaRequestStatus.APPROVED,
-          MediaRequestStatus.DECLINED,
-          MediaRequestStatus.FAILED,
-          MediaRequestStatus.COMPLETED,
-        ],
-      }
-    );
+  const pageSize = Math.min(Math.max(options.take, 1), 100);
+  const skip = Math.max(options.skip, 0);
+  const hasStatusFilter = !!options.filter && options.filter !== 'all';
+  let requests: MediaRequest[];
+  let requestCount: number;
+
+  if (hasStatusFilter) {
+    // The durable event is a cache of the last observation, not the source of
+    // truth for a live filter. Queue progress and media availability can move
+    // between reconciler runs, so evaluate every candidate before filtering;
+    // otherwise a request can disappear from (for example) Downloading until
+    // the next background poll.
+    requests = await query
+      .orderBy('request.updatedAt', 'DESC')
+      .addOrderBy('request.id', 'DESC')
+      .getMany();
+    requestCount = 0;
+  } else {
+    [requests, requestCount] = await query
+      .orderBy('request.updatedAt', 'DESC')
+      .addOrderBy('request.id', 'DESC')
+      .take(pageSize)
+      .skip(skip)
+      .getManyAndCount();
   }
 
-  const [requests, requestCount] = await query
-    .orderBy('request.updatedAt', 'DESC')
-    .addOrderBy('request.id', 'DESC')
-    .take(Math.min(Math.max(options.take, 1), 100))
-    .skip(Math.max(options.skip, 0))
-    .getManyAndCount();
   const requestIds = requests.map((request) => request.id);
   const [latestEvents, pendingRequestIds] = await Promise.all([
     getLatestEvents(requestIds),
     getPendingDispatchRequestIds(requestIds),
   ]);
-  const resultItems: RequestStatusPageItem[] = [];
-  for (const request of requests) {
-    const item = await mapRequestStatusItem(
-      request,
-      latestEvents.get(request.id),
-      pendingRequestIds.has(request.id),
-      true
+
+  if (hasStatusFilter) {
+    const matchingRequests = requests.filter((request) =>
+      stageMatchesFilter(
+        getRequestStatus(request, {
+          latestEvent: latestEvents.get(request.id),
+          dispatchPending: pendingRequestIds.has(request.id),
+        }).stage,
+        options.filter
+      )
     );
-    if (stageMatchesFilter(item.status.stage, options.filter)) {
-      resultItems.push(item);
-    }
+    requestCount = matchingRequests.length;
+    requests = matchingRequests.slice(skip, skip + pageSize);
   }
 
-  const activeCount = await requestRepository.count({
-    where: options.ownerId
-      ? {
-          requestedBy: { id: options.ownerId },
-          status: Not(
-            In([
-              MediaRequestStatus.DECLINED,
-              MediaRequestStatus.FAILED,
-              MediaRequestStatus.COMPLETED,
-            ])
-          ),
-        }
-      : {
-          status: Not(
-            In([
-              MediaRequestStatus.DECLINED,
-              MediaRequestStatus.FAILED,
-              MediaRequestStatus.COMPLETED,
-            ])
-          ),
-        },
-  });
-  const attentionCount = await requestRepository.count({
-    where: options.ownerId
-      ? {
-          requestedBy: { id: options.ownerId },
-          status: In([MediaRequestStatus.DECLINED, MediaRequestStatus.FAILED]),
-        }
-      : {
-          status: In([MediaRequestStatus.DECLINED, MediaRequestStatus.FAILED]),
-        },
-  });
-  const completedCount = await requestRepository.count({
-    where: options.ownerId
-      ? {
-          requestedBy: { id: options.ownerId },
-          status: MediaRequestStatus.COMPLETED,
-        }
-      : { status: MediaRequestStatus.COMPLETED },
+  const resultItems: RequestStatusPageItem[] = [];
+  for (const request of requests) {
+    resultItems.push(
+      await mapRequestStatusItem(
+        request,
+        latestEvents.get(request.id),
+        pendingRequestIds.has(request.id),
+        true
+      )
+    );
+  }
+
+  const counts = await getRequestStatusCounts({
+    ownerId: options.ownerId,
+    mediaType: options.mediaType,
   });
 
   return {
     pageInfo: {
-      pages: Math.ceil(requestCount / Math.min(Math.max(options.take, 1), 100)),
-      pageSize: Math.min(Math.max(options.take, 1), 100),
+      pages: Math.ceil(requestCount / pageSize),
+      pageSize,
       results: requestCount,
-      page:
-        Math.floor(
-          Math.max(options.skip, 0) / Math.min(Math.max(options.take, 1), 100)
-        ) + 1,
+      page: Math.floor(skip / pageSize) + 1,
     },
     results: resultItems,
-    counts: {
-      total: await requestRepository.count(
-        options.ownerId
-          ? { where: { requestedBy: { id: options.ownerId } } }
-          : undefined
-      ),
-      active: activeCount,
-      attention: attentionCount,
-      completed: completedCount,
-    },
+    counts,
   };
 };
 
 export const reconcileActiveRequests = async (limit = 500): Promise<void> => {
   const repository = getRepository(MediaRequest);
-  const requests = await repository.find({
+  const batchSize = Math.min(Math.max(limit, 1), 1_000);
+  let requests = await repository.find({
     where: {
-      status: In([
-        MediaRequestStatus.PENDING,
-        MediaRequestStatus.APPROVED,
-        MediaRequestStatus.FAILED,
-        MediaRequestStatus.COMPLETED,
-      ]),
+      id: MoreThan(requestStatusReconciliationCursor),
+      status: In(REQUEST_STATUS_RECONCILIATION_STATUSES),
     },
     relations: {
       media: true,
       seasons: true,
       requestedBy: true,
     },
-    order: { updatedAt: 'DESC', id: 'DESC' },
-    take: Math.min(Math.max(limit, 1), 1_000),
+    order: { id: 'ASC' },
+    take: batchSize,
   });
+  if (requests.length === 0 && requestStatusReconciliationCursor > 0) {
+    requestStatusReconciliationCursor = 0;
+    requests = await repository.find({
+      where: {
+        status: In(REQUEST_STATUS_RECONCILIATION_STATUSES),
+      },
+      relations: {
+        media: true,
+        seasons: true,
+        requestedBy: true,
+      },
+      order: { id: 'ASC' },
+      take: batchSize,
+    });
+  }
   for (const request of requests) {
     await recordRequestStatus(request.id);
+    requestStatusReconciliationCursor = request.id;
   }
 };
 

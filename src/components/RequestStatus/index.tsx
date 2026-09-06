@@ -117,6 +117,26 @@ const timelineStages: StatusStage[] = [
   'available',
 ];
 
+const statusFilterValues = [
+  'all',
+  'active',
+  'attention',
+  ...timelineStages,
+  'unavailable',
+  'failed',
+  'declined',
+  'cancelled',
+];
+const mediaTypeValues = ['all', 'movie', 'tv', 'music', 'book'];
+
+const getSafeQueryValue = (
+  value: string | string[] | undefined,
+  allowedValues: string[]
+): string => {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate && allowedValues.includes(candidate) ? candidate : 'all';
+};
+
 const stageMessageKeys: Record<StatusStage, keyof typeof messages> = {
   requested: 'requested',
   approved: 'approved',
@@ -275,7 +295,7 @@ const RequestStatusCard = ({
   isRetrying,
 }: RequestStatusCardProps) => {
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { hasPermission, user } = useUser();
   const [showHistory, setShowHistory] = useState(false);
   const activeStageRef = useRef<HTMLSpanElement>(null);
   const detailsUrl = getDetailsUrl(item);
@@ -290,7 +310,9 @@ const RequestStatusCard = ({
   );
   const current = detail?.current ?? item.status;
   const history = detail?.history.results ?? [];
-  const currentStage = current.stage as StatusStage;
+  const currentStage = statusFilterValues.includes(current.stage)
+    ? (current.stage as StatusStage)
+    : 'approved';
   const activeIndex = getLastTimelineIndex(currentStage, history);
   const poster = getPoster(details);
   const title = getTitle(details, item);
@@ -310,20 +332,33 @@ const RequestStatusCard = ({
     >
       <div className="flex flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Link
-            href={detailHref ?? '#'}
-            aria-label={title}
-            className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-gray-600 transition duration-200 hover:ring-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 motion-reduce:transition-none"
-          >
-            <CachedImage
-              src={poster.src}
-              type={poster.type}
-              alt=""
-              fill
-              sizes="64px"
-              className="object-cover"
-            />
-          </Link>
+          {detailHref ? (
+            <Link
+              href={detailHref}
+              aria-label={title}
+              className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-gray-600 transition duration-200 hover:ring-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 motion-reduce:transition-none"
+            >
+              <CachedImage
+                src={poster.src}
+                type={poster.type}
+                alt=""
+                fill
+                sizes="64px"
+                className="object-cover"
+              />
+            </Link>
+          ) : (
+            <div className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-gray-600">
+              <CachedImage
+                src={poster.src}
+                type={poster.type}
+                alt=""
+                fill
+                sizes="64px"
+                className="object-cover"
+              />
+            </div>
+          )}
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
               <span>{item.request.type}</span>
@@ -526,19 +561,21 @@ const RequestStatusCard = ({
               showHistory ? messages.hideHistory : messages.history
             )}
           </button>
-          {current.retryable && hasPermission(Permission.MANAGE_REQUESTS) && (
-            <Button
-              buttonType="warning"
-              buttonSize="sm"
-              disabled={isRetrying}
-              onClick={() => void onRetry(item.request.id)}
-            >
-              <ArrowPathIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-              {intl.formatMessage(
-                isRetrying ? messages.retrying : messages.retry
-              )}
-            </Button>
-          )}
+          {current.retryable &&
+            (hasPermission(Permission.MANAGE_REQUESTS) ||
+              item.request.requestedBy.id === user?.id) && (
+              <Button
+                buttonType="warning"
+                buttonSize="sm"
+                disabled={isRetrying}
+                onClick={() => void onRetry(item.request.id)}
+              >
+                <ArrowPathIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                {intl.formatMessage(
+                  isRetrying ? messages.retrying : messages.retry
+                )}
+              </Button>
+            )}
         </div>
 
         {showHistory && (
@@ -604,6 +641,14 @@ const RequestStatus = () => {
   const [retryingRequestId, setRetryingRequestId] = useState<number | null>(
     null
   );
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    setFilter(getSafeQueryValue(router.query.filter, statusFilterValues));
+    setMediaType(getSafeQueryValue(router.query.mediaType, mediaTypeValues));
+  }, [router.isReady, router.query.filter, router.query.mediaType]);
   const page = Math.max(Number(router.query.page) || 1, 1);
   const pageSize = 25;
   const query = useMemo(
