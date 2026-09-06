@@ -31,6 +31,7 @@ jq -e '.manifests | type == "array"' >/dev/null <<<"$raw_manifest" || {
 actual_platforms="$(jq -r '
   [.manifests[]
     | select(.platform.os? and .platform.architecture?)
+    | select(.platform.os != "unknown" and .platform.architecture != "unknown")
     | (.platform.os + "/" + .platform.architecture
       + (if .platform.variant? then "/" + .platform.variant else "" end))]
   | unique
