@@ -418,6 +418,10 @@ describe('GET /request/status', () => {
     );
 
     assert.strictEqual(detailResponse.status, 200);
+    assert.strictEqual(
+      detailResponse.body.request.media.id,
+      mediaRequest.media.id
+    );
     assert.strictEqual(detailResponse.body.current.stage, 'requested');
     assert.ok(detailResponse.body.history.total >= 1);
     assert.strictEqual(

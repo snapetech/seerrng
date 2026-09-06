@@ -2243,7 +2243,10 @@ requestRoutes.get<
     const request = await getRepository(MediaRequest).findOne({
       where: { id: requestId },
       relations: {
+        media: { identifiers: true, seasons: true },
+        modifiedBy: true,
         requestedBy: true,
+        seasons: true,
       },
     });
     if (!request) {
