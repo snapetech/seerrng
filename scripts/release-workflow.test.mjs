@@ -95,6 +95,18 @@ test('release asset uploaders preserve the draft until the final publish gate', 
   }
 });
 
+test('all container vulnerability scans use an available pinned Trivy release', () => {
+  for (const workflowName of ['ci.yml', 'trivy-scan.yml', 'release.yml']) {
+    const workflowText = fs.readFileSync(
+      path.join(workflowDirectory, workflowName),
+      'utf8'
+    );
+    assert.match(workflowText, /aquasecurity\/setup-trivy@/u);
+    assert.match(workflowText, /version: 0\.74\.0/u);
+    assert.doesNotMatch(workflowText, /version: 0\.58\.2/u);
+  }
+});
+
 test('multi-architecture publishers perform the real build once and verify the index', () => {
   const ci = readWorkflow('ci.yml');
   const preview = readWorkflow('preview.yml');
