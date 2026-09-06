@@ -69,6 +69,18 @@ const messages = defineMessages('components.RequestStatus', {
   declined: 'Declined',
   cancelled: 'Cancelled',
   mediaType: 'Media type',
+  mediaTypeValue: 'Media Type',
+  releaseDate: 'Release Date',
+  runtime: 'Runtime',
+  genres: 'Genres',
+  requestDate: 'Date',
+  requestTime: 'Time',
+  statusUpdated: 'Status Updated',
+  timeFrame: 'Time frame',
+  last7Days: 'Last 7 Days',
+  lastMonth: 'Last Month',
+  last6Months: 'Last 6 Months',
+  allTime: 'All Time',
   filter: 'Filter',
   statusFilter: 'Status',
   allMedia: 'All media',
@@ -95,13 +107,15 @@ const messages = defineMessages('components.RequestStatus', {
   progressUnavailable: 'Download service did not provide progress data.',
   progressFrom: '{percent}% complete',
   sizeProgress: '{complete} of {total}',
-  eta: 'Estimated completion {date}',
+  eta: 'ETA: {date}',
   history: 'History',
   hideHistory: 'Hide history',
   noHistory: 'No status history has been recorded yet.',
   requestedBy: 'Requested by {user}',
+  requestedByLabel: 'Requested by',
   requestedAt: 'Requested {date}',
   service: 'Service: {service}',
+  serviceLabel: 'Service',
   retry: 'Retry request',
   retrying: 'Retrying…',
   retryFailed: 'Unable to retry this request.',
@@ -132,6 +146,7 @@ type StatusStage =
 type RequestStatusItem = RequestStatusResultsResponse['results'][number];
 type MediaFilter = 'all' | 'movie' | 'tv' | 'music' | 'book' | 'audiobook';
 type UserSelection = number | 'all';
+type TimeFrame = '7d' | '1m' | '6m' | 'all';
 
 const timelineStages: StatusStage[] = [
   'requested',
@@ -163,6 +178,7 @@ const mediaTypeValues: MediaFilter[] = [
 ];
 
 const sortDirectionValues = ['asc', 'desc'] as const;
+const timeFrameValues: TimeFrame[] = ['7d', '1m', '6m', 'all'];
 
 const getSortOptions = (
   mediaFilter: MediaFilter
@@ -364,6 +380,103 @@ const getPoster = (
   return { src: getTmdbPosterImageUrl(details.posterPath), type: 'tmdb' };
 };
 
+const getMediaBadge = (item: RequestStatusItem): string => {
+  if (item.request.type === 'movie') return 'Movie';
+  if (item.request.type === 'tv') return 'Series';
+  if (item.request.type === 'music') return 'Album';
+  if (item.request.bookFormat === 'audiobook') return 'Audiobook';
+  if (item.request.bookFormat === 'both') return 'Book + Audiobook';
+  return 'Book';
+};
+
+const getMediaFormat = (item: RequestStatusItem): string => {
+  if (item.request.type === 'movie' || item.request.type === 'tv') {
+    return item.request.is4k ? '4K' : 'HD';
+  }
+  if (item.request.type === 'music') return 'Music';
+  if (item.request.bookFormat === 'audiobook') return 'Audiobook';
+  if (item.request.bookFormat === 'both') return 'Ebook + Audiobook';
+  return 'Ebook';
+};
+
+const getReleaseDate = (
+  details: MediaDetails | undefined,
+  item: RequestStatusItem
+): string | undefined => {
+  if (!details) return undefined;
+  if (item.request.type === 'movie') {
+    return (details as MovieDetails).releaseDate;
+  }
+  if (item.request.type === 'tv') {
+    return (details as TvDetails).firstAirDate;
+  }
+  if (item.request.type === 'music') {
+    return (details as MusicDetails).releaseDate;
+  }
+  const year = (details as BookDetails).firstPublishYear;
+  return year ? String(year) : undefined;
+};
+
+const getRuntime = (
+  details: MediaDetails | undefined,
+  item: RequestStatusItem
+): string => {
+  if (!details) return '—';
+  if (item.request.type === 'movie') {
+    const minutes = (details as MovieDetails).runtime;
+    return minutes ? `${minutes} minutes` : '—';
+  }
+  if (item.request.type === 'tv') {
+    const minutes = (details as TvDetails).episodeRunTime.find(
+      (runtime) => runtime > 0
+    );
+    return minutes ? `${minutes} minutes` : '—';
+  }
+  if (item.request.type === 'music') {
+    const milliseconds = (details as MusicDetails).tracks.reduce(
+      (total, track) => total + Math.max(track.length, 0),
+      0
+    );
+    return milliseconds > 0
+      ? `${Math.round(milliseconds / 60000)} minutes`
+      : '—';
+  }
+  return '—';
+};
+
+const getGenres = (
+  details: MediaDetails | undefined,
+  item: RequestStatusItem
+): string => {
+  if (!details) return '—';
+  if (item.request.type === 'movie') {
+    return (
+      (details as MovieDetails).genres
+        .slice(0, 3)
+        .map((genre) => genre.name)
+        .join(', ') || '—'
+    );
+  }
+  if (item.request.type === 'tv') {
+    return (
+      (details as TvDetails).genres
+        .slice(0, 3)
+        .map((genre) => genre.name)
+        .join(', ') || '—'
+    );
+  }
+  if (item.request.type === 'music') {
+    return (
+      (details as MusicDetails).tags?.releaseGroup
+        .slice(0, 3)
+        .map((tag) => tag.tag)
+        .filter(Boolean)
+        .join(', ') || '—'
+    );
+  }
+  return (details as BookDetails).subjects?.slice(0, 3).join(', ') || '—';
+};
+
 const formatBytes = (value: number | null): string => {
   if (value === null || !Number.isFinite(value) || value < 0) {
     return '—';
@@ -399,24 +512,27 @@ interface RequestStatusCardProps {
   item: RequestStatusItem;
   onRetry: (requestId: number) => Promise<void>;
   isRetrying: boolean;
+  isHistoryOpen: boolean;
+  onToggleHistory: (requestId: number) => void;
 }
 
 const RequestStatusCard = ({
   item,
   onRetry,
   isRetrying,
+  isHistoryOpen,
+  onToggleHistory,
 }: RequestStatusCardProps) => {
   const intl = useIntl();
   const { hasPermission, user } = useUser();
-  const [showHistory, setShowHistory] = useState(false);
-  const activeStageRef = useRef<HTMLSpanElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const detailsUrl = getDetailsUrl(item);
   const detailHref = getDetailHref(item);
   const { data: details } = useSWR<MediaDetails>(detailsUrl);
   const { data: detail } = useSWR<RequestStatusDetailResponse>(
     `/api/v1/request/status/${item.request.id}`,
     {
-      refreshInterval: 15000,
+      refreshInterval: 5000,
       revalidateOnFocus: true,
     }
   );
@@ -429,323 +545,363 @@ const RequestStatusCard = ({
   const poster = getPoster(details);
   const title = getTitle(details, item);
   const StageIcon = stageIcon[currentStage] ?? InformationCircleIcon;
-
-  useEffect(() => {
-    activeStageRef.current?.scrollIntoView({
-      block: 'nearest',
-      inline: 'center',
+  const releaseDate = getReleaseDate(details, item);
+  const releaseYear = releaseDate?.match(/\d{4}/)?.[0];
+  const displayTitle = releaseYear ? `${title} (${releaseYear})` : title;
+  const displayReleaseDate = releaseDate
+    ? /^\d{4}$/.test(releaseDate)
+      ? releaseDate
+      : intl.formatDate(new Date(releaseDate), {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+    : '—';
+  const terminalWithoutProgress =
+    current.isTerminal && currentStage !== 'available';
+  const chronologicalHistory = [...history].reverse();
+  const statusUpdatedSeconds = Math.floor(
+    (new Date(current.observedAt).getTime() - Date.now()) / 1000
+  );
+  const scrollTimeline = (direction: -1 | 1) => {
+    timelineRef.current?.scrollBy({
+      left: direction * 260,
+      behavior: 'smooth',
     });
-  }, [currentStage]);
+  };
 
   return (
     <article
-      className="overflow-hidden rounded-2xl border border-gray-700 bg-gray-800/95 shadow-lg shadow-gray-950/20"
+      className="overflow-hidden rounded-xl border border-gray-700 bg-gray-800/95 shadow-lg shadow-gray-950/20"
       data-testid={`request-status-${item.request.id}`}
     >
-      <div className="flex flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:items-start">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[80px_minmax(0,1fr)]">
+        <div>
           {detailHref ? (
             <Link
               href={detailHref}
-              aria-label={title}
-              className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-gray-600 transition duration-200 hover:ring-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 motion-reduce:transition-none"
+              aria-label={displayTitle}
+              className="relative block h-24 w-16 overflow-hidden rounded-lg ring-1 ring-gray-600 transition duration-200 hover:ring-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 motion-reduce:transition-none sm:h-[120px] sm:w-20"
             >
               <CachedImage
                 src={poster.src}
                 type={poster.type}
                 alt=""
                 fill
-                sizes="64px"
+                sizes="(min-width: 640px) 80px, 64px"
                 className="object-cover"
               />
             </Link>
           ) : (
-            <div className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-gray-600">
+            <div className="relative h-24 w-16 overflow-hidden rounded-lg ring-1 ring-gray-600 sm:h-[120px] sm:w-20">
               <CachedImage
                 src={poster.src}
                 type={poster.type}
                 alt=""
                 fill
-                sizes="64px"
+                sizes="(min-width: 640px) 80px, 64px"
                 className="object-cover"
               />
             </div>
           )}
-          <div className="min-w-0">
-            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
-              <span>{item.request.type}</span>
-              {item.request.is4k && <span>4K</span>}
-              {item.request.type === 'book' && item.request.bookFormat && (
-                <span>{item.request.bookFormat}</span>
-              )}
-            </div>
-            {detailHref ? (
-              <Link
-                href={detailHref}
-                className="block truncate text-xl font-semibold text-white hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              >
-                {title}
-              </Link>
-            ) : (
-              <h3 className="truncate text-xl font-semibold text-white">
-                {title}
-              </h3>
-            )}
-            {details && (isMusic(details) || isBook(details)) && (
-              <p className="truncate text-sm text-gray-300">
-                {isMusic(details) ? details.artist.name : details.author}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {intl.formatMessage(messages.requestedBy, {
-                user: item.request.requestedBy.displayName,
-              })}
-            </p>
-            <p className="text-xs text-gray-500">
-              <FormattedDate
-                value={new Date(item.request.createdAt)}
-                dateStyle="medium"
-                timeStyle="short"
-              />
-            </p>
-          </div>
         </div>
-
-        <div className="flex min-w-0 flex-col gap-2 lg:w-72 lg:items-end">
-          <span
-            className={`inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1 text-sm font-semibold lg:self-end ${stageTone[currentStage] ?? stageTone.cancelled}`}
-          >
-            <StageIcon className="h-4 w-4" aria-hidden="true" />
-            {getStageLabel(intl, currentStage)}
-          </span>
-          <p className="text-right text-xs text-gray-400">
-            <FormattedRelativeTime
-              value={Math.floor(
-                (new Date(current.observedAt).getTime() - Date.now()) / 1000
-              )}
-              numeric="auto"
-              updateIntervalInSeconds={30}
-            />
-          </p>
+        <div className="min-w-0">
+          {detailHref ? (
+            <Link
+              href={detailHref}
+              className="block truncate text-lg font-semibold text-white hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              {displayTitle}
+            </Link>
+          ) : (
+            <h3 className="truncate text-lg font-semibold text-white">
+              {displayTitle}
+            </h3>
+          )}
+          <div className="mt-1 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_max-content]">
+            <div className="min-w-0 text-xs leading-4 text-gray-400">
+              <span className="inline-flex min-h-4 items-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold uppercase leading-[1.3] tracking-wide text-indigo-50">
+                {getMediaBadge(item)}
+              </span>
+              <dl className="mt-0.5 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+                <dt className="font-medium text-gray-100">
+                  {intl.formatMessage(messages.mediaTypeValue)}:
+                </dt>
+                <dd className="m-0 truncate">{getMediaFormat(item)}</dd>
+                <dt className="font-medium text-gray-100">
+                  {intl.formatMessage(messages.releaseDate)}:
+                </dt>
+                <dd className="m-0 truncate">{displayReleaseDate}</dd>
+                <dt className="font-medium text-gray-100">
+                  {intl.formatMessage(messages.runtime)}:
+                </dt>
+                <dd className="m-0 truncate">{getRuntime(details, item)}</dd>
+                <dt className="font-medium text-gray-100">
+                  {intl.formatMessage(messages.genres)}:
+                </dt>
+                <dd className="m-0 truncate">{getGenres(details, item)}</dd>
+              </dl>
+            </div>
+            <dl className="grid w-full grid-cols-[max-content_max-content] gap-x-2 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4 text-gray-400 md:w-max md:border-l md:border-t-0 md:py-0 md:pl-3">
+              <dt className="font-medium text-gray-100">
+                {intl.formatMessage(messages.requestedByLabel)}
+              </dt>
+              <dd className="m-0 whitespace-nowrap">
+                {item.request.requestedBy.displayName}
+              </dd>
+              <dt className="font-medium text-gray-100">
+                {intl.formatMessage(messages.requestDate)}
+              </dt>
+              <dd className="m-0 whitespace-nowrap">
+                <FormattedDate
+                  value={new Date(item.request.createdAt)}
+                  year="numeric"
+                  month="short"
+                  day="numeric"
+                />
+              </dd>
+              <dt className="font-medium text-gray-100">
+                {intl.formatMessage(messages.requestTime)}
+              </dt>
+              <dd className="m-0 whitespace-nowrap">
+                <FormattedDate
+                  value={new Date(item.request.createdAt)}
+                  hour="numeric"
+                  minute="2-digit"
+                />
+              </dd>
+              <dt className="font-medium text-gray-100">
+                {intl.formatMessage(messages.serviceLabel)}
+              </dt>
+              <dd className="m-0 whitespace-nowrap">
+                {current.service ?? '—'}
+              </dd>
+              <dt className="font-medium text-gray-100">
+                {intl.formatMessage(messages.statusUpdated)}
+              </dt>
+              <dd className="m-0 whitespace-nowrap">
+                <FormattedRelativeTime
+                  value={statusUpdatedSeconds}
+                  numeric="auto"
+                  updateIntervalInSeconds={5}
+                />
+              </dd>
+            </dl>
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-gray-700/80 bg-gray-900/30 px-4 py-4 sm:px-5">
+      <div className="relative mx-3 rounded-lg border border-gray-700 bg-gray-900/40 py-2">
+        <button
+          type="button"
+          onClick={() => scrollTimeline(-1)}
+          className="absolute left-1 top-1/2 z-10 flex h-10 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-indigo-400/40 bg-gray-900/80 text-indigo-200 backdrop-blur-sm md:hidden"
+          aria-label="Scroll progress left"
+        >
+          <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
         <div
-          className="hide-scrollbar -mx-2 flex overflow-x-auto px-2 pb-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          tabIndex={0}
+          ref={timelineRef}
+          className="hide-scrollbar flex overflow-x-auto px-2"
           aria-label="Request lifecycle"
         >
-          {timelineStages.map((stage, index) => {
-            const isCurrent = currentStage === stage;
-            const isComplete =
-              index < activeIndex ||
-              (current.isTerminal && index <= activeIndex && !isCurrent);
-            const TimelineIcon = isComplete ? CheckIcon : stageIcon[stage];
-            return (
-              <div
-                key={stage}
-                className="flex min-w-[116px] flex-1 items-center last:min-w-[96px]"
-              >
-                <div className="flex min-w-0 flex-1 flex-col items-center text-center">
+          <div className="mx-auto flex min-w-[640px] flex-1 items-start justify-center">
+            {timelineStages.map((stage, index) => {
+              const isAvailable = currentStage === 'available';
+              const isCurrent =
+                !terminalWithoutProgress &&
+                !isAvailable &&
+                currentStage === stage;
+              const isComplete =
+                !terminalWithoutProgress &&
+                (isAvailable ? index <= activeIndex : index < activeIndex);
+              return (
+                <div
+                  key={stage}
+                  className="relative flex min-w-[80px] flex-1 flex-col items-center text-center"
+                >
+                  {index < timelineStages.length - 1 && (
+                    <span
+                      className={`absolute left-1/2 right-[-50%] top-[6px] h-0.5 ${
+                        !terminalWithoutProgress && index < activeIndex
+                          ? 'bg-emerald-400'
+                          : 'bg-gray-700'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span
-                    ref={
-                      isCurrent || (current.isTerminal && index === activeIndex)
-                        ? activeStageRef
-                        : undefined
-                    }
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors motion-reduce:transition-none ${
+                    className={`relative z-[1] flex h-[14px] w-[14px] items-center justify-center rounded-full border ${
                       isCurrent
-                        ? 'border-indigo-300 bg-indigo-500 text-white shadow-lg shadow-indigo-900/50'
+                        ? 'border-indigo-300 bg-indigo-500 text-white shadow-sm shadow-indigo-900/50'
                         : isComplete
-                          ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                          ? 'border-emerald-400 bg-emerald-500 text-white'
                           : 'border-gray-600 bg-gray-800 text-gray-500'
                     }`}
                   >
-                    <TimelineIcon className="h-4 w-4" aria-hidden="true" />
+                    {isComplete ? (
+                      <CheckIcon className="h-2.5 w-2.5" aria-hidden="true" />
+                    ) : isCurrent ? (
+                      <StageIcon className="h-2.5 w-2.5" aria-hidden="true" />
+                    ) : null}
                   </span>
                   <span
-                    className={`mt-2 whitespace-nowrap text-xs ${
+                    className={`mt-1 whitespace-nowrap text-[11px] leading-4 ${
                       isCurrent ? 'font-semibold text-white' : 'text-gray-400'
                     }`}
                   >
                     {getStageLabel(intl, stage)}
                   </span>
                 </div>
-                {index < timelineStages.length - 1 && (
-                  <span
-                    className={`h-0.5 w-6 flex-shrink-0 ${index < activeIndex ? 'bg-emerald-400/80' : 'bg-gray-700'}`}
-                    aria-hidden="true"
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm text-gray-200">{current.message}</p>
-            {current.service && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-gray-400">
-                <ServerIcon className="h-4 w-4" aria-hidden="true" />
-                {intl.formatMessage(messages.service, {
-                  service: current.service,
-                })}
-              </p>
-            )}
+              );
+            })}
           </div>
-          <div className="flex flex-shrink-0 items-center gap-2 text-xs text-gray-400">
-            {current.downloadCount > 0 && (
+        </div>
+        <button
+          type="button"
+          onClick={() => scrollTimeline(1)}
+          className="absolute right-1 top-1/2 z-10 flex h-10 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-indigo-400/40 bg-gray-900/80 text-indigo-200 backdrop-blur-sm md:hidden"
+          aria-label="Scroll progress right"
+        >
+          <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      {current.stage === 'downloading' && current.percent !== null && (
+        <div className="mx-3 mt-2 rounded-lg border border-gray-700 bg-gray-900/40 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-indigo-200">
+            <span className="inline-flex items-center gap-2">
               <span>
-                {current.downloadCount}{' '}
-                {current.downloadCount === 1 ? 'download' : 'downloads'}
+                {intl.formatMessage(messages.progressFrom, {
+                  percent: current.percent.toFixed(1).replace(/\.0$/, ''),
+                })}
               </span>
-            )}
-            {current.attempt > 0 && <span>Attempt {current.attempt}</span>}
-          </div>
-        </div>
-
-        {(current.stage === 'downloading' || current.stage === 'importing') && (
-          <div className="mt-4 rounded-xl border border-gray-700 bg-gray-950/40 p-3">
-            {current.percent !== null ? (
-              <>
-                <div className="mb-2 flex items-center justify-between text-xs text-gray-300">
-                  <span>
-                    {intl.formatMessage(messages.progressFrom, {
-                      percent: current.percent.toFixed(1).replace(/\.0$/, ''),
-                    })}
+              {current.size !== null && current.sizeLeft !== null && (
+                <>
+                  <span className="text-gray-500" aria-hidden="true">
+                    |
                   </span>
-                  {current.estimatedCompletionTime && (
-                    <span>
-                      {intl.formatMessage(messages.eta, {
-                        date: (
-                          <FormattedDate
-                            value={new Date(current.estimatedCompletionTime)}
-                            dateStyle="short"
-                            timeStyle="short"
-                          />
-                        ),
-                      })}
-                    </span>
-                  )}
-                </div>
-                <div
-                  className="h-2 overflow-hidden rounded-full bg-gray-700"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={current.percent}
-                  aria-valuetext={`${current.percent}%`}
-                >
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-[width] duration-500 motion-reduce:transition-none"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, current.percent))}%`,
-                    }}
-                  />
-                </div>
-                {current.size !== null && current.sizeLeft !== null && (
-                  <p className="mt-2 text-xs text-gray-400">
+                  <span>
                     {intl.formatMessage(messages.sizeProgress, {
                       complete: formatBytes(current.size - current.sizeLeft),
                       total: formatBytes(current.size),
                     })}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="flex items-center gap-2 text-xs text-gray-400">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-sm font-semibold text-gray-200">
-                  ?
-                </span>
-                {intl.formatMessage(messages.progressUnavailable)}
-              </p>
+                  </span>
+                </>
+              )}
+            </span>
+            {current.estimatedCompletionTime && (
+              <span>
+                {intl.formatMessage(messages.eta, {
+                  date: (
+                    <FormattedDate
+                      value={new Date(current.estimatedCompletionTime)}
+                      dateStyle="short"
+                      timeStyle="short"
+                    />
+                  ),
+                })}
+              </span>
             )}
           </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-300 transition hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            aria-expanded={showHistory}
-            onClick={() => setShowHistory((visible) => !visible)}
+          <div
+            className="h-2 overflow-hidden rounded-full bg-gray-700"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={current.percent}
+            aria-valuetext={`${current.percent}%`}
           >
-            <ChevronDownIcon
-              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${showHistory ? 'rotate-180' : ''}`}
-              aria-hidden="true"
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-[width] duration-500 motion-reduce:transition-none"
+              style={{
+                width: `${Math.min(100, Math.max(0, current.percent))}%`,
+              }}
             />
-            {intl.formatMessage(
-              showHistory ? messages.hideHistory : messages.history
-            )}
-          </button>
-          {current.retryable &&
-            (hasPermission(Permission.MANAGE_REQUESTS) ||
-              item.request.requestedBy.id === user?.id) && (
-              <Button
-                buttonType="warning"
-                buttonSize="sm"
-                disabled={isRetrying}
-                onClick={() => void onRetry(item.request.id)}
-              >
-                <ArrowPathIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                {intl.formatMessage(
-                  isRetrying ? messages.retrying : messages.retry
-                )}
-              </Button>
-            )}
-        </div>
-
-        {showHistory && (
-          <div className="mt-3 border-t border-gray-700 pt-3">
-            {history.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                {intl.formatMessage(messages.noHistory)}
-              </p>
-            ) : (
-              <ol className="space-y-3">
-                {history.map((event) => (
-                  <li key={event.id} className="flex items-start gap-3 text-sm">
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-700 text-gray-300">
-                      {(() => {
-                        const Icon =
-                          stageIcon[event.stage as StatusStage] ??
-                          InformationCircleIcon;
-                        return (
-                          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                        );
-                      })()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                        <span className="font-medium text-gray-200">
-                          {getStageLabel(intl, event.stage as StatusStage)}
-                        </span>
-                        <time
-                          className="text-xs text-gray-500"
-                          dateTime={new Date(event.createdAt).toISOString()}
-                        >
-                          <FormattedDate
-                            value={new Date(event.createdAt)}
-                            dateStyle="medium"
-                            timeStyle="short"
-                          />
-                        </time>
-                      </div>
-                      <p className="text-xs text-gray-400">
-                        {event.message ??
-                          getStageLabel(intl, event.stage as StatusStage)}
-                        {event.percent !== null && ` · ${event.percent}%`}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+        <span
+          className={`inline-flex h-6 w-32 flex-shrink-0 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold ${stageTone[currentStage] ?? stageTone.cancelled}`}
+        >
+          <StageIcon className="h-3 w-3" aria-hidden="true" />
+          {getStageLabel(intl, currentStage)}
+        </span>
+        <span className="min-w-0 flex-1 text-xs text-gray-400">
+          {current.message}
+        </span>
+        {current.retryable &&
+          (hasPermission(Permission.MANAGE_REQUESTS) ||
+            item.request.requestedBy.id === user?.id) && (
+            <Button
+              buttonType="warning"
+              buttonSize="sm"
+              disabled={isRetrying}
+              onClick={() => void onRetry(item.request.id)}
+            >
+              <ArrowPathIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {intl.formatMessage(
+                isRetrying ? messages.retrying : messages.retry
+              )}
+            </Button>
+          )}
+        <button
+          type="button"
+          className="inline-flex h-6 items-center gap-1.5 rounded-md border border-gray-600 bg-gray-900 px-2.5 text-xs font-medium text-gray-300 transition hover:border-indigo-400 hover:bg-indigo-500/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          aria-expanded={isHistoryOpen}
+          onClick={() => onToggleHistory(item.request.id)}
+        >
+          <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {intl.formatMessage(
+            isHistoryOpen ? messages.hideHistory : messages.history
+          )}
+          <ChevronDownIcon
+            className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${isHistoryOpen ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
+        </button>
       </div>
+
+      {isHistoryOpen && (
+        <section className="mx-3 mb-3 rounded-lg border border-gray-700 bg-gray-900/40 p-3">
+          <h4 className="mb-2 text-xs font-semibold text-gray-200">
+            {intl.formatMessage(messages.history)}
+          </h4>
+          {chronologicalHistory.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              {intl.formatMessage(messages.noHistory)}
+            </p>
+          ) : (
+            <ol className="grid grid-cols-[7rem_7.5rem_minmax(0,1fr)] gap-x-3 gap-y-2">
+              {chronologicalHistory.map((event) => (
+                <li key={event.id} className="contents text-xs">
+                  <time
+                    className="whitespace-nowrap text-gray-500"
+                    dateTime={new Date(event.createdAt).toISOString()}
+                  >
+                    <FormattedDate
+                      value={new Date(event.createdAt)}
+                      hour="numeric"
+                      minute="2-digit"
+                      second="2-digit"
+                    />
+                  </time>
+                  <span className="font-medium text-gray-200">
+                    {getStageLabel(intl, event.stage as StatusStage)}
+                  </span>
+                  <span className="min-w-0 text-gray-400">
+                    {event.message ??
+                      getStageLabel(intl, event.stage as StatusStage)}
+                    {event.percent !== null && ` · ${event.percent}%`}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
     </article>
   );
 };
@@ -763,7 +919,11 @@ const RequestStatus = () => {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState<RequestStatusSortField>('added');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
   const [selectedUser, setSelectedUser] = useState<UserSelection | null>(null);
+  const [expandedRequestId, setExpandedRequestId] = useState<number | null>(
+    null
+  );
   const [retryingRequestId, setRetryingRequestId] = useState<number | null>(
     null
   );
@@ -798,6 +958,14 @@ const RequestStatus = () => {
       sortDirectionValues
     );
     setSortDirection(querySortDirection === 'asc' ? 'asc' : 'desc');
+    const rawTimeFrame = Array.isArray(router.query.timeFrame)
+      ? router.query.timeFrame[0]
+      : router.query.timeFrame;
+    setTimeFrame(
+      rawTimeFrame && timeFrameValues.includes(rawTimeFrame as TimeFrame)
+        ? (rawTimeFrame as TimeFrame)
+        : '7d'
+    );
 
     const rawUserId = Array.isArray(router.query.userId)
       ? router.query.userId[0]
@@ -822,6 +990,7 @@ const RequestStatus = () => {
     router.query.mediaType,
     router.query.sort,
     router.query.sortDirection,
+    router.query.timeFrame,
     router.query.userId,
   ]);
 
@@ -876,6 +1045,7 @@ const RequestStatus = () => {
       mediaType: apiMediaType,
       sort,
       sortDirection,
+      timeFrame,
     });
     if (bookFormat) {
       params.set('bookFormat', bookFormat);
@@ -894,9 +1064,10 @@ const RequestStatus = () => {
     selectedOwnerId,
     sort,
     sortDirection,
+    timeFrame,
   ]);
   const { data, error, mutate } = useSWR<RequestStatusResultsResponse>(query, {
-    refreshInterval: 15000,
+    refreshInterval: 5000,
     revalidateOnFocus: true,
   });
 
@@ -905,6 +1076,7 @@ const RequestStatus = () => {
     nextMediaFilter = mediaFilter,
     nextSort = sort,
     nextSortDirection = sortDirection,
+    nextTimeFrame = timeFrame,
     nextUser = selectedUser,
     nextPage = 1,
   }: {
@@ -912,6 +1084,7 @@ const RequestStatus = () => {
     nextMediaFilter?: MediaFilter;
     nextSort?: RequestStatusSortField;
     nextSortDirection?: 'asc' | 'desc';
+    nextTimeFrame?: TimeFrame;
     nextUser?: UserSelection | null;
     nextPage?: number;
   } = {}) => ({
@@ -921,6 +1094,7 @@ const RequestStatus = () => {
     ...(nextSortDirection !== 'desc'
       ? { sortDirection: nextSortDirection }
       : {}),
+    ...(nextTimeFrame !== '7d' ? { timeFrame: nextTimeFrame } : {}),
     ...(canViewOtherUsers && nextUser !== null
       ? { userId: nextUser === 'all' ? 'all' : String(nextUser) }
       : {}),
@@ -961,6 +1135,11 @@ const RequestStatus = () => {
     const nextUser: UserSelection = value === 'all' ? 'all' : Number(value);
     setSelectedUser(nextUser);
     pushRouteQuery(routeQuery({ nextUser }));
+  };
+
+  const updateTimeFrame = (nextTimeFrame: TimeFrame) => {
+    setTimeFrame(nextTimeFrame);
+    pushRouteQuery(routeQuery({ nextTimeFrame }));
   };
 
   const retryRequest = async (requestId: number) => {
@@ -1116,6 +1295,21 @@ const RequestStatus = () => {
               {intl.formatMessage(messages[option.label])}
             </button>
           ))}
+          <select
+            className="min-w-[124px] whitespace-nowrap rounded-md border border-gray-600 bg-gray-900/70 px-3 py-2 text-sm font-medium text-gray-300 focus:border-indigo-400 focus:ring-indigo-400"
+            value={timeFrame}
+            onChange={(event) =>
+              updateTimeFrame(event.target.value as TimeFrame)
+            }
+            aria-label={intl.formatMessage(messages.timeFrame)}
+          >
+            <option value="7d">{intl.formatMessage(messages.last7Days)}</option>
+            <option value="1m">{intl.formatMessage(messages.lastMonth)}</option>
+            <option value="6m">
+              {intl.formatMessage(messages.last6Months)}
+            </option>
+            <option value="all">{intl.formatMessage(messages.allTime)}</option>
+          </select>
         </div>
       </section>
 
@@ -1224,6 +1418,12 @@ const RequestStatus = () => {
             item={item}
             onRetry={retryRequest}
             isRetrying={retryingRequestId === item.request.id}
+            isHistoryOpen={expandedRequestId === item.request.id}
+            onToggleHistory={(requestId) =>
+              setExpandedRequestId((currentId) =>
+                currentId === requestId ? null : requestId
+              )
+            }
           />
         ))}
       </div>

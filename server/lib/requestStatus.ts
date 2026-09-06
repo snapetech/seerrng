@@ -685,7 +685,7 @@ export const getRequestStatus = (
     estimatedCompletionTime: metrics.estimatedCompletionTime,
     downloadCount: result.downloads.length,
     downloadId: metrics.downloadId,
-    service: getServiceName(request),
+    service: getServiceName(request) ?? latestEvent?.service ?? null,
     message,
     observedAt: new Date(),
     isTerminal: (REQUEST_STATUS_TERMINAL_STAGES as readonly string[]).includes(
@@ -1081,6 +1081,7 @@ const getRequestStatusCounts = async (options: {
   ownerId?: number;
   mediaType?: MediaType;
   bookFormat?: 'ebook' | 'audiobook';
+  since?: Date;
 }): Promise<RequestStatusPage['counts']> => {
   const requestRepository = getRepository(MediaRequest);
   const latestEventQuery = getStatusEventRepository()
@@ -1107,6 +1108,11 @@ const getRequestStatusCounts = async (options: {
   if (options.ownerId) {
     query.andWhere('requestedByCount.id = :countOwnerId', {
       countOwnerId: options.ownerId,
+    });
+  }
+  if (options.since) {
+    query.andWhere('requestCount.createdAt >= :countSince', {
+      countSince: options.since,
     });
   }
   if (options.mediaType) {
@@ -1169,6 +1175,7 @@ export const getRequestStatusPage = async (options: {
   ownerId?: number;
   mediaType?: MediaType;
   bookFormat?: 'ebook' | 'audiobook';
+  since?: Date;
   filter?: string;
   sort?: RequestStatusSortField;
   sortDirection?: RequestStatusSortDirection;
@@ -1185,6 +1192,9 @@ export const getRequestStatusPage = async (options: {
 
   if (options.ownerId) {
     query.andWhere('requestedBy.id = :ownerId', { ownerId: options.ownerId });
+  }
+  if (options.since) {
+    query.andWhere('request.createdAt >= :since', { since: options.since });
   }
   if (options.mediaType) {
     query.andWhere('request.type = :mediaType', {
@@ -1291,6 +1301,7 @@ export const getRequestStatusPage = async (options: {
     ownerId: options.ownerId,
     mediaType: options.mediaType,
     bookFormat: options.bookFormat,
+    since: options.since,
   });
 
   return {
