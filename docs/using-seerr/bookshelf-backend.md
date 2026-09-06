@@ -75,9 +75,9 @@ Core policy:
 ### Installer and Compose
 
 - Change the default image from the pinned
-  `ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97`
+  `ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667`
   image to the pinned
-  `ghcr.io/snapetech/bookshelfng:hardcover@sha256:c51f6bd14b2c0b76d83b4652e55607b7e9e7b32392e2f7554e0d838177bb5186`
+  `ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636`
   image.
 - Add an installer backend mode:
 
@@ -92,7 +92,7 @@ Core policy:
     migration flow.
 - For fresh Hardcover installs:
   - use the pinned
-    `ghcr.io/snapetech/bookshelfng:hardcover@sha256:c51f6bd14b2c0b76d83b4652e55607b7e9e7b32392e2f7554e0d838177bb5186`
+    `ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636`
     image;
   - use the local rreading-glasses compatibility boundary by default;
   - pass `HARDCOVER_AUTH` to rreading-glasses;
@@ -433,7 +433,7 @@ https://github.com/snapetech/bookshelfng
 The deployment compose defaults to the Snapetech image:
 
 ```text
-ghcr.io/snapetech/bookshelfng:hardcover@sha256:c51f6bd14b2c0b76d83b4652e55607b7e9e7b32392e2f7554e0d838177bb5186
+ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636
 ```
 
 The installer and deployment Compose file use an immutable BookshelfNG digest.
@@ -445,7 +445,7 @@ Hardcover metadata backend. Fresh installs use the local rreading-glasses
 compatibility path by default; set `BOOKSHELF_METADATA_MODE=native` to pass
 `HARDCOVER_AUTH` directly to BookshelfNG. To force the legacy softcover path,
 set `BOOKSHELF_BACKEND=softcover`; this switches the image to the pinned
-`ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97`
+`ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667`
 and keeps compatibility mode.
 Softcover deployments use `COOKIE` when the Goodreads upstream requires it.
 
@@ -453,7 +453,7 @@ The image is published from GitHub Actions in the `snapetech/bookshelfng`
 repository:
 
 ```bash
-docker pull ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97
+docker pull ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667
 ```
 
 If a pull returns `denied`, the package exists but is not anonymously readable.
@@ -478,9 +478,12 @@ The validated BookshelfNG fork includes these changes:
 bde894431 Return author and editions from book lookup
 c416ad1af Add image publish workflow
 d7dc505f8 Skip CI for documentation-only changes
+0d600a564 Guard null Hardcover edition sub-objects
+fd8abff6b Add sparse Hardcover metadata regression tests
+5788f7c1c Pin patched transitive dependencies
 ```
 
-Use the pinned `ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97`
+Use the pinned `ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667`
 image for softcover once the GHCR package is public or the Docker host is
 authenticated. If you need a fully anonymous pull before that package
 visibility is corrected, use
@@ -615,7 +618,7 @@ PGID=953
 TZ=America/Regina
 
 BOOKSHELF_BACKEND=hardcover
-BOOKSHELF_IMAGE=ghcr.io/snapetech/bookshelfng:hardcover@sha256:c51f6bd14b2c0b76d83b4652e55607b7e9e7b32392e2f7554e0d838177bb5186
+BOOKSHELF_IMAGE=ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636
 BOOKSHELF_METADATA_MODE=compatibility
 BOOKSHELF_METADATA_URL=http://127.0.0.1:8790
 BOOKSHELF_HARDCOVER=true
@@ -652,7 +655,7 @@ For Goodreads/softcover compatibility mode, use:
 
 ```env
 BOOKSHELF_BACKEND=softcover
-BOOKSHELF_IMAGE=ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97
+BOOKSHELF_IMAGE=ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667
 BOOKSHELF_METADATA_MODE=compatibility
 BOOKSHELF_METADATA_URL=http://127.0.0.1:8790
 BOOKSHELF_HARDCOVER_NATIVE=false
@@ -779,7 +782,7 @@ curl -H "X-Api-Key: EBOOK_API_KEY" \
 ```
 
 With the pinned
-`ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97`
+`ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667`
 image, lookup results should include
 nested `author` metadata and at least one `editions` entry. If you use upstream
 Bookshelf and see `editions: []`, SeerrNG can still hydrate results that include

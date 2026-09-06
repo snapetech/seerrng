@@ -148,7 +148,7 @@ default deployment path uses the Snapetech BookshelfNG fork with Hardcover
 metadata:
 
 ```text
-ghcr.io/snapetech/bookshelfng:hardcover@sha256:c51f6bd14b2c0b76d83b4652e55607b7e9e7b32392e2f7554e0d838177bb5186
+ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636
 ```
 
 The installer and Compose file use an immutable BookshelfNG digest. Update the
@@ -229,7 +229,7 @@ caching, so a fresh search or uncached refresh still needs Hardcover.
 Legacy softcover/Goodreads deployments remain supported for existing users:
 
 ```text
-ghcr.io/snapetech/bookshelfng:softcover@sha256:f20b8a49c6b639083240d98ae0cdb960b637c0092b684055ee496fedbe552d97
+ghcr.io/snapetech/bookshelfng:softcover@sha256:bea37ae5981406f7221e1fced4191a06167997c9777fc2a6a5aa6301a776b667
 ```
 
 Do not convert an existing Readarr or softcover database to Hardcover by only
