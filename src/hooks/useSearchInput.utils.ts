@@ -18,7 +18,7 @@ export const shouldNavigateToSearch = (
 ): boolean =>
   searchOpen &&
   nextQuery !== '' &&
-  (pathname === '/search' || pathname === '/custom-search'
+  (pathname === '/search'
     ? currentQuery !== nextQuery
     : searchOpenedOnCurrentRoute);
 
@@ -31,4 +31,4 @@ export const shouldSyncSearchInput = (
 ): boolean =>
   routeQuery !== searchValue &&
   searchValue === debouncedValue &&
-  !((pathname === '/search' || pathname === '/custom-search') && closingSearch);
+  !(pathname === '/search' && closingSearch);

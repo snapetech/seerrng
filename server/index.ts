@@ -23,7 +23,6 @@ import WebhookAgent from '@server/lib/notifications/agents/webhook';
 import WebPushAgent from '@server/lib/notifications/agents/webpush';
 import checkOverseerrMerge from '@server/lib/overseerrMerge';
 import requestDispatchManager from '@server/lib/requestDispatch';
-import { createRequestStatusProxy } from '@server/lib/requestStatusProxy';
 import { getSettings } from '@server/lib/settings';
 import { runStartupMigrations } from '@server/lib/startupMigrations';
 import { setStaticAssetCacheControl } from '@server/lib/staticAssetCache';
@@ -319,7 +318,6 @@ app
         ...(sessionStore ? { store: sessionStore } : {}),
       })
     );
-    server.use('/request-status', createRequestStatusProxy());
     const apiSpecContent = await fs.readFile(API_SPEC_PATH, 'utf-8');
     const apiDocs = yaml.load(apiSpecContent) as Record<string, unknown>;
     server.use('/api-docs', swaggerUi.serve, swaggerUi.setup(apiDocs));

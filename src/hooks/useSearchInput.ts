@@ -32,8 +32,7 @@ const useSearchInput = (): SearchObject => {
     getSearchQuery(router.query.query)
   );
   const routeQuery = getSearchQuery(router.query.query);
-  const isSearchPage =
-    router.pathname === '/search' || router.pathname === '/custom-search';
+  const isSearchPage = router.pathname === '/search';
 
   const setIsOpen = useCallback((isOpen: boolean) => {
     searchOpenedOnCurrentRoute.current = isOpen;
