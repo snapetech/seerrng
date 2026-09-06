@@ -1915,7 +1915,7 @@
   "components.Setup.localesaveerror": "Setup completed, but the selected language could not be saved.",
   "components.Setup.servertype": "Choose Server Type",
   "components.Setup.setup": "Setup",
-  "components.Setup.signin": "Sign in to your account",
+  "components.Setup.signin": "Sign In",
   "components.Setup.signinMessage": "Get started by signing in",
   "components.Setup.signinWithEmby": "Enter your Emby details",
   "components.Setup.signinWithJellyfin": "Enter your Jellyfin details",
