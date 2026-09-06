@@ -8752,6 +8752,38 @@ paths:
             type: number
             minimum: 1
         - in: query
+          name: bookFormat
+          description: Restrict book requests to ebook-compatible or audiobook-compatible requests.
+          schema:
+            type: string
+            enum: [ebook, audiobook]
+        - in: query
+          name: sort
+          description: Sort field. Metadata-backed fields are resolved from the configured metadata provider and fall back safely when unavailable.
+          schema:
+            type: string
+            enum:
+              [
+                added,
+                modified,
+                status,
+                title,
+                director,
+                writer,
+                rating,
+                releaseDate,
+                artist,
+                author,
+                publisher,
+              ]
+            default: added
+        - in: query
+          name: sortDirection
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - in: query
           name: mediaType
           schema:
             type: string
@@ -8787,6 +8819,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RequestStatusPage'
+  /request/status/users:
+    get:
+      summary: Get users available for request status viewing
+      description: Returns minimal user identities for users with request-view permission selecting another user's request history. No account or permission fields are returned.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: take
+          schema:
+            type: number
+            minimum: 1
+            maximum: 100
+            default: 100
+        - in: query
+          name: skip
+          schema:
+            type: number
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Status viewer users returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pageInfo:
+                    $ref: '#/components/schemas/PageInfo'
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        displayName:
+                          type: string
+                        avatar:
+                          type: string
+                      required: [id, displayName, avatar]
+                required: [pageInfo, results]
   /request/status/{requestId}:
     get:
       summary: Get request lifecycle history

@@ -531,6 +531,113 @@ describe('GET /request/status', () => {
     assert.strictEqual(response.body.results[0].request.id, mediaRequest.id);
     assert.strictEqual(response.body.results[0].status.stage, 'available');
   });
+
+  it('separates ebook and audiobook status filters while including both-format requests', async () => {
+    const requestedBy = await getRepository(User).findOneByOrFail({ id: 2 });
+    const mediaRepository = getRepository(Media);
+    const requestRepository = getRepository(MediaRequest);
+    const [ebookMedia, audiobookMedia, bothMedia] = await mediaRepository.save([
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+      }),
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+      }),
+      new Media({
+        mediaType: MediaType.BOOK,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+      }),
+    ]);
+    await requestRepository.save([
+      new MediaRequest({
+        type: MediaType.BOOK,
+        status: MediaRequestStatus.PENDING,
+        media: ebookMedia,
+        requestedBy,
+        is4k: false,
+        bookFormat: 'ebook',
+      }),
+      new MediaRequest({
+        type: MediaType.BOOK,
+        status: MediaRequestStatus.PENDING,
+        media: audiobookMedia,
+        requestedBy,
+        is4k: false,
+        bookFormat: 'audiobook',
+      }),
+      new MediaRequest({
+        type: MediaType.BOOK,
+        status: MediaRequestStatus.PENDING,
+        media: bothMedia,
+        requestedBy,
+        is4k: false,
+        bookFormat: 'both',
+      }),
+    ]);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const ebookResponse = await agent
+      .get('/request/status')
+      .query({ mediaType: 'book', bookFormat: 'ebook' });
+    const audiobookResponse = await agent
+      .get('/request/status')
+      .query({ mediaType: 'book', bookFormat: 'audiobook' });
+
+    assert.strictEqual(ebookResponse.status, 200);
+    assert.strictEqual(audiobookResponse.status, 200);
+    assert.strictEqual(ebookResponse.body.pageInfo.results, 2);
+    assert.strictEqual(audiobookResponse.body.pageInfo.results, 2);
+    assert.deepStrictEqual(
+      ebookResponse.body.results
+        .map((result: { request: { id: number } }) => result.request.id)
+        .sort((left: number, right: number) => left - right),
+      [
+        (
+          await requestRepository.findOneByOrFail({
+            media: { id: ebookMedia.id },
+          })
+        ).id,
+        (
+          await requestRepository.findOneByOrFail({
+            media: { id: bothMedia.id },
+          })
+        ).id,
+      ].sort((left, right) => left - right)
+    );
+    assert.strictEqual(ebookResponse.body.counts.total, 2);
+    assert.strictEqual(audiobookResponse.body.counts.total, 2);
+  });
+
+  it('returns only safe user identities to status viewers', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+
+    const response = await agent.get('/request/status/users');
+
+    assert.strictEqual(response.status, 200);
+    assert.ok(response.body.results.length >= 2);
+    assert.ok(
+      response.body.results.every(
+        (user: Record<string, unknown>) =>
+          typeof user.id === 'number' &&
+          typeof user.displayName === 'string' &&
+          typeof user.avatar === 'string' &&
+          user.email === undefined &&
+          user.permissions === undefined
+      )
+    );
+
+    const ordinaryUser = await loginAs('friend@seerr.dev', 'test1234');
+    const forbiddenResponse = await ordinaryUser.get('/request/status/users');
+    assert.strictEqual(forbiddenResponse.status, 403);
+  });
 });
 
 describe('DELETE /request/:requestId', () => {

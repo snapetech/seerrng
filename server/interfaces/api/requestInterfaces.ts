@@ -4,6 +4,10 @@ import type {
   RequestStatusHistoryItem,
   RequestStatusSnapshot,
 } from '@server/lib/requestStatus';
+import type {
+  RequestStatusSortDirection,
+  RequestStatusSortField,
+} from '@server/lib/requestStatusSort';
 import type { NonFunctionProperties, PaginatedResponse } from './common';
 
 export interface RequestResultsResponse extends PaginatedResponse {
@@ -87,6 +91,23 @@ export interface RequestStatusResultsResponse extends PaginatedResponse {
     completed: number;
   };
 }
+
+export interface RequestStatusUsersResponse extends PaginatedResponse {
+  results: {
+    id: number;
+    displayName: string;
+    avatar: string;
+  }[];
+}
+
+export type RequestStatusQuery = {
+  requestedBy?: number;
+  mediaType?: MediaType | 'all';
+  bookFormat?: 'ebook' | 'audiobook';
+  filter?: string;
+  sort?: RequestStatusSortField;
+  sortDirection?: RequestStatusSortDirection;
+};
 
 export interface RequestStatusDetailResponse {
   request: NonFunctionProperties<MediaRequest>;

@@ -141,10 +141,7 @@ describe('release asset construction', () => {
       code: 'ENOENT',
     });
     assert.equal((await fs.stat(root)).mode & 0o777, 0o755);
-    assert.equal(
-      (await fs.stat(path.join(root, 'dist'))).mode & 0o777,
-      0o755
-    );
+    assert.equal((await fs.stat(path.join(root, 'dist'))).mode & 0o777, 0o755);
     assert.equal(
       (await fs.stat(path.join(root, 'dist', 'index.js'))).mode & 0o777,
       0o644

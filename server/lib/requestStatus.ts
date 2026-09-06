@@ -13,6 +13,12 @@ import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import logger from '@server/logger';
 import type { EntityManager, Repository } from 'typeorm';
 import { In, MoreThan } from 'typeorm';
+import {
+  isMetadataRequestStatusSort,
+  sortRequestStatusItems,
+  type RequestStatusSortDirection,
+  type RequestStatusSortField,
+} from './requestStatusSort';
 
 export enum RequestStatusStage {
   REQUESTED = 'requested',
@@ -1074,6 +1080,7 @@ const stageMatchesFilter = (
 const getRequestStatusCounts = async (options: {
   ownerId?: number;
   mediaType?: MediaType;
+  bookFormat?: 'ebook' | 'audiobook';
 }): Promise<RequestStatusPage['counts']> => {
   const requestRepository = getRepository(MediaRequest);
   const latestEventQuery = getStatusEventRepository()
@@ -1106,6 +1113,16 @@ const getRequestStatusCounts = async (options: {
     query.andWhere('requestCount.type = :countMediaType', {
       countMediaType: options.mediaType,
     });
+  }
+  if (options.bookFormat) {
+    query.andWhere(
+      options.bookFormat === 'ebook'
+        ? `requestCount.type = :countBookType
+           AND COALESCE(requestCount.bookFormat, 'ebook') IN ('ebook', 'both')`
+        : `requestCount.type = :countBookType
+           AND requestCount.bookFormat IN ('audiobook', 'both')`,
+      { countBookType: MediaType.BOOK }
+    );
   }
 
   const rows = await query.getRawMany<{
@@ -1151,7 +1168,10 @@ export const getRequestStatusPage = async (options: {
   skip: number;
   ownerId?: number;
   mediaType?: MediaType;
+  bookFormat?: 'ebook' | 'audiobook';
   filter?: string;
+  sort?: RequestStatusSortField;
+  sortDirection?: RequestStatusSortDirection;
 }): Promise<RequestStatusPage> => {
   const requestRepository = getRepository(MediaRequest);
   const query = requestRepository
@@ -1171,14 +1191,30 @@ export const getRequestStatusPage = async (options: {
       mediaType: options.mediaType,
     });
   }
+  if (options.bookFormat) {
+    query.andWhere(
+      options.bookFormat === 'ebook'
+        ? `request.type = :bookType
+           AND COALESCE(request.bookFormat, 'ebook') IN ('ebook', 'both')`
+        : `request.type = :bookType
+           AND request.bookFormat IN ('audiobook', 'both')`,
+      { bookType: MediaType.BOOK }
+    );
+  }
 
   const pageSize = Math.min(Math.max(options.take, 1), 100);
   const skip = Math.max(options.skip, 0);
   const hasStatusFilter = !!options.filter && options.filter !== 'all';
+  const sortField = options.sort ?? 'added';
+  const sortDirection = options.sortDirection ?? 'desc';
+  const requiresFullProjection =
+    hasStatusFilter ||
+    sortField === 'status' ||
+    isMetadataRequestStatusSort(sortField);
   let requests: MediaRequest[];
   let requestCount: number;
 
-  if (hasStatusFilter) {
+  if (requiresFullProjection) {
     // The durable event is a cache of the last observation, not the source of
     // truth for a live filter. Queue progress and media availability can move
     // between reconciler runs, so evaluate every candidate before filtering;
@@ -1190,8 +1226,11 @@ export const getRequestStatusPage = async (options: {
       .getMany();
     requestCount = 0;
   } else {
+    const sortColumn =
+      sortField === 'modified' ? 'request.updatedAt' : 'request.createdAt';
+    const sortSqlDirection = sortDirection === 'asc' ? 'ASC' : 'DESC';
     [requests, requestCount] = await query
-      .orderBy('request.updatedAt', 'DESC')
+      .orderBy(sortColumn, sortSqlDirection)
       .addOrderBy('request.id', 'DESC')
       .take(pageSize)
       .skip(skip)
@@ -1204,35 +1243,54 @@ export const getRequestStatusPage = async (options: {
     getPendingDispatchRequestIds(requestIds),
   ]);
 
-  if (hasStatusFilter) {
-    const matchingRequests = requests.filter((request) =>
-      stageMatchesFilter(
-        getRequestStatus(request, {
-          latestEvent: latestEvents.get(request.id),
-          dispatchPending: pendingRequestIds.has(request.id),
-        }).stage,
-        options.filter
-      )
-    );
-    requestCount = matchingRequests.length;
-    requests = matchingRequests.slice(skip, skip + pageSize);
-  }
-
-  const resultItems: RequestStatusPageItem[] = [];
+  let resultItems: RequestStatusPageItem[] = [];
   for (const request of requests) {
     resultItems.push(
       await mapRequestStatusItem(
         request,
         latestEvents.get(request.id),
         pendingRequestIds.has(request.id),
-        true
+        !requiresFullProjection
       )
     );
+  }
+
+  if (hasStatusFilter) {
+    resultItems = resultItems.filter(({ status }) =>
+      stageMatchesFilter(status.stage, options.filter)
+    );
+    requestCount = resultItems.length;
+  }
+
+  if (
+    requiresFullProjection ||
+    sortField !== 'added' ||
+    sortDirection !== 'desc'
+  ) {
+    resultItems = await sortRequestStatusItems(
+      resultItems,
+      sortField,
+      sortDirection
+    );
+  }
+
+  if (requiresFullProjection) {
+    requestCount = resultItems.length;
+    const pageItems = resultItems.slice(skip, skip + pageSize);
+    for (const item of pageItems) {
+      await persistStatusEvent(
+        item.request,
+        item.status,
+        latestEvents.get(item.request.id)
+      );
+    }
+    resultItems = pageItems;
   }
 
   const counts = await getRequestStatusCounts({
     ownerId: options.ownerId,
     mediaType: options.mediaType,
+    bookFormat: options.bookFormat,
   });
 
   return {

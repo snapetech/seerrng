@@ -13,8 +13,11 @@ import {
 import defineMessages from '@app/utils/defineMessages';
 import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import {
+  ArrowDownIcon,
   ArrowDownTrayIcon,
   ArrowPathIcon,
+  ArrowUpIcon,
+  Bars3BottomLeftIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -25,11 +28,14 @@ import {
   InformationCircleIcon,
   MagnifyingGlassIcon,
   ServerIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import type {
   RequestStatusDetailResponse,
   RequestStatusResultsResponse,
+  RequestStatusUsersResponse,
 } from '@server/interfaces/api/requestInterfaces';
+import type { RequestStatusSortField } from '@server/lib/requestStatusSort';
 import type { BookDetails } from '@server/models/Book';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MusicDetails } from '@server/models/Music';
@@ -45,6 +51,8 @@ const messages = defineMessages('components.RequestStatus', {
   title: 'Request Status',
   subtitle: 'Follow every request from approval through library availability.',
   manageRequests: 'Manage requests',
+  selectUser: 'Select user to view requests',
+  allUsers: 'All users',
   all: 'All requests',
   active: 'Active',
   attention: 'Needs attention',
@@ -61,12 +69,27 @@ const messages = defineMessages('components.RequestStatus', {
   declined: 'Declined',
   cancelled: 'Cancelled',
   mediaType: 'Media type',
+  filter: 'Filter',
   statusFilter: 'Status',
   allMedia: 'All media',
   movies: 'Movies',
   series: 'Series',
   music: 'Music',
   books: 'Books',
+  audiobooks: 'Audiobooks',
+  sortBy: 'Sort by',
+  sortAdded: 'Date',
+  sortTitle: 'Title',
+  sortStatus: 'Status',
+  sortDirector: 'Director',
+  sortWriter: 'Writer',
+  sortRating: 'Rating',
+  sortReleaseDate: 'Release date',
+  sortArtist: 'Artist',
+  sortAuthor: 'Author',
+  sortPublisher: 'Publisher',
+  sortAscending: 'Ascending',
+  sortDescending: 'Descending',
   showing:
     '{count, plural, =0 {No requests} one {# request} other {# requests}}',
   progressUnavailable: 'Download service did not provide progress data.',
@@ -77,6 +100,7 @@ const messages = defineMessages('components.RequestStatus', {
   hideHistory: 'Hide history',
   noHistory: 'No status history has been recorded yet.',
   requestedBy: 'Requested by {user}',
+  requestedAt: 'Requested {date}',
   service: 'Service: {service}',
   retry: 'Retry request',
   retrying: 'Retrying…',
@@ -106,6 +130,8 @@ type StatusStage =
   | 'declined'
   | 'cancelled';
 type RequestStatusItem = RequestStatusResultsResponse['results'][number];
+type MediaFilter = 'all' | 'movie' | 'tv' | 'music' | 'book' | 'audiobook';
+type UserSelection = number | 'all';
 
 const timelineStages: StatusStage[] = [
   'requested',
@@ -127,14 +153,100 @@ const statusFilterValues = [
   'declined',
   'cancelled',
 ];
-const mediaTypeValues = ['all', 'movie', 'tv', 'music', 'book'];
+const mediaTypeValues: MediaFilter[] = [
+  'all',
+  'movie',
+  'tv',
+  'music',
+  'book',
+  'audiobook',
+];
+
+const sortDirectionValues = ['asc', 'desc'] as const;
+
+const getSortOptions = (
+  mediaFilter: MediaFilter
+): { value: RequestStatusSortField; label: keyof typeof messages }[] => {
+  const common: {
+    value: RequestStatusSortField;
+    label: keyof typeof messages;
+  }[] = [
+    { value: 'added', label: 'sortAdded' },
+    { value: 'title', label: 'sortTitle' },
+    { value: 'status', label: 'sortStatus' },
+  ];
+
+  switch (mediaFilter) {
+    case 'movie':
+      return [
+        ...common,
+        { value: 'director', label: 'sortDirector' },
+        { value: 'rating', label: 'sortRating' },
+        { value: 'releaseDate', label: 'sortReleaseDate' },
+      ];
+    case 'tv':
+      return [
+        ...common,
+        { value: 'writer', label: 'sortWriter' },
+        { value: 'director', label: 'sortDirector' },
+        { value: 'rating', label: 'sortRating' },
+        { value: 'releaseDate', label: 'sortReleaseDate' },
+      ];
+    case 'music':
+      return [
+        ...common,
+        { value: 'artist', label: 'sortArtist' },
+        { value: 'releaseDate', label: 'sortReleaseDate' },
+      ];
+    case 'book':
+    case 'audiobook':
+      return [
+        ...common,
+        { value: 'author', label: 'sortAuthor' },
+        { value: 'publisher', label: 'sortPublisher' },
+        { value: 'releaseDate', label: 'sortReleaseDate' },
+      ];
+    default:
+      return common;
+  }
+};
 
 const getSafeQueryValue = (
   value: string | string[] | undefined,
-  allowedValues: string[]
+  allowedValues: readonly string[]
 ): string => {
   const candidate = Array.isArray(value) ? value[0] : value;
   return candidate && allowedValues.includes(candidate) ? candidate : 'all';
+};
+
+const fetchStatusUsers = async (
+  url: string
+): Promise<RequestStatusUsersResponse> => {
+  const firstResponse = await axios.get<RequestStatusUsersResponse>(url);
+  const firstPage = firstResponse.data;
+  const pageSize = firstPage.pageInfo.pageSize || 100;
+  const remainingPages = Math.max(firstPage.pageInfo.pages - 1, 0);
+  if (remainingPages === 0) {
+    return firstPage;
+  }
+
+  const pages = await Promise.all(
+    Array.from({ length: remainingPages }, (_, index) => {
+      const pageUrl = new URL(url, 'http://seerrng.local');
+      pageUrl.searchParams.set('skip', String((index + 1) * pageSize));
+      return axios.get<RequestStatusUsersResponse>(
+        `${pageUrl.pathname}${pageUrl.search}`
+      );
+    })
+  );
+
+  return {
+    ...firstPage,
+    results: [
+      ...firstPage.results,
+      ...pages.flatMap((response) => response.data.results),
+    ],
+  };
 };
 
 const stageMessageKeys: Record<StatusStage, keyof typeof messages> = {
@@ -389,6 +501,13 @@ const RequestStatusCard = ({
                 user: item.request.requestedBy.displayName,
               })}
             </p>
+            <p className="text-xs text-gray-500">
+              <FormattedDate
+                value={new Date(item.request.createdAt)}
+                dateStyle="medium"
+                timeStyle="short"
+              />
+            </p>
           </div>
         </div>
 
@@ -634,43 +753,214 @@ const RequestStatusCard = ({
 const RequestStatus = () => {
   const intl = useIntl();
   const router = useRouter();
-  const { hasPermission } = useUser();
+  const { user: currentUser, hasPermission } = useUser();
   const { addToast } = useToasts();
-  const [mediaType, setMediaType] = useState('all');
+  const canViewOtherUsers = hasPermission(
+    [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+    { type: 'or' }
+  );
+  const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
   const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState<RequestStatusSortField>('added');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selectedUser, setSelectedUser] = useState<UserSelection | null>(null);
   const [retryingRequestId, setRetryingRequestId] = useState<number | null>(
     null
   );
+
+  const { data: statusUsers } = useSWR<RequestStatusUsersResponse>(
+    canViewOtherUsers ? '/api/v1/request/status/users?take=100&skip=0' : null,
+    fetchStatusUsers
+  );
+
   useEffect(() => {
     if (!router.isReady) {
       return;
     }
 
     setFilter(getSafeQueryValue(router.query.filter, statusFilterValues));
-    setMediaType(getSafeQueryValue(router.query.mediaType, mediaTypeValues));
-  }, [router.isReady, router.query.filter, router.query.mediaType]);
+    setMediaFilter(
+      getSafeQueryValue(router.query.mediaType, mediaTypeValues) as MediaFilter
+    );
+    const queryMediaFilter = getSafeQueryValue(
+      router.query.mediaType,
+      mediaTypeValues
+    ) as MediaFilter;
+    const querySort = getSafeQueryValue(
+      router.query.sort,
+      getSortOptions(queryMediaFilter).map((option) => option.value)
+    );
+    setSort(
+      querySort === 'all' ? 'added' : (querySort as RequestStatusSortField)
+    );
+    const querySortDirection = getSafeQueryValue(
+      router.query.sortDirection,
+      sortDirectionValues
+    );
+    setSortDirection(querySortDirection === 'asc' ? 'asc' : 'desc');
+
+    const rawUserId = Array.isArray(router.query.userId)
+      ? router.query.userId[0]
+      : router.query.userId;
+    if (canViewOtherUsers) {
+      if (rawUserId === 'all') {
+        setSelectedUser('all');
+      } else if (rawUserId && /^\d+$/.test(rawUserId)) {
+        const userId = Number(rawUserId);
+        setSelectedUser(userId > 0 ? userId : (currentUser?.id ?? null));
+      } else {
+        setSelectedUser(currentUser?.id ?? null);
+      }
+    } else {
+      setSelectedUser(null);
+    }
+  }, [
+    canViewOtherUsers,
+    currentUser?.id,
+    router.isReady,
+    router.query.filter,
+    router.query.mediaType,
+    router.query.sort,
+    router.query.sortDirection,
+    router.query.userId,
+  ]);
+
+  const userOptions = useMemo(() => {
+    const users = new Map<
+      number,
+      RequestStatusUsersResponse['results'][number]
+    >();
+    for (const user of statusUsers?.results ?? []) {
+      users.set(user.id, user);
+    }
+    if (currentUser) {
+      users.set(currentUser.id, {
+        id: currentUser.id,
+        displayName: currentUser.displayName,
+        avatar: currentUser.avatar,
+      });
+    }
+    return [...users.values()].sort((left, right) =>
+      left.displayName.localeCompare(right.displayName, undefined, {
+        sensitivity: 'base',
+      })
+    );
+  }, [currentUser, statusUsers]);
+
+  const selectedOwnerId = canViewOtherUsers
+    ? selectedUser === 'all'
+      ? undefined
+      : (selectedUser ?? currentUser?.id)
+    : currentUser?.id;
   const page = Math.max(Number(router.query.page) || 1, 1);
   const pageSize = 25;
-  const query = useMemo(
-    () =>
-      `/api/v1/request/status?take=${pageSize}&skip=${(page - 1) * pageSize}&filter=${filter}&mediaType=${mediaType}`,
-    [filter, mediaType, page]
-  );
+  const apiMediaType =
+    mediaFilter === 'book' || mediaFilter === 'audiobook'
+      ? 'book'
+      : mediaFilter;
+  const bookFormat =
+    mediaFilter === 'book'
+      ? 'ebook'
+      : mediaFilter === 'audiobook'
+        ? 'audiobook'
+        : undefined;
+  const query = useMemo(() => {
+    if (!currentUser || (canViewOtherUsers && selectedOwnerId === undefined)) {
+      return null;
+    }
+
+    const params = new URLSearchParams({
+      take: String(pageSize),
+      skip: String((page - 1) * pageSize),
+      filter,
+      mediaType: apiMediaType,
+      sort,
+      sortDirection,
+    });
+    if (bookFormat) {
+      params.set('bookFormat', bookFormat);
+    }
+    if (selectedOwnerId !== undefined) {
+      params.set('requestedBy', String(selectedOwnerId));
+    }
+    return `/api/v1/request/status?${params.toString()}`;
+  }, [
+    apiMediaType,
+    bookFormat,
+    canViewOtherUsers,
+    currentUser,
+    filter,
+    page,
+    selectedOwnerId,
+    sort,
+    sortDirection,
+  ]);
   const { data, error, mutate } = useSWR<RequestStatusResultsResponse>(query, {
     refreshInterval: 15000,
     revalidateOnFocus: true,
   });
 
-  const updateFilter = (nextFilter: string, nextMediaType = mediaType) => {
+  const routeQuery = ({
+    nextFilter = filter,
+    nextMediaFilter = mediaFilter,
+    nextSort = sort,
+    nextSortDirection = sortDirection,
+    nextUser = selectedUser,
+    nextPage = 1,
+  }: {
+    nextFilter?: string;
+    nextMediaFilter?: MediaFilter;
+    nextSort?: RequestStatusSortField;
+    nextSortDirection?: 'asc' | 'desc';
+    nextUser?: UserSelection | null;
+    nextPage?: number;
+  } = {}) => ({
+    ...(nextFilter !== 'all' ? { filter: nextFilter } : {}),
+    ...(nextMediaFilter !== 'all' ? { mediaType: nextMediaFilter } : {}),
+    ...(nextSort !== 'added' ? { sort: nextSort } : {}),
+    ...(nextSortDirection !== 'desc'
+      ? { sortDirection: nextSortDirection }
+      : {}),
+    ...(canViewOtherUsers && nextUser !== null
+      ? { userId: nextUser === 'all' ? 'all' : String(nextUser) }
+      : {}),
+    ...(nextPage > 1 ? { page: String(nextPage) } : {}),
+  });
+
+  const pushRouteQuery = (queryParams: Record<string, string>) => {
+    void router.push({ pathname: router.pathname, query: queryParams });
+  };
+
+  const updateFilter = (nextFilter: string) => {
     setFilter(nextFilter);
-    setMediaType(nextMediaType);
-    void router.push({
-      pathname: router.pathname,
-      query: {
-        ...(nextFilter !== 'all' ? { filter: nextFilter } : {}),
-        ...(nextMediaType !== 'all' ? { mediaType: nextMediaType } : {}),
-      },
-    });
+    pushRouteQuery(routeQuery({ nextFilter }));
+  };
+
+  const updateMediaFilter = (nextMediaFilter: MediaFilter) => {
+    const options = getSortOptions(nextMediaFilter);
+    const keepsSort = options.some((option) => option.value === sort);
+    const nextSort = keepsSort ? sort : 'added';
+    const nextSortDirection = keepsSort ? sortDirection : 'desc';
+    setMediaFilter(nextMediaFilter);
+    setSort(nextSort);
+    setSortDirection(nextSortDirection);
+    pushRouteQuery(
+      routeQuery({ nextMediaFilter, nextSort, nextSortDirection })
+    );
+  };
+
+  const updateSort = (nextSort: RequestStatusSortField) => {
+    const nextSortDirection =
+      sort === nextSort ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'desc';
+    setSort(nextSort);
+    setSortDirection(nextSortDirection);
+    pushRouteQuery(routeQuery({ nextSort, nextSortDirection }));
+  };
+
+  const updateUser = (value: string) => {
+    const nextUser: UserSelection = value === 'all' ? 'all' : Number(value);
+    setSelectedUser(nextUser);
+    pushRouteQuery(routeQuery({ nextUser }));
   };
 
   const retryRequest = async (requestId: number) => {
@@ -713,15 +1003,20 @@ const RequestStatus = () => {
   }
 
   const totalPages = Math.max(data.pageInfo.pages, 1);
+  const sortOptions = getSortOptions(mediaFilter);
+  const mediaFilters: {
+    value: MediaFilter;
+    label: keyof typeof messages;
+  }[] = [
+    { value: 'all', label: 'allMedia' },
+    { value: 'movie', label: 'movies' },
+    { value: 'tv', label: 'series' },
+    { value: 'music', label: 'music' },
+    { value: 'book', label: 'books' },
+    { value: 'audiobook', label: 'audiobooks' },
+  ];
   const changePage = (nextPage: number) => {
-    void router.push({
-      pathname: router.pathname,
-      query: {
-        ...(filter !== 'all' ? { filter } : {}),
-        ...(mediaType !== 'all' ? { mediaType } : {}),
-        ...(nextPage > 1 ? { page: nextPage } : {}),
-      },
-    });
+    pushRouteQuery(routeQuery({ nextPage }));
   };
 
   return (
@@ -731,14 +1026,43 @@ const RequestStatus = () => {
         <Header subtext={intl.formatMessage(messages.subtitle)}>
           {intl.formatMessage(messages.title)}
         </Header>
-        {hasPermission(Permission.MANAGE_REQUESTS) && (
-          <Link
-            href="/requests"
-            className="inline-flex items-center self-start rounded-md border border-gray-600 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-indigo-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 lg:self-auto"
-          >
-            {intl.formatMessage(messages.manageRequests)}
-          </Link>
-        )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          {canViewOtherUsers && (
+            <label className="flex min-w-56 flex-col gap-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+              <span className="flex items-center gap-1.5">
+                <UserIcon className="h-4 w-4" aria-hidden="true" />
+                {intl.formatMessage(messages.selectUser)}
+              </span>
+              <select
+                className="rounded-md border-gray-600 bg-gray-800 px-3 py-2 text-sm font-normal normal-case tracking-normal text-gray-100 focus:border-indigo-400 focus:ring-indigo-400"
+                value={
+                  selectedUser === 'all'
+                    ? 'all'
+                    : String(selectedUser ?? currentUser?.id ?? '')
+                }
+                onChange={(event) => updateUser(event.target.value)}
+                aria-label={intl.formatMessage(messages.selectUser)}
+              >
+                <option value="all">
+                  {intl.formatMessage(messages.allUsers)}
+                </option>
+                {userOptions.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {hasPermission(Permission.MANAGE_REQUESTS) && (
+            <Link
+              href="/requests"
+              className="inline-flex items-center self-start rounded-md border border-gray-600 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-indigo-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 sm:self-auto"
+            >
+              {intl.formatMessage(messages.manageRequests)}
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -772,28 +1096,57 @@ const RequestStatus = () => {
         ))}
       </div>
 
-      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-700 bg-gray-800/70 p-3 sm:flex-row">
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-gray-300">
-          <FilmIcon
-            className="h-5 w-5 flex-shrink-0 text-gray-400"
-            aria-hidden="true"
-          />
-          <span className="sr-only">
-            {intl.formatMessage(messages.mediaType)}
-          </span>
-          <select
-            className="w-full rounded-md border-gray-600 bg-gray-900 text-sm text-gray-100 focus:border-indigo-400 focus:ring-indigo-400"
-            value={mediaType}
-            onChange={(event) => updateFilter(filter, event.target.value)}
-            aria-label={intl.formatMessage(messages.mediaType)}
-          >
-            <option value="all">{intl.formatMessage(messages.allMedia)}</option>
-            <option value="movie">{intl.formatMessage(messages.movies)}</option>
-            <option value="tv">{intl.formatMessage(messages.series)}</option>
-            <option value="music">{intl.formatMessage(messages.music)}</option>
-            <option value="book">{intl.formatMessage(messages.books)}</option>
-          </select>
-        </label>
+      <section
+        className="mb-5 rounded-xl border border-gray-700 bg-gray-800/70 p-3"
+        aria-label={intl.formatMessage(messages.mediaType)}
+      >
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <FilmIcon className="h-4 w-4" aria-hidden="true" />
+          {intl.formatMessage(messages.filter)}
+        </div>
+        <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+          {mediaFilters.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={mediaFilter === option.value}
+              onClick={() => updateMediaFilter(option.value)}
+              className={`whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${mediaFilter === option.value ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-gray-600 bg-gray-900/70 text-gray-300 hover:border-gray-400 hover:text-white'}`}
+            >
+              {intl.formatMessage(messages[option.label])}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-5 rounded-xl border border-gray-700 bg-gray-800/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <Bars3BottomLeftIcon className="h-4 w-4" aria-hidden="true" />
+          {intl.formatMessage(messages.sortBy)}
+        </div>
+        <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+          {sortOptions.map((option) => {
+            const active = sort === option.value;
+            const DirectionIcon =
+              active && sortDirection === 'asc' ? ArrowUpIcon : ArrowDownIcon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={active}
+                aria-label={`${intl.formatMessage(messages[option.label])} (${intl.formatMessage(active && sortDirection === 'asc' ? messages.sortAscending : messages.sortDescending)})`}
+                onClick={() => updateSort(option.value)}
+                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ${active ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-gray-600 bg-gray-900/70 text-gray-300 hover:border-gray-400 hover:text-white'}`}
+              >
+                {intl.formatMessage(messages[option.label])}
+                <DirectionIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-700 bg-gray-800/70 p-3 sm:flex-row sm:items-center">
         <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-gray-300">
           <ClockIcon
             className="h-5 w-5 flex-shrink-0 text-gray-400"

@@ -33,6 +33,7 @@ import type {
   RequestResultsResponse,
   RequestStatusDetailResponse,
   RequestStatusResultsResponse,
+  RequestStatusUsersResponse,
 } from '@server/interfaces/api/requestInterfaces';
 import {
   isValidMusicBrainzResourceId,
@@ -53,6 +54,10 @@ import {
   getRequestStatusPage,
   recordRequestStatus,
 } from '@server/lib/requestStatus';
+import {
+  REQUEST_STATUS_SORT_FIELDS,
+  parseRequestStatusSort,
+} from '@server/lib/requestStatusSort';
 import { runWithCurrentServarrService } from '@server/lib/serviceAdmission';
 import {
   UserMutationActorUnauthorizedError,
@@ -116,6 +121,7 @@ const requestTimelineStatusFilters = [
   'completed',
   ...Object.values(RequestStatusStage),
 ] as const;
+const requestStatusBookFormatFilters = ['ebook', 'audiobook'] as const;
 
 const getExpectedCredentialVersion = (
   req: Pick<Request, 'session' | 'user'>
@@ -2173,6 +2179,25 @@ requestRoutes.get<
     if ('error' in parsedMediaType) {
       return next({ status: 400, message: parsedMediaType.error });
     }
+    const parsedBookFormat = parseOptionalAllowedString(req.query.bookFormat, {
+      fieldName: 'Book format',
+      allowedValues: requestStatusBookFormatFilters,
+      maxLength: 16,
+    });
+    if ('error' in parsedBookFormat) {
+      return next({ status: 400, message: parsedBookFormat.error });
+    }
+    const selectedMediaType = parsedMediaType.value ?? 'all';
+    const mediaType =
+      parsedBookFormat.value && selectedMediaType === 'all'
+        ? 'book'
+        : selectedMediaType;
+    if (parsedBookFormat.value && mediaType !== 'book') {
+      return next({
+        status: 400,
+        message: 'Book format filtering requires mediaType=book.',
+      });
+    }
     const parsedFilter = parseOptionalAllowedString(
       req.query.filter ?? req.query.status,
       {
@@ -2184,6 +2209,29 @@ requestRoutes.get<
     if ('error' in parsedFilter) {
       return next({ status: 400, message: parsedFilter.error });
     }
+    const parsedSort = parseOptionalAllowedString(req.query.sort, {
+      fieldName: 'Sort field',
+      allowedValues: REQUEST_STATUS_SORT_FIELDS,
+      maxLength: 32,
+    });
+    if ('error' in parsedSort) {
+      return next({ status: 400, message: parsedSort.error });
+    }
+    const parsedSortDirection = parseOptionalAllowedString(
+      req.query.sortDirection,
+      {
+        fieldName: 'Sort direction',
+        allowedValues: ['asc', 'desc'] as const,
+        maxLength: 8,
+      }
+    );
+    if ('error' in parsedSortDirection) {
+      return next({ status: 400, message: parsedSortDirection.error });
+    }
+    const { field: sort, direction: sortDirection } = parseRequestStatusSort(
+      parsedSort.value,
+      parsedSortDirection.value
+    );
 
     const actorId = req.user!.id;
     return await runUserSecurityReadWithActor(
@@ -2199,11 +2247,11 @@ requestRoutes.get<
           take: pageSize,
           skip,
           ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
-          mediaType:
-            parsedMediaType.value === 'all'
-              ? undefined
-              : (parsedMediaType.value as MediaType),
+          mediaType: mediaType === 'all' ? undefined : (mediaType as MediaType),
+          bookFormat: parsedBookFormat.value,
           filter: parsedFilter.value,
+          sort,
+          sortDirection,
         });
 
         return res.status(200).json({
@@ -2227,6 +2275,79 @@ requestRoutes.get<
       ...getErrorLogFields(error),
     });
     return next({ status: 500, message: 'Unable to retrieve request status.' });
+  }
+});
+
+requestRoutes.get<
+  Record<string, unknown>,
+  RequestStatusUsersResponse | { status: number; message: string }
+>('/status/users', async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+    const { pageSize, skip } = parsePageParams(req.query, {
+      take: 100,
+      maxTake: 100,
+    });
+
+    return await runUserSecurityReadWithActor(
+      req.user!.id,
+      req.user!.id,
+      [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+      async () => {
+        const [users, userCount] = await getRepository(User)
+          .createQueryBuilder('user')
+          .addSelect(
+            `CASE WHEN (user.username IS NULL OR user.username = '') THEN (
+              CASE WHEN (user.plexUsername IS NULL OR user.plexUsername = '') THEN (
+                CASE WHEN (user.jellyfinUsername IS NULL OR user.jellyfinUsername = '') THEN
+                  "user"."email"
+                ELSE
+                  LOWER(user.jellyfinUsername)
+                END)
+              ELSE
+                LOWER(user.plexUsername)
+              END)
+            ELSE
+              LOWER(user.username)
+            END`,
+            'displayname_sort_key'
+          )
+          .orderBy('displayname_sort_key', 'ASC')
+          .addOrderBy('user.id', 'ASC')
+          .take(pageSize)
+          .skip(skip)
+          .getManyAndCount();
+
+        return res.status(200).json({
+          pageInfo: {
+            pages: Math.ceil(userCount / pageSize),
+            pageSize,
+            results: userCount,
+            page: Math.floor(skip / pageSize) + 1,
+          },
+          results: users.map((user) => ({
+            id: user.id,
+            displayName: user.displayName,
+            avatar: user.avatar,
+          })),
+        });
+      },
+      {
+        requirePermission: true,
+        expectedCredentialVersion: getExpectedCredentialVersion(req),
+      }
+    );
+  } catch (error) {
+    if (error instanceof UserMutationActorUnauthorizedError) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+    logger.error('Something went wrong retrieving request status users', {
+      label: 'API',
+      ...getErrorLogFields(error),
+    });
+    return next({ status: 500, message: 'Unable to retrieve request users.' });
   }
 });
 

@@ -63,6 +63,7 @@ export interface OpenLibraryAuthorWork {
 export interface OpenLibraryEdition {
   key: string;
   title?: string;
+  publishers?: string[];
   isbn_10?: string[];
   isbn_13?: string[];
   physical_format?: string;
@@ -291,6 +292,7 @@ const sanitizeEdition = (value: unknown): OpenLibraryEdition | undefined => {
   return {
     key,
     title: boundedString(value.title, MAX_OPENLIBRARY_TITLE_LENGTH),
+    publishers: boundedStrings(value.publishers, 20, 256),
     isbn_10: boundedStrings(value.isbn_10),
     isbn_13: boundedStrings(value.isbn_13),
     physical_format: boundedString(value.physical_format, 256),
