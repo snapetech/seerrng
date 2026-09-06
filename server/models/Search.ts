@@ -53,6 +53,8 @@ export interface MovieResult extends TmdbSearchResult {
   releaseDate: string;
   adult: boolean;
   video: boolean;
+  directors?: string[];
+  writers?: string[];
   mediaInfo?: Media;
 }
 
@@ -62,6 +64,8 @@ export interface TvResult extends TmdbSearchResult {
   originalName: string;
   originCountry: string[];
   firstAirDate: string;
+  directors?: string[];
+  writers?: string[];
 }
 
 export interface CollectionResult {

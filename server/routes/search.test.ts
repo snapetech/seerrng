@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import ExternalAPI from '@server/api/externalapi';
@@ -24,6 +25,7 @@ import { setupTestDb } from '@server/test/db';
 import { waitForBackgroundTasks } from '@server/utils/backgroundTasks';
 import type { Express } from 'express';
 import express from 'express';
+import * as OpenApiValidator from 'express-openapi-validator';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import request from 'supertest';
@@ -34,6 +36,7 @@ import searchRoutes, {
   SEARCH_PROVIDER_TIMEOUT_MS,
   SEARCH_RATE_LIMIT,
   capSearchProviderResults,
+  extractSearchCrew,
 } from './search';
 
 let app: Express;
@@ -61,6 +64,40 @@ describe('search provider result bounds', () => {
       MAX_COMBINED_SEARCH_RESULTS
     );
     assert.deepStrictEqual(capSearchProviderResults({}), []);
+  });
+});
+
+describe('search credit enrichment', () => {
+  it('extracts and alphabetizes movie directors and credited writers', () => {
+    assert.deepStrictEqual(
+      extractSearchCrew({
+        credits: {
+          crew: [
+            { job: 'Director', name: 'Zed Director' },
+            { job: 'Screenplay', name: 'Beth Writer' },
+            { job: 'Writer', name: 'Alex Writer' },
+            { job: 'Producer', name: 'Ignored Producer' },
+          ],
+        },
+      }),
+      {
+        directors: ['Zed Director'],
+        writers: ['Alex Writer', 'Beth Writer'],
+      }
+    );
+  });
+
+  it('uses series creators when no writing credit is present', () => {
+    assert.deepStrictEqual(
+      extractSearchCrew({
+        credits: { crew: [{ job: 'Director', name: 'Series Director' }] },
+        created_by: [{ name: 'Series Creator' }],
+      }),
+      {
+        directors: ['Series Director'],
+        writers: ['Series Creator'],
+      }
+    );
   });
 });
 
@@ -199,6 +236,34 @@ describe('GET /search', () => {
 
     assert.strictEqual(res.status, 400);
     assert.match(res.body.message, /Language must be a string/);
+  });
+
+  it('does not return ebook catalog results for an unavailable audiobook service', async () => {
+    getSettings().readarr = [{ serviceType: 'ebook' } as ReadarrSettings];
+    const bookSearch = mock.method(OpenLibraryAPI.prototype, 'searchBooks');
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get('/search').query({
+      query: 'microsoft',
+      type: 'book',
+      format: 'audiobook',
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body.results, []);
+    assert.strictEqual(res.body.totalResults, 0);
+    assert.strictEqual(bookSearch.mock.callCount(), 0);
+  });
+
+  it('rejects book formats on non-book searches', async () => {
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get('/search').query({
+      query: 'microsoft',
+      type: 'music',
+      format: 'ebook',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /only be used with book searches/);
   });
 
   it('rejects blank keyword searches', async () => {
@@ -369,6 +434,18 @@ describe('GET /search', () => {
     assert.equal(book.isbn13, '9780000000002');
     assert.equal(book.mediaInfo.id, bookMedia.id);
     assert.equal(book.mediaInfo.status, MediaStatus.AVAILABLE);
+
+    const musicOnly = await agent
+      .get('/search')
+      .query({ query: 'global', type: 'music' });
+
+    assert.strictEqual(musicOnly.status, 200);
+    assert.deepStrictEqual(
+      musicOnly.body.results.map(
+        (result: { mediaType: string }) => result.mediaType
+      ),
+      ['album', 'artist']
+    );
   });
 
   it('returns completed provider results when another provider exceeds the deadline', async () => {
@@ -816,5 +893,65 @@ describe('GET /search', () => {
         { mediaType: 'artist', name: 'Unmapped Singer' },
       ]
     );
+  });
+});
+
+describe('search filters behind the OpenAPI validator', () => {
+  function createValidatedApp(): Express {
+    const validatedApp = express();
+    validatedApp.use(express.json());
+    validatedApp.use((req, _res, next) => {
+      req.user = { id: 1 } as Express.Request['user'];
+      next();
+    });
+    validatedApp.use(
+      OpenApiValidator.middleware({
+        apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
+        validateRequests: true,
+        validateSecurity: false,
+      })
+    );
+    validatedApp.use('/api/v1/search', searchRoutes);
+    validatedApp.use(
+      (
+        err: { status?: number; message?: string; errors?: unknown[] },
+        _req: express.Request,
+        res: express.Response,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _next: express.NextFunction
+      ) => {
+        res.status(err.status ?? 500).json({
+          status: err.status ?? 500,
+          message: err.message,
+          errors: err.errors,
+        });
+      }
+    );
+    return validatedApp;
+  }
+
+  it('admits the music type and both book formats', async () => {
+    const validatedApp = createValidatedApp();
+    getSettings().lidarr = [];
+    getSettings().readarr = [{ serviceType: 'ebook' } as ReadarrSettings];
+
+    const music = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'music' });
+    const audiobook = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'book', format: 'audiobook' });
+
+    getSettings().readarr = [{ serviceType: 'audiobook' } as ReadarrSettings];
+    const ebook = await request(validatedApp)
+      .get('/api/v1/search')
+      .query({ query: 'microsoft', type: 'book', format: 'ebook' });
+
+    assert.strictEqual(music.status, 200);
+    assert.strictEqual(audiobook.status, 200);
+    assert.strictEqual(ebook.status, 200);
+    assert.deepStrictEqual(music.body.results, []);
+    assert.deepStrictEqual(audiobook.body.results, []);
+    assert.deepStrictEqual(ebook.body.results, []);
   });
 });

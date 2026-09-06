@@ -1,12 +1,14 @@
 import { JSDOM } from 'jsdom';
 import { RouterContext } from 'next/dist/shared/lib/router-context.shared-runtime';
 import type { NextRouter } from 'next/router';
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 import { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import useSearchInput from './useSearchInput';
 import {
+  getDefaultSearchFormat,
+  getDefaultSearchType,
   getSearchQuery,
   shouldNavigateToSearch,
   shouldSyncSearchInput,
@@ -69,6 +71,20 @@ describe('getSearchQuery', () => {
   });
 });
 
+describe('getDefaultSearchType', () => {
+  it('starts searches from book discovery with the book filter', () => {
+    strictEqual(getDefaultSearchType('/discover/books'), 'book');
+    strictEqual(getDefaultSearchType('/discover/movies'), undefined);
+  });
+});
+
+describe('getDefaultSearchFormat', () => {
+  it('starts searches from book discovery with the ebook format', () => {
+    strictEqual(getDefaultSearchFormat('/discover/books'), 'ebook');
+    strictEqual(getDefaultSearchFormat('/discover/movies'), undefined);
+  });
+});
+
 describe('shouldNavigateToSearch', () => {
   it('does not navigate again when the URL already has the search query', () => {
     strictEqual(
@@ -127,6 +143,63 @@ describe('shouldSyncSearchInput', () => {
 });
 
 describe('useSearchInput routing', () => {
+  it('carries the book filter from book discovery into search', async () => {
+    dom = new JSDOM('<div id="root"></div>', {
+      url: 'http://localhost/discover/books',
+    });
+    dom.window.scrollTo = () => undefined;
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: dom.window,
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: dom.window.document,
+    });
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+
+    const pushes: unknown[] = [];
+    const router = createRouter({
+      asPath: '/discover/books',
+      pathname: '/discover/books',
+      query: {},
+      route: '/discover/books',
+      push: async (...args) => {
+        pushes.push(args);
+        return true;
+      },
+    });
+    let search: ReturnType<typeof useSearchInput> | undefined;
+    const Probe = () => {
+      search = useSearchInput();
+      return null;
+    };
+
+    root = createRoot(dom.window.document.getElementById('root')!);
+    await act(async () =>
+      root?.render(
+        createElement(RouterProvider, { router }, createElement(Probe))
+      )
+    );
+    await act(async () => {
+      search?.setIsOpen(true);
+      search?.setSearchValue('linux');
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+
+    strictEqual(pushes.length, 1);
+    deepStrictEqual(pushes[0], [
+      {
+        pathname: '/search',
+        query: { query: 'linux', type: 'book', format: 'ebook' },
+      },
+    ]);
+  });
+
   it('leaves a clicked search result on top and preserves search in history', async () => {
     dom = new JSDOM('<div id="root"></div>', {
       url: 'http://localhost/search?query=alien',
@@ -164,8 +237,9 @@ describe('useSearchInput routing', () => {
         return true;
       },
     });
+    let search: ReturnType<typeof useSearchInput> | undefined;
     const Probe = () => {
-      useSearchInput();
+      search = useSearchInput();
       return null;
     };
     const render = () =>
@@ -184,6 +258,24 @@ describe('useSearchInput routing', () => {
     await act(async () => render());
 
     strictEqual(pushes.length, 0);
+
+    routeChangeStart?.();
+    router.pathname = '/search';
+    router.route = '/search';
+    router.asPath =
+      '/search?query=alien&type=book&format=ebook&sort=date&order=desc';
+    router.query = {
+      query: 'alien',
+      type: 'book',
+      format: 'ebook',
+      sort: 'date',
+      order: 'desc',
+    };
+    await act(async () => render());
+
+    strictEqual(pushes.length, 0);
+    strictEqual(search?.searchValue, 'alien');
+    strictEqual(search?.searchOpen, true);
   });
 
   it('preserves newer typing through a stale route update and navigates once', async () => {

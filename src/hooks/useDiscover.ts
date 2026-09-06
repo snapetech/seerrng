@@ -40,6 +40,7 @@ interface BaseMedia {
 interface DiscoverResult<T, S> {
   isLoadingInitialData: boolean;
   isLoadingMore: boolean;
+  isValidating: boolean;
   fetchMore: () => void;
   isEmpty: boolean;
   isReachingEnd: boolean;
@@ -140,6 +141,8 @@ const useDiscover = <
     hideAvailable = true,
     hideBlocklisted = true,
     randomizeOrder = false,
+    showErrorToast = true,
+    shouldRetryOnError = true,
   } = {}
 ): DiscoverResult<T, S> => {
   const settings = useSettings();
@@ -196,6 +199,7 @@ const useDiscover = <
       dedupingInterval: 30000,
       revalidateOnFocus: false,
       fallbackData,
+      shouldRetryOnError,
     }
   );
 
@@ -334,17 +338,18 @@ const useDiscover = <
   }, [data, fallbackCacheKey, randomizeOrder, titles.length]);
 
   useEffect(() => {
-    if (error && titles.length) {
+    if (showErrorToast && error && titles.length) {
       addToast(intl.formatMessage(globalMessages.error), {
         appearance: 'error',
         autoDismiss: true,
       });
     }
-  }, [data, error, addToast, intl, titles.length]);
+  }, [data, error, addToast, intl, showErrorToast, titles.length]);
 
   return {
     isLoadingInitialData,
     isLoadingMore,
+    isValidating,
     fetchMore,
     isEmpty,
     isReachingEnd,

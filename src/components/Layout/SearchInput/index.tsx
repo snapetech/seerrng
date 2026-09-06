@@ -1,6 +1,7 @@
+import useSearchActivity from '@app/hooks/useSearchActivity';
 import useSearchInput from '@app/hooks/useSearchInput';
 import defineMessages from '@app/utils/defineMessages';
-import { XCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 import type { KeyboardEvent } from 'react';
 import { useCallback } from 'react';
@@ -8,11 +9,13 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Layout.SearchInput', {
   searchPlaceholder: 'Search movies, series, music, books, and people',
+  searching: 'Searching',
 });
 
 const SearchInput = () => {
   const intl = useIntl();
   const { searchValue, setSearchValue, setIsOpen, clear } = useSearchInput();
+  const isSearching = useSearchActivity();
   const hasSearchValue = searchValue.length > 0;
   const handleBlur = useCallback(() => {
     if (searchValue === '') {
@@ -27,8 +30,8 @@ const SearchInput = () => {
   }, []);
 
   return (
-    <div className="flex flex-1">
-      <div className="flex w-full">
+    <div className="flex flex-1 items-center gap-3">
+      <div className="flex w-1/2 min-w-0">
         <label htmlFor="search_field" className="sr-only">
           Search
         </label>
@@ -60,6 +63,16 @@ const SearchInput = () => {
           )}
         </div>
       </div>
+      {isSearching && (
+        <div
+          className="flex shrink-0 items-center gap-2 text-sm text-gray-200"
+          role="status"
+          aria-live="polite"
+        >
+          <ArrowPathIcon className="h-5 w-5 animate-spin" />
+          <span>{intl.formatMessage(messages.searching)}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -26,6 +26,7 @@ export interface BookResult {
   ratingsAverage?: number;
   ratingsCount?: number;
   wantToReadCount?: number;
+  publisher?: string;
   score?: number;
   mediaInfo?: Media;
 }
@@ -132,6 +133,7 @@ export const mapOpenLibrarySearchDoc = (
     ratingsAverage: doc.ratings_average,
     ratingsCount: doc.ratings_count,
     wantToReadCount: doc.want_to_read_count,
+    publisher: doc.publisher?.[0],
     mediaInfo: media,
   };
 };

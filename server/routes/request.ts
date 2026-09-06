@@ -122,6 +122,23 @@ const requestTimelineStatusFilters = [
   ...Object.values(RequestStatusStage),
 ] as const;
 const requestStatusBookFormatFilters = ['ebook', 'audiobook'] as const;
+const requestStatusTimeFrames = ['7d', '1m', '6m', 'all'] as const;
+
+const getRequestStatusStartDate = (
+  timeFrame: (typeof requestStatusTimeFrames)[number] | undefined
+): Date | undefined => {
+  const days =
+    timeFrame === '7d'
+      ? 7
+      : timeFrame === '1m'
+        ? 30
+        : timeFrame === '6m'
+          ? 180
+          : 0;
+  return days > 0
+    ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    : undefined;
+};
 
 const getExpectedCredentialVersion = (
   req: Pick<Request, 'session' | 'user'>
@@ -2228,6 +2245,14 @@ requestRoutes.get<
     if ('error' in parsedSortDirection) {
       return next({ status: 400, message: parsedSortDirection.error });
     }
+    const parsedTimeFrame = parseOptionalAllowedString(req.query.timeFrame, {
+      fieldName: 'Time frame',
+      allowedValues: requestStatusTimeFrames,
+      maxLength: 8,
+    });
+    if ('error' in parsedTimeFrame) {
+      return next({ status: 400, message: parsedTimeFrame.error });
+    }
     const { field: sort, direction: sortDirection } = parseRequestStatusSort(
       parsedSort.value,
       parsedSortDirection.value
@@ -2249,6 +2274,7 @@ requestRoutes.get<
           ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
           mediaType: mediaType === 'all' ? undefined : (mediaType as MediaType),
           bookFormat: parsedBookFormat.value,
+          since: getRequestStatusStartDate(parsedTimeFrame.value ?? '7d'),
           filter: parsedFilter.value,
           sort,
           sortDirection,

@@ -5953,6 +5953,8 @@ paths:
             enum:
               - movie
               - tv
+              - music
+              - book
       responses:
         '200':
           description: Blocklist details in JSON
@@ -5976,6 +5978,8 @@ paths:
             enum:
               - movie
               - tv
+              - music
+              - book
       responses:
         '204':
           description: Succesfully removed media item
@@ -6086,6 +6090,8 @@ paths:
             enum:
               - movie
               - tv
+              - music
+              - book
       responses:
         '200':
           description: Blocklist details in JSON
@@ -6112,6 +6118,8 @@ paths:
             enum:
               - movie
               - tv
+              - music
+              - book
       responses:
         '204':
           description: Succesfully removed media item
@@ -6730,7 +6738,16 @@ paths:
               - album
               - artist
               - book
+              - music
             description: Filter results by media type. When omitted, all types are returned.
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum:
+              - ebook
+              - audiobook
+            description: Select the configured book service format. Valid only when type is book.
       responses:
         '200':
           description: Results
@@ -8757,6 +8774,13 @@ paths:
           schema:
             type: string
             enum: [ebook, audiobook]
+        - in: query
+          name: timeFrame
+          description: Restrict results to requests created in the selected rolling time window.
+          schema:
+            type: string
+            enum: [7d, 1m, 6m, all]
+            default: 7d
         - in: query
           name: sort
           description: Sort field. Metadata-backed fields are resolved from the configured metadata provider and fall back safely when unavailable.

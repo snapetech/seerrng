@@ -106,8 +106,10 @@ describe('mapOpenLibrarySearchDoc', () => {
     const result = mapOpenLibrarySearchDoc({
       key: '/WORKS/ol456w',
       title: 'Search Book',
+      publisher: ['Example Press', 'Second Publisher'],
     });
 
     assert.strictEqual(result.id, 'OL456W');
+    assert.strictEqual(result.publisher, 'Example Press');
   });
 });

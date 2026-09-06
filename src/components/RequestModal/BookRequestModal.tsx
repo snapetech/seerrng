@@ -68,6 +68,7 @@ const messages = defineMessages('components.RequestModal.Book', {
 
 interface BookRequestModalProps {
   bookId: string;
+  initialBookFormat?: 'ebook' | 'audiobook';
   onCancel?: () => void;
   onComplete?: (newStatus: MediaStatus) => void;
   onUpdating?: (isUpdating: boolean) => void;
@@ -76,6 +77,7 @@ interface BookRequestModalProps {
 
 const BookRequestModal = ({
   bookId,
+  initialBookFormat = 'ebook',
   onCancel,
   onComplete,
   onUpdating,
@@ -86,7 +88,7 @@ const BookRequestModal = ({
   const { user, hasPermission } = useUser();
   const [isUpdating, setIsUpdating] = useState(false);
   const [bookFormat, setBookFormat] = useState<'ebook' | 'audiobook' | 'both'>(
-    editRequest?.bookFormat ?? 'ebook'
+    editRequest?.bookFormat ?? initialBookFormat
   );
   const [hasUserSelectedFormat, setHasUserSelectedFormat] = useState(false);
   const [selectedIsbn, setSelectedIsbn] = useState<string>('');
@@ -110,11 +112,11 @@ const BookRequestModal = ({
   );
 
   useEffect(() => {
-    setBookFormat(editRequest?.bookFormat ?? 'ebook');
+    setBookFormat(editRequest?.bookFormat ?? initialBookFormat);
     setHasUserSelectedFormat(false);
     setSelectedIsbn('');
     setRequestOverrides(null);
-  }, [bookId, editRequest?.bookFormat, editRequest?.id]);
+  }, [bookId, editRequest?.bookFormat, editRequest?.id, initialBookFormat]);
 
   const hasEbookServer = (bookServices ?? []).some(
     (service) => (service.serviceType ?? 'ebook') === 'ebook'

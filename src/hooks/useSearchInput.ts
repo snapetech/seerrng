@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UrlObject } from 'url';
 import useDebouncedState from './useDebouncedState';
 import {
+  getDefaultSearchFormat,
+  getDefaultSearchType,
   getSearchQuery,
   shouldNavigateToSearch,
   shouldSyncSearchInput,
@@ -30,6 +32,7 @@ const useSearchInput = (): SearchObject => {
     getSearchQuery(router.query.query)
   );
   const routeQuery = getSearchQuery(router.query.query);
+  const isSearchPage = router.pathname === '/search';
 
   const setIsOpen = useCallback((isOpen: boolean) => {
     searchOpenedOnCurrentRoute.current = isOpen;
@@ -68,7 +71,7 @@ const useSearchInput = (): SearchObject => {
     ) {
       pendingSearchQuery.current = debouncedValue;
 
-      if (router.pathname.startsWith('/search')) {
+      if (isSearchPage) {
         void router.replace(
           {
             pathname: router.pathname,
@@ -82,15 +85,28 @@ const useSearchInput = (): SearchObject => {
         );
       } else {
         setLastRoute(router.asPath);
+        const defaultSearchType = getDefaultSearchType(router.pathname);
+        const defaultSearchFormat = getDefaultSearchFormat(router.pathname);
         void router
           .push({
             pathname: '/search',
-            query: { query: debouncedValue },
+            query: {
+              query: debouncedValue,
+              ...(defaultSearchType ? { type: defaultSearchType } : {}),
+              ...(defaultSearchFormat ? { format: defaultSearchFormat } : {}),
+            },
           })
           .then(() => window.scrollTo(0, 0));
       }
     }
-  }, [debouncedValue, routeQuery, router, router.pathname, searchOpen]);
+  }, [
+    debouncedValue,
+    isSearchPage,
+    routeQuery,
+    router,
+    router.pathname,
+    searchOpen,
+  ]);
 
   /**
    * This effect is handling behavior when the search input is closed.
@@ -101,10 +117,10 @@ const useSearchInput = (): SearchObject => {
   useEffect(() => {
     if (
       searchValue === '' &&
-      router.pathname.startsWith('/search') &&
-      !searchOpen
+      isSearchPage &&
+      !searchOpen &&
+      closingSearch.current
     ) {
-      closingSearch.current = true;
       pendingSearchQuery.current = null;
 
       if (lastRoute) {
@@ -113,7 +129,7 @@ const useSearchInput = (): SearchObject => {
         router.replace('/').then(() => window.scrollTo(0, 0));
       }
     }
-  }, [lastRoute, router, searchOpen, searchValue]);
+  }, [isSearchPage, lastRoute, router, searchOpen, searchValue]);
 
   /**
    * This effect handles behavior for when the route is changed.
@@ -131,7 +147,13 @@ const useSearchInput = (): SearchObject => {
    * is on /search
    */
   useEffect(() => {
-    if (!router.pathname.startsWith('/search')) {
+    const restoringSearchRoute =
+      isSearchPage &&
+      !searchOpen &&
+      !closingSearch.current &&
+      routeQuery !== '';
+
+    if (!isSearchPage) {
       closingSearch.current = false;
     }
 
@@ -140,6 +162,7 @@ const useSearchInput = (): SearchObject => {
         pendingSearchQuery.current = null;
       }
     } else if (
+      restoringSearchRoute ||
       shouldSyncSearchInput(
         router.pathname,
         routeQuery,
@@ -150,17 +173,18 @@ const useSearchInput = (): SearchObject => {
     ) {
       setSearchValue(routeQuery);
 
-      if (!router.pathname.startsWith('/search') && !routeQuery) {
+      if (!isSearchPage && !routeQuery) {
         searchOpenedOnCurrentRoute.current = false;
         setSearchOpen(false);
       }
     }
 
-    if (router.pathname.startsWith('/search') && !closingSearch.current) {
+    if (isSearchPage && !closingSearch.current) {
       setSearchOpen(true);
     }
   }, [
     debouncedValue,
+    isSearchPage,
     routeQuery,
     router.pathname,
     searchOpen,

@@ -65,6 +65,7 @@ interface TitleCardProps {
   showText?: boolean;
   hideAssociationWhenEmpty?: boolean;
   priority?: boolean;
+  preferredBookFormat?: 'ebook' | 'audiobook';
 }
 
 const messages = defineMessages('components.TitleCard', {
@@ -94,6 +95,7 @@ const TitleCard = ({
   showText = false,
   hideAssociationWhenEmpty = false,
   priority = false,
+  preferredBookFormat,
 }: TitleCardProps) => {
   const isTouch = useIsTouch();
   const intl = useIntl();
@@ -392,7 +394,12 @@ const TitleCard = ({
           : mediaType === 'album'
             ? `/music/${encodeApiPathSegment(canonicalId)}`
             : mediaType === 'book'
-              ? `/book/${encodeApiPathSegment(canonicalId)}`
+              ? {
+                  pathname: `/book/${encodeApiPathSegment(canonicalId)}`,
+                  query: preferredBookFormat
+                    ? { format: preferredBookFormat }
+                    : undefined,
+                }
               : `/artist/${encodeApiPathSegment(canonicalId)}`;
   const displayImage = getTmdbPosterImageUrl(image, 'w300_and_h450_face');
   const imageCacheType =
@@ -492,6 +499,7 @@ const TitleCard = ({
           {isBook && typeof canonicalId === 'string' && (
             <RequestModal
               bookId={canonicalId}
+              initialBookFormat={preferredBookFormat}
               show={showRequestModal}
               type="book"
               onComplete={requestComplete}

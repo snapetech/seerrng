@@ -6,9 +6,30 @@ import OpenLibraryAPI, {
   MAX_OPENLIBRARY_EDITION_ISBNS,
   MAX_OPENLIBRARY_PAGE_SIZE,
   MAX_OPENLIBRARY_TITLE_LENGTH,
+  OPENLIBRARY_SEARCH_FIELDS,
 } from '@server/api/openlibrary';
 
 describe('OpenLibraryAPI response bounds', () => {
+  it('requests every bounded field used by search result sorting and display', async () => {
+    const openLibrary = new OpenLibraryAPI();
+    let requestOptions: { params?: Record<string, string> } | undefined;
+    Object.defineProperty(openLibrary, 'get', {
+      configurable: true,
+      value: async (
+        _endpoint: string,
+        options: { params?: Record<string, string> }
+      ) => {
+        requestOptions = options;
+        return { numFound: 0, start: 0, docs: [] };
+      },
+    });
+
+    await openLibrary.searchBooks({ query: 'microsoft' });
+
+    assert.equal(requestOptions?.params?.fields, OPENLIBRARY_SEARCH_FIELDS);
+    assert.match(OPENLIBRARY_SEARCH_FIELDS, /publisher/);
+  });
+
   it('rejects path-control resource IDs before dispatch', async () => {
     const openLibrary = new OpenLibraryAPI();
     let dispatches = 0;
@@ -72,6 +93,7 @@ describe('OpenLibraryAPI response bounds', () => {
               { length: MAX_OPENLIBRARY_EDITION_ISBNS + 100 },
               (_, index) => String(index)
             ),
+            publisher: ['Example Press', 42, 'Second Publisher'],
           },
         ],
       }),
@@ -90,6 +112,10 @@ describe('OpenLibraryAPI response bounds', () => {
       response.docs[0].isbn?.length,
       MAX_OPENLIBRARY_EDITION_ISBNS
     );
+    assert.deepStrictEqual(response.docs[0].publisher, [
+      'Example Press',
+      'Second Publisher',
+    ]);
   });
 
   it('bounds work text and drops malformed nested values', async () => {

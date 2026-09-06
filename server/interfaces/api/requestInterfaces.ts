@@ -104,6 +104,7 @@ export type RequestStatusQuery = {
   requestedBy?: number;
   mediaType?: MediaType | 'all';
   bookFormat?: 'ebook' | 'audiobook';
+  timeFrame?: '7d' | '1m' | '6m' | 'all';
   filter?: string;
   sort?: RequestStatusSortField;
   sortDirection?: RequestStatusSortDirection;
