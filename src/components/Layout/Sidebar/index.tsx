@@ -9,11 +9,13 @@ import versionedAsset from '@app/utils/versionedAsset';
 import { Transition } from '@headlessui/react';
 import {
   BookOpenIcon,
+  ChartBarSquareIcon,
   ClockIcon,
   CogIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  MagnifyingGlassIcon,
   MusicalNoteIcon,
   SparklesIcon,
   TvIcon,
@@ -34,6 +36,8 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browsetv: 'Series',
   requests: 'Requests',
   requeststatus: 'Request Status',
+  customsearch: 'Custom Search',
+  customstatus: 'Custom Status',
   blocklist: 'Blocklist',
   issues: 'Issues',
   users: 'Users',
@@ -58,6 +62,7 @@ interface SidebarLinkProps {
   requiredPermission?: Permission | Permission[];
   permissionType?: 'and' | 'or';
   dataTestId?: string;
+  nativeNavigation?: boolean;
 }
 
 const SidebarLinks: SidebarLinkProps[] = [
@@ -92,10 +97,23 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/books$/,
   },
   {
+    href: '/custom-search',
+    messagesKey: 'customsearch',
+    svgIcon: <MagnifyingGlassIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/custom-search/,
+  },
+  {
     href: '/requests/status',
     messagesKey: 'requeststatus',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/requests\/status/,
+  },
+  {
+    href: '/request-status/',
+    messagesKey: 'customstatus',
+    svgIcon: <ChartBarSquareIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/request-status/,
+    nativeNavigation: true,
   },
   {
     href: '/requests',
@@ -246,7 +264,13 @@ const Sidebar = ({
                             href={sidebarLink.href}
                             as={sidebarLink.as}
                             prefetch={false}
-                            onClick={() => setClosed()}
+                            onClick={(event) => {
+                              setClosed();
+                              if (sidebarLink.nativeNavigation) {
+                                event.preventDefault();
+                                window.location.assign(sidebarLink.href);
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 setClosed();
@@ -310,6 +334,12 @@ const Sidebar = ({
                       href={sidebarLink.href}
                       as={sidebarLink.as}
                       prefetch={false}
+                      onClick={(event) => {
+                        if (sidebarLink.nativeNavigation) {
+                          event.preventDefault();
+                          window.location.assign(sidebarLink.href);
+                        }
+                      }}
                       className={`group flex items-center rounded-md px-2 py-2 text-lg font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
                         router.pathname.match(sidebarLink.activeRegExp)
                           ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'

@@ -32,6 +32,8 @@ const useSearchInput = (): SearchObject => {
     getSearchQuery(router.query.query)
   );
   const routeQuery = getSearchQuery(router.query.query);
+  const isSearchPage =
+    router.pathname === '/search' || router.pathname === '/custom-search';
 
   const setIsOpen = useCallback((isOpen: boolean) => {
     searchOpenedOnCurrentRoute.current = isOpen;
@@ -70,7 +72,7 @@ const useSearchInput = (): SearchObject => {
     ) {
       pendingSearchQuery.current = debouncedValue;
 
-      if (router.pathname.startsWith('/search')) {
+      if (isSearchPage) {
         void router.replace(
           {
             pathname: router.pathname,
@@ -98,7 +100,14 @@ const useSearchInput = (): SearchObject => {
           .then(() => window.scrollTo(0, 0));
       }
     }
-  }, [debouncedValue, routeQuery, router, router.pathname, searchOpen]);
+  }, [
+    debouncedValue,
+    isSearchPage,
+    routeQuery,
+    router,
+    router.pathname,
+    searchOpen,
+  ]);
 
   /**
    * This effect is handling behavior when the search input is closed.
@@ -109,7 +118,7 @@ const useSearchInput = (): SearchObject => {
   useEffect(() => {
     if (
       searchValue === '' &&
-      router.pathname.startsWith('/search') &&
+      isSearchPage &&
       !searchOpen &&
       closingSearch.current
     ) {
@@ -121,7 +130,7 @@ const useSearchInput = (): SearchObject => {
         router.replace('/').then(() => window.scrollTo(0, 0));
       }
     }
-  }, [lastRoute, router, searchOpen, searchValue]);
+  }, [isSearchPage, lastRoute, router, searchOpen, searchValue]);
 
   /**
    * This effect handles behavior for when the route is changed.
@@ -140,12 +149,12 @@ const useSearchInput = (): SearchObject => {
    */
   useEffect(() => {
     const restoringSearchRoute =
-      router.pathname.startsWith('/search') &&
+      isSearchPage &&
       !searchOpen &&
       !closingSearch.current &&
       routeQuery !== '';
 
-    if (!router.pathname.startsWith('/search')) {
+    if (!isSearchPage) {
       closingSearch.current = false;
     }
 
@@ -165,17 +174,18 @@ const useSearchInput = (): SearchObject => {
     ) {
       setSearchValue(routeQuery);
 
-      if (!router.pathname.startsWith('/search') && !routeQuery) {
+      if (!isSearchPage && !routeQuery) {
         searchOpenedOnCurrentRoute.current = false;
         setSearchOpen(false);
       }
     }
 
-    if (router.pathname.startsWith('/search') && !closingSearch.current) {
+    if (isSearchPage && !closingSearch.current) {
       setSearchOpen(true);
     }
   }, [
     debouncedValue,
+    isSearchPage,
     routeQuery,
     router.pathname,
     searchOpen,

@@ -100,6 +100,13 @@ describe('shouldNavigateToSearch', () => {
     );
   });
 
+  it('navigates when a new query is ready on custom search', () => {
+    strictEqual(
+      shouldNavigateToSearch('/custom-search', 'alien', 'aliens', true, false),
+      true
+    );
+  });
+
   it('does not navigate for a closed or empty search', () => {
     strictEqual(shouldNavigateToSearch('/', '', 'alien', false, true), false);
     strictEqual(shouldNavigateToSearch('/', '', '', true, true), false);
@@ -135,6 +142,13 @@ describe('shouldSyncSearchInput', () => {
 
   it('does not restore the route query while search is being closed', () => {
     strictEqual(shouldSyncSearchInput('/search', 'alien', '', '', true), false);
+  });
+
+  it('does not restore the custom route query while search is closing', () => {
+    strictEqual(
+      shouldSyncSearchInput('/custom-search', 'alien', '', '', true),
+      false
+    );
   });
 
   it('syncs a query when navigating to search externally', () => {
