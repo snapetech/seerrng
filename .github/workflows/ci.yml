@@ -18,9 +18,8 @@ env:
   DOCKER_HUB: snapetech/seerrng
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Main publishes/deployments must finish their cutover or rollback sequence.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   release-notes:
@@ -231,12 +230,17 @@ jobs:
     name: Publish multi-arch image
     timeout-minutes: 90
     if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: seerrng-main-image-publish
+      cancel-in-progress: true
     runs-on:
       [self-hosted, seerrng, linux-build, linux-amd64, linux-arm64-cross]
     permissions:
       contents: read
       packages: write
       id-token: write
+    outputs:
+      image_digest: ${{ steps.resolve-digest.outputs.image_digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -379,11 +383,96 @@ jobs:
           scripts/verify-container-manifest.sh --require-provenance "${image_name}:main" linux/amd64 linux/arm64
           scripts/verify-container-manifest.sh --require-provenance "${image_name}:sha-${GITHUB_SHA::7}" linux/amd64 linux/arm64
 
+      - name: Resolve published image digest
+        id: resolve-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_name="ghcr.io/${GITHUB_REPOSITORY}"
+          for attempt in 1 2 3 4 5; do
+            echo "Resolving published image digest (attempt ${attempt}/5)"
+            if digest=$(docker buildx imagetools inspect "${image_name}:main" --format '{{json .Manifest.Digest}}' | tr -d '"') &&
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "image_digest=$digest" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo 'Unable to resolve the published image digest after 5 attempts.' >&2
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
+
+  scan-main-image:
+    name: Scan main image (${{ matrix.platform }})
+    if: github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            suffix: amd64
+          - platform: linux/arm64
+            suffix: arm64
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    env:
+      TRIVY_CACHE_DIR: .trivycache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache Trivy DB
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .trivycache
+          key: trivy-${{ runner.os }}-${{ hashFiles('**/Dockerfile') }}
+          restore-keys: |
+            trivy-${{ runner.os }}-
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: 0.58.2
+
+      - name: Run Trivy image scan
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          trivy image \
+            --platform "$PLATFORM" \
+            --format sarif \
+            --output "trivy-main-${{ matrix.suffix }}.sarif" \
+            --ignore-unfixed \
+            "ghcr.io/${{ github.repository }}@${{ needs.publish.outputs.image_digest }}"
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: trivy-main-${{ matrix.suffix }}.sarif
+          category: trivy-main-${{ matrix.suffix }}
+
   deploy-main:
     name: Deploy main to seerr.home
     timeout-minutes: 30
     if: github.ref == 'refs/heads/main'
     needs: [publish, preflight-deploy]
+    concurrency:
+      group: seerrng-live-deploy
+      cancel-in-progress: false
     runs-on: [self-hosted, seerrng, linux-build, kspls0]
     permissions:
       contents: read
@@ -392,6 +481,7 @@ jobs:
       SEERRNG_CONTAINER_NAME: ${{ vars.SEERRNG_CONTAINER_NAME || 'seerr-host' }}
       SEERRNG_PORT: ${{ vars.SEERRNG_PORT || '5055' }}
       SEERRNG_CONFIG_DIR: ${{ vars.SEERRNG_CONFIG_DIR || '/mnt/datapool_lvm_media/seerrng-config' }}
+      SEERRNG_IMAGE_DIGEST: ${{ needs.publish.outputs.image_digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -415,26 +505,11 @@ jobs:
         run: |
           set -euo pipefail
           image_name="ghcr.io/${GITHUB_REPOSITORY}"
-          # ':main' now resolves to a multi-arch manifest list. Resolve its
-          # digest on the registry side with `imagetools inspect` (the same
-          # approach release.yml uses) rather than reading back
-          # `docker image inspect --format '{{.RepoDigests}}'`: once a tag
-          # points at an index, what that local field reports for a pulled
-          # image varies by Docker storage driver (classic image store vs.
-          # containerd image store) and is no longer reliably single-valued.
-          digest=""
-          for attempt in 1 2 3 4 5; do
-            echo "Resolving main image digest (attempt ${attempt}/5)"
-            if digest=$(docker buildx imagetools inspect "${image_name}:main" --format '{{json .Manifest.Digest}}' | tr -d '"') &&
-              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-              break
-            fi
-            if [ "$attempt" -eq 5 ]; then
-              echo 'Unable to resolve the main image digest after 5 attempts.' >&2
-              exit 1
-            fi
-            sleep $((attempt * 15))
-          done
+          digest="${SEERRNG_IMAGE_DIGEST:?The publish job did not provide an image digest}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo 'The publish job returned an invalid image digest.' >&2
+            exit 1
+          }
           image_ref="${image_name}@${digest}"
           docker pull "$image_ref"
           printf 'SEERRNG_IMAGE_REF=%s\n' "$image_ref" >> "$GITHUB_ENV"

@@ -103,6 +103,10 @@ test('multi-architecture publishers perform the real build once and verify the i
   assert.equal(ci.jobs.build, undefined);
   assert.equal(ci.jobs.publish.if, "github.ref == 'refs/heads/main'");
   assert.equal(ci.jobs.publish.needs, undefined);
+  assert.equal(
+    ci.jobs.publish.outputs.image_digest,
+    '${{ steps.resolve-digest.outputs.image_digest }}'
+  );
   assert.deepEqual(ci.jobs['deploy-main'].needs, [
     'publish',
     'preflight-deploy',
@@ -124,6 +128,17 @@ test('multi-architecture publishers perform the real build once and verify the i
       (step) => step.name === 'Verify published architectures'
     ).run,
     /verify-container-manifest\.sh --require-provenance/u
+  );
+  assert.equal(ci.jobs['scan-main-image'].needs, 'publish');
+  assert.deepEqual(ci.jobs['scan-main-image'].strategy.matrix.include, [
+    { platform: 'linux/amd64', suffix: 'amd64' },
+    { platform: 'linux/arm64', suffix: 'arm64' },
+  ]);
+  assert.match(
+    ci.jobs['scan-main-image'].steps.find(
+      (step) => step.name === 'Run Trivy image scan'
+    ).run,
+    /ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.publish\.outputs\.image_digest \}\}/u
   );
 
   assert.equal(preview.jobs.build, undefined);

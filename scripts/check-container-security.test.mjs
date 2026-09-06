@@ -110,7 +110,8 @@ test('the main deployment runs the pulled digest inside the container boundary',
   const verifyScript = deploySteps.find(
     (step) => step.name === 'Verify seerr.home deployment'
   ).run;
-  assert.match(pullScript, /RepoDigests/u);
+  assert.match(pullScript, /SEERRNG_IMAGE_DIGEST/u);
+  assert.match(pullScript, /invalid image digest/u);
   assert.match(pullScript, /SEERRNG_IMAGE_REF/u);
   assert.match(deploymentValidationScript, /65535/u);
   assert.match(deploymentValidationScript, /SEERRNG_CONFIG_DIR/u);
@@ -371,8 +372,13 @@ test('rollback restarts the old container if cancellation lands before rename', 
 });
 
 test('main CI runs cannot cancel a deployment during cutover', () => {
+  assert.equal(ciWorkflow.jobs.publish.concurrency['cancel-in-progress'], true);
+  assert.deepEqual(ciWorkflow.jobs['deploy-main'].concurrency, {
+    group: 'seerrng-live-deploy',
+    'cancel-in-progress': false,
+  });
   assert.equal(
     ciWorkflow.concurrency['cancel-in-progress'],
-    "${{ github.ref != 'refs/heads/main' }}"
+    "${{ github.event_name == 'pull_request' }}"
   );
 });
