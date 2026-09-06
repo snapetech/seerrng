@@ -37,6 +37,34 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.14.0](https://github.com/snapetech/seerrng/compare/v3.13.3..v3.14.0) - 2026-09-06
+
+### User-facing changes
+
+#### Added
+
+- **Request Status:** A new Request Status page tracks requests from approval through download and library availability, preserves status history, and lets authorized users retry requests that need attention.
+  - **Action required:** upgrade
+
+#### Fixed
+
+- **Request Status:** Request Status detail responses now include the associated media and request metadata, so direct links and API clients have the same context as the status list.
+  - **Action required:** upgrade
+- **Request Status:** Book request status now names only the selected ebook or audiobook service, while mixed-format requests continue to show both services accurately.
+  - **Action required:** upgrade
+- **Request Status:** Request Status now keeps filtered results, TV season progress, mixed download queues, and status history aligned with the latest trustworthy media and download state. Request owners can also retry failed or unavailable requests when their media-request permission still applies.
+  - **Action required:** upgrade
+
+### 🚀 Features
+- *(requests)* Add request status timeline - ([5c83029](https://github.com/snapetech/seerrng/commit/5c8302904b7cee5f9928ef3c580a6e4adf9ec29d))
+
+### 🐛 Bug Fixes
+- *(requests)* Include media in status details - ([fee86fa](https://github.com/snapetech/seerrng/commit/fee86fa56db2dd36185f9b936d03008f8fb4a84c))
+- *(requests)* Scope book status services to format - ([0788f98](https://github.com/snapetech/seerrng/commit/0788f984c61e37c7f4d57398b56c5a502a84d657))
+- *(requests)* Reconcile status projections with live state - ([7d0ed62](https://github.com/snapetech/seerrng/commit/7d0ed62a0405f54195b3e8317e9c1d5bb3c9c91d))
+
 ## [3.13.3](https://github.com/snapetech/seerrng/compare/v3.13.2..v3.13.3) - 2026-09-05
 
 ### User-facing changes
