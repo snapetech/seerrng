@@ -46,12 +46,16 @@ test('multi-architecture publishers perform the real build once and verify the i
 
   assert.equal(ci.jobs.build, undefined);
   assert.equal(ci.jobs.publish.if, "github.ref == 'refs/heads/main'");
-  assert.equal(ci.jobs.publish.needs, 'preflight-deploy');
+  assert.equal(ci.jobs.publish.needs, undefined);
+  assert.deepEqual(ci.jobs['deploy-main'].needs, [
+    'publish',
+    'preflight-deploy',
+  ]);
   assert.match(
     ci.jobs['preflight-deploy'].steps.find(
       (step) => step.name === 'Verify deployment storage is mounted read-write'
     ).run,
-    /refusing to publish an image that cannot be deployed/u
+    /refusing deployment until the host is repaired/u
   );
   assert.match(
     ci.jobs.publish.steps.find(

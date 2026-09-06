@@ -208,7 +208,7 @@ jobs:
           mount_options="$(findmnt -T "$SEERRNG_CONFIG_DIR" -no OPTIONS)"
           echo "Deployment mount options: $mount_options"
           if [[ ",$mount_options," == *,ro,* || ",$mount_options," == *,emergency_ro,* ]]; then
-            echo 'Deployment storage is read-only; refusing to publish an image that cannot be deployed.' >&2
+            echo 'Deployment storage is read-only; refusing deployment until the host is repaired.' >&2
             findmnt -T "$SEERRNG_CONFIG_DIR" -o TARGET,SOURCE,FSTYPE,OPTIONS >&2 || true
             df -hT "$SEERRNG_CONFIG_DIR" >&2 || true
             sudo -n lvs -o lv_name,vg_name,lv_attr,lv_size,devices >&2 || true
@@ -231,7 +231,6 @@ jobs:
     name: Publish multi-arch image
     timeout-minutes: 90
     if: github.ref == 'refs/heads/main'
-    needs: preflight-deploy
     runs-on:
       [self-hosted, seerrng, linux-build, linux-amd64, linux-arm64-cross]
     permissions:
@@ -384,7 +383,7 @@ jobs:
     name: Deploy main to seerr.home
     timeout-minutes: 30
     if: github.ref == 'refs/heads/main'
-    needs: publish
+    needs: [publish, preflight-deploy]
     runs-on: [self-hosted, seerrng, linux-build, kspls0]
     permissions:
       contents: read
