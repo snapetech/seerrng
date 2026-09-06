@@ -479,7 +479,8 @@ jobs:
 
   publish-release:
     name: Publish release
-    needs: [create-draft-release, verify]
+    needs:
+      [create-draft-release, verify, build-release-assets, dispatch-package-channels]
     timeout-minutes: 10
     runs-on: [self-hosted, Linux, X64, seerrng]
     permissions:
@@ -494,7 +495,7 @@ jobs:
 
   build-release-assets:
     name: Build release assets
-    needs: publish-release
+    needs: verify
     uses: ./.github/workflows/release-assets.yml
     with:
       tag: ${{ inputs.tag || github.ref_name }}
@@ -503,7 +504,7 @@ jobs:
 
   dispatch-package-channels:
     name: Dispatch package channels
-    needs: [publish-release, build-release-assets]
+    needs: [verify, build-release-assets]
     timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:
@@ -615,9 +616,12 @@ jobs:
       RELEASE_BODY: ${{ needs.changelog.outputs.release_body }}
     steps:
       - name: Send Discord announcement
-        if: env.DISCORD_WEBHOOK != ''
         shell: bash
         run: |
+          test -n "$DISCORD_WEBHOOK" || {
+            echo 'DISCORD_RELEASE_WEBHOOK is required to complete a release.' >&2
+            exit 1
+          }
           release_url="${{ github.server_url }}/${{ github.repository }}/releases/tag/${VERSION}"
           image_ref="ghcr.io/${{ github.repository }}:${VERSION}"
           body="${RELEASE_BODY}"$'\n\n'"Images are published by the release pipeline."

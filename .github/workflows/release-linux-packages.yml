@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Resolve version
         id: version
@@ -29,6 +31,10 @@ jobs:
           [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Verify release tag is on main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/ensure-release-tag-on-main.sh "$TAG"
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y build-essential debhelper devscripts dpkg-dev
       - name: Download Linux asset
@@ -73,6 +79,7 @@ jobs:
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
           files: |
             seerrng_${{ steps.version.outputs.version }}_amd64.deb
             seerrng_${{ steps.version.outputs.version }}_amd64.deb.sha256
@@ -84,6 +91,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Resolve version
         id: version
@@ -96,6 +105,10 @@ jobs:
           [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Verify release tag is on main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/ensure-release-tag-on-main.sh "$TAG"
       - name: Install packaging tools
         run: dnf install -y gh rpm-build rpmdevtools systemd-rpm-macros
       - name: Download Linux asset
@@ -127,6 +140,7 @@ jobs:
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
           files: |
             *.rpm
             *.rpm.sha256
@@ -137,6 +151,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Resolve version
         id: version
@@ -149,6 +165,10 @@ jobs:
           [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Verify release tag is on main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/ensure-release-tag-on-main.sh "$TAG"
       - name: Download Linux asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -183,6 +203,7 @@ jobs:
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
           files: |
             SeerrNG-*.AppImage
             SeerrNG-*.AppImage.sha256

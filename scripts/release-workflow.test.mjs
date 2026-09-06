@@ -18,17 +18,15 @@ test('release package channels wait for the reusable release asset build', () =>
   const release = readWorkflow('release.yml');
   const assetBuild = release.jobs['build-release-assets'];
   const packageDispatch = release.jobs['dispatch-package-channels'];
+  const publishRelease = release.jobs['publish-release'];
   const dispatchScript = packageDispatch.steps.find(
     (step) => step.name === 'Dispatch package workflows'
   ).run;
 
   assert.equal(assetBuild.uses, './.github/workflows/release-assets.yml');
-  assert.equal(assetBuild.needs, 'publish-release');
+  assert.equal(assetBuild.needs, 'verify');
   assert.equal(assetBuild.with.tag, '${{ inputs.tag || github.ref_name }}');
-  assert.deepEqual(packageDispatch.needs, [
-    'publish-release',
-    'build-release-assets',
-  ]);
+  assert.deepEqual(packageDispatch.needs, ['verify', 'build-release-assets']);
   assert.equal(packageDispatch['timeout-minutes'], 120);
   assert.match(dispatchScript, /--ref main/u);
   assert.match(dispatchScript, /release-linux-packages\.yml/u);
@@ -37,6 +35,64 @@ test('release package channels wait for the reusable release asset build', () =>
     dispatchScript,
     /Skipping stable package channels for pre-release/u
   );
+  assert.deepEqual(publishRelease.needs, [
+    'create-draft-release',
+    'verify',
+    'build-release-assets',
+    'dispatch-package-channels',
+  ]);
+  assert.equal(
+    release.jobs['announce-discord'].needs.includes('publish-release'),
+    true
+  );
+  const discordStep = release.jobs['announce-discord'].steps.find(
+    (step) => step.name === 'Send Discord announcement'
+  );
+  assert.equal(discordStep.if, undefined);
+  assert.match(
+    discordStep.run,
+    /DISCORD_RELEASE_WEBHOOK is required to complete a release/u
+  );
+});
+
+test('package workflows build the requested tag and reject tags outside main', () => {
+  for (const workflowName of [
+    'release-linux-packages.yml',
+    'release-flatpak.yml',
+    'release-ppa.yml',
+    'release-copr.yml',
+  ]) {
+    const workflowText = fs.readFileSync(
+      path.join(workflowDirectory, workflowName),
+      'utf8'
+    );
+    assert.match(
+      workflowText,
+      /ref: \$\{\{ (?:github\.event\.inputs|steps\.version\.outputs)\.tag(?: \}\})?/u
+    );
+    assert.match(
+      workflowText,
+      /ensure-release-tag-on-main\.sh/u,
+      `${workflowName} must verify tag ancestry before publishing`
+    );
+  }
+});
+
+test('release asset uploaders preserve the draft until the final publish gate', () => {
+  for (const workflowName of [
+    'release-assets.yml',
+    'release-linux-packages.yml',
+    'release-flatpak.yml',
+  ]) {
+    const workflowText = fs.readFileSync(
+      path.join(workflowDirectory, workflowName),
+      'utf8'
+    );
+    assert.match(
+      workflowText,
+      /softprops\/action-gh-release@[\s\S]*?draft: true/u
+    );
+  }
 });
 
 test('multi-architecture publishers perform the real build once and verify the index', () => {

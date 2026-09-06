@@ -168,5 +168,6 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ needs.resolve.outputs.tag }}
+          draft: true
           files: |
             dist-release/seerrng-*

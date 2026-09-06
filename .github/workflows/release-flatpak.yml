@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Resolve version
         id: version
@@ -29,6 +31,10 @@ jobs:
           [[ "$tag" != *-* ]] || { echo "Stable package channels reject pre-release tag: $tag" >&2; exit 2; }
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Verify release tag is on main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/ensure-release-tag-on-main.sh "$TAG"
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
@@ -64,6 +70,7 @@ jobs:
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
           files: |
             SeerrNG-*.flatpak
             SeerrNG-*.flatpak.sha256

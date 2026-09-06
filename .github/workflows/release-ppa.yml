@@ -33,7 +33,14 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ steps.version.outputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify release tag is on main
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/ensure-release-tag-on-main.sh "$TAG"
 
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y build-essential debhelper devscripts dpkg-dev gnupg curl
