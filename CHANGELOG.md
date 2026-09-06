@@ -39,6 +39,19 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.15.0](https://github.com/snapetech/seerrng/compare/v3.14.0..v3.15.0) - 2026-09-06
+
+### User-facing changes
+
+#### Added
+
+- **Request Status:** Request Status now matches the full workflow view with per-user history, media-type and ebook/audiobook filters, and media-aware sorting across movies, series, music, and books.
+
+### 🚀 Features
+- *(requests)* Expand request status workflow view - ([53bd101](https://github.com/snapetech/seerrng/commit/53bd101c066411da6ba223439cc06cc0a8733777))
+
 ## [3.14.0](https://github.com/snapetech/seerrng/compare/v3.13.3..v3.14.0) - 2026-09-06
 
 ### User-facing changes
