@@ -372,7 +372,7 @@ const Search = () => {
             return (
               <Button
                 key={searchCategory.key}
-                className="w-28"
+                className="w-[104px] px-2"
                 buttonSize="sm"
                 buttonType={isSelected ? 'primary' : 'default'}
                 aria-pressed={isSelected}
@@ -425,7 +425,7 @@ const Search = () => {
             return (
               <Button
                 key={sortOption.field}
-                className="w-28"
+                className="w-[104px] px-2"
                 buttonSize="sm"
                 buttonType={isSelected ? 'primary' : 'default'}
                 aria-pressed={isSelected}
@@ -454,8 +454,10 @@ const Search = () => {
                   );
                 }}
               >
-                {intl.formatMessage(sortOption.message)}
-                <SortDirectionIcon className="ml-2 h-4 w-4" />
+                <span className="flex items-center gap-2">
+                  {intl.formatMessage(sortOption.message)}
+                  <SortDirectionIcon className="h-4 w-4 flex-shrink-0" />
+                </span>
               </Button>
             );
           })}
