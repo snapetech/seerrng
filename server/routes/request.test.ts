@@ -111,7 +111,11 @@ async function loginAs(email: string, password: string) {
   }
 }
 
-async function seedRequest(status = MediaRequestStatus.PENDING) {
+async function seedRequest(
+  status = MediaRequestStatus.PENDING,
+  createdAt?: Date,
+  tmdbId = 12345
+) {
   const userRepo = getRepository(User);
   const mediaRepo = getRepository(Media);
   const requestRepo = getRepository(MediaRequest);
@@ -123,22 +127,25 @@ async function seedRequest(status = MediaRequestStatus.PENDING) {
   const media = await mediaRepo.save(
     new Media({
       mediaType: MediaType.MOVIE,
-      tmdbId: 12345,
+      tmdbId,
       status: MediaStatus.UNKNOWN,
       status4k: MediaStatus.UNKNOWN,
     })
   );
 
-  const created = await requestRepo.save(
-    new MediaRequest({
-      type: MediaType.MOVIE,
-      status,
-      media,
-      requestedBy,
-      is4k: false,
-      updatedAt: new Date('2025-03-01T00:00:00.000Z'),
-    })
-  );
+  const request = new MediaRequest({
+    type: MediaType.MOVIE,
+    status,
+    media,
+    requestedBy,
+    is4k: false,
+    updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+  });
+  if (createdAt) {
+    request.createdAt = createdAt;
+  }
+
+  const created = await requestRepo.save(request);
 
   return requestRepo.findOneOrFail({
     where: { id: created.id },
@@ -398,6 +405,39 @@ describe('GET /request/count', () => {
 });
 
 describe('GET /request/status', () => {
+  it('defaults to recent requests while exposing older history', async () => {
+    const now = Date.now();
+    await seedRequest(
+      MediaRequestStatus.PENDING,
+      new Date(now - 45 * 24 * 60 * 60 * 1000)
+    );
+    await seedRequest(
+      MediaRequestStatus.PENDING,
+      new Date(now - 2 * 24 * 60 * 60 * 1000),
+      12346
+    );
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+
+    const recentResponse = await agent.get('/request/status');
+    assert.strictEqual(recentResponse.status, 200);
+    assert.strictEqual(recentResponse.body.pageInfo.results, 1);
+    assert.strictEqual(recentResponse.body.olderCount, 1);
+
+    const fourteenDayResponse = await agent
+      .get('/request/status')
+      .query({ timeFrame: '14d' });
+    assert.strictEqual(fourteenDayResponse.status, 200);
+    assert.strictEqual(fourteenDayResponse.body.pageInfo.results, 1);
+    assert.strictEqual(fourteenDayResponse.body.olderCount, 1);
+
+    const allResponse = await agent
+      .get('/request/status')
+      .query({ timeFrame: 'all' });
+    assert.strictEqual(allResponse.status, 200);
+    assert.strictEqual(allResponse.body.pageInfo.results, 2);
+    assert.strictEqual(allResponse.body.olderCount, 0);
+  });
+
   it('returns the owner-scoped lifecycle and durable history', async () => {
     const mediaRequest = await seedRequest();
     const agent = await loginAs('friend@seerr.dev', 'test1234');
@@ -462,6 +502,7 @@ describe('GET /request/status', () => {
     assert.strictEqual(listResponse.status, 200);
     assert.strictEqual(listResponse.body.pageInfo.results, 1);
     assert.strictEqual(listResponse.body.counts.total, 1);
+    assert.strictEqual(listResponse.body.olderCount, 0);
     assert.strictEqual(forbiddenResponse.status, 403);
   });
 

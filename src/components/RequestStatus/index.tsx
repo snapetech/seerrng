@@ -70,6 +70,18 @@ const messages = defineMessages('components.RequestStatus', {
   cancelled: 'Cancelled',
   mediaType: 'Media type',
   mediaTypeValue: 'Media Type',
+  movie: 'Movie',
+  series: 'Series',
+  album: 'Album',
+  bookAndAudiobook: 'Book + Audiobook',
+  book: 'Book',
+  fourK: '4K',
+  hd: 'HD',
+  musicFormat: 'Music',
+  ebookAndAudiobook: 'Ebook + Audiobook',
+  ebook: 'Ebook',
+  minutes: '{count} minutes',
+  notAvailable: 'Not available',
   releaseDate: 'Release Date',
   runtime: 'Runtime',
   genres: 'Genres',
@@ -77,15 +89,18 @@ const messages = defineMessages('components.RequestStatus', {
   requestTime: 'Time',
   statusUpdated: 'Status Updated',
   timeFrame: 'Time frame',
-  last7Days: 'Last 7 Days',
-  lastMonth: 'Last Month',
-  last6Months: 'Last 6 Months',
-  allTime: 'All Time',
+  last7Days: 'Last 7 days',
+  last14Days: 'Last 14 days',
+  last30Days: 'Last 30 days',
+  last6Months: 'Last 6 months',
+  allTime: 'All time',
+  olderRequests:
+    '{count, plural, =1 {# older request is outside this window.} other {# older requests are outside this window.}}',
+  viewAllHistory: 'View all history',
   filter: 'Filter',
   statusFilter: 'Status',
   allMedia: 'All media',
   movies: 'Movies',
-  series: 'Series',
   music: 'Music',
   books: 'Books',
   audiobooks: 'Audiobooks',
@@ -121,12 +136,22 @@ const messages = defineMessages('components.RequestStatus', {
   retryFailed: 'Unable to retry this request.',
   retrySuccess: 'Request queued for another attempt.',
   loading: 'Loading request status',
+  refresh: 'Refresh',
+  refreshing: 'Refreshing…',
+  loadError: 'Request status could not be loaded.',
+  loadErrorHint: 'The request service did not respond. Try again.',
+  retryLoad: 'Try again',
   noResults: 'No requests match these filters.',
+  clearFilters: 'Clear filters',
   statusExplanation:
     'Progress is shown only when the connected download service reports a usable size. A question mark means no trustworthy percentage was available.',
   previous: 'Previous',
   next: 'Next',
   page: 'Page {page} of {pages}',
+  scrollProgressLeft: 'Scroll progress left',
+  requestLifecycle: 'Request lifecycle',
+  scrollProgressRight: 'Scroll progress right',
+  pagination: 'Pagination',
   unknownTitle: 'Unknown title',
 });
 
@@ -146,7 +171,7 @@ type StatusStage =
 type RequestStatusItem = RequestStatusResultsResponse['results'][number];
 type MediaFilter = 'all' | 'movie' | 'tv' | 'music' | 'book' | 'audiobook';
 type UserSelection = number | 'all';
-type TimeFrame = '7d' | '1m' | '6m' | 'all';
+type TimeFrame = '7d' | '14d' | '30d' | '6m' | 'all';
 
 const timelineStages: StatusStage[] = [
   'requested',
@@ -178,7 +203,7 @@ const mediaTypeValues: MediaFilter[] = [
 ];
 
 const sortDirectionValues = ['asc', 'desc'] as const;
-const timeFrameValues: TimeFrame[] = ['7d', '1m', '6m', 'all'];
+const timeFrameValues: TimeFrame[] = ['7d', '14d', '30d', '6m', 'all'];
 
 const getSortOptions = (
   mediaFilter: MediaFilter
@@ -233,6 +258,18 @@ const getSafeQueryValue = (
 ): string => {
   const candidate = Array.isArray(value) ? value[0] : value;
   return candidate && allowedValues.includes(candidate) ? candidate : 'all';
+};
+
+const getTimeFrameFromQuery = (
+  value: string | string[] | undefined
+): TimeFrame => {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  if (candidate === '1m') {
+    return '30d';
+  }
+  return candidate && timeFrameValues.includes(candidate as TimeFrame)
+    ? (candidate as TimeFrame)
+    : '7d';
 };
 
 const fetchStatusUsers = async (
@@ -347,6 +384,7 @@ const getDetailHref = (item: RequestStatusItem): string | null => {
 };
 
 const getTitle = (
+  intl: ReturnType<typeof useIntl>,
   details: MediaDetails | undefined,
   item: RequestStatusItem
 ): string => {
@@ -360,7 +398,7 @@ const getTitle = (
     return item.request.media.mbId;
   }
   if (item.request.type === 'book') {
-    return getBookId(item) ?? messages.unknownTitle.defaultMessage;
+    return getBookId(item) ?? intl.formatMessage(messages.unknownTitle);
   }
   return `${item.request.type.toUpperCase()} #${item.request.media.tmdbId}`;
 };
@@ -380,23 +418,39 @@ const getPoster = (
   return { src: getTmdbPosterImageUrl(details.posterPath), type: 'tmdb' };
 };
 
-const getMediaBadge = (item: RequestStatusItem): string => {
-  if (item.request.type === 'movie') return 'Movie';
-  if (item.request.type === 'tv') return 'Series';
-  if (item.request.type === 'music') return 'Album';
-  if (item.request.bookFormat === 'audiobook') return 'Audiobook';
-  if (item.request.bookFormat === 'both') return 'Book + Audiobook';
-  return 'Book';
+const getMediaBadge = (
+  intl: ReturnType<typeof useIntl>,
+  item: RequestStatusItem
+): string => {
+  if (item.request.type === 'movie') return intl.formatMessage(messages.movie);
+  if (item.request.type === 'tv') return intl.formatMessage(messages.series);
+  if (item.request.type === 'music') return intl.formatMessage(messages.album);
+  if (item.request.bookFormat === 'audiobook') {
+    return intl.formatMessage(messages.audiobooks);
+  }
+  if (item.request.bookFormat === 'both') {
+    return intl.formatMessage(messages.bookAndAudiobook);
+  }
+  return intl.formatMessage(messages.book);
 };
 
-const getMediaFormat = (item: RequestStatusItem): string => {
+const getMediaFormat = (
+  intl: ReturnType<typeof useIntl>,
+  item: RequestStatusItem
+): string => {
   if (item.request.type === 'movie' || item.request.type === 'tv') {
-    return item.request.is4k ? '4K' : 'HD';
+    return intl.formatMessage(item.request.is4k ? messages.fourK : messages.hd);
   }
-  if (item.request.type === 'music') return 'Music';
-  if (item.request.bookFormat === 'audiobook') return 'Audiobook';
-  if (item.request.bookFormat === 'both') return 'Ebook + Audiobook';
-  return 'Ebook';
+  if (item.request.type === 'music') {
+    return intl.formatMessage(messages.musicFormat);
+  }
+  if (item.request.bookFormat === 'audiobook') {
+    return intl.formatMessage(messages.audiobooks);
+  }
+  if (item.request.bookFormat === 'both') {
+    return intl.formatMessage(messages.ebookAndAudiobook);
+  }
+  return intl.formatMessage(messages.ebook);
 };
 
 const getReleaseDate = (
@@ -418,19 +472,25 @@ const getReleaseDate = (
 };
 
 const getRuntime = (
+  intl: ReturnType<typeof useIntl>,
   details: MediaDetails | undefined,
   item: RequestStatusItem
 ): string => {
-  if (!details) return '—';
+  const notAvailable = intl.formatMessage(messages.notAvailable);
+  if (!details) return notAvailable;
   if (item.request.type === 'movie') {
     const minutes = (details as MovieDetails).runtime;
-    return minutes ? `${minutes} minutes` : '—';
+    return minutes && Number.isFinite(minutes)
+      ? intl.formatMessage(messages.minutes, { count: minutes })
+      : notAvailable;
   }
   if (item.request.type === 'tv') {
     const minutes = (details as TvDetails).episodeRunTime.find(
-      (runtime) => runtime > 0
+      (runtime) => runtime > 0 && Number.isFinite(runtime)
     );
-    return minutes ? `${minutes} minutes` : '—';
+    return minutes
+      ? intl.formatMessage(messages.minutes, { count: minutes })
+      : notAvailable;
   }
   if (item.request.type === 'music') {
     const milliseconds = (details as MusicDetails).tracks.reduce(
@@ -438,23 +498,27 @@ const getRuntime = (
       0
     );
     return milliseconds > 0
-      ? `${Math.round(milliseconds / 60000)} minutes`
-      : '—';
+      ? intl.formatMessage(messages.minutes, {
+          count: Math.round(milliseconds / 60000),
+        })
+      : notAvailable;
   }
-  return '—';
+  return notAvailable;
 };
 
 const getGenres = (
+  intl: ReturnType<typeof useIntl>,
   details: MediaDetails | undefined,
   item: RequestStatusItem
 ): string => {
-  if (!details) return '—';
+  const notAvailable = intl.formatMessage(messages.notAvailable);
+  if (!details) return notAvailable;
   if (item.request.type === 'movie') {
     return (
       (details as MovieDetails).genres
         .slice(0, 3)
         .map((genre) => genre.name)
-        .join(', ') || '—'
+        .join(', ') || notAvailable
     );
   }
   if (item.request.type === 'tv') {
@@ -462,7 +526,7 @@ const getGenres = (
       (details as TvDetails).genres
         .slice(0, 3)
         .map((genre) => genre.name)
-        .join(', ') || '—'
+        .join(', ') || notAvailable
     );
   }
   if (item.request.type === 'music') {
@@ -471,15 +535,20 @@ const getGenres = (
         .slice(0, 3)
         .map((tag) => tag.tag)
         .filter(Boolean)
-        .join(', ') || '—'
+        .join(', ') || notAvailable
     );
   }
-  return (details as BookDetails).subjects?.slice(0, 3).join(', ') || '—';
+  return (
+    (details as BookDetails).subjects?.slice(0, 3).join(', ') || notAvailable
+  );
 };
 
-const formatBytes = (value: number | null): string => {
+const formatBytes = (
+  intl: ReturnType<typeof useIntl>,
+  value: number | null
+): string => {
   if (value === null || !Number.isFinite(value) || value < 0) {
-    return '—';
+    return intl.formatMessage(messages.notAvailable);
   }
   if (value < 1024) return `${Math.round(value)} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -494,6 +563,17 @@ const formatBytes = (value: number | null): string => {
 
 const getStageLabel = (intl: ReturnType<typeof useIntl>, stage: StatusStage) =>
   intl.formatMessage(messages[stageMessageKeys[stage]]);
+
+const getValidDate = (
+  value: string | number | Date | null | undefined
+): Date | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : undefined;
+};
 
 const getLastTimelineIndex = (
   stage: StatusStage,
@@ -543,7 +623,7 @@ const RequestStatusCard = ({
     : 'approved';
   const activeIndex = getLastTimelineIndex(currentStage, history);
   const poster = getPoster(details);
-  const title = getTitle(details, item);
+  const title = getTitle(intl, details, item);
   const StageIcon = stageIcon[currentStage] ?? InformationCircleIcon;
   const releaseDate = getReleaseDate(details, item);
   const releaseYear = releaseDate?.match(/\d{4}/)?.[0];
@@ -551,18 +631,27 @@ const RequestStatusCard = ({
   const displayReleaseDate = releaseDate
     ? /^\d{4}$/.test(releaseDate)
       ? releaseDate
-      : intl.formatDate(new Date(releaseDate), {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        })
-    : '—';
+      : (() => {
+          const parsedReleaseDate = getValidDate(releaseDate);
+          return parsedReleaseDate
+            ? intl.formatDate(parsedReleaseDate, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : intl.formatMessage(messages.notAvailable);
+        })()
+    : intl.formatMessage(messages.notAvailable);
   const terminalWithoutProgress =
     current.isTerminal && currentStage !== 'available';
   const chronologicalHistory = [...history].reverse();
-  const statusUpdatedSeconds = Math.floor(
-    (new Date(current.observedAt).getTime() - Date.now()) / 1000
-  );
+  const observedAt = getValidDate(current.observedAt);
+  const statusUpdatedSeconds = observedAt
+    ? Math.floor((observedAt.getTime() - Date.now()) / 1000)
+    : undefined;
+  const estimatedCompletionTime = getValidDate(current.estimatedCompletionTime);
+  const createdAt = getValidDate(item.request.createdAt);
+  const notAvailable = intl.formatMessage(messages.notAvailable);
   const scrollTimeline = (direction: -1 | 1) => {
     timelineRef.current?.scrollBy({
       left: direction * 260,
@@ -621,13 +710,13 @@ const RequestStatusCard = ({
           <div className="mt-1 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_max-content]">
             <div className="min-w-0 text-xs leading-4 text-gray-400">
               <span className="inline-flex min-h-4 items-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold uppercase leading-[1.3] tracking-wide text-indigo-50">
-                {getMediaBadge(item)}
+                {getMediaBadge(intl, item)}
               </span>
               <dl className="mt-0.5 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.mediaTypeValue)}:
                 </dt>
-                <dd className="m-0 truncate">{getMediaFormat(item)}</dd>
+                <dd className="m-0 truncate">{getMediaFormat(intl, item)}</dd>
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.releaseDate)}:
                 </dt>
@@ -635,11 +724,15 @@ const RequestStatusCard = ({
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.runtime)}:
                 </dt>
-                <dd className="m-0 truncate">{getRuntime(details, item)}</dd>
+                <dd className="m-0 truncate">
+                  {getRuntime(intl, details, item)}
+                </dd>
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.genres)}:
                 </dt>
-                <dd className="m-0 truncate">{getGenres(details, item)}</dd>
+                <dd className="m-0 truncate">
+                  {getGenres(intl, details, item)}
+                </dd>
               </dl>
             </div>
             <dl className="grid w-full grid-cols-[max-content_max-content] gap-x-2 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4 text-gray-400 md:w-max md:border-l md:border-t-0 md:py-0 md:pl-3">
@@ -653,38 +746,50 @@ const RequestStatusCard = ({
                 {intl.formatMessage(messages.requestDate)}
               </dt>
               <dd className="m-0 whitespace-nowrap">
-                <FormattedDate
-                  value={new Date(item.request.createdAt)}
-                  year="numeric"
-                  month="short"
-                  day="numeric"
-                />
+                {createdAt ? (
+                  <FormattedDate
+                    value={createdAt}
+                    year="numeric"
+                    month="short"
+                    day="numeric"
+                  />
+                ) : (
+                  notAvailable
+                )}
               </dd>
               <dt className="font-medium text-gray-100">
                 {intl.formatMessage(messages.requestTime)}
               </dt>
               <dd className="m-0 whitespace-nowrap">
-                <FormattedDate
-                  value={new Date(item.request.createdAt)}
-                  hour="numeric"
-                  minute="2-digit"
-                />
+                {createdAt ? (
+                  <FormattedDate
+                    value={createdAt}
+                    hour="numeric"
+                    minute="2-digit"
+                  />
+                ) : (
+                  notAvailable
+                )}
               </dd>
               <dt className="font-medium text-gray-100">
                 {intl.formatMessage(messages.serviceLabel)}
               </dt>
               <dd className="m-0 whitespace-nowrap">
-                {current.service ?? '—'}
+                {current.service ?? notAvailable}
               </dd>
               <dt className="font-medium text-gray-100">
                 {intl.formatMessage(messages.statusUpdated)}
               </dt>
               <dd className="m-0 whitespace-nowrap">
-                <FormattedRelativeTime
-                  value={statusUpdatedSeconds}
-                  numeric="auto"
-                  updateIntervalInSeconds={5}
-                />
+                {statusUpdatedSeconds !== undefined ? (
+                  <FormattedRelativeTime
+                    value={statusUpdatedSeconds}
+                    numeric="auto"
+                    updateIntervalInSeconds={5}
+                  />
+                ) : (
+                  notAvailable
+                )}
               </dd>
             </dl>
           </div>
@@ -696,14 +801,14 @@ const RequestStatusCard = ({
           type="button"
           onClick={() => scrollTimeline(-1)}
           className="absolute left-1 top-1/2 z-10 flex h-10 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-indigo-400/40 bg-gray-900/80 text-indigo-200 backdrop-blur-sm md:hidden"
-          aria-label="Scroll progress left"
+          aria-label={intl.formatMessage(messages.scrollProgressLeft)}
         >
           <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
         </button>
         <div
           ref={timelineRef}
           className="hide-scrollbar flex overflow-x-auto px-2"
-          aria-label="Request lifecycle"
+          aria-label={intl.formatMessage(messages.requestLifecycle)}
         >
           <div className="mx-auto flex min-w-[640px] flex-1 items-start justify-center">
             {timelineStages.map((stage, index) => {
@@ -761,7 +866,7 @@ const RequestStatusCard = ({
           type="button"
           onClick={() => scrollTimeline(1)}
           className="absolute right-1 top-1/2 z-10 flex h-10 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-indigo-400/40 bg-gray-900/80 text-indigo-200 backdrop-blur-sm md:hidden"
-          aria-label="Scroll progress right"
+          aria-label={intl.formatMessage(messages.scrollProgressRight)}
         >
           <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -783,19 +888,22 @@ const RequestStatusCard = ({
                   </span>
                   <span>
                     {intl.formatMessage(messages.sizeProgress, {
-                      complete: formatBytes(current.size - current.sizeLeft),
-                      total: formatBytes(current.size),
+                      complete: formatBytes(
+                        intl,
+                        current.size - current.sizeLeft
+                      ),
+                      total: formatBytes(intl, current.size),
                     })}
                   </span>
                 </>
               )}
             </span>
-            {current.estimatedCompletionTime && (
+            {estimatedCompletionTime && (
               <span>
                 {intl.formatMessage(messages.eta, {
                   date: (
                     <FormattedDate
-                      value={new Date(current.estimatedCompletionTime)}
+                      value={estimatedCompletionTime}
                       dateStyle="short"
                       timeStyle="short"
                     />
@@ -875,29 +983,36 @@ const RequestStatusCard = ({
             </p>
           ) : (
             <ol className="grid grid-cols-[7rem_7.5rem_minmax(0,1fr)] gap-x-3 gap-y-2">
-              {chronologicalHistory.map((event) => (
-                <li key={event.id} className="contents text-xs">
-                  <time
-                    className="whitespace-nowrap text-gray-500"
-                    dateTime={new Date(event.createdAt).toISOString()}
-                  >
-                    <FormattedDate
-                      value={new Date(event.createdAt)}
-                      hour="numeric"
-                      minute="2-digit"
-                      second="2-digit"
-                    />
-                  </time>
-                  <span className="font-medium text-gray-200">
-                    {getStageLabel(intl, event.stage as StatusStage)}
-                  </span>
-                  <span className="min-w-0 text-gray-400">
-                    {event.message ??
-                      getStageLabel(intl, event.stage as StatusStage)}
-                    {event.percent !== null && ` · ${event.percent}%`}
-                  </span>
-                </li>
-              ))}
+              {chronologicalHistory.map((event) => {
+                const eventDate = getValidDate(event.createdAt);
+                if (!eventDate) {
+                  return null;
+                }
+
+                return (
+                  <li key={event.id} className="contents text-xs">
+                    <time
+                      className="whitespace-nowrap text-gray-500"
+                      dateTime={eventDate.toISOString()}
+                    >
+                      <FormattedDate
+                        value={eventDate}
+                        hour="numeric"
+                        minute="2-digit"
+                        second="2-digit"
+                      />
+                    </time>
+                    <span className="font-medium text-gray-200">
+                      {getStageLabel(intl, event.stage as StatusStage)}
+                    </span>
+                    <span className="min-w-0 text-gray-400">
+                      {event.message ??
+                        getStageLabel(intl, event.stage as StatusStage)}
+                      {event.percent !== null && ` · ${event.percent}%`}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </section>
@@ -919,7 +1034,7 @@ const RequestStatus = () => {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState<RequestStatusSortField>('added');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('all');
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
   const [selectedUser, setSelectedUser] = useState<UserSelection | null>(null);
   const [expandedRequestId, setExpandedRequestId] = useState<number | null>(
     null
@@ -958,14 +1073,7 @@ const RequestStatus = () => {
       sortDirectionValues
     );
     setSortDirection(querySortDirection === 'asc' ? 'asc' : 'desc');
-    const rawTimeFrame = Array.isArray(router.query.timeFrame)
-      ? router.query.timeFrame[0]
-      : router.query.timeFrame;
-    setTimeFrame(
-      rawTimeFrame && timeFrameValues.includes(rawTimeFrame as TimeFrame)
-        ? (rawTimeFrame as TimeFrame)
-        : 'all'
-    );
+    setTimeFrame(getTimeFrameFromQuery(router.query.timeFrame));
 
     const rawUserId = Array.isArray(router.query.userId)
       ? router.query.userId[0]
@@ -1066,10 +1174,11 @@ const RequestStatus = () => {
     sortDirection,
     timeFrame,
   ]);
-  const { data, error, mutate } = useSWR<RequestStatusResultsResponse>(query, {
-    refreshInterval: 15000,
-    revalidateOnFocus: true,
-  });
+  const { data, error, isValidating, mutate } =
+    useSWR<RequestStatusResultsResponse>(query, {
+      refreshInterval: 15000,
+      revalidateOnFocus: true,
+    });
 
   const routeQuery = ({
     nextFilter = filter,
@@ -1094,7 +1203,7 @@ const RequestStatus = () => {
     ...(nextSortDirection !== 'desc'
       ? { sortDirection: nextSortDirection }
       : {}),
-    ...(nextTimeFrame !== 'all' ? { timeFrame: nextTimeFrame } : {}),
+    ...(nextTimeFrame !== '7d' ? { timeFrame: nextTimeFrame } : {}),
     ...(canViewOtherUsers && nextUser !== null
       ? { userId: nextUser === 'all' ? 'all' : String(nextUser) }
       : {}),
@@ -1174,8 +1283,32 @@ const RequestStatus = () => {
     return (
       <>
         <PageTitle title={intl.formatMessage(messages.title)} />
-        <div className="mt-8 rounded-xl border border-red-500/50 bg-red-500/10 p-6 text-red-100">
-          {intl.formatMessage(messages.noResults)}
+        <div
+          className="mt-8 flex flex-col items-start gap-4 rounded-xl border border-red-500/50 bg-red-500/10 p-6 text-red-100 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <div>
+            <p className="font-medium">
+              {intl.formatMessage(messages.loadError)}
+            </p>
+            <p className="mt-1 text-sm text-red-100/80">
+              {intl.formatMessage(messages.loadErrorHint)}
+            </p>
+          </div>
+          <Button
+            buttonType="warning"
+            buttonSize="sm"
+            disabled={isValidating}
+            onClick={() => void mutate()}
+          >
+            <ArrowPathIcon
+              className={`mr-1.5 h-4 w-4 ${isValidating ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {intl.formatMessage(
+              isValidating ? messages.refreshing : messages.retryLoad
+            )}
+          </Button>
         </div>
       </>
     );
@@ -1196,6 +1329,23 @@ const RequestStatus = () => {
   ];
   const changePage = (nextPage: number) => {
     pushRouteQuery(routeQuery({ nextPage }));
+  };
+  const hasFilters =
+    filter !== 'all' ||
+    mediaFilter !== 'all' ||
+    sort !== 'added' ||
+    sortDirection !== 'desc' ||
+    timeFrame !== '7d' ||
+    (canViewOtherUsers &&
+      (selectedUser === 'all' || selectedUser !== currentUser?.id));
+  const clearFilters = () => {
+    setFilter('all');
+    setMediaFilter('all');
+    setSort('added');
+    setSortDirection('desc');
+    setTimeFrame('7d');
+    setSelectedUser(currentUser?.id ?? null);
+    pushRouteQuery({});
   };
 
   return (
@@ -1241,8 +1391,42 @@ const RequestStatus = () => {
               {intl.formatMessage(messages.manageRequests)}
             </Link>
           )}
+          <Button
+            buttonType="default"
+            buttonSize="sm"
+            disabled={isValidating}
+            onClick={() => void mutate()}
+            title={intl.formatMessage(messages.refresh)}
+          >
+            <ArrowPathIcon
+              className={`mr-1.5 h-4 w-4 ${isValidating ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {intl.formatMessage(
+              isValidating ? messages.refreshing : messages.refresh
+            )}
+          </Button>
         </div>
       </div>
+
+      {error && (
+        <div
+          className="mb-5 flex flex-col items-start gap-3 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <span>{intl.formatMessage(messages.loadErrorHint)}</span>
+          <Button
+            buttonType="default"
+            buttonSize="sm"
+            disabled={isValidating}
+            onClick={() => void mutate()}
+          >
+            {intl.formatMessage(
+              isValidating ? messages.refreshing : messages.retryLoad
+            )}
+          </Button>
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
@@ -1304,7 +1488,12 @@ const RequestStatus = () => {
             aria-label={intl.formatMessage(messages.timeFrame)}
           >
             <option value="7d">{intl.formatMessage(messages.last7Days)}</option>
-            <option value="1m">{intl.formatMessage(messages.lastMonth)}</option>
+            <option value="14d">
+              {intl.formatMessage(messages.last14Days)}
+            </option>
+            <option value="30d">
+              {intl.formatMessage(messages.last30Days)}
+            </option>
             <option value="6m">
               {intl.formatMessage(messages.last6Months)}
             </option>
@@ -1312,6 +1501,29 @@ const RequestStatus = () => {
           </select>
         </div>
       </section>
+
+      {timeFrame !== 'all' && data.olderCount > 0 && (
+        <div className="mb-5 flex flex-col gap-3 rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-3 text-sm text-indigo-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <ClockIcon
+              className="mt-0.5 h-5 w-5 flex-shrink-0 text-indigo-300"
+              aria-hidden="true"
+            />
+            <span>
+              {intl.formatMessage(messages.olderRequests, {
+                count: data.olderCount,
+              })}
+            </span>
+          </div>
+          <Button
+            buttonType="default"
+            buttonSize="sm"
+            onClick={() => updateTimeFrame('all')}
+          >
+            {intl.formatMessage(messages.viewAllHistory)}
+          </Button>
+        </div>
+      )}
 
       <section className="mb-5 rounded-xl border border-gray-700 bg-gray-800/70 p-3">
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -1429,14 +1641,19 @@ const RequestStatus = () => {
       </div>
 
       {data.results.length === 0 && (
-        <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center text-gray-400">
-          {intl.formatMessage(messages.noResults)}
+        <div className="flex min-h-48 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center text-gray-400">
+          <span>{intl.formatMessage(messages.noResults)}</span>
+          {hasFilters && (
+            <Button buttonType="default" buttonSize="sm" onClick={clearFilters}>
+              {intl.formatMessage(messages.clearFilters)}
+            </Button>
+          )}
         </div>
       )}
 
       <nav
         className="mt-6 flex items-center justify-between"
-        aria-label="Pagination"
+        aria-label={intl.formatMessage(messages.pagination)}
       >
         <Button
           disabled={page <= 1}

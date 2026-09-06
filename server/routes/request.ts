@@ -122,7 +122,15 @@ const requestTimelineStatusFilters = [
   ...Object.values(RequestStatusStage),
 ] as const;
 const requestStatusBookFormatFilters = ['ebook', 'audiobook'] as const;
-const requestStatusTimeFrames = ['7d', '1m', '6m', 'all'] as const;
+const requestStatusTimeFrames = [
+  '7d',
+  '14d',
+  '30d',
+  // Keep accepting the original API value as a compatibility alias.
+  '1m',
+  '6m',
+  'all',
+] as const;
 
 const getRequestStatusStartDate = (
   timeFrame: (typeof requestStatusTimeFrames)[number] | undefined
@@ -130,11 +138,13 @@ const getRequestStatusStartDate = (
   const days =
     timeFrame === '7d'
       ? 7
-      : timeFrame === '1m'
-        ? 30
-        : timeFrame === '6m'
-          ? 180
-          : 0;
+      : timeFrame === '14d'
+        ? 14
+        : timeFrame === '30d' || timeFrame === '1m'
+          ? 30
+          : timeFrame === '6m'
+            ? 180
+            : 0;
   return days > 0
     ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
     : undefined;
@@ -2274,7 +2284,7 @@ requestRoutes.get<
           ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
           mediaType: mediaType === 'all' ? undefined : (mediaType as MediaType),
           bookFormat: parsedBookFormat.value,
-          since: getRequestStatusStartDate(parsedTimeFrame.value),
+          since: getRequestStatusStartDate(parsedTimeFrame.value ?? '7d'),
           filter: parsedFilter.value,
           sort,
           sortDirection,

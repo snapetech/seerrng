@@ -47,6 +47,10 @@ const messages = defineMessages('components.Search', {
   ascending: 'Ascending',
   descending: 'Descending',
   noResultsFound: 'No Results Found',
+  searchUnavailable: 'Search is unavailable right now.',
+  searchUnavailableHint: 'The catalog could not be reached. Try again.',
+  retrySearch: 'Try again',
+  retryingSearch: 'Trying again…',
 });
 
 const searchCategories = [
@@ -273,6 +277,7 @@ const Search = () => {
     titles,
     fetchMore,
     error,
+    mutate,
   } = useDiscover<SearchResult>(`/api/v1/search`, searchOptions, {
     enabled: isSearchReady,
     hideAvailable: false,
@@ -286,9 +291,8 @@ const Search = () => {
     return () => setSearchActivity(false);
   }, [isLoadingInitialData, isSearchReady, isValidating]);
   const visibleTitles = useMemo(
-    () =>
-      error ? [] : titles.filter((title) => matchesCategory(title, category)),
-    [category, error, titles]
+    () => titles.filter((title) => matchesCategory(title, category)),
+    [category, titles]
   );
   const sortedTitles = useMemo(() => {
     const collator = new Intl.Collator(undefined, {
@@ -352,7 +356,33 @@ const Search = () => {
     isSearchReady &&
     !isLoadingInitialData &&
     !isLoadingMore &&
-    (Boolean(error) || sortedTitles.length === 0);
+    sortedTitles.length === 0;
+
+  const searchError = error && (
+    <div
+      className="mt-6 flex flex-col items-start gap-4 rounded-xl border border-red-500/50 bg-red-500/10 p-6 text-red-100 sm:flex-row sm:items-center sm:justify-between"
+      role="alert"
+    >
+      <div>
+        <p className="font-medium">
+          {intl.formatMessage(messages.searchUnavailable)}
+        </p>
+        <p className="mt-1 text-sm text-red-100/80">
+          {intl.formatMessage(messages.searchUnavailableHint)}
+        </p>
+      </div>
+      <Button
+        buttonType="warning"
+        buttonSize="sm"
+        disabled={isValidating}
+        onClick={() => mutate?.()}
+      >
+        {intl.formatMessage(
+          isValidating ? messages.retryingSearch : messages.retrySearch
+        )}
+      </Button>
+    </div>
+  );
 
   return (
     <>
@@ -468,21 +498,28 @@ const Search = () => {
           })}
         </div>
       </div>
-      <ListView
-        items={sortedTitles}
-        preferredBookFormat={preferredBookFormat}
-        emptyMessage={intl.formatMessage(messages.noResultsFound)}
-        emptyClassName="mt-6"
-        isEmpty={isShowingEmptyState || (isSearchReady && isEmpty)}
-        isLoading={
-          !router.isReady ||
-          (isSearchReady &&
-            (isLoadingInitialData ||
-              (isLoadingMore && (titles?.length ?? 0) > 0)))
-        }
-        isReachingEnd={isReachingEnd}
-        onScrollBottom={fetchMore}
-      />
+      {error && sortedTitles.length === 0 ? (
+        searchError
+      ) : (
+        <>
+          {error && searchError}
+          <ListView
+            items={sortedTitles}
+            preferredBookFormat={preferredBookFormat}
+            emptyMessage={intl.formatMessage(messages.noResultsFound)}
+            emptyClassName="mt-6"
+            isEmpty={isShowingEmptyState || (isSearchReady && isEmpty)}
+            isLoading={
+              !router.isReady ||
+              (isSearchReady &&
+                (isLoadingInitialData ||
+                  (isLoadingMore && (titles?.length ?? 0) > 0)))
+            }
+            isReachingEnd={isReachingEnd}
+            onScrollBottom={fetchMore}
+          />
+        </>
+      )}
     </>
   );
 };

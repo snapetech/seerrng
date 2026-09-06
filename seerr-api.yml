@@ -1770,10 +1770,14 @@ components:
             - active
             - attention
             - completed
+        olderCount:
+          type: integer
+          description: Number of requests in the same scope that predate the selected rolling time window.
       required:
         - pageInfo
         - results
         - counts
+        - olderCount
     RequestStatusDetail:
       type: object
       properties:
@@ -8776,11 +8780,11 @@ paths:
             enum: [ebook, audiobook]
         - in: query
           name: timeFrame
-          description: Optionally restrict results to requests created in the selected rolling time window. Defaults to all requests.
+          description: Restrict results to requests created in the selected rolling time window. Defaults to the last 7 days; use all for complete history.
           schema:
             type: string
-            enum: [7d, 1m, 6m, all]
-            default: all
+            enum: [7d, 14d, 30d, 1m, 6m, all]
+            default: 7d
         - in: query
           name: sort
           description: Sort field. Metadata-backed fields are resolved from the configured metadata provider and fall back safely when unavailable.

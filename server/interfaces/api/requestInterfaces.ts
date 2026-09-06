@@ -90,6 +90,7 @@ export interface RequestStatusResultsResponse extends PaginatedResponse {
     attention: number;
     completed: number;
   };
+  olderCount: number;
 }
 
 export interface RequestStatusUsersResponse extends PaginatedResponse {
@@ -104,7 +105,7 @@ export type RequestStatusQuery = {
   requestedBy?: number;
   mediaType?: MediaType | 'all';
   bookFormat?: 'ebook' | 'audiobook';
-  timeFrame?: '7d' | '1m' | '6m' | 'all';
+  timeFrame?: '7d' | '14d' | '30d' | '1m' | '6m' | 'all';
   filter?: string;
   sort?: RequestStatusSortField;
   sortDirection?: RequestStatusSortDirection;

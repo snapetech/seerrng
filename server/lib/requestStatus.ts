@@ -108,6 +108,8 @@ export interface RequestStatusPage {
     attention: number;
     completed: number;
   };
+  /** Requests in the same scope that predate the selected rolling window. */
+  olderCount: number;
 }
 
 type RequestMediaLike = {
@@ -1169,6 +1171,44 @@ const getRequestStatusCounts = async (options: {
   return { total: rows.length, active, attention, completed };
 };
 
+const getRequestStatusOlderCount = async (options: {
+  ownerId?: number;
+  mediaType?: MediaType;
+  bookFormat?: 'ebook' | 'audiobook';
+  since: Date;
+}): Promise<number> => {
+  const requestRepository = getRepository(MediaRequest);
+  const query = requestRepository
+    .createQueryBuilder('requestOlder')
+    .leftJoin('requestOlder.requestedBy', 'requestedByOlder')
+    .where('requestOlder.createdAt < :olderSince', {
+      olderSince: options.since,
+    });
+
+  if (options.ownerId) {
+    query.andWhere('requestedByOlder.id = :olderOwnerId', {
+      olderOwnerId: options.ownerId,
+    });
+  }
+  if (options.mediaType) {
+    query.andWhere('requestOlder.type = :olderMediaType', {
+      olderMediaType: options.mediaType,
+    });
+  }
+  if (options.bookFormat) {
+    query.andWhere(
+      options.bookFormat === 'ebook'
+        ? `requestOlder.type = :olderBookType
+           AND COALESCE(requestOlder.bookFormat, 'ebook') IN ('ebook', 'both')`
+        : `requestOlder.type = :olderBookType
+           AND requestOlder.bookFormat IN ('audiobook', 'both')`,
+      { olderBookType: MediaType.BOOK }
+    );
+  }
+
+  return query.getCount();
+};
+
 export const getRequestStatusPage = async (options: {
   take: number;
   skip: number;
@@ -1297,12 +1337,22 @@ export const getRequestStatusPage = async (options: {
     resultItems = pageItems;
   }
 
-  const counts = await getRequestStatusCounts({
-    ownerId: options.ownerId,
-    mediaType: options.mediaType,
-    bookFormat: options.bookFormat,
-    since: options.since,
-  });
+  const [counts, olderCount] = await Promise.all([
+    getRequestStatusCounts({
+      ownerId: options.ownerId,
+      mediaType: options.mediaType,
+      bookFormat: options.bookFormat,
+      since: options.since,
+    }),
+    options.since && !hasStatusFilter
+      ? getRequestStatusOlderCount({
+          ownerId: options.ownerId,
+          mediaType: options.mediaType,
+          bookFormat: options.bookFormat,
+          since: options.since,
+        })
+      : Promise.resolve(0),
+  ]);
 
   return {
     pageInfo: {
@@ -1313,6 +1363,7 @@ export const getRequestStatusPage = async (options: {
     },
     results: resultItems,
     counts,
+    olderCount,
   };
 };
 
