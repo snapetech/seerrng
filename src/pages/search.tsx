@@ -1,7 +1,7 @@
-import NativeSearch from '@app/components/NativeSearch';
+import Search from '@app/components/Search';
 
 const SearchPage = () => {
-  return <NativeSearch />;
+  return <Search />;
 };
 
 export default SearchPage;
