@@ -467,15 +467,26 @@ const getServiceName = (request: RequestLike): string | null => {
         ?.name
     );
   } else {
-    add(
-      settings.readarr.find((server) => server.id === request.media.serviceId)
-        ?.name
-    );
-    add(
-      settings.readarr.find(
-        (server) => server.id === request.media.audiobookServiceId
-      )?.name
-    );
+    const formats =
+      request.bookFormat === 'both'
+        ? (['ebook', 'audiobook'] as const)
+        : request.bookFormat === 'audiobook'
+          ? (['audiobook'] as const)
+          : (['ebook'] as const);
+    for (const format of formats) {
+      add(
+        settings.readarr.find((server) => {
+          const serviceId =
+            format === 'audiobook'
+              ? request.media.audiobookServiceId
+              : request.media.serviceId;
+          return (
+            server.id === serviceId &&
+            (server.serviceType ?? 'ebook') === format
+          );
+        })?.name
+      );
+    }
   }
 
   return names.size > 0 ? [...names].join(' + ') : null;

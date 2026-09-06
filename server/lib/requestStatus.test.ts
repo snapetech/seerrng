@@ -3,6 +3,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
 import type { DownloadingItem } from './downloadtracker';
@@ -247,6 +248,85 @@ test('movie, series, music, ebook, audiobook, and mixed book requests share the 
     ).stage,
     RequestStatusStage.LIBRARY
   );
+});
+
+test('reports music and book queue progress with only the requested services', () => {
+  const settings = getSettings();
+  const originalLidarr = settings.lidarr;
+  const originalReadarr = settings.readarr;
+
+  try {
+    settings.lidarr = [
+      {
+        id: 30,
+        name: 'Lidarr',
+        isDefault: true,
+      } as (typeof settings.lidarr)[number],
+    ];
+    settings.readarr = [
+      {
+        id: 10,
+        name: 'Ebooks',
+        serviceType: 'ebook',
+      } as (typeof settings.readarr)[number],
+      {
+        id: 11,
+        name: 'Audiobooks',
+        serviceType: 'audiobook',
+      } as (typeof settings.readarr)[number],
+    ];
+
+    const musicStatus = getRequestStatus(
+      request({
+        type: MediaType.MUSIC,
+        media: {
+          ...request().media,
+          mediaType: MediaType.MUSIC,
+          serviceId: 30,
+          externalServiceId: 40,
+        },
+      }),
+      {
+        downloads: [download({ mediaType: MediaType.MUSIC, externalId: 40 })],
+      }
+    );
+    assert.equal(musicStatus.stage, RequestStatusStage.DOWNLOADING);
+    assert.equal(musicStatus.percent, 75);
+    assert.equal(musicStatus.service, 'Lidarr');
+
+    const bookMedia = {
+      ...request().media,
+      mediaType: MediaType.BOOK,
+      status: MediaStatus.PROCESSING,
+      serviceId: 10,
+      externalServiceId: 20,
+      audiobookServiceId: 11,
+      audiobookExternalServiceId: 21,
+    };
+    const audiobookStatus = getRequestStatus(
+      request({
+        type: MediaType.BOOK,
+        bookFormat: 'audiobook',
+        media: bookMedia,
+      }),
+      {
+        downloads: [download({ mediaType: MediaType.BOOK, externalId: 21 })],
+      }
+    );
+    assert.equal(audiobookStatus.stage, RequestStatusStage.DOWNLOADING);
+    assert.equal(audiobookStatus.service, 'Audiobooks');
+
+    const bothStatus = getRequestStatus(
+      request({ type: MediaType.BOOK, bookFormat: 'both', media: bookMedia }),
+      {
+        downloads: [download({ mediaType: MediaType.BOOK, externalId: 20 })],
+      }
+    );
+    assert.equal(bothStatus.service, 'Ebooks + Audiobooks');
+  } finally {
+    settings.lidarr = originalLidarr;
+    settings.readarr = originalReadarr;
+  }
 });
 
 test('request failures and declines remain visible as terminal attention states', () => {
