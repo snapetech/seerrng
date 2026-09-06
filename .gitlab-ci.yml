@@ -44,10 +44,10 @@ docker:seerrng:
 .trivy_scan:
   stage: scan
   image:
-    name: aquasec/trivy:0.58.2@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56
+    name: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
     entrypoint: ['']
   script:
-    - TRIVY_USERNAME="$CI_REGISTRY_USER" TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD" trivy image --exit-code 0 --severity HIGH,CRITICAL "$CS_IMAGE"
+    - TRIVY_USERNAME="$CI_REGISTRY_USER" TRIVY_PASSWORD="$CI_REGISTRY_PASSWORD" trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed "$CS_IMAGE"
 
 container_scanning:
   extends: .trivy_scan

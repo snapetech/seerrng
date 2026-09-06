@@ -104,7 +104,19 @@ test('all container vulnerability scans use an available pinned Trivy release', 
     assert.match(workflowText, /aquasecurity\/setup-trivy@/u);
     assert.match(workflowText, /version: v0\.74\.0/u);
     assert.doesNotMatch(workflowText, /version: 0\.58\.2/u);
+    assert.match(workflowText, /--exit-code 1/u);
+    assert.match(workflowText, /--severity HIGH,CRITICAL/u);
+    assert.match(workflowText, /--ignore-unfixed/u);
   }
+  const gitlab = fs.readFileSync(
+    path.join(rootDirectory, '.gitlab-ci.yml'),
+    'utf8'
+  );
+  assert.match(gitlab, /aquasec\/trivy:0\.74\.0@sha256:/u);
+  assert.match(
+    gitlab,
+    /trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed/u
+  );
 });
 
 test('multi-architecture publishers perform the real build once and verify the index', () => {
@@ -172,6 +184,18 @@ test('multi-architecture publishers perform the real build once and verify the i
       (step) => step.name === 'Verify published architectures'
     ).run,
     /verify-container-manifest\.sh --require-provenance/u
+  );
+  assert.deepEqual(release.jobs['scan-release-image'].needs, 'publish');
+  assert.deepEqual(release.jobs['scan-release-image'].strategy.matrix.include, [
+    { platform: 'linux/amd64', suffix: 'amd64' },
+    { platform: 'linux/arm64', suffix: 'arm64' },
+  ]);
+  assert.deepEqual(release.jobs.sign.needs, ['publish', 'scan-release-image']);
+  assert.match(
+    release.jobs['scan-release-image'].steps.find(
+      (step) => step.name === 'Run Trivy image scan'
+    ).run,
+    /needs\.publish\.outputs\.image_digest/u
   );
 });
 

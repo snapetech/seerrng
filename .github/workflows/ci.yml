@@ -456,10 +456,13 @@ jobs:
             --platform "$PLATFORM" \
             --format sarif \
             --output "trivy-main-${{ matrix.suffix }}.sarif" \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
             --ignore-unfixed \
             "ghcr.io/${{ github.repository }}@${{ needs.publish.outputs.image_digest }}"
 
       - name: Upload SARIF to code scanning
+        if: always()
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: trivy-main-${{ matrix.suffix }}.sarif
