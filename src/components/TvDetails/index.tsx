@@ -32,7 +32,10 @@ import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
-import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
+import {
+  getTmdbPosterImageUrl,
+  getTmdbPosterImageVariants,
+} from '@app/utils/imageCache';
 import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
 import { getSafeHref } from '@app/utils/safeUrl';
 import { Disclosure, Transition } from '@headlessui/react';
@@ -572,6 +575,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 ? getTmdbPosterImageUrl(data.posterPath)
                 : '/images/seerr_poster_not_found.png'
             }
+            variants={getTmdbPosterImageVariants(data.posterPath)}
             alt=""
             sizes="100vw"
             style={{ width: '100%', height: 'auto' }}

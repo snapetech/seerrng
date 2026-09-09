@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, before, describe, it, mock } from 'node:test';
 
+import CoverArtArchive from '@server/api/coverartarchive';
 import ExternalAPI from '@server/api/externalapi';
 import ListenBrainzAPI from '@server/api/listenbrainz';
 import MusicBrainz from '@server/api/musicbrainz';
@@ -864,6 +865,101 @@ describe('GET /discover/tv', () => {
 });
 
 describe('GET /discover/music', () => {
+  for (const sortBy of ['popular.week', 'release_date.desc']) {
+    it(`reuses detail cover URLs for ${sortBy} without additional artwork lookups`, async () => {
+      const releaseMbid = '55f7c1d9-b4f4-4c8d-a578-7d98687c4e45';
+      const albumId = 'f5093c06-23e3-404f-aeaa-40f72885ee3a';
+      const archive = new CoverArtArchive();
+      Object.defineProperty(archive, 'fetchReleaseGroupMetadata', {
+        value: async () => ({
+          release: `/release/${releaseMbid}`,
+          images: [{ id: 123, front: true, approved: true }],
+        }),
+      });
+      const detailArtwork = await archive.getCoverArt(albumId);
+      const getCoverArt = mock.method(
+        CoverArtArchive.prototype,
+        'getCoverArt',
+        async () => {
+          throw new Error('Discovery must not look up additional artwork');
+        }
+      );
+      const cases = [
+        {
+          imageId: 123,
+          releaseMbid,
+          expected: `https://archive.org/download/mbid-${releaseMbid}/mbid-${releaseMbid}-123_thumb250.jpg`,
+        },
+        ...[undefined, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1].map(
+          (imageId) => ({
+            imageId,
+            releaseMbid,
+            expected: `https://coverartarchive.org/release/${releaseMbid}/front-250`,
+          })
+        ),
+        {
+          imageId: 123,
+          releaseMbid: 'release-not-a-uuid',
+          expected:
+            'https://coverartarchive.org/release/release-not-a-uuid/front-250',
+        },
+        { imageId: 123, releaseMbid: '', expected: undefined },
+      ];
+      const albums = cases.map((entry, index) => ({
+        artist_mbids: [`artist-cover-${index}`],
+        artist_name: `Cover Artist ${index}`,
+        caa_id: entry.imageId as number,
+        caa_release_mbid: entry.releaseMbid,
+        listen_count: 100 - index,
+        release_group_mbid: index === 0 ? albumId : `album-cover-${index}`,
+        release_group_name: `Cover Album ${index}`,
+      }));
+      mock.method(ListenBrainzAPI.prototype, 'getTopAlbums', async () => ({
+        payload: {
+          count: albums.length,
+          from_ts: 0,
+          last_updated: 0,
+          offset: 0,
+          range: 'week',
+          release_groups: albums,
+          to_ts: 0,
+        },
+      }));
+      mock.method(ListenBrainzAPI.prototype, 'getFreshReleases', async () => ({
+        payload: {
+          releases: albums.map((album) => ({
+            ...album,
+            artist_credit_name: album.artist_name,
+            release_date: '2026-05-01',
+            release_group_primary_type: 'Album',
+            release_group_secondary_type: '',
+            release_mbid: album.caa_release_mbid,
+            release_name: album.release_group_name,
+            release_tags: [],
+          })),
+        },
+      }));
+
+      const agent = await login();
+      const res = await agent.get('/discover/music').query({ sortBy });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.results.length, cases.length);
+      for (const [index, entry] of cases.entries()) {
+        const album = res.body.results.find(
+          (result: { title: string }) => result.title === `Cover Album ${index}`
+        );
+        assert.equal(album?.posterPath, entry.expected);
+      }
+      assert.equal(
+        res.body.results.find((result: { id: string }) => result.id === albumId)
+          ?.posterPath,
+        detailArtwork.images[0]?.thumbnails[250]
+      );
+      assert.equal(getCoverArt.mock.callCount(), 0);
+    });
+  }
+
   it('rejects oversized music discovery queries before provider lookup', async () => {
     const searchAlbum = mock.method(MusicBrainz.prototype, 'searchAlbum');
     const getFreshReleases = mock.method(

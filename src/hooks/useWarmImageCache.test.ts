@@ -7,6 +7,19 @@ import {
 } from './useWarmImageCache';
 
 describe('poster cache warming', () => {
+  it('preserves resolved video artwork and skips authenticated local covers', () => {
+    const src = 'https://artworks.thetvdb.com/banners/poster.jpg';
+    assert.deepEqual(getImageUrls({ mediaType: 'tv', posterPath: src }, true), [
+      src,
+    ]);
+    assert.deepEqual(
+      getImageUrls(
+        { mediaType: 'movie', posterPath: '/api/v1/movie/1/cover' },
+        true
+      ),
+      []
+    );
+  });
   it('warms only poster sources when posterOnly is enabled', () => {
     assert.deepEqual(
       getImageUrls(
@@ -19,7 +32,7 @@ describe('poster cache warming', () => {
         },
         true
       ),
-      ['https://image.tmdb.org/t/p/w300_and_h450_face/movie.jpg']
+      ['https://image.tmdb.org/t/p/w342/movie.jpg']
     );
   });
 

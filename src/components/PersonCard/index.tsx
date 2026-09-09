@@ -1,4 +1,5 @@
 import CachedImage from '@app/components/Common/CachedImage';
+import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import { UserCircleIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -53,7 +54,10 @@ const PersonCard = ({
                 <div className="relative h-full w-3/4 overflow-hidden rounded-full ring-1 ring-gray-700">
                   <CachedImage
                     type="tmdb"
-                    src={`https://image.tmdb.org/t/p/w600_and_h900_bestv2${profilePath}`}
+                    src={getTmdbPosterImageUrl(
+                      profilePath,
+                      'w600_and_h900_bestv2'
+                    )}
                     alt=""
                     style={{
                       width: '100%',

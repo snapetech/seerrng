@@ -19,6 +19,10 @@ import {
   normalizeOpenLibraryWorkId,
 } from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  getTmdbPosterImageUrl,
+  getTmdbPosterImageVariants,
+} from '@app/utils/imageCache';
 import { getSafeHref } from '@app/utils/safeUrl';
 import { Transition } from '@headlessui/react';
 import {
@@ -260,7 +264,7 @@ const IssueDetails = () => {
     isMusic(data) || isBook(data)
       ? data.posterPath
       : data.posterPath
-        ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${data.posterPath}`
+        ? getTmdbPosterImageUrl(data.posterPath)
         : undefined;
   const backdropPath = isMusic(data)
     ? data.artistBackdrop
@@ -357,6 +361,11 @@ const IssueDetails = () => {
           <CachedImage
             type={isBook(data) ? 'book' : isMusic(data) ? 'music' : 'tmdb'}
             src={posterPath ?? '/images/seerr_poster_not_found.png'}
+            variants={
+              !isMusic(data) && !isBook(data)
+                ? getTmdbPosterImageVariants(data.posterPath)
+                : undefined
+            }
             alt=""
             sizes="100vw"
             style={{ width: '100%', height: 'auto' }}

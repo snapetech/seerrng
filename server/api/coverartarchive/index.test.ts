@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import dns from 'node:dns/promises';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import CoverArtArchive from '@server/api/coverartarchive';
@@ -240,6 +241,12 @@ describe('CoverArtArchive metadata persistence', () => {
 });
 
 describe('CoverArtArchive redirect chain resolution', () => {
+  beforeEach(() => {
+    mock.method(dns, 'lookup', async () => [
+      { address: '93.184.216.34', family: 4 },
+    ]);
+  });
+
   afterEach(() => mock.restoreAll());
 
   it('follows Cover Art Archive through archive.org to its CDN subdomain', async () => {

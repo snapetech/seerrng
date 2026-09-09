@@ -425,7 +425,7 @@ const TitleCard = ({
                     : undefined,
                 }
               : `/artist/${encodeApiPathSegment(canonicalId)}`;
-  const displayImage = getTmdbPosterImageUrl(image, 'w300_and_h450_face');
+  const displayImage = getTmdbPosterImageUrl(image);
   const imageCacheType =
     isResolvedImageUrl(displayImage) && isBook
       ? 'book'

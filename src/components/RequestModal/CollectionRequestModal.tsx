@@ -11,6 +11,7 @@ import globalMessages from '@app/i18n/globalMessages';
 import { getCoveredCollectionPartIds } from '@app/utils/collectionRequestState';
 import { mapWithConcurrency } from '@app/utils/concurrency';
 import defineMessages from '@app/utils/defineMessages';
+import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
@@ -512,7 +513,7 @@ const CollectionRequestModal = ({
                                 type="tmdb"
                                 src={
                                   part.posterPath
-                                    ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${part.posterPath}`
+                                    ? getTmdbPosterImageUrl(part.posterPath)
                                     : '/images/seerr_poster_not_found.png'
                                 }
                                 alt=""

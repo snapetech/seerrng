@@ -1,6 +1,7 @@
 import CachedImage from '@app/components/Common/CachedImage';
 import Placeholder from '@app/components/TitleCard/Placeholder';
 import defineMessages from '@app/utils/defineMessages';
+import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { memo, useMemo } from 'react';
@@ -27,9 +28,7 @@ const getImageProps = (poster: string) => {
 
   return {
     type: 'tmdb' as const,
-    src: poster.startsWith('http')
-      ? poster
-      : `https://image.tmdb.org/t/p/w300_and_h450_face${poster}`,
+    src: getTmdbPosterImageUrl(poster),
   };
 };
 
