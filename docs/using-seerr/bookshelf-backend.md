@@ -430,6 +430,10 @@ The public Snapetech fork is:
 https://github.com/snapetech/bookshelfng
 ```
 
+If Docker is not an option, follow the [BookshelfNG source-build
+guide](./bookshelf-source-build.md) to compile and run the backend directly on
+Linux.
+
 The deployment compose defaults to the Snapetech image:
 
 ```text

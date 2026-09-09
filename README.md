@@ -163,6 +163,10 @@ These components solve different problems. Fresh Hardcover installs use the
 rreading-glasses compatibility boundary by default; native Hardcover remains an
 explicit opt-in:
 
+If Docker is not an option, see the [BookshelfNG source-build
+guide](./docs/using-seerr/bookshelf-source-build.md) for a direct Linux build,
+systemd service, metadata configuration, and SeerrNG connection.
+
 - **BookshelfNG** is the maintained Readarr-style application. It manages the
   library, download clients, imports, file organization, and the
   Readarr-compatible API that SeerrNG uses.
