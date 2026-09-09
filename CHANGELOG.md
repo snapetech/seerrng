@@ -53,6 +53,29 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.19.3](https://github.com/snapetech/seerrng/compare/v3.19.2..v3.19.3) - 2026-09-09
+
+### User-facing changes
+
+#### Added
+
+- **Bookshelf:** Operators can now build and run BookshelfNG directly from source without Docker, with documented toolchain, systemd, metadata, and SeerrNG connection steps.
+
+#### Fixed
+
+- **Discover:** Returning from details to a discovery grid now keeps the same row in place, including when earlier poster rows are offscreen.
+
+### 🐛 Bug Fixes
+- *(discover)* Keep poster rows stable on back navigation - ([ed3d299](https://github.com/snapetech/seerrng/commit/ed3d2990e54ffd53744c5cb4fb4d09f77cbf63f8))
+
+### 📖 Documentation
+- *(bookshelf)* Add source build guide - ([c57fe3a](https://github.com/snapetech/seerrng/commit/c57fe3a54eaccde68c36e2656fe4d8367fd95eda))
+
+### 🧪 Testing
+- *(e2e)* Stabilize repeated navigation and screenshot checks - ([61b228e](https://github.com/snapetech/seerrng/commit/61b228e366cb075e5b46ee663c0661f702ce5cc5))
+
 ## [3.19.2](https://github.com/snapetech/seerrng/compare/v3.19.1..v3.19.2) - 2026-09-08
 
 ### User-facing changes
