@@ -116,12 +116,33 @@ const installMocks = () => {
 };
 
 const waitForImages = () => {
-  cy.get('[data-testid=title-card] img:visible')
-    .should('have.length.greaterThan', 8)
-    .then({ timeout: 20000 }, ($images) => {
-      const images = ($images.toArray() as HTMLImageElement[]).filter(
-        (image) => image.currentSrc || image.src
+  const viewportImages = ($images: JQuery<HTMLElement>) =>
+    ($images.toArray() as HTMLImageElement[]).filter((image) => {
+      const bounds = image.getBoundingClientRect();
+      const viewport = image.ownerDocument.documentElement;
+
+      // jQuery's :visible also matches lazy images in offscreen sliders.
+      // Only await covers that can appear in the viewport screenshot.
+      return (
+        (image.currentSrc || image.src) &&
+        bounds.width > 0 &&
+        bounds.height > 0 &&
+        bounds.bottom > 0 &&
+        bounds.right > 0 &&
+        bounds.top < viewport.clientHeight &&
+        bounds.left < viewport.clientWidth
       );
+    });
+
+  cy.get('[data-testid=title-card] img:visible')
+    .should(($images) => {
+      expect(
+        viewportImages($images),
+        'covers in the screenshot viewport'
+      ).to.have.length.greaterThan(8);
+    })
+    .then({ timeout: 20000 }, ($images) => {
+      const images = viewportImages($images);
 
       return Cypress.Promise.all(
         images.map(

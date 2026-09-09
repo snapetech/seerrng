@@ -312,7 +312,7 @@ const ListView = ({
           {emptyMessage ?? intl.formatMessage(globalMessages.noresults)}
         </div>
       )}
-      <ul className="cards-vertical">
+      <ul className="cards-vertical poster-grid">
         {plexCards}
         {itemCards}
         {isLoading && !isReachingEnd && placeholderCards}

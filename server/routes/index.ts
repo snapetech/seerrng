@@ -85,7 +85,8 @@ const publicStatusRateLimit = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () =>
+    process.env.NODE_ENV === 'test' || process.env.E2E_TESTS === 'true',
 });
 export const PUBLIC_BACKDROPS_RATE_LIMIT = {
   windowMs: 60 * 1000,

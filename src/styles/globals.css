@@ -442,6 +442,14 @@
     contain-intrinsic-size: auto 20rem;
   }
 
+  /* Match the responsive poster height even before an offscreen card renders.
+   * A fixed estimate shifts rows when Back navigation remounts the list. */
+  ul.cards-vertical.poster-grid > li {
+    aspect-ratio: 2 / 3;
+    min-height: 0;
+    contain-intrinsic-size: auto none;
+  }
+
   ul.cards-horizontal > li {
     content-visibility: auto;
     contain-intrinsic-size: auto 14rem;
