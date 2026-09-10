@@ -59,6 +59,13 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.20.0](https://github.com/snapetech/seerrng/compare/v3.19.5..v3.20.0) - 2026-09-10
+
+### 🚀 Features
+- *(plex)* Add Music and Audiobook library support (#110) - ([76035d9](https://github.com/snapetech/seerrng/commit/76035d98f070f7c44af5d75a2782c0d05de0d84e))
+
 ## [3.19.5](https://github.com/snapetech/seerrng/compare/v3.19.4..v3.19.5) - 2026-09-10
 
 ### User-facing changes
