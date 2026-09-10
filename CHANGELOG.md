@@ -57,6 +57,20 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.19.5](https://github.com/snapetech/seerrng/compare/v3.19.4..v3.19.5) - 2026-09-10
+
+### User-facing changes
+
+#### Fixed
+
+- **Bookshelf:** SeerrNG now follows the latest released BookshelfNG `main` build through stable image tags; development builds no longer replace those defaults. BookshelfNG source builds also accept forwarded MSBuild warning settings when NuGet audit output needs an explicit policy.
+  - **Action required:** pull the latest BookshelfNG image when upgrading
+
+### 🐛 Bug Fixes
+- *(bookshelf)* Follow latest BookshelfNG main release - ([3a3f6e4](https://github.com/snapetech/seerrng/commit/3a3f6e49d420e06339003203520acf110f5f56a6))
+
 ## [3.19.4](https://github.com/snapetech/seerrng/compare/v3.19.3..v3.19.4) - 2026-09-10
 
 ### User-facing changes
