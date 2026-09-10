@@ -55,6 +55,23 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.19.4](https://github.com/snapetech/seerrng/compare/v3.19.3..v3.19.4) - 2026-09-10
+
+### User-facing changes
+
+#### Fixed
+
+- **Artwork:** Opening a title reuses downloaded artwork immediately, with sharper movie and TV posters loaded only when needed. Fresh cached covers avoid redundant background requests, and matching album covers share the same image URL across discovery and details.
+
+### 🐛 Bug Fixes
+- *(images)* Reuse loaded artwork across navigation - ([bfe4d19](https://github.com/snapetech/seerrng/commit/bfe4d19fa25878861067d2da1733efe236c31038))
+
+
+## New Contributors ❤️
+* @EasyAsABC123 made their first contribution
+
 ## [3.19.3](https://github.com/snapetech/seerrng/compare/v3.19.2..v3.19.3) - 2026-09-09
 
 ### User-facing changes
