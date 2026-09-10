@@ -15,6 +15,10 @@ import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import { encodeApiPathSegment } from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  getTmdbPosterImageUrl,
+  getTmdbPosterImageVariants,
+} from '@app/utils/imageCache';
 import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowDownTrayIcon,
@@ -355,9 +359,10 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
             type="tmdb"
             src={
               data.posterPath
-                ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${data.posterPath}`
+                ? getTmdbPosterImageUrl(data.posterPath)
                 : '/images/seerr_poster_not_found.png'
             }
+            variants={getTmdbPosterImageVariants(data.posterPath)}
             alt=""
             sizes="100vw"
             style={{ width: '100%', height: 'auto' }}

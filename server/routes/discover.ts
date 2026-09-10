@@ -1,3 +1,4 @@
+import { getCoverArtArchiveThumbnailUrl } from '@server/api/coverartarchive/urls';
 import { DEFAULT_EXTERNAL_API_TIMEOUT_MS } from '@server/api/externalapi';
 import ListenBrainzAPI from '@server/api/listenbrainz';
 import type {
@@ -507,9 +508,14 @@ const mapTopAlbumRelease = (releaseGroup: LbReleaseGroup): MbAlbumResult => ({
       },
     },
   ],
-  posterPath: releaseGroup.caa_release_mbid
-    ? `https://coverartarchive.org/release/${releaseGroup.caa_release_mbid}/front-250`
-    : undefined,
+  posterPath:
+    getCoverArtArchiveThumbnailUrl(
+      releaseGroup.caa_release_mbid,
+      releaseGroup.caa_id
+    ) ??
+    (releaseGroup.caa_release_mbid
+      ? `https://coverartarchive.org/release/${releaseGroup.caa_release_mbid}/front-250`
+      : undefined),
 });
 
 const mapFreshReleaseAlbum = (release: LbRelease): MbAlbumResult => ({
@@ -533,9 +539,11 @@ const mapFreshReleaseAlbum = (release: LbRelease): MbAlbumResult => ({
       },
     },
   ],
-  posterPath: release.caa_release_mbid
-    ? `https://coverartarchive.org/release/${release.caa_release_mbid}/front-250`
-    : undefined,
+  posterPath:
+    getCoverArtArchiveThumbnailUrl(release.caa_release_mbid, release.caa_id) ??
+    (release.caa_release_mbid
+      ? `https://coverartarchive.org/release/${release.caa_release_mbid}/front-250`
+      : undefined),
 });
 
 const mergeMusicAlbumMetadata = (

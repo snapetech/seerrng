@@ -3,6 +3,26 @@ import { describe, it } from 'node:test';
 
 import { extractImageCacheUrls } from './imageCacheUrls';
 
+describe('resolved poster warming', () => {
+  it('keeps provider URLs intact without turning local covers into TMDB paths', () => {
+    assert.deepEqual(
+      extractImageCacheUrls([
+        {
+          mediaType: 'tv',
+          posterPath: 'https://artworks.thetvdb.com/banners/poster.jpg',
+        },
+        { mediaType: 'movie', posterPath: '/api/v1/movie/1/cover' },
+        { mediaType: 'tv', posterPath: '/imageproxy/tvdb/banners/poster.jpg' },
+        {
+          mediaType: 'movie',
+          posterPath: '/images/seerr_poster_not_found.png',
+        },
+      ]),
+      ['https://artworks.thetvdb.com/banners/poster.jpg']
+    );
+  });
+});
+
 describe('extractImageCacheUrls', () => {
   it('extracts warmable image URLs from nested media responses', () => {
     const urls = extractImageCacheUrls({
@@ -47,7 +67,7 @@ describe('extractImageCacheUrls', () => {
     });
 
     assert.deepEqual(urls, [
-      'https://image.tmdb.org/t/p/w300_and_h450_face/movie.jpg',
+      'https://image.tmdb.org/t/p/w342/movie.jpg',
       'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/movie-backdrop.jpg',
       'https://coverartarchive.org/release/release-id/front-250',
       'https://covers.openlibrary.org/b/id/123-L.jpg',
@@ -76,9 +96,7 @@ describe('extractImageCacheUrls', () => {
       ],
     });
 
-    assert.deepEqual(urls, [
-      'https://image.tmdb.org/t/p/w300_and_h450_face/same.jpg',
-    ]);
+    assert.deepEqual(urls, ['https://image.tmdb.org/t/p/w342/same.jpg']);
   });
 
   it('ignores non-HTTP-like external image strings', () => {

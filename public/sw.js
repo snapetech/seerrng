@@ -98,7 +98,9 @@ const getCacheControlDirectives = (response) =>
   new Set(
     (response?.headers.get('cache-control') ?? '')
       .split(',')
-      .map((directive) => directive.trim().toLowerCase().split('=', 1)[0])
+      .map((directive) =>
+        directive.trim().toLowerCase().split('=', 1)[0].trim()
+      )
       .filter(Boolean)
   );
 
@@ -133,6 +135,60 @@ const isFresh = (response, maxAgeMs) => {
       : maxAgeMs;
 
   return Date.now() - getCachedAt(response) < effectiveMaxAge;
+};
+
+const isPublicArtworkResponse = (request, response, cacheType) => {
+  const directives = getCacheControlDirectives(response);
+
+  return (
+    cacheType === 'static' &&
+    new URL(request.url).pathname.startsWith('/imageproxy/') &&
+    isRuntimeCacheableResponse(response) &&
+    /^image\//i.test(response.headers.get('content-type') ?? '') &&
+    directives.has('public') &&
+    !directives.has('private') &&
+    !directives.has('no-cache')
+  );
+};
+
+const isFreshArtwork = (response) => {
+  const now = Date.now();
+  const cachedAt = getCachedAt(response);
+  if (cachedAt <= 0 || cachedAt > now) {
+    return false;
+  }
+
+  let maxAgeMs = STATIC_CACHE_FRESH_MS;
+  const maxAgeDirectives = (response.headers.get('cache-control') ?? '')
+    .split(',')
+    .filter((directive) => /^\s*max-age\s*(?:=|$)/i.test(directive));
+
+  if (maxAgeDirectives.length > 0) {
+    // Malformed or conflicting freshness metadata cannot authorize a cache hit.
+    const match = maxAgeDirectives[0].match(
+      /^\s*max-age\s*=\s*(?:"(\d+)"|(\d+))\s*$/i
+    );
+    if (maxAgeDirectives.length !== 1 || !match) {
+      return false;
+    }
+    maxAgeMs = Math.min(maxAgeMs, Number(match[1] ?? match[2]) * 1000);
+  }
+
+  const ageHeader = response.headers.get('age');
+  if (ageHeader !== null && !/^\d+$/.test(ageHeader.trim())) {
+    return false;
+  }
+  const ageMs = Number(ageHeader ?? 0) * 1000;
+  const dateHeader = response.headers.get('date');
+  const responseDate = dateHeader === null ? cachedAt : Date.parse(dateHeader);
+  if (!Number.isFinite(ageMs) || !Number.isFinite(responseDate)) {
+    return false;
+  }
+
+  // A response may already be old when fetched from the browser/CDN cache.
+  // The worker's insertion timestamp must not reset that existing age.
+  const initialAgeMs = Math.max(0, cachedAt - responseDate, ageMs);
+  return initialAgeMs + (now - cachedAt) < maxAgeMs;
 };
 
 const addCacheTimestamp = (response) => {
@@ -341,6 +397,23 @@ const staleWhileRevalidate = async (request, cacheRequest, cacheType) => {
   const config = getCacheConfig(cacheType);
   const cache = await caches.open(config.cacheName);
   const cachedResponse = await cache.match(cacheRequest);
+  const publicArtwork = isPublicArtworkResponse(
+    request,
+    cachedResponse,
+    cacheType
+  );
+  const freshCachedResponse = publicArtwork
+    ? !['reload', 'no-cache', 'no-store'].includes(request.cache) &&
+      isFreshArtwork(cachedResponse)
+    : isFresh(cachedResponse, config.freshMs);
+
+  if (publicArtwork && freshCachedResponse) {
+    return {
+      responsePromise: Promise.resolve(cachedResponse),
+      networkResponsePromise: Promise.resolve(undefined),
+    };
+  }
+
   const networkResponsePromise = fetch(request)
     .then(async (networkResponse) => {
       if ([401, 403, 404, 410].includes(networkResponse.status)) {
@@ -352,7 +425,7 @@ const staleWhileRevalidate = async (request, cacheRequest, cacheType) => {
     .catch(() => undefined);
 
   const responsePromise =
-    cachedResponse && isFresh(cachedResponse, config.freshMs)
+    cachedResponse && freshCachedResponse
       ? Promise.resolve(cachedResponse)
       : networkResponsePromise.then((networkResponse) => {
           if (networkResponse && networkResponse.status < 500) {

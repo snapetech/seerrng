@@ -36,8 +36,15 @@ const getWarmableImageUrls = (item: ImageWarmableRecord): string[] => {
   const mediaType = typeof item.mediaType === 'string' ? item.mediaType : '';
 
   if (typeof item.posterPath === 'string') {
-    if (TMDB_POSTER_TYPES.has(mediaType) && item.posterPath.startsWith('/')) {
-      urls.push(getTmdbImageUrl(item.posterPath, 'w300_and_h450_face'));
+    const posterPath = item.posterPath;
+    if (
+      TMDB_POSTER_TYPES.has(mediaType) &&
+      posterPath.startsWith('/') &&
+      !['/api/', '/images/', '/imageproxy/'].some((prefix) =>
+        posterPath.startsWith(prefix)
+      )
+    ) {
+      urls.push(getTmdbImageUrl(posterPath, TMDB_POSTER_BASE_SIZE));
     } else {
       urls.push(normalizeExternalImageUrl(item.posterPath));
     }
@@ -106,3 +113,4 @@ export const extractImageCacheUrls = (body: unknown): string[] => {
 
   return [...urls];
 };
+import { TMDB_POSTER_BASE_SIZE } from '@server/constants/images';

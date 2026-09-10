@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import { In } from 'typeorm';
 import type { CoverArtResponse } from './interfaces';
+import { formatCoverArtArchiveThumbnailUrl } from './urls';
 
 const MAX_COVER_ART_IMAGES = 100;
 const MAX_COVER_ART_IDENTIFIER_LENGTH = 256;
@@ -205,9 +206,7 @@ class CoverArtArchive extends ExternalAPI {
           ? rawData.release.slice(0, MAX_COVER_ART_IDENTIFIER_LENGTH)
           : `/release/${albumId}`;
 
-      const releaseMBID = encodeURIComponent(
-        release.split('/').filter(Boolean).pop() ?? albumId
-      );
+      const releaseMBID = release.split('/').filter(Boolean).pop() ?? albumId;
       const images = (Array.isArray(rawData.images) ? rawData.images : [])
         .slice(0, MAX_COVER_ART_IMAGES)
         .flatMap((value) => {
@@ -220,8 +219,7 @@ class CoverArtArchive extends ExternalAPI {
             return [];
           }
 
-          const imageId = encodeURIComponent(String(id));
-          const fullUrl = `https://archive.org/download/mbid-${releaseMBID}/mbid-${releaseMBID}-${imageId}_thumb250.jpg`;
+          const fullUrl = formatCoverArtArchiveThumbnailUrl(releaseMBID, id);
 
           return [
             {

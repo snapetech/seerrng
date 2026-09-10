@@ -1,3 +1,8 @@
+import {
+  TMDB_POSTER_BASE_SIZE,
+  TMDB_POSTER_WIDTHS,
+} from '@server/constants/images';
+
 export type CacheableImageType = 'tmdb' | 'avatar' | 'tvdb' | 'music' | 'book';
 
 export const AVATAR_FALLBACK_IMAGE = '/user-icon-192x192.png';
@@ -6,7 +11,8 @@ export const isResolvedImageUrl = (src?: string): boolean =>
   !!src &&
   (src.startsWith('http') ||
     src.startsWith('/images/') ||
-    src.startsWith('/api/'));
+    src.startsWith('/api/') ||
+    src.startsWith('/imageproxy/'));
 
 export function getTmdbPosterImageUrl(
   posterPath: string,
@@ -18,7 +24,7 @@ export function getTmdbPosterImageUrl(
 ): string | undefined;
 export function getTmdbPosterImageUrl(
   posterPath?: string,
-  size = 'w600_and_h900_bestv2'
+  size = TMDB_POSTER_BASE_SIZE
 ): string | undefined {
   if (!posterPath) {
     return undefined;
@@ -28,6 +34,19 @@ export function getTmdbPosterImageUrl(
     ? posterPath
     : `https://image.tmdb.org/t/p/${size}${posterPath}`;
 }
+
+// Only explicitly generated sizes of the same uncropped TMDB poster are
+// interchangeable. Already resolved artwork may use a different provider,
+// edition, or crop and must retain its exact URL.
+export const getTmdbPosterImageVariants = (
+  posterPath?: string
+): readonly { src: string; width: number }[] | undefined =>
+  posterPath && !isResolvedImageUrl(posterPath)
+    ? TMDB_POSTER_WIDTHS.map((width) => ({
+        src: getTmdbPosterImageUrl(posterPath, `w${width}`),
+        width,
+      }))
+    : undefined;
 
 export const getInitialImageUrl = (
   type: CacheableImageType,

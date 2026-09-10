@@ -34,6 +34,8 @@ const createHarness = () => {
   const listeners = new Map<string, Listener>();
   const cacheStores = new Map<string, MemoryCache>();
   const networkResponses: (Response | Error)[] = [];
+  const networkRequests: string[] = [];
+  let now = Date.UTC(2026, 8, 9);
   const shownNotifications: { subject: string; options: unknown }[] = [];
   const openedWindows: string[] = [];
 
@@ -71,8 +73,14 @@ const createHarness = () => {
         },
       },
       console,
+      Date: class extends Date {
+        static now() {
+          return now;
+        }
+      },
       encodeURIComponent,
-      fetch: async () => {
+      fetch: async (request: Request) => {
+        networkRequests.push(request.url);
         const nextResponse = networkResponses.shift();
         if (nextResponse instanceof Error) {
           throw nextResponse;
@@ -156,11 +164,16 @@ const createHarness = () => {
 
   return {
     activate,
+    advanceTime: (milliseconds: number) => {
+      now += milliseconds;
+    },
     cacheNames: () => [...cacheStores.keys()],
     clickNotification,
     dispatchPush,
     fetchRequest,
+    networkRequests,
     networkResponses,
+    now: () => now,
     openedWindows,
     seedCache: (name: string) => caches.open(name),
     setUser,
@@ -351,6 +364,279 @@ describe('service worker runtime cache', () => {
       await (await harness.fetchRequest(request))?.text(),
       'manager-data'
     );
+  });
+});
+
+describe('service worker public artwork reuse', () => {
+  const artworkRequest = new Request(
+    'https://seerr.test/imageproxy/tmdb/t/p/w342/poster.jpg'
+  );
+  const artworkResponse = (
+    body = 'poster',
+    headers: Record<string, string> = {}
+  ) =>
+    new Response(body, {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=3600',
+        ...headers,
+      },
+    });
+
+  it('reuses a downloaded public image without fetching during navigation or user changes', async () => {
+    const harness = createHarness();
+    harness.networkResponses.push(artworkResponse());
+    await harness.setUser(1, 2);
+    assert.equal(
+      await (await harness.fetchRequest(artworkRequest))?.text(),
+      'poster'
+    );
+    const requestsAfterDownload = harness.networkRequests.length;
+
+    for (const user of [1, 2, null]) {
+      await harness.setUser(user);
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'poster'
+      );
+    }
+
+    assert.equal(harness.networkRequests.length - requestsAfterDownload, 0);
+  });
+
+  it('honors a shorter max-age and waits for an expired image to refresh', async () => {
+    const harness = createHarness();
+    harness.networkResponses.push(
+      artworkResponse('original', { 'Cache-Control': 'public, max-age="60"' })
+    );
+    await harness.fetchRequest(artworkRequest);
+
+    harness.advanceTime(59000);
+    assert.equal(
+      await (await harness.fetchRequest(artworkRequest))?.text(),
+      'original'
+    );
+    assert.equal(harness.networkRequests.length, 1);
+
+    harness.advanceTime(1000);
+    harness.networkResponses.push(artworkResponse('updated'));
+    assert.equal(
+      await (await harness.fetchRequest(artworkRequest))?.text(),
+      'updated'
+    );
+    assert.equal(harness.networkRequests.length, 2);
+  });
+
+  it('honors explicit request cache bypasses even when artwork is fresh', async () => {
+    for (const cache of ['reload', 'no-cache', 'no-store'] as const) {
+      const harness = createHarness();
+      harness.networkResponses.push(artworkResponse('original'));
+      await harness.fetchRequest(artworkRequest);
+      harness.networkResponses.push(artworkResponse('updated'));
+      assert.equal(
+        await (
+          await harness.fetchRequest(new Request(artworkRequest, { cache }))
+        )?.text(),
+        'updated'
+      );
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('caps long or missing max-age at the existing 24-hour policy', async () => {
+    for (const cacheControl of ['public, max-age=31536000', 'public']) {
+      const harness = createHarness();
+      harness.networkResponses.push(
+        artworkResponse('original', { 'Cache-Control': cacheControl })
+      );
+      await harness.fetchRequest(artworkRequest);
+      harness.advanceTime(24 * 60 * 60 * 1000 - 1);
+      await harness.fetchRequest(artworkRequest);
+      assert.equal(harness.networkRequests.length, 1);
+
+      harness.advanceTime(1);
+      harness.networkResponses.push(artworkResponse('updated'));
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'updated'
+      );
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('preserves upstream Age and Date instead of restarting freshness on insertion', async () => {
+    const cases: Record<string, string>[] = [
+      { Age: '40' },
+      { Date: new Date(Date.UTC(2026, 8, 8, 23, 59, 20)).toUTCString() },
+      {
+        Age: '40',
+        Date: new Date(Date.UTC(2026, 8, 8, 23, 59, 50)).toUTCString(),
+      },
+    ];
+    for (const metadata of cases) {
+      const harness = createHarness();
+      harness.networkResponses.push(
+        artworkResponse('original', {
+          'Cache-Control': 'public, max-age=60',
+          ...metadata,
+        })
+      );
+      await harness.fetchRequest(artworkRequest);
+      harness.advanceTime(19000);
+      await harness.fetchRequest(artworkRequest);
+      assert.equal(harness.networkRequests.length, 1);
+
+      harness.advanceTime(1000);
+      harness.networkResponses.push(artworkResponse('updated'));
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'updated'
+      );
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('requires valid freshness metadata before skipping a fetch', async () => {
+    const cases: Record<string, string>[] = [
+      { 'Cache-Control': 'public, max-age=0' },
+      { 'Cache-Control': 'public, max-age=-1' },
+      { 'Cache-Control': 'public, max-age=invalid' },
+      { 'Cache-Control': 'public, max-age=60, max-age=3600' },
+      { 'Cache-Control': 'public, max-age="60' },
+      { Age: '-1' },
+      { Age: 'invalid' },
+      { Age: '3600' },
+      { Date: 'invalid' },
+    ];
+    for (const metadata of cases) {
+      const harness = createHarness();
+      harness.networkResponses.push(artworkResponse('original', metadata));
+      await harness.fetchRequest(artworkRequest);
+      harness.networkResponses.push(artworkResponse('updated'));
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'updated'
+      );
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('requires a valid insertion timestamp in an existing compatible cache', async () => {
+    for (const timestamp of [undefined, '', 'invalid', '-1', '9999999999999']) {
+      const harness = createHarness();
+      const cache = await harness.seedCache('seerrng-static-v1');
+      await cache.put(
+        artworkRequest,
+        artworkResponse('original', {
+          ...(timestamp === undefined
+            ? {}
+            : { 'x-seerrng-cache-time': timestamp }),
+        })
+      );
+      harness.networkResponses.push(artworkResponse('updated'));
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'updated'
+      );
+      assert.equal(harness.networkRequests.length, 1);
+    }
+  });
+
+  it('excludes private, no-store, no-cache, implicit-public, and non-image responses from the shortcut', async () => {
+    const cases: Record<string, string>[] = [
+      { 'Cache-Control': 'private, max-age=3600' },
+      { 'Cache-Control': 'public, private="Set-Cookie", max-age=3600' },
+      { 'Cache-Control': 'public, no-store, max-age=3600' },
+      { 'Cache-Control': 'public, no-cache, max-age=3600' },
+      { 'Cache-Control': 'max-age=3600' },
+      { 'Content-Type': 'text/html' },
+      { Vary: '*' },
+    ];
+    for (const headers of cases) {
+      const harness = createHarness();
+      harness.networkResponses.push(artworkResponse('original', headers));
+      await harness.fetchRequest(artworkRequest);
+      harness.networkResponses.push(artworkResponse('updated', headers));
+      await harness.fetchRequest(artworkRequest);
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('does not extend cache-first behavior to avatars, static files, or authenticated APIs', async () => {
+    for (const path of [
+      '/avatarproxy/gravatar/avatar.jpg',
+      '/poster.jpg',
+      '/api/v1/book/42/cover.jpg',
+    ]) {
+      const harness = createHarness();
+      await harness.setUser(1);
+      const request = new Request(`https://seerr.test${path}`);
+      harness.networkResponses.push(artworkResponse('original'));
+      await harness.fetchRequest(request);
+      harness.networkResponses.push(artworkResponse('updated'));
+      await harness.fetchRequest(request);
+      assert.equal(harness.networkRequests.length, 2);
+    }
+  });
+
+  it('keeps provider, artwork, size, and version query URLs distinct', async () => {
+    const harness = createHarness();
+    const paths = [
+      '/imageproxy/tmdb/t/p/w342/poster.jpg',
+      '/imageproxy/tmdb/t/p/w780/poster.jpg',
+      '/imageproxy/tmdb/t/p/w342/another.jpg',
+      '/imageproxy/openlibrary/b/id/42-L.jpg',
+      '/imageproxy/openlibrary/b/id/43-L.jpg',
+      '/imageproxy/openlibrary/b/id/42-L.jpg?version=1',
+      '/imageproxy/openlibrary/b/id/42-L.jpg?version=2',
+    ];
+    for (const path of paths) {
+      harness.networkResponses.push(artworkResponse(path));
+      await harness.fetchRequest(new Request(`https://seerr.test${path}`));
+    }
+    assert.equal(harness.networkRequests.length, paths.length);
+
+    for (const path of paths) {
+      assert.equal(
+        await (
+          await harness.fetchRequest(new Request(`https://seerr.test${path}`))
+        )?.text(),
+        path
+      );
+    }
+    assert.equal(harness.networkRequests.length, paths.length);
+  });
+
+  it('retains expired images on network failures but evicts them after terminal errors', async () => {
+    const harness = createHarness();
+    harness.networkResponses.push(
+      artworkResponse('original', { 'Cache-Control': 'public, max-age=1' })
+    );
+    await harness.fetchRequest(artworkRequest);
+    harness.advanceTime(1000);
+
+    for (const failure of [
+      new Error('offline'),
+      new Response('unavailable', { status: 503 }),
+    ]) {
+      harness.networkResponses.push(failure);
+      assert.equal(
+        await (await harness.fetchRequest(artworkRequest))?.text(),
+        'original'
+      );
+    }
+
+    harness.networkResponses.push(new Response('missing', { status: 404 }));
+    assert.equal(
+      await (await harness.fetchRequest(artworkRequest))?.text(),
+      'missing'
+    );
+    harness.networkResponses.push(new Error('offline'));
+    assert.notEqual(
+      await (await harness.fetchRequest(artworkRequest))?.text(),
+      'original'
+    );
+    assert.equal(harness.networkRequests.length, 5);
   });
 });
 

@@ -6,8 +6,57 @@ import {
   getImageCacheUrl,
   getImageErrorFallback,
   getInitialImageUrl,
+  getTmdbPosterImageUrl,
+  getTmdbPosterImageVariants,
   isRemoteAvatarCacheUrlAllowed,
 } from './imageCache';
+
+describe('poster artwork identity', () => {
+  it('uses the same base URL for cards and compatible detail variants', () => {
+    const path = '/poster.jpg?version=2';
+    assert.equal(
+      getTmdbPosterImageUrl(path),
+      'https://image.tmdb.org/t/p/w342/poster.jpg?version=2'
+    );
+    assert.deepEqual(
+      getTmdbPosterImageVariants(path),
+      [342, 500, 780].map((width) => ({
+        src: `https://image.tmdb.org/t/p/w${width}${path}`,
+        width,
+      }))
+    );
+  });
+
+  it('preserves provider, edition, query, and explicit crop identities', () => {
+    for (const src of [
+      'https://artworks.thetvdb.com/banners/poster.jpg',
+      'https://covers.openlibrary.org/b/id/123-L.jpg',
+      'https://archive.org/download/album/cover_thumb250.jpg',
+      'https://image.tmdb.org/t/p/w300_and_h450_face/poster.jpg',
+      '/api/v1/book/OL123W/cover?mediaId=12&format=audiobook',
+      '/imageproxy/tmdb/t/p/w342/poster.jpg',
+      '/images/seerr_poster_not_found.png',
+    ]) {
+      assert.equal(getTmdbPosterImageUrl(src), src);
+      assert.equal(getTmdbPosterImageVariants(src), undefined);
+    }
+    assert.equal(getTmdbPosterImageUrl(undefined), undefined);
+    assert.equal(getTmdbPosterImageVariants(undefined), undefined);
+    assert.notDeepEqual(
+      getTmdbPosterImageVariants('/poster.jpg?version=1'),
+      getTmdbPosterImageVariants('/poster.jpg?version=2')
+    );
+  });
+
+  it('preserves resolved artist photos while supporting TMDB profile paths', () => {
+    const artist = 'https://r2.theaudiodb.com/images/media/artist/thumb.jpg';
+    assert.equal(getTmdbPosterImageUrl(artist, 'w600_and_h900_bestv2'), artist);
+    assert.equal(
+      getTmdbPosterImageUrl('/person.jpg', 'w600_and_h900_bestv2'),
+      'https://image.tmdb.org/t/p/w600_and_h900_bestv2/person.jpg'
+    );
+  });
+});
 
 describe('getInitialImageUrl', () => {
   it('shows the bundled default while avatars load', () => {

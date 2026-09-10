@@ -1,3 +1,4 @@
+import useImageVariants from '@app/hooks/useImageVariants';
 import useSettings from '@app/hooks/useSettings';
 import type { CacheableImageType } from '@app/utils/imageCache';
 import {
@@ -6,6 +7,7 @@ import {
   getImageErrorFallback,
   getInitialImageUrl,
 } from '@app/utils/imageCache';
+import type { ImageVariant } from '@app/utils/loadedImages';
 import { UserIcon } from '@heroicons/react/24/solid';
 import type { ImageLoader, ImageProps } from 'next/image';
 import Image from 'next/image';
@@ -16,6 +18,7 @@ const imageLoader: ImageLoader = ({ src }) => src;
 export type CachedImageProps = ImageProps & {
   src: string;
   type: CacheableImageType;
+  variants?: readonly ImageVariant[];
 };
 
 /**
@@ -26,10 +29,12 @@ const CachedImage = memo(
   ({
     src,
     type,
+    variants,
     decoding = 'async',
     loading,
     priority,
     onError,
+    onLoad,
     ...props
   }: CachedImageProps) => {
     const { currentSettings } = useSettings();
@@ -42,6 +47,19 @@ const CachedImage = memo(
           type,
         }),
       [currentSettings.cacheImages, src, type]
+    );
+    const resolvedVariants = variants?.map((variant) => ({
+      ...variant,
+      src: getImageCacheUrl({
+        cacheImages: currentSettings.cacheImages,
+        src: variant.src,
+        type,
+      }),
+    }));
+    const progressiveImage = useImageVariants(
+      imageUrl,
+      resolvedVariants,
+      type !== 'avatar'
     );
     const [activeImageUrl, setActiveImageUrl] = useState(() =>
       getInitialImageUrl(type, imageUrl)
@@ -76,16 +94,25 @@ const CachedImage = memo(
       );
     }
 
+    const displayImageUrl =
+      type === 'avatar' ? activeImageUrl : progressiveImage.src;
+
     return (
       <Image
         unoptimized
         loader={imageLoader}
-        src={activeImageUrl}
+        src={displayImageUrl}
+        ref={progressiveImage.ref}
         decoding={decoding}
         loading={priority ? undefined : (loading ?? 'lazy')}
         priority={priority}
+        onLoad={(event) => {
+          if (type !== 'avatar') progressiveImage.onLoad(event.currentTarget);
+          onLoad?.(event);
+        }}
         onError={(event) => {
-          const fallbackImage = getImageErrorFallback(type, activeImageUrl);
+          if (type !== 'avatar') progressiveImage.onError(event.currentTarget);
+          const fallbackImage = getImageErrorFallback(type, displayImageUrl);
           if (fallbackImage) {
             setActiveImageUrl(fallbackImage);
           }

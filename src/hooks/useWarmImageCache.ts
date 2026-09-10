@@ -1,4 +1,5 @@
 import useSettings from '@app/hooks/useSettings';
+import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import axios from 'axios';
 import { useEffect, useMemo } from 'react';
 
@@ -40,7 +41,9 @@ export const getImageUrls = (
     item.posterPath &&
     ['movie', 'tv', 'person', 'collection'].includes(item.mediaType ?? '')
   ) {
-    urls.push(getTmdbImageUrl(item.posterPath, 'w300_and_h450_face'));
+    urls.push(
+      normalizeExternalImageUrl(getTmdbPosterImageUrl(item.posterPath))
+    );
   } else {
     urls.push(normalizeExternalImageUrl(item.posterPath));
   }
