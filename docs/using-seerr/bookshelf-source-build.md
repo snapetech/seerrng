@@ -16,10 +16,11 @@ guide](/getting-started/buildfromsource) instead.
 
 :::warning
 
-Source builds follow the BookshelfNG `develop` branch and are intended for
-operators who are comfortable maintaining a local service. Use a pinned
-BookshelfNG commit or a published image when you need a reproducible upgrade
-path.
+Source builds follow the BookshelfNG `main` branch and are intended for
+operators who are comfortable maintaining a local service. The published
+`hardcover` and `softcover` image tags follow the same released `main` line.
+Use a pinned BookshelfNG commit or image digest when you need a reproducible
+upgrade path.
 
 :::
 
@@ -69,12 +70,12 @@ npm install --global yarn@1.22.19
 ## Clone the source
 
 The maintained public fork is [snapetech/bookshelfng](https://github.com/snapetech/bookshelfng).
-Its development branch is `develop`:
+The supported source-build branch is `main`:
 
 ```bash
 mkdir -p ~/src
 cd ~/src
-git clone --branch develop https://github.com/snapetech/bookshelfng.git
+git clone --branch main https://github.com/snapetech/bookshelfng.git
 cd bookshelfng
 ```
 
@@ -95,6 +96,18 @@ For a normal Linux x64 host, build only the runtime you need:
 ```bash
 ./build.sh --backend --frontend -r linux-x64 -f net6.0
 ```
+
+If NuGet reports an advisory while restoring, pass an explicit MSBuild warning
+policy through the wrapper. Keep the warning visible while investigating it:
+
+```bash
+./build.sh --backend --frontend -r linux-x64 -f net6.0 \
+  --msbuild-arg "-p:WarningsNotAsErrors=NU1903"
+```
+
+Replace `NU1903` with the warning code from the restore output. `build.sh`
+rejects unknown options, so flags such as `--no-warn` are not silently ignored.
+Do not suppress an advisory instead of updating a vulnerable package.
 
 The command restores .NET and Yarn dependencies, publishes the backend, and
 builds the frontend. Validate the expected output before installing it:
@@ -283,7 +296,7 @@ sudo tar -C /var/lib -czf \
 
 cd ~/src/bookshelfng
 git fetch origin
-git checkout develop
+git checkout main
 git pull --ff-only
 ./build.sh --backend --frontend -r linux-x64 -f net6.0
 
@@ -303,6 +316,15 @@ treating this as a normal binary upgrade.
 
 Install the .NET 6 SDK. A newer runtime or SDK alone does not guarantee that
 the `net6.0` solution can restore and publish correctly.
+
+### NuGet reports a vulnerable package
+
+First update the checkout to the latest BookshelfNG `main` commit and confirm
+the resolved package version. The maintained release line pins patched MailKit
+and other security-sensitive transitive packages. If an audit warning still
+blocks a source build, use the supported `--msbuild-arg` forwarding option with
+`WarningsNotAsErrors` while the dependency is reviewed; use `NoWarn` only when
+you have deliberately accepted that audit policy.
 
 ### The UI is missing
 

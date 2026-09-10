@@ -224,7 +224,7 @@ describe('Bookshelf backup permissions', () => {
     );
     assert.match(
       compose,
-      /image: \$\{BOOKSHELF_IMAGE:-ghcr\.io\/snapetech\/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636\}/
+      /image: \$\{BOOKSHELF_IMAGE:-ghcr\.io\/snapetech\/bookshelfng:hardcover\}/
     );
     assert.match(compose, /profiles: \['rreading-glasses'\]/);
     assert.match(compose, /entrypoint: \['\/main', 'serve'\]/);

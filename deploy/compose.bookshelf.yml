@@ -48,7 +48,7 @@ services:
     command: ['--verbose']
 
   bookshelf-ebooks:
-    image: ${BOOKSHELF_IMAGE:-ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636}
+    image: ${BOOKSHELF_IMAGE:-ghcr.io/snapetech/bookshelfng:hardcover}
     container_name: ${BOOKSHELF_EBOOKS_CONTAINER_NAME:-bookshelf-ebooks}
     network_mode: host
     restart: unless-stopped
@@ -80,7 +80,7 @@ services:
       - ${PLEX_ROOT:-/mnt/datapool_lvm_media/plex}:/media/plex
 
   bookshelf-audiobooks:
-    image: ${BOOKSHELF_IMAGE:-ghcr.io/snapetech/bookshelfng:hardcover@sha256:867abb5a95d1556c30bd22389ea913755c9157323fac36159a691d5453f92636}
+    image: ${BOOKSHELF_IMAGE:-ghcr.io/snapetech/bookshelfng:hardcover}
     container_name: ${BOOKSHELF_AUDIOBOOKS_CONTAINER_NAME:-bookshelf-audiobooks}
     network_mode: host
     restart: unless-stopped
