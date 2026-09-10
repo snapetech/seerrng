@@ -80,6 +80,10 @@ const messages = defineMessages('components.Settings', {
   toastTautulliSettingsSuccess: 'Tautulli settings saved successfully!',
   toastTautulliSettingsFailure:
     'Something went wrong while saving Tautulli settings.',
+  reclassifyToAudiobook: 'Reclassify as an Audiobooks library',
+  reclassifyToMusic: 'Reclassify as a Music library',
+  toastReclassifyFailure:
+    'Something went wrong while reclassifying the library.',
 });
 
 interface Library {
@@ -332,6 +336,23 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
     }
     setIsSyncing(false);
     revalidate();
+  };
+
+  const reclassifyLibrary = async (
+    libraryId: string,
+    nextType: 'music' | 'book'
+  ) => {
+    try {
+      await axios.put(`/api/v1/settings/plex/library/${libraryId}/type`, {
+        type: nextType,
+      });
+      revalidate();
+    } catch {
+      addToast(intl.formatMessage(messages.toastReclassifyFailure), {
+        autoDismiss: true,
+        appearance: 'error',
+      });
+    }
   };
 
   if ((!data || !dataTautulli) && !error) {
@@ -652,9 +673,24 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
           {data?.libraries.map((library) => (
             <LibraryItem
               name={library.name}
+              type={library.type}
               isEnabled={library.enabled}
               key={`setting-library-${library.id}`}
               onToggle={() => toggleLibrary(library.id)}
+              {...(library.type === 'music' || library.type === 'book'
+                ? {
+                    reclassifyLabel: intl.formatMessage(
+                      library.type === 'music'
+                        ? messages.reclassifyToAudiobook
+                        : messages.reclassifyToMusic
+                    ),
+                    onReclassify: () =>
+                      reclassifyLibrary(
+                        library.id,
+                        library.type === 'music' ? 'book' : 'music'
+                      ),
+                  }
+                : {})}
             />
           ))}
         </ul>

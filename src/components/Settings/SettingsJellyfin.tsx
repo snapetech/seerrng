@@ -292,6 +292,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
           {data?.libraries.map((library) => (
             <LibraryItem
               name={library.name}
+              type={library.type}
               isEnabled={library.enabled}
               key={`setting-library-${library.id}`}
               onToggle={() => toggleLibrary(library.id)}

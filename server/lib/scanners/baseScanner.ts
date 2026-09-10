@@ -347,6 +347,7 @@ class BaseScanner<T> {
     mbId: string,
     {
       mediaAddedAt,
+      ratingKey,
       serviceId,
       externalServiceId,
       externalServiceSlug,
@@ -432,6 +433,14 @@ class BaseScanner<T> {
                   changedExisting = true;
                 }
 
+                if (
+                  ratingKey !== undefined &&
+                  existing.ratingKey !== ratingKey
+                ) {
+                  existing.ratingKey = ratingKey;
+                  changedExisting = true;
+                }
+
                 if (changedExisting) {
                   await mediaRepository.save(existing);
                   this.log(`Updating existing album: ${title}`, 'info');
@@ -443,6 +452,7 @@ class BaseScanner<T> {
                     mbId: normalizedMbId,
                     mediaType: MediaType.MUSIC,
                     mediaAddedAt,
+                    ratingKey,
                     serviceId,
                     externalServiceId,
                     externalServiceSlug,
@@ -469,6 +479,7 @@ class BaseScanner<T> {
     value: string,
     {
       mediaAddedAt,
+      ratingKey,
       serviceId,
       externalServiceId,
       externalServiceSlug,
@@ -633,6 +644,14 @@ class BaseScanner<T> {
                     changedExisting = true;
                   }
 
+                  if (
+                    ratingKey !== undefined &&
+                    existing.ratingKey !== ratingKey
+                  ) {
+                    existing.ratingKey = ratingKey;
+                    changedExisting = true;
+                  }
+
                   if (changedExisting) {
                     await mediaRepository.save(existing);
                     this.log(`Updating existing book: ${title}`, 'info');
@@ -690,6 +709,7 @@ class BaseScanner<T> {
                       tmdbId: 0,
                       mediaType: MediaType.BOOK,
                       mediaAddedAt,
+                      ratingKey,
                       serviceId:
                         bookServiceType === 'ebook' ? serviceId : undefined,
                       externalServiceId:

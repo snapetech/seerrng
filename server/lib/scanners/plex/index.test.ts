@@ -1,7 +1,13 @@
+import MusicBrainz from '@server/api/musicbrainz';
+import OpenLibraryAPI from '@server/api/openlibrary';
 import PlexAPI, { type PlexLibraryItem } from '@server/api/plexapi';
+import { MediaStatus, MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaIdentifier, {
+  MediaIdentifierProvider,
+} from '@server/entity/MediaIdentifier';
 import { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 import { runUserSecurityMutation } from '@server/lib/userSecurityMutation';
@@ -179,5 +185,117 @@ describe('Plex scanner configuration authority', () => {
       await getRepository(Media).findOne({ where: { tmdbId: 993 } }),
       null
     );
+  });
+});
+
+// Fixture shapes below are taken from a real Plex server's responses for an
+// 'artist'-type library (Plex has no separate wire-level type for music vs.
+// audiobook libraries -- both report as 'artist', and the resolved
+// MusicBrainz/ISBN id, when present, is on the singular `guid` field rather
+// than the `Guid[]` array movie/show agents use).
+describe('Plex music and audiobook library scanning', () => {
+  it('resolves a music album via the MusicBrainz id on its guid field', async () => {
+    const settings = getSettings();
+    settings.main = { ...settings.main, mediaServerType: MediaServerType.PLEX };
+    settings.radarr = [];
+    settings.sonarr = [];
+    settings.plex = {
+      ...settings.plex,
+      ip: 'plex.local',
+      port: 32400,
+      useSsl: false,
+      libraries: [{ id: 'music', name: 'Music', enabled: true, type: 'music' }],
+    };
+    mock.method(PlexAPI.prototype, 'getLibraries', async () => []);
+    mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        {
+          ratingKey: '60487',
+          title: 'The Count of Monte Cristo',
+          parentTitle: 'Alexandre Dumas',
+          guid: 'mbid://cf988074-7ee4-4eb3-8a39-42b1467b2de7',
+          addedAt: 1789059800,
+          updatedAt: 1789059802,
+          type: 'album',
+          Media: [],
+        } as PlexLibraryItem,
+      ],
+    }));
+    mock.method(
+      MusicBrainz.prototype,
+      'getReleaseGroupDetails',
+      async () => ({}) as never
+    );
+
+    await new PlexScanner().run();
+
+    const media = await getRepository(Media).findOne({
+      where: {
+        mbId: 'cf988074-7ee4-4eb3-8a39-42b1467b2de7',
+        mediaType: MediaType.MUSIC,
+      },
+    });
+
+    assert.ok(media);
+    assert.strictEqual(media?.ratingKey, '60487');
+    assert.strictEqual(media?.status, MediaStatus.AVAILABLE);
+  });
+
+  it('resolves an audiobook via an Open Library title/author search when Plex has no matched id', async () => {
+    const settings = getSettings();
+    settings.main = { ...settings.main, mediaServerType: MediaServerType.PLEX };
+    settings.radarr = [];
+    settings.sonarr = [];
+    settings.plex = {
+      ...settings.plex,
+      ip: 'plex.local',
+      port: 32400,
+      useSsl: false,
+      libraries: [
+        { id: 'audiobooks', name: 'Audiobooks', enabled: true, type: 'book' },
+      ],
+    };
+    mock.method(PlexAPI.prototype, 'getLibraries', async () => []);
+    mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        {
+          ratingKey: '59713',
+          title: 'Charon - The Court of the Underworld',
+          parentTitle: 'Ada Sinclair',
+          // Plex's local (unmatched) agent -- no external id, the common
+          // case for self-published/indie audiobooks on a real server.
+          guid: 'local://59713',
+          addedAt: 1789059680,
+          updatedAt: 1789059680,
+          type: 'album',
+          Media: [],
+        } as PlexLibraryItem,
+      ],
+    }));
+    mock.method(OpenLibraryAPI.prototype, 'searchBooks', async () => ({
+      numFound: 1,
+      start: 0,
+      docs: [
+        {
+          key: '/works/OL123W',
+          title: 'Charon - The Court of the Underworld',
+          isbn: ['9781234567890'],
+        },
+      ],
+    }));
+
+    await new PlexScanner().run();
+
+    const identifier = await getRepository(MediaIdentifier).findOne({
+      where: { provider: MediaIdentifierProvider.OPENLIBRARY, value: 'OL123W' },
+      relations: { media: true },
+    });
+
+    assert.ok(identifier);
+    assert.strictEqual(identifier?.media.mediaType, MediaType.BOOK);
+    assert.strictEqual(identifier?.media.ratingKey, '59713');
+    assert.strictEqual(identifier?.media.status, MediaStatus.AVAILABLE);
   });
 });

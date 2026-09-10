@@ -59,6 +59,49 @@ describe('Plex library synchronization', () => {
 
     assert.strictEqual(settings.plex, original);
   });
+
+  it('classifies artist libraries as music by default, and preserves a manual audiobook override across re-syncs', async () => {
+    const settings = getSettings();
+    settings.replaceSection('plex', {
+      ...settings.plex,
+      libraries: [
+        {
+          id: 'audiobooks',
+          name: 'Audiobooks',
+          enabled: true,
+          type: 'book' as const,
+        },
+      ],
+    });
+    mock.method(settings, 'save', async () => undefined);
+    const plex = new PlexAPI({ plexToken: 'token' });
+    mock.method(plex, 'getLibraries', async () => [
+      {
+        key: 'music',
+        title: 'Music',
+        type: 'artist' as const,
+        agent: 'tv.plex.agents.music',
+      },
+      {
+        key: 'audiobooks',
+        title: 'Audiobooks',
+        type: 'artist' as const,
+        agent: 'tv.plex.agents.music',
+      },
+    ]);
+
+    const libraries = await plex.syncLibraries({
+      enabledLibraryIds: ['music', 'audiobooks'],
+    });
+
+    const music = libraries.find((library) => library.id === 'music');
+    const audiobooks = libraries.find((library) => library.id === 'audiobooks');
+
+    assert.strictEqual(music?.type, 'music');
+    // Plex reports both as 'artist' -- the manual reclassification
+    // recorded for 'audiobooks' in settings must survive the re-sync.
+    assert.strictEqual(audiobooks?.type, 'book');
+  });
 });
 
 describe('Plex response normalization', () => {

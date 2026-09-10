@@ -9,10 +9,14 @@ import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import type { PlayButtonLink } from '@app/components/Common/PlayButton';
+import PlayButton from '@app/components/Common/PlayButton';
 import Tooltip from '@app/components/Common/Tooltip';
 import IssueBlock from '@app/components/IssueBlock';
 import BulkRequestModal from '@app/components/RequestModal/BulkRequestModal';
 import StatusBadge from '@app/components/StatusBadge';
+import useDeepLinks from '@app/hooks/useDeepLinks';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { getQueryParamString } from '@app/hooks/useUpdateQueryParams';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -23,6 +27,7 @@ import {
   normalizeOpenLibraryWorkId,
 } from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
+import { PlayIcon } from '@heroicons/react/24/outline';
 import {
   ArrowDownTrayIcon,
   CogIcon,
@@ -38,6 +43,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
@@ -66,6 +72,7 @@ const RequestModal = dynamic(() => import('@app/components/RequestModal'), {
 });
 
 const messages = defineMessages('components.BookDetails', {
+  play: 'Listen on {mediaServerName}',
   book: 'Book',
   author: 'Author',
   firstPublished: 'First Published',
@@ -95,6 +102,7 @@ const messages = defineMessages('components.BookDetails', {
 const BookDetails = () => {
   const router = useRouter();
   const intl = useIntl();
+  const settings = useSettings();
   const { addToast } = useToasts();
   const { user, hasPermission } = useUser();
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -137,6 +145,11 @@ const BookDetails = () => {
     setToggleWatchlist(!data?.onUserWatchlist);
   }, [data?.onUserWatchlist]);
 
+  const { mediaUrl: plexUrl } = useDeepLinks({
+    mediaUrl: data?.mediaInfo?.mediaUrl,
+    iOSPlexUrl: data?.mediaInfo?.iOSPlexUrl,
+  });
+
   if (!data && !error) {
     return <LoadingSpinner />;
   }
@@ -151,6 +164,31 @@ const BookDetails = () => {
     [Permission.REQUEST, Permission.REQUEST_BOOK],
     { type: 'or' }
   );
+
+  const getAvailableMediaServerName = () => {
+    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
+      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+    }
+
+    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
+      return intl.formatMessage(messages.play, { mediaServerName: 'Plex' });
+    }
+
+    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
+  };
+
+  // Plex only ever hosts the audiobook format -- a populated ratingKey
+  // (and thus mediaUrl) here always means "this book is an audiobook
+  // available in Plex."
+  const mediaLinks: PlayButtonLink[] = [];
+
+  if (plexUrl && canRequest) {
+    mediaLinks.push({
+      text: getAvailableMediaServerName(),
+      url: plexUrl,
+      svg: <PlayIcon />,
+    });
+  }
   const hasEbookServiceLink =
     data.mediaInfo?.serviceId !== null &&
     data.mediaInfo?.serviceId !== undefined &&
@@ -614,8 +652,14 @@ const BookDetails = () => {
             canShowRequest ||
             canReportIssue ||
             canBlocklist ||
-            canManage) && (
+            canManage ||
+            mediaLinks.length > 0) && (
             <div className="media-actions mt-6 justify-start gap-2 sm:justify-start xl:mt-6">
+              {mediaLinks.length > 0 && (
+                <div className="z-20">
+                  <PlayButton links={mediaLinks} />
+                </div>
+              )}
               {canWatchlist && (
                 <>
                   {toggleWatchlist ? (

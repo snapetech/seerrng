@@ -5,11 +5,15 @@ import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import MediaTypeBadge from '@app/components/Common/MediaTypeBadge';
 import PageTitle from '@app/components/Common/PageTitle';
+import type { PlayButtonLink } from '@app/components/Common/PlayButton';
+import PlayButton from '@app/components/Common/PlayButton';
 import Tooltip from '@app/components/Common/Tooltip';
 import IssueBlock from '@app/components/IssueBlock';
 import MediaSlider from '@app/components/MediaSlider';
 import BulkRequestModal from '@app/components/RequestModal/BulkRequestModal';
 import StatusBadge from '@app/components/StatusBadge';
+import useDeepLinks from '@app/hooks/useDeepLinks';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { getQueryParamString } from '@app/hooks/useUpdateQueryParams';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -20,6 +24,7 @@ import {
   normalizeMusicBrainzId,
 } from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
+import { PlayIcon } from '@heroicons/react/24/outline';
 import {
   ArrowDownTrayIcon,
   CogIcon,
@@ -35,6 +40,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
@@ -63,6 +69,7 @@ const RequestModal = dynamic(() => import('@app/components/RequestModal'), {
 });
 
 const messages = defineMessages('components.MusicDetails', {
+  play: 'Listen on {mediaServerName}',
   album: 'Album',
   artist: 'Artist',
   releasedate: 'Release Date',
@@ -89,6 +96,7 @@ const messages = defineMessages('components.MusicDetails', {
 const MusicDetails = () => {
   const router = useRouter();
   const intl = useIntl();
+  const settings = useSettings();
   const { addToast } = useToasts();
   const { user, hasPermission } = useUser();
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -124,6 +132,11 @@ const MusicDetails = () => {
     setToggleWatchlist(!data?.onUserWatchlist);
   }, [data?.onUserWatchlist]);
 
+  const { mediaUrl: plexUrl } = useDeepLinks({
+    mediaUrl: data?.mediaInfo?.mediaUrl,
+    iOSPlexUrl: data?.mediaInfo?.iOSPlexUrl,
+  });
+
   if (!data && !error) {
     return <LoadingSpinner />;
   }
@@ -135,6 +148,33 @@ const MusicDetails = () => {
   const musicBrainzId = normalizeMusicBrainzId(data.mbId);
   const albumId = normalizeMusicBrainzId(data.id);
   const artistId = normalizeMusicBrainzId(data.artist.id);
+
+  const getAvailableMediaServerName = () => {
+    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
+      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+    }
+
+    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
+      return intl.formatMessage(messages.play, { mediaServerName: 'Plex' });
+    }
+
+    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
+  };
+
+  const mediaLinks: PlayButtonLink[] = [];
+
+  if (
+    plexUrl &&
+    hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
+      type: 'or',
+    })
+  ) {
+    mediaLinks.push({
+      text: getAvailableMediaServerName(),
+      url: plexUrl,
+      svg: <PlayIcon />,
+    });
+  }
 
   const canRequest = hasPermission(
     [Permission.REQUEST, Permission.REQUEST_MUSIC],
@@ -424,8 +464,14 @@ const MusicDetails = () => {
             canShowRequest ||
             canReportIssue ||
             canBlocklist ||
-            canManage) && (
+            canManage ||
+            mediaLinks.length > 0) && (
             <div className="media-actions mt-6 justify-start gap-2 sm:justify-start xl:mt-6">
+              {mediaLinks.length > 0 && (
+                <div className="z-20">
+                  <PlayButton links={mediaLinks} />
+                </div>
+              )}
               {canWatchlist && (
                 <>
                   {toggleWatchlist ? (

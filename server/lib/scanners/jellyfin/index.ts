@@ -615,6 +615,12 @@ export class JellyfinScanner
 
       if (this.isRecentOnly) {
         for (const library of this.libraries) {
+          // Jellyfin has no book-library concept -- 'book' only exists on
+          // the shared settings type for Plex's audiobook classification.
+          if (library.type === 'book') {
+            continue;
+          }
+          const libraryType = library.type;
           this.currentLibrary = library;
           // Reset AniDB season tracking per library
           this.processedAnidbSeason = new Map();
@@ -623,7 +629,7 @@ export class JellyfinScanner
             'info'
           );
           const libraryItems = await this.withConfigurationSnapshot(() =>
-            this.jfClient.getRecentlyAdded(library.id, library.type)
+            this.jfClient.getRecentlyAdded(library.id, libraryType)
           );
 
           // Bundle items up by rating keys
@@ -643,12 +649,16 @@ export class JellyfinScanner
         }
       } else {
         for (const library of this.libraries) {
+          if (library.type === 'book') {
+            continue;
+          }
+          const libraryType = library.type;
           this.currentLibrary = library;
           // Reset AniDB season tracking per library
           this.processedAnidbSeason = new Map();
           this.log(`Beginning to process library: ${library.name}`, 'info');
           this.items = await this.withConfigurationSnapshot(() =>
-            this.jfClient.getLibraryContents(library.id, library.type)
+            this.jfClient.getLibraryContents(library.id, libraryType)
           );
           await this.loop(this.processItem.bind(this), { sessionId });
         }

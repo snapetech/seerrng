@@ -1610,6 +1610,65 @@ settingsRoutes.post(
   })
 );
 
+settingsRoutes.put(
+  '/plex/library/:libraryId/type',
+  authorizedMutation(Permission.ADMIN, async (req, res) => {
+    const libraryId = parseBoundedString(req.params.libraryId, {
+      fieldName: 'Library ID',
+      maxLength: 128,
+    });
+    if ('error' in libraryId) {
+      return res.status(400).json({ message: libraryId.error });
+    }
+
+    const parsedBody = parseSettingsBodyObject(req.body);
+    if ('error' in parsedBody) {
+      return res.status(400).json({ message: parsedBody.error });
+    }
+    const type = parseOptionalAllowedString(parsedBody.value.type, {
+      fieldName: 'Type',
+      allowedValues: ['music', 'book'] as const,
+      maxLength: 16,
+    });
+    if ('error' in type) {
+      return res.status(400).json({ message: type.error });
+    }
+    if (!type.value) {
+      return res.status(400).json({ message: 'Type is required.' });
+    }
+    const nextType = type.value;
+
+    return runWithConfigurationAdmission('plex', async () => {
+      const settings = getSettings();
+      const existing = settings.plex.libraries.find(
+        (library) => library.id === libraryId.value
+      );
+      // Only libraries Plex reports as an 'artist' section (surfaced here
+      // as 'music' or 'book') can be reclassified between the two --
+      // Plex has no separate wire-level type for audiobook libraries.
+      if (
+        !existing ||
+        (existing.type !== 'music' && existing.type !== 'book')
+      ) {
+        return res.status(400).json({
+          message:
+            'Only Music/Audiobook libraries can be reclassified between the two.',
+        });
+      }
+
+      const plex = await settings.persistSection('plex', (current) => ({
+        ...current,
+        libraries: current.libraries.map((library) =>
+          library.id === libraryId.value
+            ? { ...library, type: nextType }
+            : library
+        ),
+      }));
+      return res.status(200).json(plex.libraries);
+    });
+  })
+);
+
 settingsRoutes.get('/plex/sync', (_req, res) => {
   return res.status(200).json(plexFullScanner.status());
 });

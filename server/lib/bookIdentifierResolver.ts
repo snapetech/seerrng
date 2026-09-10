@@ -95,3 +95,56 @@ export const resolveOpenLibraryIdentifiersForReadarrBook = async (
 
   return uniqIdentifiers(identifiers);
 };
+
+/**
+ * Resolves identifiers for a Plex-hosted audiobook that carries no ISBN or
+ * other direct identifier in its Plex metadata, by searching Open Library
+ * for the closest title/author match. Best-effort: Plex audiobook libraries
+ * commonly expose only a title and author, unlike Bookshelf/Readarr which
+ * hands us a structured book record.
+ */
+export const resolveOpenLibraryIdentifiersForPlexAudiobook = async (
+  title: string,
+  author: string | undefined,
+  openLibrary = new OpenLibraryAPI()
+): Promise<ResolvedIdentifier[]> => {
+  const query = [title, author].filter(Boolean).join(' ').trim();
+  if (!query) {
+    return [];
+  }
+
+  try {
+    const results = await openLibrary.searchBooks({ query, limit: 1 });
+    const bestMatch = results.docs[0];
+    if (!bestMatch) {
+      return [];
+    }
+
+    const identifiers: (ResolvedIdentifier | undefined)[] = [];
+    const workId = getOpenLibraryWorkId(bestMatch.key);
+    if (workId) {
+      identifiers.push({
+        provider: MediaIdentifierProvider.OPENLIBRARY,
+        value: workId,
+      });
+    }
+
+    const isbn = bestMatch.isbn?.[0];
+    if (isbn) {
+      identifiers.push({
+        provider: MediaIdentifierProvider.ISBN,
+        value: isbn,
+      });
+    }
+
+    return uniqIdentifiers(identifiers);
+  } catch (e) {
+    logger.debug('Unable to resolve Open Library match for Plex audiobook', {
+      label: 'Plex Audiobook Scan',
+      title,
+      author,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return [];
+  }
+};

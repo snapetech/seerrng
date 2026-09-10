@@ -16,6 +16,7 @@ export interface PlexLibraryItem {
   parentRatingKey?: string;
   grandparentRatingKey?: string;
   title: string;
+  parentTitle?: string;
   guid: string;
   parentGuid?: string;
   grandparentGuid?: string;
@@ -24,12 +25,12 @@ export interface PlexLibraryItem {
   Guid?: {
     id: string;
   }[];
-  type: 'movie' | 'show' | 'season' | 'episode';
+  type: 'movie' | 'show' | 'season' | 'episode' | 'artist' | 'album';
   Media: Media[];
 }
 
 export interface PlexLibrary {
-  type: 'show' | 'movie';
+  type: 'show' | 'movie' | 'artist';
   key: string;
   title: string;
   agent: string;
@@ -39,7 +40,7 @@ export interface PlexMetadata {
   ratingKey: string;
   parentRatingKey?: string;
   guid: string;
-  type: 'movie' | 'show' | 'season' | 'episode';
+  type: 'movie' | 'show' | 'season' | 'episode' | 'artist' | 'album';
   title: string;
   Guid: {
     id: string;
@@ -123,7 +124,14 @@ const sanitizePlexGuids = (value: unknown): { id: string }[] =>
       return id ? [{ id }] : [];
     });
 
-const plexItemTypes = ['movie', 'show', 'season', 'episode'] as const;
+const plexItemTypes = [
+  'movie',
+  'show',
+  'season',
+  'episode',
+  'artist',
+  'album',
+] as const;
 
 export const sanitizePlexLibraryItem = (
   value: unknown
@@ -142,6 +150,7 @@ export const sanitizePlexLibraryItem = (
     grandparentRatingKey:
       boundedPlexText(value.grandparentRatingKey, 128) || undefined,
     title: boundedPlexText(value.title, 512),
+    parentTitle: boundedPlexText(value.parentTitle, 512) || undefined,
     guid: boundedPlexText(value.guid, 512),
     parentGuid: boundedPlexText(value.parentGuid, 512) || undefined,
     grandparentGuid: boundedPlexText(value.grandparentGuid, 512) || undefined,
@@ -273,7 +282,12 @@ class PlexAPI extends ExternalAPI {
         const type = library.type;
         const key = boundedPlexText(library.key, 128);
         const title = boundedPlexText(library.title, 512);
-        if ((type !== 'movie' && type !== 'show') || !key || !title) return [];
+        if (
+          (type !== 'movie' && type !== 'show' && type !== 'artist') ||
+          !key ||
+          !title
+        )
+          return [];
         return [
           {
             type,
@@ -296,9 +310,12 @@ class PlexAPI extends ExternalAPI {
       const plex = await settings.persistSection('plex', (current) => ({
         ...current,
         libraries: libraries
-          // Remove libraries that are not movie or show
+          // Remove libraries that are not movie, show, or artist (music)
           .filter(
-            (library) => library.type === 'movie' || library.type === 'show'
+            (library) =>
+              library.type === 'movie' ||
+              library.type === 'show' ||
+              library.type === 'artist'
           )
           // Remove libraries that do not have a metadata agent set (usually personal video libraries)
           .filter((library) => library.agent !== 'com.plexapp.agents.none')
@@ -307,6 +324,18 @@ class PlexAPI extends ExternalAPI {
               (item) => item.id === library.key && item.name === library.title
             );
 
+            // Plex has no distinct wire-level type for music vs. audiobook
+            // libraries -- both report as 'artist'. An 'artist' library is
+            // classified as 'music' unless the admin has manually
+            // reclassified it as 'book' (see settings PATCH handler), and
+            // that manual choice survives re-syncs via `existing`.
+            const type: Library['type'] =
+              library.type === 'artist'
+                ? existing?.type === 'book'
+                  ? 'book'
+                  : 'music'
+                : library.type;
+
             return {
               id: library.key,
               name: library.title,
@@ -314,7 +343,7 @@ class PlexAPI extends ExternalAPI {
                 enabledLibraryIds?.includes(library.key) ??
                 existing?.enabled ??
                 false,
-              type: library.type,
+              type,
               lastScan: existing?.lastScan,
             };
           }),
@@ -332,7 +361,15 @@ class PlexAPI extends ExternalAPI {
 
   public async getLibraryContents(
     id: string,
-    { offset = 0, size = 50 }: { offset?: number; size?: number } = {}
+    {
+      offset = 0,
+      size = 50,
+      libraryType,
+    }: {
+      offset?: number;
+      size?: number;
+      libraryType?: 'show' | 'movie' | 'music' | 'book';
+    } = {}
   ): Promise<{ totalSize: number; items: PlexLibraryItem[] }> {
     const safeOffset =
       Number.isSafeInteger(offset) && offset >= 0
@@ -342,10 +379,18 @@ class PlexAPI extends ExternalAPI {
       Number.isSafeInteger(size) && size > 0
         ? Math.min(size, MAX_PLEX_LIBRARY_ITEMS)
         : 50;
+    // Artist-type (music/audiobook) sections return artists, not albums,
+    // from /all unless we explicitly ask for album-type items (9). Movie
+    // and show sections only ever contain their one leaf type, so no
+    // filter is needed there.
+    const params: Record<string, number> = { includeGuids: 1 };
+    if (libraryType === 'music' || libraryType === 'book') {
+      params.type = 9;
+    }
     const response = await this.get<unknown>(
       `/library/sections/${encodeURIComponent(boundedPlexText(id, 128))}/all`,
       {
-        params: { includeGuids: 1 },
+        params,
         headers: {
           'X-Plex-Container-Start': `${safeOffset}`,
           'X-Plex-Container-Size': `${safeSize}`,
@@ -422,7 +467,7 @@ class PlexAPI extends ExternalAPI {
     options: { addedAt: number } = {
       addedAt: Date.now() - 1000 * 60 * 60,
     },
-    mediaType: 'movie' | 'show'
+    mediaType: 'movie' | 'show' | 'music' | 'book'
   ): Promise<PlexLibraryItem[]> {
     const addedAt =
       typeof options.addedAt === 'number' &&
@@ -430,11 +475,19 @@ class PlexAPI extends ExternalAPI {
       options.addedAt >= 0
         ? Math.floor(options.addedAt / 1000)
         : 0;
+    // Plex numeric section-item types: 1=movie, 4=episode, 9=album (used for
+    // both music and audiobook libraries -- Plex has no distinct wire type).
+    const numericType =
+      mediaType === 'show'
+        ? 4
+        : mediaType === 'music' || mediaType === 'book'
+          ? 9
+          : 1;
     const response = await this.get<unknown>(
       `/library/sections/${encodeURIComponent(boundedPlexText(id, 128))}/all`,
       {
         params: {
-          type: mediaType === 'show' ? 4 : 1,
+          type: numericType,
           sort: 'addedAt:desc',
           'addedAt>>': addedAt,
         },
