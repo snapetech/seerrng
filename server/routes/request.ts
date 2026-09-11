@@ -117,6 +117,7 @@ const requestStatusFilters = [
 const requestTimelineStatusFilters = [
   'all',
   'active',
+  'incomplete',
   'attention',
   'completed',
   ...Object.values(RequestStatusStage),

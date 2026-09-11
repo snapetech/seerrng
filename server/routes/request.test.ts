@@ -522,6 +522,48 @@ describe('GET /request/status', () => {
     assert.strictEqual(response.body.results[0].status.stage, 'available');
   });
 
+  it('exposes partially fulfilled requests as incomplete', async () => {
+    const mediaRequest = await seedRequest(MediaRequestStatus.APPROVED);
+    await getRepository(Media).update(mediaRequest.media.id, {
+      status: MediaStatus.PARTIALLY_AVAILABLE,
+      serviceId: 10,
+      externalServiceId: 20,
+    });
+    const completeRequest = await seedRequest(
+      MediaRequestStatus.APPROVED,
+      undefined,
+      12346
+    );
+    await getRepository(Media).update(completeRequest.media.id, {
+      status: MediaStatus.AVAILABLE,
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const response = await agent.get('/request/status').query({
+      filter: 'incomplete',
+      sort: 'incomplete',
+      sortDirection: 'desc',
+    });
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.body.pageInfo.results, 1);
+    assert.strictEqual(response.body.results[0].request.id, mediaRequest.id);
+    assert.strictEqual(response.body.results[0].status.stage, 'library');
+    assert.strictEqual(response.body.counts.incomplete, 1);
+
+    const sortedResponse = await agent.get('/request/status').query({
+      sort: 'incomplete',
+      sortDirection: 'desc',
+    });
+    assert.strictEqual(sortedResponse.status, 200);
+    assert.deepStrictEqual(
+      sortedResponse.body.results.map(
+        (result: { request: { id: number } }) => result.request.id
+      ),
+      [mediaRequest.id, completeRequest.id]
+    );
+  });
+
   it('evaluates selected TV seasons from the status page query', async () => {
     const requestedBy = await getRepository(User).findOneByOrFail({ id: 2 });
     const media = await getRepository(Media).save(

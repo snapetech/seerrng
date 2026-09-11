@@ -16,6 +16,7 @@ import {
   FilmIcon,
   MusicalNoteIcon,
   SparklesIcon,
+  SpeakerWaveIcon,
   TvIcon,
   UsersIcon,
   XMarkIcon,
@@ -31,6 +32,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browsemovies: 'Movies',
   browsemusic: 'Music',
   browsebooks: 'Books',
+  browseaudiobooks: 'Audiobooks',
   browsetv: 'Series',
   requests: 'Requests',
   requeststatus: 'Request Status',
@@ -90,6 +92,12 @@ const SidebarLinks: SidebarLinkProps[] = [
     messagesKey: 'browsebooks',
     svgIcon: <BookOpenIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/discover\/books$/,
+  },
+  {
+    href: '/discover/audiobooks',
+    messagesKey: 'browseaudiobooks',
+    svgIcon: <SpeakerWaveIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/discover\/audiobooks$/,
   },
   {
     href: '/requests/status',

@@ -19,6 +19,7 @@ export const REQUEST_STATUS_SORT_FIELDS = [
   'added',
   'modified',
   'status',
+  'incomplete',
   'title',
   'director',
   'writer',
@@ -328,7 +329,7 @@ export const parseRequestStatusSort = (
 
 export const isMetadataRequestStatusSort = (
   field: RequestStatusSortField
-): boolean => !['added', 'modified', 'status'].includes(field);
+): boolean => !['added', 'modified', 'status', 'incomplete'].includes(field);
 
 const getSortValue = (
   item: RequestStatusPageItem,
@@ -342,6 +343,8 @@ const getSortValue = (
       return item.request.updatedAt.getTime();
     case 'status':
       return STATUS_ORDER.indexOf(item.status.stage);
+    case 'incomplete':
+      return item.status.stage === 'library' ? 1 : 0;
     case 'title':
       return metadata.title;
     case 'director':

@@ -105,6 +105,7 @@ export interface RequestStatusPage {
   counts: {
     total: number;
     active: number;
+    incomplete: number;
     attention: number;
     completed: number;
   };
@@ -1064,6 +1065,8 @@ const stageMatchesFilter = (
   switch (filter) {
     case 'active':
       return ACTIVE_STAGES.includes(stage);
+    case 'incomplete':
+      return stage === RequestStatusStage.LIBRARY;
     case 'attention':
       return [
         RequestStatusStage.UNAVAILABLE,
@@ -1138,6 +1141,7 @@ const getRequestStatusCounts = async (options: {
     stage?: string | null;
   }>();
   let active = 0;
+  let incomplete = 0;
   let attention = 0;
   let completed = 0;
   for (const row of rows) {
@@ -1166,9 +1170,12 @@ const getRequestStatusCounts = async (options: {
       completed += 1;
     } else {
       active += 1;
+      if (stage === RequestStatusStage.LIBRARY) {
+        incomplete += 1;
+      }
     }
   }
-  return { total: rows.length, active, attention, completed };
+  return { total: rows.length, active, incomplete, attention, completed };
 };
 
 const getRequestStatusOlderCount = async (options: {
@@ -1260,6 +1267,7 @@ export const getRequestStatusPage = async (options: {
   const requiresFullProjection =
     hasStatusFilter ||
     sortField === 'status' ||
+    sortField === 'incomplete' ||
     isMetadataRequestStatusSort(sortField);
   let requests: MediaRequest[];
   let requestCount: number;

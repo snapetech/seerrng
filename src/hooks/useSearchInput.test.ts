@@ -74,13 +74,15 @@ describe('getSearchQuery', () => {
 describe('getDefaultSearchType', () => {
   it('starts searches from book discovery with the book filter', () => {
     strictEqual(getDefaultSearchType('/discover/books'), 'book');
+    strictEqual(getDefaultSearchType('/discover/audiobooks'), 'book');
     strictEqual(getDefaultSearchType('/discover/movies'), undefined);
   });
 });
 
 describe('getDefaultSearchFormat', () => {
-  it('starts searches from book discovery with the ebook format', () => {
+  it('starts book discovery searches with the matching format', () => {
     strictEqual(getDefaultSearchFormat('/discover/books'), 'ebook');
+    strictEqual(getDefaultSearchFormat('/discover/audiobooks'), 'audiobook');
     strictEqual(getDefaultSearchFormat('/discover/movies'), undefined);
   });
 });

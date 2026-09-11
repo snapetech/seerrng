@@ -8,5 +8,6 @@ export const isOptionalCatalogPathEnabled = (
   availability: OptionalServiceAvailability
 ): boolean =>
   path !== '/discover/music'
-    ? path !== '/discover/books' || availability.booksEnabled
+    ? !['/discover/books', '/discover/audiobooks'].includes(path) ||
+      availability.booksEnabled
     : availability.musicEnabled;

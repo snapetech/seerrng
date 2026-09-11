@@ -11,6 +11,7 @@ interface LibraryItemProps {
   name: string;
   /** Library content type, e.g. 'movie' | 'show' | 'music' | 'book'. */
   type?: string;
+  typeLabel?: string;
   onToggle: () => void;
   /**
    * Shown as a small reclassify control when set. Used for Plex 'artist'
@@ -23,6 +24,7 @@ const LibraryItem = ({
   isEnabled,
   name,
   type,
+  typeLabel,
   onToggle,
   reclassify,
 }: LibraryItemProps) => {
@@ -43,9 +45,10 @@ const LibraryItem = ({
               mediaType={badgeType}
               variant="compact"
               label={
-                type === 'music'
+                typeLabel ??
+                (type === 'music'
                   ? intl.formatMessage(globalMessages.music)
-                  : undefined
+                  : undefined)
               }
             />
           )}

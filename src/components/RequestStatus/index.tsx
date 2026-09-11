@@ -63,6 +63,7 @@ const messages = defineMessages('components.RequestStatus', {
   allUsers: 'All users',
   all: 'All requests',
   active: 'Active',
+  incomplete: 'Incomplete',
   attention: 'Needs attention',
   completed: 'Completed',
   requested: 'Requested',
@@ -119,6 +120,7 @@ const messages = defineMessages('components.RequestStatus', {
   sortAdded: 'Date',
   sortTitle: 'Title',
   sortStatus: 'Status',
+  sortIncomplete: 'Incomplete',
   sortDirector: 'Director',
   sortWriter: 'Writer',
   sortRating: 'Rating',
@@ -197,6 +199,7 @@ const timelineStages: StatusStage[] = [
 const statusFilterValues = [
   'all',
   'active',
+  'incomplete',
   'attention',
   ...timelineStages,
   'unavailable',
@@ -226,6 +229,7 @@ const getSortOptions = (
     { value: 'added', label: 'sortAdded' },
     { value: 'title', label: 'sortTitle' },
     { value: 'status', label: 'sortStatus' },
+    { value: 'incomplete', label: 'sortIncomplete' },
   ];
 
   switch (mediaFilter) {
@@ -1459,9 +1463,14 @@ const RequestStatus = () => {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
         {[
           { key: 'active', label: messages.active, value: data.counts.active },
+          {
+            key: 'incomplete',
+            label: messages.incomplete,
+            value: data.counts.incomplete,
+          },
           {
             key: 'attention',
             label: messages.attention,
@@ -1610,6 +1619,9 @@ const RequestStatus = () => {
             <option value="all">{intl.formatMessage(messages.all)}</option>
             <option value="active">
               {intl.formatMessage(messages.active)}
+            </option>
+            <option value="incomplete">
+              {intl.formatMessage(messages.incomplete)}
             </option>
             <option value="attention">
               {intl.formatMessage(messages.attention)}

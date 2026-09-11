@@ -219,6 +219,7 @@ const getErrorLogFields = (error: unknown) => ({
 const getDiscoverLogQuery = (query: Record<string, unknown>) => ({
   page: query.page,
   sortBy: query.sortBy,
+  format: query.format,
   query: query.query,
   genre: query.genre,
   subject: query.subject,
@@ -2359,6 +2360,13 @@ discoverRoutes.get('/books', async (req, res) => {
   const itemsPerPage = 20;
   const page = parsePositiveInt(req.query.page, 1, 500);
   const sortByValue = getValidatedSort(req.query.sortBy, bookSortOptions);
+  const parsedFormat = req.query.format
+    ? parseOptionalAllowedString(req.query.format, {
+        fieldName: 'Format',
+        allowedValues: ['ebook', 'audiobook'] as const,
+        maxLength: 16,
+      })
+    : ({ value: undefined } as { value?: 'ebook' | 'audiobook' });
   const parsedSubject = parseOptionalDiscoverString(
     req.query.subject,
     'Subject',
@@ -2374,6 +2382,9 @@ discoverRoutes.get('/books', async (req, res) => {
     128
   );
 
+  if ('error' in parsedFormat) {
+    return res.status(400).json({ status: 400, message: parsedFormat.error });
+  }
   if ('error' in parsedSubject) {
     return res.status(400).json({ status: 400, message: parsedSubject.error });
   }

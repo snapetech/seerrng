@@ -1319,6 +1319,20 @@ describe('Settings route input validation', () => {
     assert.strictEqual(res.body[0].type, 'book');
   });
 
+  it('supports switching an audiobook library back to Music', async () => {
+    const settings = getSettings();
+    settings.plex.libraries = [
+      { id: 'audiobooks', name: 'Audiobooks', enabled: true, type: 'book' },
+    ];
+
+    const res = await request(createOpenApiValidatedApp())
+      .put('/api/v1/settings/plex/library/audiobooks/type')
+      .send({ type: 'music' });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body[0].type, 'music');
+  });
+
   it('keeps Jellyfin library GET requests read-only', async () => {
     const settings = getSettings();
     settings.jellyfin.libraries[0].enabled = true;

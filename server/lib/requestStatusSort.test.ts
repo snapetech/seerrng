@@ -29,6 +29,10 @@ test('request status sort defaults to newest requests', () => {
     field: 'status',
     direction: 'asc',
   });
+  assert.deepStrictEqual(parseRequestStatusSort('incomplete', 'desc'), {
+    field: 'incomplete',
+    direction: 'desc',
+  });
   assert.deepStrictEqual(parseRequestStatusSort('not-a-field', 'sideways'), {
     field: 'added',
     direction: 'desc',
@@ -43,6 +47,21 @@ test('sorts status projections by live lifecycle stage', async () => {
   ];
 
   const sorted = await sortRequestStatusItems(requests, 'status', 'asc');
+
+  assert.deepStrictEqual(
+    sorted.map(({ request }) => request.id),
+    [2, 3, 1]
+  );
+});
+
+test('sorts incomplete projections before fully available requests', async () => {
+  const requests = [
+    item(1, 'available'),
+    item(2, 'library'),
+    item(3, 'requested'),
+  ];
+
+  const sorted = await sortRequestStatusItems(requests, 'incomplete', 'desc');
 
   assert.deepStrictEqual(
     sorted.map(({ request }) => request.id),

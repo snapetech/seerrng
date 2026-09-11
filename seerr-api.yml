@@ -1802,6 +1802,8 @@ components:
               type: integer
             active:
               type: integer
+            incomplete:
+              type: integer
             attention:
               type: integer
             completed:
@@ -1809,6 +1811,7 @@ components:
           required:
             - total
             - active
+            - incomplete
             - attention
             - completed
         olderCount:
@@ -7961,6 +7964,13 @@ paths:
             example: fiction
             default: fiction
         - in: query
+          name: format
+          schema:
+            type: string
+            enum: [ebook, audiobook]
+            default: ebook
+          description: Format context for book requests from this discovery view.
+        - in: query
           name: sortBy
           schema:
             type: string
@@ -8988,6 +8998,7 @@ paths:
                 added,
                 modified,
                 status,
+                incomplete,
                 title,
                 director,
                 writer,
@@ -9018,6 +9029,7 @@ paths:
               [
                 all,
                 active,
+                incomplete,
                 attention,
                 requested,
                 approved,

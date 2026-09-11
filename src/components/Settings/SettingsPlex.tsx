@@ -83,6 +83,7 @@ const messages = defineMessages('components.Settings', {
     'Something went wrong while saving Tautulli settings.',
   reclassifyToAudiobook: 'Reclassify as an Audiobooks library',
   reclassifyToMusic: 'Reclassify as a Music library',
+  audiobooks: 'Audiobooks',
   toastReclassifyFailure:
     'Something went wrong while reclassifying the library.',
 });
@@ -361,9 +362,12 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
     nextType: 'music' | 'book'
   ) => {
     try {
-      await axios.put(`/api/v1/settings/plex/library/${libraryId}/type`, {
-        type: nextType,
-      });
+      await axios.put(
+        `/api/v1/settings/plex/library/${encodeURIComponent(libraryId)}/type`,
+        {
+          type: nextType,
+        }
+      );
       revalidate();
     } catch {
       addToast(intl.formatMessage(messages.toastReclassifyFailure), {
@@ -692,6 +696,11 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
             <LibraryItem
               name={library.name}
               type={library.type}
+              typeLabel={
+                library.type === 'book'
+                  ? intl.formatMessage(messages.audiobooks)
+                  : undefined
+              }
               isEnabled={library.enabled}
               key={`setting-library-${library.id}`}
               onToggle={() => toggleLibrary(library.id)}

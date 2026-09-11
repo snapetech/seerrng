@@ -3,6 +3,9 @@ import CardTextVisibilityToggle from '@app/components/Common/CardTextVisibilityT
 import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
+import BookFormatTabs, {
+  type BookDiscoveryFormat,
+} from '@app/components/Discover/BookFormatTabs';
 import {
   bookSortOptions,
   countLibraryFilters,
@@ -20,6 +23,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverBooks', {
   books: 'Books',
+  audiobooks: 'Audiobooks',
   activefilters:
     '{count, plural, one {# Active Filter} other {# Active Filters}}',
   allRecommended: 'All Recommended',
@@ -37,16 +41,22 @@ const messages = defineMessages('components.Discover.DiscoverBooks', {
   random: 'Random',
 });
 
+interface DiscoverBooksProps {
+  format?: BookDiscoveryFormat;
+}
+
 const LibraryFilterSlideover = dynamic(
   () => import('@app/components/Discover/LibraryFilterSlideover'),
   { ssr: false }
 );
 
-const DiscoverBooks = () => {
+const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
   const intl = useIntl();
   const router = useRouter();
   const updateQueryParams = useBatchUpdateQueryParams({});
-  const title = intl.formatMessage(messages.books);
+  const title = intl.formatMessage(
+    format === 'audiobook' ? messages.audiobooks : messages.books
+  );
   const query =
     typeof router.query.query === 'string' ? router.query.query : '';
   const subject =
@@ -67,7 +77,11 @@ const DiscoverBooks = () => {
     fetchMore,
   } = useDiscover<BookResult>(
     '/api/v1/discover/books',
-    query ? { query, sortBy } : subject ? { subject, sortBy } : { sortBy },
+    query
+      ? { query, sortBy, format }
+      : subject
+        ? { subject, sortBy, format }
+        : { sortBy, format },
     { randomizeOrder: sortBy === 'ranked' }
   );
   useDiscoverScrollRestoration({
@@ -83,7 +97,10 @@ const DiscoverBooks = () => {
     <>
       <PageTitle title={title} />
       <div className="mb-4 flex flex-col justify-between lg:flex-row lg:items-end">
-        <Header>{title}</Header>
+        <div>
+          <Header>{title}</Header>
+          <BookFormatTabs format={format} query={router.query} />
+        </div>
         <div className="mt-2 flex flex-grow flex-col gap-2 sm:flex-row lg:mt-0 lg:flex-grow-0">
           <div className="mb-2 flex flex-grow sm:mb-0 sm:flex-grow-0">
             <CardTextVisibilityToggle mediaType="book" />
@@ -193,6 +210,7 @@ const DiscoverBooks = () => {
       </div>
       <ListView
         items={titles}
+        preferredBookFormat={format}
         isEmpty={isEmpty}
         isLoading={
           isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)

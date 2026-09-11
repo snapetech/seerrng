@@ -2325,6 +2325,17 @@ describe('GET /discover/books', () => {
     assert.strictEqual(searchBooks.mock.callCount(), 0);
   });
 
+  it('rejects unsupported book formats before provider lookup', async () => {
+    const searchBooks = mock.method(OpenLibraryAPI.prototype, 'searchBooks');
+
+    const agent = await login();
+    const res = await agent.get('/discover/books').query({ format: 'print' });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /Format must be valid/);
+    assert.strictEqual(searchBooks.mock.callCount(), 0);
+  });
+
   it('uses the selected subject when browsing without a search query', async () => {
     const searchBooksMock = mock.method(
       OpenLibraryAPI.prototype,

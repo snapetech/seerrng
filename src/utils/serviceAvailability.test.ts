@@ -15,6 +15,10 @@ describe('isOptionalCatalogPathEnabled', () => {
       false
     );
     strictEqual(
+      isOptionalCatalogPathEnabled('/discover/audiobooks', availability),
+      false
+    );
+    strictEqual(
       isOptionalCatalogPathEnabled('/discover/movies', availability),
       true
     );
@@ -30,6 +34,13 @@ describe('isOptionalCatalogPathEnabled', () => {
     );
     strictEqual(
       isOptionalCatalogPathEnabled('/discover/books', {
+        musicEnabled: false,
+        booksEnabled: true,
+      }),
+      true
+    );
+    strictEqual(
+      isOptionalCatalogPathEnabled('/discover/audiobooks', {
         musicEnabled: false,
         booksEnabled: true,
       }),
