@@ -1857,7 +1857,7 @@ settingsRoutes.post(
 
         const newLibraries: Library[] = libraries.map((library) => {
           const existing = settings.jellyfin.libraries.find(
-            (l) => l.id === library.key && l.name === library.title
+            (l) => l.id === library.key
           );
 
           return {

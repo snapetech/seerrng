@@ -426,6 +426,9 @@ components:
         enabled:
           type: boolean
           example: false
+        type:
+          type: string
+          enum: [show, movie, music, book]
       required:
         - id
         - name
@@ -595,6 +598,9 @@ components:
         enabled:
           type: boolean
           example: false
+        type:
+          type: string
+          enum: [show, movie, music, book]
       required:
         - id
         - name
@@ -3697,6 +3703,41 @@ paths:
       responses:
         '200':
           description: 'Plex libraries updated'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlexLibrary'
+  /settings/plex/library/{libraryId}/type:
+    put:
+      summary: Reclassify a Plex artist library
+      description: Changes a Plex artist library between Music and Audiobooks.
+      tags:
+        - settings
+      parameters:
+        - name: libraryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - music
+                    - book
+      responses:
+        '200':
+          description: 'Plex libraries returned after reclassification'
           content:
             application/json:
               schema:

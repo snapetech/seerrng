@@ -67,7 +67,7 @@ describe('Plex library synchronization', () => {
       libraries: [
         {
           id: 'audiobooks',
-          name: 'Audiobooks',
+          name: 'Previous audiobook name',
           enabled: true,
           type: 'book' as const,
         },
@@ -98,9 +98,10 @@ describe('Plex library synchronization', () => {
     const audiobooks = libraries.find((library) => library.id === 'audiobooks');
 
     assert.strictEqual(music?.type, 'music');
-    // Plex reports both as 'artist' -- the manual reclassification
-    // recorded for 'audiobooks' in settings must survive the re-sync.
+    // Plex reports both as 'artist' -- the manual reclassification and
+    // enabled state must survive a provider-side library rename.
     assert.strictEqual(audiobooks?.type, 'book');
+    assert.strictEqual(audiobooks?.enabled, true);
   });
 });
 
@@ -180,5 +181,28 @@ describe('Plex response normalization', () => {
       params: { includeChildren: 1 },
     });
     assert.ok(!('providerOnly' in metadata));
+  });
+
+  it('requests GUID details for recently added music albums', async () => {
+    const plex = new PlexAPI({ plexToken: 'token' });
+    let requestOptions: {
+      params?: Record<string, number | string>;
+    } = {};
+    Object.defineProperty(plex, 'get', {
+      configurable: true,
+      value: async (_path: string, options: typeof requestOptions) => {
+        requestOptions = options;
+        return { MediaContainer: { Metadata: [] } };
+      },
+    });
+
+    await plex.getRecentlyAdded(
+      'music',
+      { addedAt: 1_789_059_680_000 },
+      'music'
+    );
+
+    assert.strictEqual(requestOptions.params?.includeGuids, 1);
+    assert.strictEqual(requestOptions.params?.type, 9);
   });
 });

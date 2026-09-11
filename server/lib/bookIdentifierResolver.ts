@@ -5,6 +5,7 @@ import {
   normalizeOpenLibraryEditionId,
   normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
+import { normalizeValidIsbn } from '@server/lib/isbn';
 import logger from '@server/logger';
 
 type ResolvedIdentifier = {
@@ -129,7 +130,13 @@ export const resolveOpenLibraryIdentifiersForPlexAudiobook = async (
       });
     }
 
-    const isbn = bestMatch.isbn?.[0];
+    // Open Library exposes provider-supplied ISBN strings without
+    // guaranteeing that they pass the ISBN checksum. Never persist an
+    // invalid ISBN as a canonical book identifier: it cannot match the
+    // normalized ISBN lookups used elsewhere in the application.
+    const isbn = (bestMatch.isbn ?? [])
+      .map((candidate) => normalizeValidIsbn(candidate))
+      .find((candidate): candidate is string => !!candidate);
     if (isbn) {
       identifiers.push({
         provider: MediaIdentifierProvider.ISBN,

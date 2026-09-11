@@ -27,6 +27,7 @@ import {
   isValidMusicBrainzResourceId,
   normalizeMusicBrainzId,
 } from '@server/lib/externalIds';
+import { normalizeValidIsbn } from '@server/lib/isbn';
 import {
   MediaServerUserAuthorityChangedError,
   captureMediaServerUserAuthority,
@@ -94,6 +95,28 @@ export const preparePlexLibraryPageItems = (
           : PLEX_SCAN_PAGE_SIZE
       )
     : [];
+
+export const dedupePlexRecentlyAddedItems = (
+  items: PlexLibraryItem[],
+  libraryType: Library['type']
+): PlexLibraryItem[] =>
+  uniqWith(items, (mediaA, mediaB) => {
+    // Plex album records use parentRatingKey for the artist, so grouping
+    // albums by parent would drop every later album by the same artist.
+    if (libraryType === 'music' || libraryType === 'book') {
+      return mediaA.ratingKey === mediaB.ratingKey;
+    }
+
+    if (mediaA.grandparentRatingKey && mediaB.grandparentRatingKey) {
+      return mediaA.grandparentRatingKey === mediaB.grandparentRatingKey;
+    }
+
+    if (mediaA.parentRatingKey && mediaB.parentRatingKey) {
+      return mediaA.parentRatingKey === mediaB.parentRatingKey;
+    }
+
+    return mediaA.ratingKey === mediaB.ratingKey;
+  });
 
 export const getPlexGuidCacheKey = (
   plex: Pick<PlexSettings, 'machineId' | 'ip' | 'port' | 'useSsl'>,
@@ -202,20 +225,8 @@ export class PlexScanner
             )
           );
 
-          // Bundle items up by rating keys
-          this.items = uniqWith(libraryItems, (mediaA, mediaB) => {
-            if (mediaA.grandparentRatingKey && mediaB.grandparentRatingKey) {
-              return (
-                mediaA.grandparentRatingKey === mediaB.grandparentRatingKey
-              );
-            }
-
-            if (mediaA.parentRatingKey && mediaB.parentRatingKey) {
-              return mediaA.parentRatingKey === mediaB.parentRatingKey;
-            }
-
-            return mediaA.ratingKey === mediaB.ratingKey;
-          });
+          // Bundle items up by rating keys.
+          this.items = dedupePlexRecentlyAddedItems(libraryItems, libraryType);
 
           await this.loop(this.processItem.bind(this), { sessionId });
 
@@ -587,7 +598,9 @@ export class PlexScanner
     const author = plexitem.parentTitle;
     const title = plexitem.title;
 
-    const rawIsbn = this.extractPlexGuidValue(plexitem, 'isbn://');
+    const rawIsbn = normalizeValidIsbn(
+      this.extractPlexGuidValue(plexitem, 'isbn://')
+    );
 
     const resolved = rawIsbn
       ? [{ provider: MediaIdentifierProvider.ISBN, value: rawIsbn }]

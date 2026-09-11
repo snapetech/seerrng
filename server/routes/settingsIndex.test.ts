@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
@@ -29,6 +30,7 @@ import { runUserSecurityMutation } from '@server/lib/userSecurityMutation';
 import { setupTestDb } from '@server/test/db';
 import type { Express } from 'express';
 import express from 'express';
+import * as OpenApiValidator from 'express-openapi-validator';
 import { scheduleJob, type Spec } from 'node-schedule';
 import request from 'supertest';
 import settingsRoutes, {
@@ -75,6 +77,39 @@ function createApp(
     }
   );
   return app;
+}
+
+function createOpenApiValidatedApp(): Express {
+  const validatedApp = express();
+  validatedApp.use(express.json());
+  validatedApp.use((req, _res, next) => {
+    req.user = new User({ id: 1, permissions: Permission.ADMIN });
+    next();
+  });
+  validatedApp.use(
+    OpenApiValidator.middleware({
+      apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
+      validateRequests: true,
+      validateSecurity: false,
+    })
+  );
+  validatedApp.use('/api/v1/settings', settingsRoutes);
+  validatedApp.use(
+    (
+      err: { status?: number; message?: string; errors?: unknown[] },
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction
+    ) => {
+      void _next;
+      res.status(err.status ?? 500).json({
+        status: err.status ?? 500,
+        message: err.message,
+        errors: err.errors,
+      });
+    }
+  );
+  return validatedApp;
 }
 
 before(() => {
@@ -1270,6 +1305,20 @@ describe('Settings route input validation', () => {
     assert.match(res.body.message, /Sync must be a boolean/);
   });
 
+  it('keeps Plex library reclassification reachable through the OpenAPI validator', async () => {
+    const settings = getSettings();
+    settings.plex.libraries = [
+      { id: 'music', name: 'Music', enabled: true, type: 'music' },
+    ];
+
+    const res = await request(createOpenApiValidatedApp())
+      .put('/api/v1/settings/plex/library/music/type')
+      .send({ type: 'book' });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body[0].type, 'book');
+  });
+
   it('keeps Jellyfin library GET requests read-only', async () => {
     const settings = getSettings();
     settings.jellyfin.libraries[0].enabled = true;
@@ -1301,6 +1350,30 @@ describe('Settings route input validation', () => {
     assert.strictEqual(libraryMock.mock.callCount(), 0);
     assert.strictEqual(res.status, 400);
     assert.match(res.body.message, /Sync must be a boolean/);
+  });
+
+  it('preserves enabled Jellyfin libraries when the provider renames them', async () => {
+    const settings = getSettings();
+    settings.jellyfin.libraries = [
+      { id: '2', name: 'Previous Shows', enabled: true, type: 'show' },
+    ];
+    mock.method(JellyfinAPI.prototype, 'getLibraries', async () => [
+      {
+        key: '2',
+        title: 'Renamed Shows',
+        type: 'show',
+        agent: 'jellyfin',
+      },
+    ]);
+
+    const res = await request(app)
+      .post('/settings/jellyfin/library')
+      .send({ sync: true, enable: '2' });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, [
+      { id: '2', name: 'Renamed Shows', enabled: true, type: 'show' },
+    ]);
   });
 
   it('rejects string scanner commands', async () => {

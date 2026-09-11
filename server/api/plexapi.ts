@@ -321,7 +321,7 @@ class PlexAPI extends ExternalAPI {
           .filter((library) => library.agent !== 'com.plexapp.agents.none')
           .map((library) => {
             const existing = current.libraries.find(
-              (item) => item.id === library.key && item.name === library.title
+              (item) => item.id === library.key
             );
 
             // Plex has no distinct wire-level type for music vs. audiobook
@@ -487,6 +487,7 @@ class PlexAPI extends ExternalAPI {
       `/library/sections/${encodeURIComponent(boundedPlexText(id, 128))}/all`,
       {
         params: {
+          includeGuids: 1,
           type: numericType,
           sort: 'addedAt:desc',
           'addedAt>>': addedAt,

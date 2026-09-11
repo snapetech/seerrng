@@ -18,6 +18,7 @@ import {
   PLEX_SCAN_ITEM_CONCURRENCY,
   PLEX_SCAN_PAGE_SIZE,
   PlexScanner,
+  dedupePlexRecentlyAddedItems,
   getBoundedPlexScanTotal,
   getPlexGuidCacheKey,
   preparePlexLibraryPageItems,
@@ -50,6 +51,26 @@ describe('Plex library page bounds', () => {
     );
     assert.strictEqual(getBoundedPlexScanTotal(0, 50, 50), 150);
     assert.strictEqual(getBoundedPlexScanTotal(75, 50, 25), 75);
+  });
+
+  it('keeps separate recent albums by the same artist', () => {
+    const items = [
+      {
+        ratingKey: 'album-1',
+        parentRatingKey: 'artist-1',
+      },
+      {
+        ratingKey: 'album-2',
+        parentRatingKey: 'artist-1',
+      },
+    ] as PlexLibraryItem[];
+
+    assert.deepStrictEqual(
+      dedupePlexRecentlyAddedItems(items, 'music').map(
+        (item) => item.ratingKey
+      ),
+      ['album-1', 'album-2']
+    );
   });
 });
 
@@ -297,5 +318,67 @@ describe('Plex music and audiobook library scanning', () => {
     assert.strictEqual(identifier?.media.mediaType, MediaType.BOOK);
     assert.strictEqual(identifier?.media.ratingKey, '59713');
     assert.strictEqual(identifier?.media.status, MediaStatus.AVAILABLE);
+  });
+
+  it('falls back to Open Library when Plex exposes an invalid ISBN guid', async () => {
+    const settings = getSettings();
+    settings.main = { ...settings.main, mediaServerType: MediaServerType.PLEX };
+    settings.radarr = [];
+    settings.sonarr = [];
+    settings.plex = {
+      ...settings.plex,
+      ip: 'plex.local',
+      port: 32400,
+      useSsl: false,
+      libraries: [
+        { id: 'audiobooks', name: 'Audiobooks', enabled: true, type: 'book' },
+      ],
+    };
+    mock.method(PlexAPI.prototype, 'getLibraries', async () => []);
+    mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        {
+          ratingKey: '59714',
+          title: 'Example Book',
+          parentTitle: 'Example Author',
+          guid: 'isbn://9781234567890',
+          addedAt: 1789059680,
+          updatedAt: 1789059680,
+          type: 'album',
+          Media: [],
+        } as PlexLibraryItem,
+      ],
+    }));
+    mock.method(OpenLibraryAPI.prototype, 'searchBooks', async () => ({
+      numFound: 1,
+      start: 0,
+      docs: [
+        {
+          key: '/works/OL456W',
+          title: 'Example Book',
+          isbn: ['9780306406157'],
+        },
+      ],
+    }));
+
+    await new PlexScanner().run();
+
+    const identifier = await getRepository(MediaIdentifier).findOne({
+      where: { provider: MediaIdentifierProvider.OPENLIBRARY, value: 'OL456W' },
+      relations: { media: true },
+    });
+
+    assert.ok(identifier);
+    assert.strictEqual(identifier?.media.ratingKey, '59714');
+    assert.strictEqual(
+      await getRepository(MediaIdentifier).findOne({
+        where: {
+          provider: MediaIdentifierProvider.ISBN,
+          value: '9781234567890',
+        },
+      }),
+      null
+    );
   });
 });

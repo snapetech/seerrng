@@ -47,6 +47,7 @@ const messages = defineMessages('components.Settings', {
     'Custom authentication with Automatic Library Grouping not supported',
   jellyfinSyncFailedGenericError:
     'Something went wrong while syncing libraries',
+  jellyfinLibraryUpdateFailure: 'Failed to update {mediaServerName} libraries.',
   invalidurlerror: 'Unable to connect to {mediaServerName} server.',
   syncing: 'Syncing',
   syncJellyfin: 'Sync Libraries',
@@ -73,6 +74,7 @@ interface Library {
   id: string;
   name: string;
   enabled: boolean;
+  type: 'show' | 'movie' | 'music' | 'book';
 }
 
 interface SyncStatus {
@@ -219,26 +221,42 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
 
   const toggleLibrary = async (libraryId: string) => {
     setIsSyncing(true);
-    if (activeLibraries.includes(libraryId)) {
-      const params: { enable?: string } = {};
+    try {
+      if (activeLibraries.includes(libraryId)) {
+        const params: { enable?: string } = {};
 
-      if (activeLibraries.length > 1) {
-        params.enable = activeLibraries
-          .filter((id) => id !== libraryId)
-          .join(',');
+        if (activeLibraries.length > 1) {
+          params.enable = activeLibraries
+            .filter((id) => id !== libraryId)
+            .join(',');
+        }
+
+        await axios.post('/api/v1/settings/jellyfin/library', params);
+      } else {
+        await axios.post('/api/v1/settings/jellyfin/library', {
+          enable: [...activeLibraries, libraryId].join(','),
+        });
       }
-
-      await axios.post('/api/v1/settings/jellyfin/library', params);
-    } else {
-      await axios.post('/api/v1/settings/jellyfin/library', {
-        enable: [...activeLibraries, libraryId].join(','),
-      });
+      if (onComplete) {
+        onComplete();
+      }
+      revalidate();
+    } catch {
+      addToast(
+        intl.formatMessage(messages.jellyfinLibraryUpdateFailure, {
+          mediaServerName:
+            settings.currentSettings.mediaServerType === MediaServerType.EMBY
+              ? 'Emby'
+              : 'Jellyfin',
+        }),
+        {
+          autoDismiss: true,
+          appearance: 'error',
+        }
+      );
+    } finally {
+      setIsSyncing(false);
     }
-    if (onComplete) {
-      onComplete();
-    }
-    setIsSyncing(false);
-    revalidate();
   };
 
   if (!data && !error) {

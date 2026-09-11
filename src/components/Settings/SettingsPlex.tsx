@@ -43,6 +43,7 @@ const messages = defineMessages('components.Settings', {
   toastPlexConnecting: 'Attempting to connect to Plex…',
   toastPlexConnectingSuccess: 'Plex connection established successfully!',
   toastPlexConnectingFailure: 'Failed to connect to Plex.',
+  toastPlexLibraryUpdateFailure: 'Failed to update Plex libraries.',
   settingUpPlexDescription:
     'To set up Plex, you can either enter the details manually or select a server retrieved from <RegisterPlexTVLink>plex.tv</RegisterPlexTVLink>. Press the button to the right of the dropdown to fetch the list of available servers.',
   hostname: 'Hostname or IP Address',
@@ -90,6 +91,7 @@ interface Library {
   id: string;
   name: string;
   enabled: boolean;
+  type: 'show' | 'movie' | 'music' | 'book';
 }
 
 interface SyncStatus {
@@ -254,9 +256,17 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
       params.enable = activeLibraries.join(',');
     }
 
-    await axios.post('/api/v1/settings/plex/library', params);
-    setIsSyncing(false);
-    revalidate();
+    try {
+      await axios.post('/api/v1/settings/plex/library', params);
+      revalidate();
+    } catch {
+      addToast(intl.formatMessage(messages.toastPlexLibraryUpdateFailure), {
+        autoDismiss: true,
+        appearance: 'error',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const refreshPresetServers = async () => {
@@ -315,27 +325,35 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
 
   const toggleLibrary = async (libraryId: string) => {
     setIsSyncing(true);
-    if (activeLibraries.includes(libraryId)) {
-      const params: { enable?: string } = {};
+    try {
+      if (activeLibraries.includes(libraryId)) {
+        const params: { enable?: string } = {};
 
-      if (activeLibraries.length > 1) {
-        params.enable = activeLibraries
-          .filter((id) => id !== libraryId)
-          .join(',');
+        if (activeLibraries.length > 1) {
+          params.enable = activeLibraries
+            .filter((id) => id !== libraryId)
+            .join(',');
+        }
+
+        await axios.post('/api/v1/settings/plex/library', params);
+      } else {
+        await axios.post('/api/v1/settings/plex/library', {
+          enable: [...activeLibraries, libraryId].join(','),
+        });
       }
 
-      await axios.post('/api/v1/settings/plex/library', params);
-    } else {
-      await axios.post('/api/v1/settings/plex/library', {
-        enable: [...activeLibraries, libraryId].join(','),
+      if (onComplete) {
+        onComplete();
+      }
+      revalidate();
+    } catch {
+      addToast(intl.formatMessage(messages.toastPlexLibraryUpdateFailure), {
+        autoDismiss: true,
+        appearance: 'error',
       });
+    } finally {
+      setIsSyncing(false);
     }
-
-    if (onComplete) {
-      onComplete();
-    }
-    setIsSyncing(false);
-    revalidate();
   };
 
   const reclassifyLibrary = async (
