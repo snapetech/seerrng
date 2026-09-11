@@ -61,6 +61,31 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.20.1](https://github.com/snapetech/seerrng/compare/v3.20.0..v3.20.1) - 2026-09-11
+
+### User-facing changes
+
+#### Added
+
+- **Request Status:** Request Status now highlights partially fulfilled requests as Incomplete, with a dedicated summary count, filter, and sort option so unfinished media or formats are easier to find.
+
+#### Fixed
+
+- **Books:** Book discovery now has separate Books and Audiobooks sections, and each section keeps the matching format selected when searching or requesting a title.
+- **Jellyfin:** Jellyfin library syncs now keep each library's enabled state when its name changes on the server.
+- **Settings:** Media-server library controls now recover cleanly from failed update requests and show an error instead of leaving the settings page stuck in a loading state.
+- **Plex:** Plex audiobook scans now ignore malformed ISBNs from Plex and Open Library instead of storing identifiers that cannot match future book searches.
+- **Plex:** Plex audiobook libraries now show the correct label and reliably support switching between Music and Audiobooks from Settings.
+- **Plex:** Plex library settings can now switch artist libraries between Music and Audiobooks, keep that choice when a Plex library is renamed, and keep every newly added album in recent scans instead of dropping albums that share an artist.
+- **Plex:** Plex recent music scans now resolve matched albums whose MusicBrainz identifiers are returned in Plex’s detailed GUID metadata.
+
+### 🐛 Bug Fixes
+- *(books)* Harden audiobook discovery and Plex reclassification - ([24cfaa3](https://github.com/snapetech/seerrng/commit/24cfaa31d1ad03553da4e0263f80e5fab0ec5ac6))
+- *(plex)* Correct recent-music dedup, ISBN validation, and library rename handling - ([b0f1469](https://github.com/snapetech/seerrng/commit/b0f1469a9ce945b05907d16ca3d6c2682db5747f))
+- *(settings)* Correct Music library badge label and simplify reclassify prop - ([881c0bd](https://github.com/snapetech/seerrng/commit/881c0bd9815d44d09b6272d6e6ef5ed8fc9e8579))
+
 ## [3.20.0](https://github.com/snapetech/seerrng/compare/v3.19.5..v3.20.0) - 2026-09-10
 
 ### 🚀 Features
