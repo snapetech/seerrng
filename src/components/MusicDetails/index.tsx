@@ -161,14 +161,14 @@ const MusicDetails = () => {
     return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
   };
 
+  const canRequest = hasPermission(
+    [Permission.REQUEST, Permission.REQUEST_MUSIC],
+    { type: 'or' }
+  );
+
   const mediaLinks: PlayButtonLink[] = [];
 
-  if (
-    plexUrl &&
-    hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
-      type: 'or',
-    })
-  ) {
+  if (plexUrl && canRequest) {
     mediaLinks.push({
       text: getAvailableMediaServerName(),
       url: plexUrl,
@@ -176,10 +176,6 @@ const MusicDetails = () => {
     });
   }
 
-  const canRequest = hasPermission(
-    [Permission.REQUEST, Permission.REQUEST_MUSIC],
-    { type: 'or' }
-  );
   const canShowRequest =
     canRequest &&
     (!data.mediaInfo?.status ||

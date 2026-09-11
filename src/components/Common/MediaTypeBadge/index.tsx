@@ -44,6 +44,13 @@ interface MediaTypeBadgeProps {
   variant?: 'card' | 'compact' | 'inline';
   className?: string;
   showIcon?: boolean;
+  /**
+   * Overrides the default per-type label (e.g. 'Album') while keeping that
+   * type's icon and tone -- for contexts where the same icon/color applies
+   * but the content-type label doesn't fit (a Plex library row is a whole
+   * Music library, not a single Album).
+   */
+  label?: string;
 }
 
 const badgeConfig = {
@@ -97,10 +104,11 @@ const MediaTypeBadge = ({
   variant = 'compact',
   className,
   showIcon = true,
+  label: labelOverride,
 }: MediaTypeBadgeProps) => {
   const intl = useIntl();
   const config = badgeConfig[mediaType];
-  const label = intl.formatMessage(config.message);
+  const label = labelOverride ?? intl.formatMessage(config.message);
   const Icon = config.icon;
 
   return (

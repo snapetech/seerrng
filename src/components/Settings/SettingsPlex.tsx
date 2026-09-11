@@ -695,20 +695,22 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
               isEnabled={library.enabled}
               key={`setting-library-${library.id}`}
               onToggle={() => toggleLibrary(library.id)}
-              {...(library.type === 'music' || library.type === 'book'
-                ? {
-                    reclassifyLabel: intl.formatMessage(
-                      library.type === 'music'
-                        ? messages.reclassifyToAudiobook
-                        : messages.reclassifyToMusic
-                    ),
-                    onReclassify: () =>
-                      reclassifyLibrary(
-                        library.id,
-                        library.type === 'music' ? 'book' : 'music'
+              reclassify={
+                library.type === 'music' || library.type === 'book'
+                  ? {
+                      label: intl.formatMessage(
+                        library.type === 'music'
+                          ? messages.reclassifyToAudiobook
+                          : messages.reclassifyToMusic
                       ),
-                  }
-                : {})}
+                      onReclassify: () =>
+                        reclassifyLibrary(
+                          library.id,
+                          library.type === 'music' ? 'book' : 'music'
+                        ),
+                    }
+                  : undefined
+              }
             />
           ))}
         </ul>

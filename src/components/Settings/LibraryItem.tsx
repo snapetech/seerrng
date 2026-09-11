@@ -1,8 +1,10 @@
 import MediaTypeBadge, {
   getMediaTypeBadgeType,
 } from '@app/components/Common/MediaTypeBadge';
+import globalMessages from '@app/i18n/globalMessages';
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
+import { useIntl } from 'react-intl';
 
 interface LibraryItemProps {
   isEnabled?: boolean;
@@ -14,8 +16,7 @@ interface LibraryItemProps {
    * Shown as a small reclassify control when set. Used for Plex 'artist'
    * libraries, where music vs. audiobook can't be told apart automatically.
    */
-  reclassifyLabel?: string;
-  onReclassify?: () => void;
+  reclassify?: { label: string; onReclassify: () => void };
 }
 
 const LibraryItem = ({
@@ -23,10 +24,12 @@ const LibraryItem = ({
   name,
   type,
   onToggle,
-  reclassifyLabel,
-  onReclassify,
+  reclassify,
 }: LibraryItemProps) => {
-  // Library.type uses 'show' where MediaTypeBadgeType uses 'tv'.
+  const intl = useIntl();
+  // Library.type uses 'show' where MediaTypeBadgeType uses 'tv'. A Music
+  // library isn't a single Album -- it keeps the Album badge's icon/tone
+  // but overrides the label via MediaTypeBadge's `label` prop.
   const badgeType = getMediaTypeBadgeType(
     type === 'show' ? 'tv' : (type ?? '')
   );
@@ -36,17 +39,25 @@ const LibraryItem = ({
       <div className="flex flex-1 items-center justify-between truncate rounded-md border-b border-r border-t border-gray-700 bg-gray-600">
         <div className="flex min-w-0 flex-1 cursor-default items-center gap-2 truncate px-4 py-6 text-sm leading-5">
           {badgeType && (
-            <MediaTypeBadge mediaType={badgeType} variant="compact" />
+            <MediaTypeBadge
+              mediaType={badgeType}
+              variant="compact"
+              label={
+                type === 'music'
+                  ? intl.formatMessage(globalMessages.music)
+                  : undefined
+              }
+            />
           )}
           <span className="truncate">{name}</span>
-          {onReclassify && (
+          {reclassify && (
             <button
               type="button"
-              title={reclassifyLabel}
-              aria-label={reclassifyLabel}
+              title={reclassify.label}
+              aria-label={reclassify.label}
               onClick={(e) => {
                 e.stopPropagation();
-                onReclassify();
+                reclassify.onReclassify();
               }}
               className="ml-1 shrink-0 rounded p-1 text-gray-400 hover:bg-gray-700 hover:text-white"
             >
