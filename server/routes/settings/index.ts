@@ -1481,7 +1481,19 @@ settingsRoutes.post(
 
         await settings.persistSection('plex', (current) => ({
           ...parsedPlex.value,
-          libraries: current.libraries,
+          // A different machineId means this connection now points at a
+          // different physical Plex server. Stored library ids are only
+          // meaningful within one server (Plex reuses small sequential
+          // keys across installs), so carrying them over risks silently
+          // applying a stale enabled/type classification to an unrelated
+          // library on the new server. Only preserve libraries when we're
+          // re-confirming the same server (or connecting for the first
+          // time, when current.machineId is unset).
+          libraries:
+            current.machineId &&
+            current.machineId !== result.MediaContainer.machineIdentifier
+              ? []
+              : current.libraries,
           machineId: result.MediaContainer.machineIdentifier,
           name: result.MediaContainer.friendlyName,
         }));
@@ -1754,7 +1766,13 @@ settingsRoutes.post(
             parsedBody.value.apiKey === REDACTED_SECRET
               ? current.apiKey
               : parsedJellyfin.value.apiKey,
-          libraries: current.libraries,
+          // See the analogous Plex machineId check above: a different
+          // serverId means a different physical server, so stale library
+          // ids must not carry over their enabled state to it.
+          libraries:
+            current.serverId && current.serverId !== result.Id
+              ? []
+              : current.libraries,
           serverId: result.Id,
           name: result.ServerName,
         }));

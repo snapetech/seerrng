@@ -915,6 +915,88 @@ describe('Settings route input validation', () => {
     assert.strictEqual(settings.jellyfin.apiKey, 'rotated-key');
   });
 
+  it('clears stored Plex libraries when the connection resolves to a different server', async () => {
+    const settings = getSettings();
+    settings.plex = {
+      ...settings.plex,
+      machineId: 'old-machine',
+      libraries: [
+        { id: '1', name: 'Movies', enabled: true, type: 'movie' as const },
+      ],
+    };
+    mock.method(PlexAPI.prototype, 'getStatus', async () => ({
+      MediaContainer: {
+        machineIdentifier: 'new-machine',
+        friendlyName: 'New Plex',
+      },
+    }));
+
+    const res = await request(app).post('/settings/plex').send({
+      ip: 'new-plex.local',
+      port: 32400,
+      useSsl: false,
+    });
+
+    assert.strictEqual(res.status, 200);
+    // Plex reuses small sequential library keys across independent
+    // installs, so stale enabled/type state must not carry over to an
+    // unrelated library id on the new server.
+    assert.deepStrictEqual(settings.plex.libraries, []);
+    assert.strictEqual(settings.plex.machineId, 'new-machine');
+  });
+
+  it('preserves stored Plex libraries when re-confirming the same server', async () => {
+    const settings = getSettings();
+    const storedLibraries = [
+      { id: '1', name: 'Movies', enabled: true, type: 'movie' as const },
+    ];
+    settings.plex = {
+      ...settings.plex,
+      machineId: 'same-machine',
+      libraries: storedLibraries,
+    };
+    mock.method(PlexAPI.prototype, 'getStatus', async () => ({
+      MediaContainer: {
+        machineIdentifier: 'same-machine',
+        friendlyName: 'Plex',
+      },
+    }));
+
+    const res = await request(app).post('/settings/plex').send({
+      ip: 'plex.local',
+      port: 32400,
+      useSsl: false,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(settings.plex.libraries, storedLibraries);
+  });
+
+  it('clears stored Jellyfin libraries when the connection resolves to a different server', async () => {
+    const settings = getSettings();
+    settings.jellyfin = {
+      ...settings.jellyfin,
+      serverId: 'old-server',
+      libraries: [
+        { id: '2', name: 'Movies', enabled: true, type: 'movie' as const },
+      ],
+    };
+    mock.method(JellyfinAPI.prototype, 'getSystemInfo', async () => ({
+      Id: 'new-server',
+      ServerName: 'New Jellyfin',
+    }));
+
+    const res = await request(app).post('/settings/jellyfin').send({
+      ip: 'new-jellyfin.local',
+      port: 8096,
+      useSsl: false,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(settings.jellyfin.libraries, []);
+    assert.strictEqual(settings.jellyfin.serverId, 'new-server');
+  });
+
   it('does not overwrite a Tautulli key rotated during connection testing', async () => {
     const settings = getSettings();
     settings.tautulli = {
