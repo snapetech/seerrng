@@ -5,7 +5,7 @@ import { availableLocales } from '@server/types/languages';
 import fs from 'fs';
 import path from 'path';
 
-type IntlInstance = ReturnType<typeof createIntl>;
+export type IntlInstance = ReturnType<typeof createIntl>;
 
 const cache = createIntlCache();
 const intls = new Map<string, IntlInstance>();

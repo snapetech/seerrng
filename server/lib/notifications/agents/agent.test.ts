@@ -1,24 +1,31 @@
 import assert from 'node:assert/strict';
-import { afterEach, describe, it, mock } from 'node:test';
+import { afterEach, before, describe, it, mock } from 'node:test';
 
+import { MediaType } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import { MediaIdentifierProvider } from '@server/entity/MediaIdentifier';
+import { getIntl, initI18n } from '@server/i18n';
 import { Notification } from '@server/lib/notifications';
 import { requiresDirectSafeHttpConnection } from '@server/utils/security';
 import axios from 'axios';
 import {
   CONFIGURABLE_NOTIFICATION_HTTP_OPTIONS,
-  getNotificationMediaUrl,
   NOTIFICATION_DELIVERY_CONCURRENCY,
   NOTIFICATION_HTTP_OPTIONS,
+  getMediaTypeLabel,
+  getNotificationMediaUrl,
   truncateNotificationText,
   truncateNotificationUtf8,
 } from './agent';
 import WebhookAgent, {
-  decodeStoredWebhookPayloadTemplate,
   MAX_WEBHOOK_URL_LENGTH,
+  decodeStoredWebhookPayloadTemplate,
   parseWebhookPayloadTemplate,
 } from './webhook';
+
+before(() => {
+  initI18n();
+});
 
 afterEach(() => {
   mock.restoreAll();
@@ -87,6 +94,16 @@ describe('getNotificationMediaUrl', () => {
       }),
       '/book/OL123W'
     );
+  });
+});
+
+describe('getMediaTypeLabel', () => {
+  it('labels each media type distinctly instead of collapsing to movie/series', () => {
+    const intl = getIntl('en');
+    assert.equal(getMediaTypeLabel(intl, MediaType.MOVIE), 'movie');
+    assert.equal(getMediaTypeLabel(intl, MediaType.TV), 'series');
+    assert.equal(getMediaTypeLabel(intl, MediaType.MUSIC), 'music');
+    assert.equal(getMediaTypeLabel(intl, MediaType.BOOK), 'book');
   });
 });
 

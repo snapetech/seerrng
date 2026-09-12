@@ -1,8 +1,11 @@
+import { MediaType } from '@server/constants/media';
 import type Issue from '@server/entity/Issue';
 import type IssueComment from '@server/entity/IssueComment';
 import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
+import type { IntlInstance } from '@server/i18n';
+import globalMessages from '@server/i18n/globalMessages';
 import {
   isValidOpenLibraryResourceId,
   normalizeMusicBrainzId,
@@ -117,6 +120,22 @@ const isSafeRelativeNotificationPath = (value: string): boolean => {
     );
   } catch {
     return false;
+  }
+};
+
+export const getMediaTypeLabel = (
+  intl: IntlInstance,
+  mediaType: Media['mediaType']
+): string => {
+  switch (mediaType) {
+    case MediaType.MOVIE:
+      return intl.formatMessage(globalMessages.movie);
+    case MediaType.MUSIC:
+      return intl.formatMessage(globalMessages.music);
+    case MediaType.BOOK:
+      return intl.formatMessage(globalMessages.book);
+    default:
+      return intl.formatMessage(globalMessages.series);
   }
 };
 

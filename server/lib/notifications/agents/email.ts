@@ -1,7 +1,6 @@
 import { IssueType, IssueTypeName } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
 import { defineMessages, getIntl } from '@server/i18n';
-import globalMessages from '@server/i18n/globalMessages';
 import PreparedEmail from '@server/lib/email';
 import {
   getExternalNotificationAgent,
@@ -21,6 +20,7 @@ import type { NotificationAgent, NotificationPayload } from './agent';
 import {
   BaseAgent,
   NOTIFICATION_DELIVERY_CONCURRENCY,
+  getMediaTypeLabel,
   getNotificationActionUrl,
 } from './agent';
 
@@ -129,9 +129,7 @@ class EmailAgent
     }
 
     const mediaType = payload.media
-      ? payload.media.mediaType === MediaType.MOVIE
-        ? intl.formatMessage(globalMessages.movie)
-        : intl.formatMessage(globalMessages.series)
+      ? getMediaTypeLabel(intl, payload.media.mediaType)
       : undefined;
     const is4k = payload.request?.is4k;
 

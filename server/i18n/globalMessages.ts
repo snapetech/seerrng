@@ -19,6 +19,8 @@ const globalMessages = defineMessages('notifications.common', {
   openIn: 'Open in {applicationTitle}',
   movie: 'movie',
   series: 'series',
+  music: 'music',
+  book: 'book',
   issue: 'issue',
   issueTypeName: '{type} issue',
 });

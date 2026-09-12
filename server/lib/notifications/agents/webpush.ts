@@ -1,5 +1,5 @@
 import { IssueType, IssueTypeName } from '@server/constants/issue';
-import { MediaRequestStatus, MediaType } from '@server/constants/media';
+import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MediaRequest from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
@@ -24,6 +24,7 @@ import type { NotificationAgent, NotificationPayload } from './agent';
 import {
   BaseAgent,
   NOTIFICATION_HTTP_OPTIONS,
+  getMediaTypeLabel,
   getNotificationMediaUrl,
 } from './agent';
 
@@ -119,9 +120,7 @@ class WebPushAgent
     const { embedPoster } = this.getSettings();
 
     const mediaType = payload.media
-      ? payload.media.mediaType === MediaType.MOVIE
-        ? intl.formatMessage(globalMessages.movie)
-        : intl.formatMessage(globalMessages.series)
+      ? getMediaTypeLabel(intl, payload.media.mediaType)
       : undefined;
     const is4k = payload.request?.is4k;
     const quality = is4k ? '4K ' : '';
