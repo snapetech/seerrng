@@ -1,8 +1,8 @@
 ---
 category: fixed
-audience: developers
+audience: operators
 area: developer-experience
 action: none
 breaking: false
 ---
-`pnpm dev` no longer crashes on startup with "Cannot find module '@server/entity/IssueComment'" (or a similar error for a different module) — a race between Next.js's require-hook and the `@server/*` path-alias resolver, triggered whenever TypeORM's directory-based loaders or the settings migrator resolved files dynamically after Next's dev server was constructed. Database and settings initialization now runs before Next installs its hook.
+`pnpm dev` no longer crashes on startup with errors like "Cannot find module '@server/entity/IssueComment'" — a race between Next.js's require-hook and the `@server/*` path-alias resolver whenever TypeORM or the settings migrator resolved files dynamically after Next's dev server was constructed. Database and settings now initialize before Next installs its hook.

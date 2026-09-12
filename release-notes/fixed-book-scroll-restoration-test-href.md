@@ -1,6 +1,6 @@
 ---
 category: fixed
-audience: developers
+audience: operators
 area: testing
 action: none
 breaking: false
