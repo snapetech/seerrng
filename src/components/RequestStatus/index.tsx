@@ -1641,9 +1641,6 @@ const RequestStatus = () => {
             <option value="importing">
               {intl.formatMessage(messages.importing)}
             </option>
-            <option value="library">
-              {intl.formatMessage(messages.library)}
-            </option>
             <option value="available">
               {intl.formatMessage(messages.available)}
             </option>
