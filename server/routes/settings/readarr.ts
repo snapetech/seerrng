@@ -606,7 +606,8 @@ readarrRoutes.put<{ id: string }, ReadarrSettings, ReadarrSettings>(
             'readarr',
             (current) => {
               const serviceType = admittedReadarr.value.serviceType ?? 'ebook';
-              return current.map((instance) => {
+              const oldServiceType = currentReadarr.serviceType ?? 'ebook';
+              const updated = current.map((instance) => {
                 if (instance.id === readarrId) {
                   return {
                     ...admittedReadarr.value,
@@ -623,6 +624,34 @@ readarrRoutes.put<{ id: string }, ReadarrSettings, ReadarrSettings>(
                   ? { ...instance, isDefault: false }
                   : instance;
               });
+
+              // Changing an instance's book format away from the type it
+              // was the default for must not leave that type without one,
+              // matching the auto-promotion the DELETE route already does.
+              if (oldServiceType !== serviceType && currentReadarr.isDefault) {
+                const hasDefaultForOldType = updated.some(
+                  (instance) =>
+                    instance.id !== readarrId &&
+                    (instance.serviceType ?? 'ebook') === oldServiceType &&
+                    instance.isDefault
+                );
+                if (!hasDefaultForOldType) {
+                  let promoted = false;
+                  return updated.map((instance) => {
+                    if (
+                      !promoted &&
+                      instance.id !== readarrId &&
+                      (instance.serviceType ?? 'ebook') === oldServiceType
+                    ) {
+                      promoted = true;
+                      return { ...instance, isDefault: true };
+                    }
+                    return instance;
+                  });
+                }
+              }
+
+              return updated;
             }
           );
 

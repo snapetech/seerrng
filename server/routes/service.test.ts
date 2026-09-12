@@ -1477,6 +1477,47 @@ describe('Bookshelf settings routes', () => {
     );
   });
 
+  it('promotes another Bookshelf server for the same format when editing away the default', async () => {
+    getSettings().readarr = [
+      makeReadarr({ id: 7, name: 'Primary Ebook', isDefault: true }),
+      makeReadarr({ id: 8, name: 'Backup Ebook', isDefault: false }),
+    ];
+
+    const res = await request(app)
+      .put('/settings/readarr/7')
+      .send(
+        makeReadarr({
+          name: 'Primary Ebook',
+          isDefault: true,
+          serviceType: 'audiobook',
+        })
+      );
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(
+      getSettings().readarr.map(({ id, name, isDefault, serviceType }) => ({
+        id,
+        name,
+        isDefault,
+        serviceType,
+      })),
+      [
+        {
+          id: 7,
+          name: 'Primary Ebook',
+          isDefault: true,
+          serviceType: 'audiobook',
+        },
+        {
+          id: 8,
+          name: 'Backup Ebook',
+          isDefault: true,
+          serviceType: 'ebook',
+        },
+      ]
+    );
+  });
+
   it('returns Bookshelf/Readarr service summaries with metadata profile and tags', async () => {
     getSettings().readarr = [
       makeReadarr({
