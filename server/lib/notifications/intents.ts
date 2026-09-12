@@ -190,6 +190,9 @@ export const buildMediaRequestNotificationPayload = async (
       mediaUrl: `/music/${mbId}`,
       subject: `${releaseGroup.name}${releaseYear ? ` (${releaseYear})` : ''}`,
       message: artist.name,
+      image: album.caa_release_mbid
+        ? `https://coverartarchive.org/release/${album.caa_release_mbid}/front-500`
+        : undefined,
       extra: [{ name: 'Artist', value: artist.name }],
     };
   }
