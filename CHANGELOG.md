@@ -63,6 +63,40 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.20.2](https://github.com/snapetech/seerrng/compare/v3.20.1..v3.20.2) - 2026-09-12
+
+### User-facing changes
+
+#### Fixed
+
+- **Requests:** The "request on behalf of" user list in the advanced request modal no longer stays filtered against the previous quality or media type after switching between Standard/4K or between movie, TV, music, and book — a missing effect dependency let the stale permission filter linger until something unrelated forced a refresh.
+- **Plex:** Plex audiobook scans no longer trust Open Library's top search hit unconditionally when Plex has no direct identifier for a title — a weakly related or unrelated book is now rejected instead of being silently marked available.
+- **Testing:** The book-discovery scroll-restoration E2E test now matches the book detail link's real href (which carries a `?format=` query parameter to preserve the discovery tab's format context, added alongside the Audiobooks discovery page) instead of a bare path, fixing a false failure introduced when that link shape changed.
+- **Developer Experience:** `pnpm dev` no longer crashes on startup with errors like "Cannot find module '@server/entity/IssueComment'" — a race between Next.js's require-hook and the `@server/*` path-alias resolver whenever TypeORM or the settings migrator resolved files dynamically after Next's dev server was constructed. Database and settings now initialize before Next installs its hook.
+- **Requests:** The request status filter dropdown no longer offers both "Incomplete" and "Adding to library" as separate options — they matched the exact same requests, since "Incomplete" was added as a friendlier alias for the same underlying stage without removing the older entry.
+- **Settings:** Switching Settings > Plex or Settings > Jellyfin to point at a different physical server now clears the previous server's stored libraries instead of carrying over their enabled state and Music/Audiobook classification onto an unrelated library that happens to reuse the same library id.
+- **Requests:** A book request for both ebook and audiobook formats now correctly shows as "Incomplete" once both services are dispatched but not yet processed — previously it could report "Searching" while both downloads were already underway, because the check stopped once both formats were linked instead of also checking progress.
+- **Search:** Searching for music or audiobooks/books no longer gets stuck after the first ~20 results — pagination was being computed from this page's (capped) result count instead of the true number of matches reported by MusicBrainz and Open Library, so scrolling past the first page silently stopped fetching more.
+- **Notifications:** Music request notifications (pending, approved, available, declined, and auto-approved/auto-requested) now include the album's cover art across every notification agent — the music branch of the notification builder never set an image, so these were the only request-lifecycle notifications sent without artwork.
+- **Notifications:** Email and web push notifications now say "music" or "book" instead of mislabeling those requests as "series" — the movie/series wording predates the Music and Audiobook request types and was never updated for them.
+- **Settings:** Switching a Bookshelf/Readarr server's book format (ebook/audiobook) while it was the default for its old format no longer leaves that format without a default server — another server of the old format is now automatically promoted, matching what already happens when the default server is deleted.
+
+### 🐛 Bug Fixes
+- *(dev)* Initialize database and settings before Next installs its require-hook - ([4f80cf8](https://github.com/snapetech/seerrng/commit/4f80cf8889dabafdeb8ea29deeafcf457d98d541))
+- *(notifications)* Include cover art in music request notifications - ([c1f1ab2](https://github.com/snapetech/seerrng/commit/c1f1ab285adadc281d7ca396cf9052793ab03fe2))
+- *(notifications)* Label music and book requests correctly in email/webpush - ([ff40f50](https://github.com/snapetech/seerrng/commit/ff40f508ed574e4b547d9446b3e4c8da56e79e74))
+- *(plex)* Reject weak Open Library matches for unidentified audiobooks - ([bba410e](https://github.com/snapetech/seerrng/commit/bba410ee31fe7c38f48c3f0d8f0e463250362374))
+- *(release-notes)* Correct audience and body-length schema violations - ([acb4340](https://github.com/snapetech/seerrng/commit/acb43401b21e61527d4d3a42b58ce6aa05f81fad))
+- *(requests)* Show incomplete status for a fully-dispatched mixed-format book - ([806e638](https://github.com/snapetech/seerrng/commit/806e6383eb00d864ddd0394e39d90c03d7067b6e))
+- *(requests)* Remove duplicate library filter option from status page - ([39f7a84](https://github.com/snapetech/seerrng/commit/39f7a84f4d8a84ba8c3e43376105057089b01dc7))
+- *(requests)* Refresh proxy-user filter when quality or media type changes - ([ff0109b](https://github.com/snapetech/seerrng/commit/ff0109bc1724d7970171550764fb393ddb6d4957))
+- *(search)* Use true provider match counts for music/book pagination - ([48318be](https://github.com/snapetech/seerrng/commit/48318be707eed1b08fd48417249ca88b5727dfc9))
+- *(settings)* Re-promote a Bookshelf default when its format changes - ([c4ff242](https://github.com/snapetech/seerrng/commit/c4ff242905dc776f8640918e0cfe147f3850fa8f))
+- *(settings)* Clear stale library state when Plex/Jellyfin points at a new server - ([cfcb72e](https://github.com/snapetech/seerrng/commit/cfcb72ede846ee0ceb6a8d79ba9433ab635dd264))
+- *(tests)* Match real book detail href in scroll-restoration E2E test - ([9f43e45](https://github.com/snapetech/seerrng/commit/9f43e459a459603fe49163f53f0817000b718bd5))
+
 ## [3.20.1](https://github.com/snapetech/seerrng/compare/v3.20.0..v3.20.1) - 2026-09-11
 
 ### User-facing changes
