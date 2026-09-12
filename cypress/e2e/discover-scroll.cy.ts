@@ -81,6 +81,12 @@ describe('Discover Back navigation geometry', () => {
       const results = mockDiscovery(tab, mediaType);
       const target = results[targetIndex];
       const detailPath = `/${mediaType}/${target.id}`;
+      // Book cards on /discover/books carry a `?format=` query param on their
+      // detail link so the request modal defaults to the tab's format --
+      // pathname-only checks (location, API intercepts) use detailPath, but
+      // the rendered <a href> for books includes the query string.
+      const detailHref =
+        mediaType === 'book' ? `${detailPath}?format=ebook` : detailPath;
       let beforeTop = 0;
       let beforeOrder: string[] = [];
 
@@ -126,7 +132,7 @@ describe('Discover Back navigation geometry', () => {
 
       browseToTarget();
 
-      cy.get(`${listItems} a[href="${detailPath}"]`).should('be.visible');
+      cy.get(`${listItems} a[href="${detailHref}"]`).should('be.visible');
       cy.get(`${listItems} a`).then(($links) => {
         beforeOrder = $links
           .toArray()
@@ -139,7 +145,7 @@ describe('Discover Back navigation geometry', () => {
         .then(($item) => {
           beforeTop = $item[0].getBoundingClientRect().top;
         });
-      cy.get(`${listItems} a[href="${detailPath}"]`).click({
+      cy.get(`${listItems} a[href="${detailHref}"]`).click({
         scrollBehavior: false,
       });
       cy.wait('@details');
@@ -158,7 +164,7 @@ describe('Discover Back navigation geometry', () => {
       cy.get(listItems)
         .eq(targetIndex)
         .should(($item) => {
-          expect($item.find(`a[href="${detailPath}"]`)).to.have.length(1);
+          expect($item.find(`a[href="${detailHref}"]`)).to.have.length(1);
           expect($item[0].getBoundingClientRect().top).to.be.closeTo(
             beforeTop,
             2
