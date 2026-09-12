@@ -372,7 +372,15 @@ class MusicBrainz extends ExternalAPI {
     );
   }
 
-  public async searchAlbum({
+  public async searchAlbum(options: {
+    query: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<MbAlbumDetails[]> {
+    return (await this.searchAlbumWithTotal(options)).results;
+  }
+
+  public async searchAlbumWithTotal({
     query,
     limit = 30,
     offset = 0,
@@ -380,7 +388,7 @@ class MusicBrainz extends ExternalAPI {
     query: string;
     limit?: number;
     offset?: number;
-  }): Promise<MbAlbumDetails[]> {
+  }): Promise<{ results: MbAlbumDetails[]; totalResults: number }> {
     try {
       const boundedLimit = clampPageSize(limit, 30);
       const data = await this.get<{
@@ -401,12 +409,13 @@ class MusicBrainz extends ExternalAPI {
         43200
       );
 
-      return Array.isArray(data?.['release-groups'])
+      const results = Array.isArray(data?.['release-groups'])
         ? data['release-groups']
             .slice(0, boundedLimit)
             .map(sanitizeMusicBrainzAlbum)
             .filter((album): album is MbAlbumDetails => !!album)
         : [];
+      return { results, totalResults: data?.count ?? results.length };
     } catch (e) {
       throw new Error(
         `[MusicBrainz] Failed to search albums: ${
@@ -555,7 +564,15 @@ class MusicBrainz extends ExternalAPI {
     }
   }
 
-  public async searchArtist({
+  public async searchArtist(options: {
+    query: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<MbArtistDetails[]> {
+    return (await this.searchArtistWithTotal(options)).results;
+  }
+
+  public async searchArtistWithTotal({
     query,
     limit = 50,
     offset = 0,
@@ -563,7 +580,7 @@ class MusicBrainz extends ExternalAPI {
     query: string;
     limit?: number;
     offset?: number;
-  }): Promise<MbArtistDetails[]> {
+  }): Promise<{ results: MbArtistDetails[]; totalResults: number }> {
     try {
       const boundedLimit = clampPageSize(limit, 50);
       const data = await this.get<{
@@ -584,12 +601,13 @@ class MusicBrainz extends ExternalAPI {
         43200
       );
 
-      return Array.isArray(data?.artists)
+      const results = Array.isArray(data?.artists)
         ? data.artists
             .slice(0, boundedLimit)
             .map(sanitizeMusicBrainzArtist)
             .filter((artist): artist is MbArtistDetails => !!artist)
         : [];
+      return { results, totalResults: data?.count ?? results.length };
     } catch (e) {
       throw new Error(
         `[MusicBrainz] Failed to search artists: ${

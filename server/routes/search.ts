@@ -295,19 +295,19 @@ searchRoutes.get('/', async (req, res, next) => {
               total_results: 0,
             }),
         shouldSearchMusic && musicEnabled
-          ? musicbrainz.searchAlbum({
+          ? musicbrainz.searchAlbumWithTotal({
               query: queryString,
               limit: 20,
               offset: musicOffset,
             })
-          : Promise.resolve([]),
+          : Promise.resolve({ results: [], totalResults: 0 }),
         shouldSearchMusic && musicEnabled
-          ? musicbrainz.searchArtist({
+          ? musicbrainz.searchArtistWithTotal({
               query: queryString,
               limit: 20,
               offset: musicOffset,
             })
-          : Promise.resolve([]),
+          : Promise.resolve({ results: [], totalResults: 0 }),
         shouldSearchBooks && booksEnabled
           ? openLibrary.searchBooks({
               query: queryString,
@@ -321,9 +321,11 @@ searchRoutes.get('/', async (req, res, next) => {
         result: PromiseSettledResult<unknown>;
       };
       type TmdbSearchResults = Awaited<ReturnType<TheMovieDb['searchMulti']>>;
-      type AlbumSearchResults = Awaited<ReturnType<MusicBrainz['searchAlbum']>>;
+      type AlbumSearchResults = Awaited<
+        ReturnType<MusicBrainz['searchAlbumWithTotal']>
+      >;
       type ArtistSearchResults = Awaited<
-        ReturnType<MusicBrainz['searchArtist']>
+        ReturnType<MusicBrainz['searchArtistWithTotal']>
       >;
       type BookSearchResults = Awaited<
         ReturnType<OpenLibraryAPI['searchBooks']>
@@ -384,12 +386,20 @@ searchRoutes.get('/', async (req, res, next) => {
           MAX_SEARCH_RESULTS_PER_PROVIDER
         ),
       };
-      const albumResults = capSearchProviderResults<AlbumSearchResults[number]>(
-        getProviderValue<AlbumSearchResults>(1, [])
-      );
+      const rawAlbumResults = getProviderValue<AlbumSearchResults>(1, {
+        results: [],
+        totalResults: 0,
+      });
+      const albumResults = capSearchProviderResults<
+        AlbumSearchResults['results'][number]
+      >(rawAlbumResults.results);
+      const rawArtistResults = getProviderValue<ArtistSearchResults>(2, {
+        results: [],
+        totalResults: 0,
+      });
       const artistResults = capSearchProviderResults<
-        ArtistSearchResults[number]
-      >(getProviderValue<ArtistSearchResults>(2, []));
+        ArtistSearchResults['results'][number]
+      >(rawArtistResults.results);
       const rawBookResults = getProviderValue<BookSearchResults>(3, {
         numFound: 0,
         start: 0,
@@ -580,10 +590,12 @@ searchRoutes.get('/', async (req, res, next) => {
         (a, b) => (b.score || 0) - (a.score || 0)
       );
 
+      const musicTotalResults = Math.max(
+        musicResults.length,
+        rawAlbumResults.totalResults + rawArtistResults.totalResults
+      );
       const totalItems =
-        tmdbResults.total_results +
-        musicResults.length +
-        dedupedBookDocs.length;
+        tmdbResults.total_results + musicTotalResults + bookResults.numFound;
       const totalPages = Math.max(
         tmdbResults.total_pages,
         Math.ceil(totalItems / 20)

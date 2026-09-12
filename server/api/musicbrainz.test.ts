@@ -90,6 +90,52 @@ describe('MusicBrainz response boundaries', () => {
     assert.ok(!('unexpectedProviderSecret' in results[0]));
   });
 
+  it('exposes the provider match count separately from the capped page', async () => {
+    const musicBrainz = new MusicBrainz();
+    Object.defineProperty(musicBrainz, 'get', {
+      configurable: true,
+      value: async () => ({
+        count: 4200,
+        'release-groups': [album(0)],
+      }),
+    });
+
+    const { results, totalResults } = await musicBrainz.searchAlbumWithTotal({
+      query: 'album',
+      limit: 30,
+    });
+
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(totalResults, 4200);
+  });
+
+  it('exposes the provider artist match count separately from the capped page', async () => {
+    const musicBrainz = new MusicBrainz();
+    Object.defineProperty(musicBrainz, 'get', {
+      configurable: true,
+      value: async () => ({
+        count: 900,
+        artists: [
+          {
+            id: 'artist-0',
+            name: 'Artist 0',
+            type: 'Group',
+            'sort-name': 'Artist 0',
+            score: 100,
+          },
+        ],
+      }),
+    });
+
+    const { results, totalResults } = await musicBrainz.searchArtistWithTotal({
+      query: 'artist',
+      limit: 30,
+    });
+
+    assert.strictEqual(results.length, 1);
+    assert.strictEqual(totalResults, 900);
+  });
+
   it('rejects malformed albums and normalizes artist records', () => {
     assert.strictEqual(sanitizeMusicBrainzAlbum(null), undefined);
     assert.strictEqual(
