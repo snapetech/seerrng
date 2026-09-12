@@ -213,7 +213,7 @@ const AdvancedRequester = ({
           { type: 'or' }
         )
       ),
-    [userData?.results]
+    [userData?.results, hasPermission, is4k, type]
   );
 
   useEffect(() => {
