@@ -76,7 +76,7 @@ jobs:
             mv seerrng_*_amd64.deb "seerrng_${version}_amd64.deb"
           fi
           sha256sum "seerrng_${version}_amd64.deb" > "seerrng_${version}_amd64.deb.sha256"
-      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           draft: true
@@ -152,7 +152,7 @@ jobs:
           for package in ./*.rpm; do
             sha256sum "${package#./}" > "${package#./}.sha256"
           done
-      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           draft: true
@@ -215,7 +215,7 @@ jobs:
           cp public/android-chrome-512x512.png SeerrNG.AppDir/usr/share/icons/hicolor/256x256/apps/seerrng.png
           ARCH=x86_64 ./appimagetool SeerrNG.AppDir "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage"
           sha256sum "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage" > "SeerrNG-${{ steps.version.outputs.version }}-x86_64.AppImage.sha256"
-      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           draft: true
