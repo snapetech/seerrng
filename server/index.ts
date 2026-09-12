@@ -144,391 +144,412 @@ if (
   process.exit(1);
 }
 
-const app = next({ dev });
-const handle = app.getRequestHandler();
-
-if (!appDataPermissions()) {
-  logger.error(
-    'Something went wrong while checking config folder! Please ensure the config folder is set up properly.\nhttps://snapetech.github.io/seerrng/getting-started'
-  );
-}
-
-app
-  .prepare()
+// Initialize the database and load settings through the plain
+// tsconfig-paths resolver before `next({ dev })` below installs Next's
+// own require-hook. TypeORM's directory-based loaders (entities,
+// subscribers, migrations) and the settings migrator both resolve
+// `@server/*`-aliased files dynamically at runtime; once Next's hook is
+// layered on top of tsconfig-paths, that resolution can throw "Cannot
+// find module" for one of them. Everything here is idempotent, so the
+// equivalent calls further down (kept for production-path parity) are
+// safe no-ops once this has already run. Only reproduces in `pnpm dev`'s
+// ts-node invocation -- compiled production builds have no runtime path
+// aliases to resolve, and the test suite never imports `next` at all.
+Promise.resolve()
   .then(async () => {
-    // Run Overseerr to Seerr migration
-    await checkOverseerrMerge();
-
-    const dbConnection = dataSource.isInitialized
-      ? dataSource
-      : await dataSource.initialize();
+    if (!dataSource.isInitialized) {
+      await dataSource.initialize();
+    }
     enforceSqliteDatabasePermissions();
+    await getSettings().load();
+  })
+  .then(() => {
+    const app = next({ dev });
+    const handle = app.getRequestHandler();
 
-    // Run migrations in production unless a prepared test database is being used.
-    if (
-      process.env.NODE_ENV === 'production' &&
-      process.env.SEERR_SKIP_DB_MIGRATIONS !== 'true'
-    ) {
-      await runStartupMigrations(dbConnection);
-    }
-
-    // Load Settings
-    const settings = await getSettings().load();
-    const port = parseListenPort(process.env.PORT);
-    const tlsConfiguration = await initializeTls({
-      httpPort: port,
-      settings: settings.network.tls,
-    });
-    loadExternalRuntimeConfig();
-    restartFlag.initializeSettings(settings);
-
-    initI18n();
-
-    setForceIpv4First(settings.network.forceIpv4First);
-
-    // Add DNS caching
-    if (settings.network.dnsCache?.enabled) {
-      initializeDnsCache({
-        forceMinTtl: settings.network.dnsCache.forceMinTtl,
-        forceMaxTtl: settings.network.dnsCache.forceMaxTtl,
-      });
-    }
-
-    // Register HTTP proxy
-    if (settings.network.proxy.enabled) {
-      await createCustomProxyAgent(
-        settings.network.proxy,
-        settings.network.forceIpv4First
+    if (!appDataPermissions()) {
+      logger.error(
+        'Something went wrong while checking config folder! Please ensure the config folder is set up properly.\nhttps://snapetech.github.io/seerrng/getting-started'
       );
     }
 
-    const isE2eTest = isTruthyEnv(process.env.E2E_TESTS);
+    return app.prepare().then(async () => {
+      // Run Overseerr to Seerr migration
+      await checkOverseerrMerge();
 
-    // Migrate library types
-    if (
-      settings.plex.libraries.length > 1 &&
-      !settings.plex.libraries[0].type
-    ) {
-      await runWithConfigurationAdmission('plex', async () => {
-        const currentPlex = getSettings().plex;
-        if (
-          currentPlex.libraries.length <= 1 ||
-          currentPlex.libraries[0].type
-        ) {
-          return;
-        }
-        const userRepository = getRepository(User);
-        const admin = await userRepository.findOne({
-          select: { id: true, plexToken: true },
-          where: { id: 1 },
-        });
+      const dbConnection = dataSource.isInitialized
+        ? dataSource
+        : await dataSource.initialize();
+      enforceSqliteDatabasePermissions();
 
-        if (admin) {
-          logger.info('Migrating Plex libraries to include media type', {
-            label: 'Settings',
-          });
-
-          const plexapi = new PlexAPI({
-            plexToken: admin.plexToken,
-            plexSettings: structuredClone(currentPlex),
-          });
-          await plexapi.syncLibraries();
-        }
-      });
-    }
-
-    // Register Notification Agents
-    notificationManager.registerAgents([
-      new DiscordAgent(),
-      new EmailAgent(),
-      new GotifyAgent(),
-      new NtfyAgent(),
-      new PushbulletAgent(),
-      new PushoverAgent(),
-      new SlackAgent(),
-      new TelegramAgent(),
-      new WebhookAgent(),
-      new WebPushAgent(),
-    ]);
-    if (isE2eTest) {
-      logger.info('Skipping background delivery loops in E2E test mode', {
-        label: 'Server',
-      });
-    } else {
-      await notificationManager.resumePendingNotifications();
-      notificationManager.startOutboxRetryLoop();
-      await requestDispatchManager.resume();
-      requestDispatchManager.start();
-      await resumePendingPasswordResetDeliveries();
-    }
-
-    const userRepository = getRepository(User);
-    const totalUsers = await userRepository.count();
-    if (totalUsers > 0 && !isE2eTest) {
-      startJobs();
-    } else if (isE2eTest) {
-      logger.info('Skipping scheduled jobs in E2E test mode', {
-        label: 'Server',
-      });
-    } else {
-      logger.info(
-        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
-        {
-          label: 'Server',
-        }
-      );
-    }
-
-    // Bootstrap Discovery Sliders
-    await DiscoverSlider.bootstrapSliders();
-
-    const server = express();
-    server.disable('x-powered-by');
-    if (settings.network.trustProxy) {
-      server.set('trust proxy', 1);
-    }
-    server.use(securityHeaders);
-    server.use(compression());
-    server.use(cookieParser(settings.sessionSecret));
-    server.use(express.json({ limit: API_BODY_LIMIT }));
-    server.use(
-      express.urlencoded({
-        extended: true,
-        limit: API_BODY_LIMIT,
-        parameterLimit: API_URLENCODED_PARAMETER_LIMIT,
-      })
-    );
-    if (settings.network.csrfProtection) {
-      server.use(csrfProtection());
-      server.use(csrfTokenCookie(requestUsesSecureTransport));
-    }
-
-    // Set up sessions
-    const sessionRespository = getRepository(Session);
-    const sessionTransportOptions = getSessionTransportOptions(
-      dev,
-      settings.network.csrfProtection,
-      tlsConfiguration.httpAuthAllowed
-    );
-    // Cypress drives many concurrent API requests through one SQLite session
-    // row. Keep E2E session state process-local so those requests cannot queue
-    // behind TypeORM session touches. Production retains durable sessions.
-    const sessionStore = isE2eTest
-      ? undefined
-      : (new TypeormStore({
-          cleanupLimit: 2,
-          ttl: 60 * 60 * 24 * 30,
-        }).connect(sessionRespository) as Store);
-    server.use(
-      '/api',
-      session({
-        secret: settings.sessionSecret,
-        resave: false,
-        saveUninitialized: false,
-        cookie: {
-          ...sessionTransportOptions.cookie,
-        },
-        proxy: sessionTransportOptions.proxy,
-        ...(sessionStore ? { store: sessionStore } : {}),
-      })
-    );
-    const apiSpecContent = await fs.readFile(API_SPEC_PATH, 'utf-8');
-    const apiDocs = yaml.load(apiSpecContent) as Record<string, unknown>;
-    server.use('/api-docs', swaggerUi.serve, swaggerUi.setup(apiDocs));
-    server.use(
-      OpenApiValidator.middleware({
-        apiSpec: API_SPEC_PATH,
-        validateRequests: true,
-      })
-    );
-    server.use('/api/v1', API_RATE_LIMIT, routes);
-
-    // Do not set cookies so CDNs can cache them
-    server.use('/imageproxy', clearCookies, imageproxy);
-    server.use('/avatarproxy', clearCookies, avatarproxy);
-
-    server.get('*path', (req, res) => {
-      setStaticAssetCacheControl(req, res);
-
-      return handle(req, res);
-    });
-    server.use(
-      (
-        err: {
-          status?: number;
-          message?: string;
-          errors?: string[];
-          stack?: string;
-          error?: string;
-        },
-        req: Request,
-        res: Response,
-        // We must provide a next function for the function signature here even though its not used
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        _next: NextFunction
-      ) => {
-        const status = normalizeApiErrorStatus(err.status);
-
-        if (status >= 500) {
-          logger.error('Unhandled API request error', {
-            label: 'API',
-            method: req.method,
-            path: getRequestLogPath(req.originalUrl),
-            status,
-            errorMessage: err.message,
-            errorStack: err.stack,
-            errors: err.errors,
-          });
-        }
-
-        res.status(status).json(formatApiErrorResponse(err, status));
+      // Run migrations in production unless a prepared test database is being used.
+      if (
+        process.env.NODE_ENV === 'production' &&
+        process.env.SEERR_SKIP_DB_MIGRATIONS !== 'true'
+      ) {
+        await runStartupMigrations(dbConnection);
       }
-    );
 
-    const host = process.env.HOST;
-    const listener = configureHttpServer(
-      tlsConfiguration.mode === 'disabled'
-        ? http.createServer(server)
-        : http.createServer(
-            (tlsConfiguration.redirectsHttpToHttps
-              ? createHttpsRedirectHandler
-              : createHttpsUpgradeHandler)(
-              tlsConfiguration.httpsPort!,
-              tlsConfiguration.hosts
-            )
-          )
-    );
-    const secureListener = tlsConfiguration.httpsOptions
-      ? configureHttpServer(
-          https.createServer(tlsConfiguration.httpsOptions, server)
-        )
-      : undefined;
-    const listeners = secureListener ? [listener, secureListener] : [listener];
+      // Load Settings
+      const settings = await getSettings().load();
+      const port = parseListenPort(process.env.PORT);
+      const tlsConfiguration = await initializeTls({
+        httpPort: port,
+        settings: settings.network.tls,
+      });
+      loadExternalRuntimeConfig();
+      restartFlag.initializeSettings(settings);
 
-    const listen = (
-      target: typeof listener,
-      targetPort: number,
-      message: string
-    ) => {
-      if (host) {
-        target.listen(targetPort, host, () => {
-          logger.info(message, { label: 'Server' });
+      initI18n();
+
+      setForceIpv4First(settings.network.forceIpv4First);
+
+      // Add DNS caching
+      if (settings.network.dnsCache?.enabled) {
+        initializeDnsCache({
+          forceMinTtl: settings.network.dnsCache.forceMinTtl,
+          forceMaxTtl: settings.network.dnsCache.forceMaxTtl,
+        });
+      }
+
+      // Register HTTP proxy
+      if (settings.network.proxy.enabled) {
+        await createCustomProxyAgent(
+          settings.network.proxy,
+          settings.network.forceIpv4First
+        );
+      }
+
+      const isE2eTest = isTruthyEnv(process.env.E2E_TESTS);
+
+      // Migrate library types
+      if (
+        settings.plex.libraries.length > 1 &&
+        !settings.plex.libraries[0].type
+      ) {
+        await runWithConfigurationAdmission('plex', async () => {
+          const currentPlex = getSettings().plex;
+          if (
+            currentPlex.libraries.length <= 1 ||
+            currentPlex.libraries[0].type
+          ) {
+            return;
+          }
+          const userRepository = getRepository(User);
+          const admin = await userRepository.findOne({
+            select: { id: true, plexToken: true },
+            where: { id: 1 },
+          });
+
+          if (admin) {
+            logger.info('Migrating Plex libraries to include media type', {
+              label: 'Settings',
+            });
+
+            const plexapi = new PlexAPI({
+              plexToken: admin.plexToken,
+              plexSettings: structuredClone(currentPlex),
+            });
+            await plexapi.syncLibraries();
+          }
+        });
+      }
+
+      // Register Notification Agents
+      notificationManager.registerAgents([
+        new DiscordAgent(),
+        new EmailAgent(),
+        new GotifyAgent(),
+        new NtfyAgent(),
+        new PushbulletAgent(),
+        new PushoverAgent(),
+        new SlackAgent(),
+        new TelegramAgent(),
+        new WebhookAgent(),
+        new WebPushAgent(),
+      ]);
+      if (isE2eTest) {
+        logger.info('Skipping background delivery loops in E2E test mode', {
+          label: 'Server',
         });
       } else {
-        target.listen(targetPort, () => {
-          logger.info(message, { label: 'Server' });
-        });
+        await notificationManager.resumePendingNotifications();
+        notificationManager.startOutboxRetryLoop();
+        await requestDispatchManager.resume();
+        requestDispatchManager.start();
+        await resumePendingPasswordResetDeliveries();
       }
-    };
 
-    if (tlsConfiguration.mode === 'disabled') {
-      listen(
-        listener,
-        port,
-        `Server ready on ${host ? `${host} ` : ''}port ${port}`
-      );
-      if (tlsConfiguration.httpAuthAllowed) {
-        logger.warn(
-          'SEERR_ALLOW_HTTP_AUTH is enabled. Browser sessions may be intercepted by anyone who can observe this HTTP connection; use built-in HTTPS or an HTTPS reverse proxy when possible.',
-          { label: 'Security' }
-        );
-      }
-    } else {
-      listen(
-        listener,
-        port,
-        `${tlsConfiguration.redirectsHttpToHttps ? 'HTTP redirect' : 'HTTP upgrade'} listener ready on ${host ? `${host} ` : ''}port ${port}`
-      );
-      listen(
-        secureListener!,
-        tlsConfiguration.httpsPort!,
-        `HTTPS server ready on ${host ? `${host} ` : ''}port ${tlsConfiguration.httpsPort}`
-      );
-      logger.warn(
-        `Built-in HTTPS is enabled. Trust the local CA before signing in. Certificate fingerprint: ${tlsConfiguration.runtime.fingerprint}`,
-        {
-          label: 'Security',
-          tlsMode: tlsConfiguration.mode,
-          tlsHosts: tlsConfiguration.hosts,
-          caCertificatePath: tlsConfiguration.caCertificatePath,
-          httpsPort: tlsConfiguration.httpsPort,
-        }
-      );
-    }
-
-    for (const target of listeners) {
-      target.on('error', (err: Error) => {
-        logger.error('Failed to start server', {
-          label: 'Server',
-          message: err.message,
-        });
-        process.exit(1);
-      });
-    }
-
-    let stoppingJobs: Promise<void> | undefined;
-    const shutdownController = createProcessShutdownController({
-      onStart: (reason) => {
-        logger.info(`Received ${reason}; draining server before shutdown.`, {
+      const userRepository = getRepository(User);
+      const totalUsers = await userRepository.count();
+      if (totalUsers > 0 && !isE2eTest) {
+        startJobs();
+      } else if (isE2eTest) {
+        logger.info('Skipping scheduled jobs in E2E test mode', {
           label: 'Server',
         });
-        notificationManager.stopOutboxRetryLoop();
-        requestDispatchManager.stop();
-        // Cancel future schedules immediately, while the listener drains.
-        stoppingJobs = stopJobs();
-      },
-      drain: () =>
-        drainForShutdown({
-          server: listeners,
-          tasks: [
-            {
-              name: 'scheduled jobs and background tasks',
-              run: async () => {
-                await stoppingJobs;
-                // Active HTTP handlers may have reached a job invocation or
-                // delayed retry immediately before the listener finished
-                // draining. A second pass closes that admission race.
-                await stopJobs();
-                // Reset deliveries can enqueue tracked recovery work. Drain
-                // them first so the background-task pass observes that work.
-                await waitForPendingPasswordResetDeliveries();
-                await waitForBackgroundTasks();
-              },
-            },
-          ],
-          connectionTimeoutMs: SHUTDOWN_CONNECTION_TIMEOUT_MS,
-          taskTimeoutMs: SHUTDOWN_TASK_TIMEOUT_MS,
-        }),
-      onComplete: (result, failed) => {
-        const log = failed
-          ? logger.error.bind(logger)
-          : logger.info.bind(logger);
-        log(
-          failed
-            ? 'Server shutdown drain finished with incomplete work.'
-            : 'Server shutdown drain completed.',
+      } else {
+        logger.info(
+          `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
           {
             label: 'Server',
-            forcedConnections: result.forcedConnections,
-            serverError: result.serverError?.message,
-            taskErrors: result.taskErrors.map(({ name, error }) => ({
-              name,
-              errorMessage:
-                error instanceof Error ? error.message : 'Unknown error',
-            })),
-            timedOutTasks: result.timedOutTasks,
           }
         );
-      },
-      onError: (error) => {
-        logger.error('Server shutdown drain failed.', {
-          label: 'Server',
-          ...getErrorLogFields(error),
-        });
-      },
-    });
+      }
 
-    requestGracefulShutdown = shutdownController.request;
+      // Bootstrap Discovery Sliders
+      await DiscoverSlider.bootstrapSliders();
+
+      const server = express();
+      server.disable('x-powered-by');
+      if (settings.network.trustProxy) {
+        server.set('trust proxy', 1);
+      }
+      server.use(securityHeaders);
+      server.use(compression());
+      server.use(cookieParser(settings.sessionSecret));
+      server.use(express.json({ limit: API_BODY_LIMIT }));
+      server.use(
+        express.urlencoded({
+          extended: true,
+          limit: API_BODY_LIMIT,
+          parameterLimit: API_URLENCODED_PARAMETER_LIMIT,
+        })
+      );
+      if (settings.network.csrfProtection) {
+        server.use(csrfProtection());
+        server.use(csrfTokenCookie(requestUsesSecureTransport));
+      }
+
+      // Set up sessions
+      const sessionRespository = getRepository(Session);
+      const sessionTransportOptions = getSessionTransportOptions(
+        dev,
+        settings.network.csrfProtection,
+        tlsConfiguration.httpAuthAllowed
+      );
+      // Cypress drives many concurrent API requests through one SQLite session
+      // row. Keep E2E session state process-local so those requests cannot queue
+      // behind TypeORM session touches. Production retains durable sessions.
+      const sessionStore = isE2eTest
+        ? undefined
+        : (new TypeormStore({
+            cleanupLimit: 2,
+            ttl: 60 * 60 * 24 * 30,
+          }).connect(sessionRespository) as Store);
+      server.use(
+        '/api',
+        session({
+          secret: settings.sessionSecret,
+          resave: false,
+          saveUninitialized: false,
+          cookie: {
+            ...sessionTransportOptions.cookie,
+          },
+          proxy: sessionTransportOptions.proxy,
+          ...(sessionStore ? { store: sessionStore } : {}),
+        })
+      );
+      const apiSpecContent = await fs.readFile(API_SPEC_PATH, 'utf-8');
+      const apiDocs = yaml.load(apiSpecContent) as Record<string, unknown>;
+      server.use('/api-docs', swaggerUi.serve, swaggerUi.setup(apiDocs));
+      server.use(
+        OpenApiValidator.middleware({
+          apiSpec: API_SPEC_PATH,
+          validateRequests: true,
+        })
+      );
+      server.use('/api/v1', API_RATE_LIMIT, routes);
+
+      // Do not set cookies so CDNs can cache them
+      server.use('/imageproxy', clearCookies, imageproxy);
+      server.use('/avatarproxy', clearCookies, avatarproxy);
+
+      server.get('*path', (req, res) => {
+        setStaticAssetCacheControl(req, res);
+
+        return handle(req, res);
+      });
+      server.use(
+        (
+          err: {
+            status?: number;
+            message?: string;
+            errors?: string[];
+            stack?: string;
+            error?: string;
+          },
+          req: Request,
+          res: Response,
+          // We must provide a next function for the function signature here even though its not used
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          _next: NextFunction
+        ) => {
+          const status = normalizeApiErrorStatus(err.status);
+
+          if (status >= 500) {
+            logger.error('Unhandled API request error', {
+              label: 'API',
+              method: req.method,
+              path: getRequestLogPath(req.originalUrl),
+              status,
+              errorMessage: err.message,
+              errorStack: err.stack,
+              errors: err.errors,
+            });
+          }
+
+          res.status(status).json(formatApiErrorResponse(err, status));
+        }
+      );
+
+      const host = process.env.HOST;
+      const listener = configureHttpServer(
+        tlsConfiguration.mode === 'disabled'
+          ? http.createServer(server)
+          : http.createServer(
+              (tlsConfiguration.redirectsHttpToHttps
+                ? createHttpsRedirectHandler
+                : createHttpsUpgradeHandler)(
+                tlsConfiguration.httpsPort!,
+                tlsConfiguration.hosts
+              )
+            )
+      );
+      const secureListener = tlsConfiguration.httpsOptions
+        ? configureHttpServer(
+            https.createServer(tlsConfiguration.httpsOptions, server)
+          )
+        : undefined;
+      const listeners = secureListener
+        ? [listener, secureListener]
+        : [listener];
+
+      const listen = (
+        target: typeof listener,
+        targetPort: number,
+        message: string
+      ) => {
+        if (host) {
+          target.listen(targetPort, host, () => {
+            logger.info(message, { label: 'Server' });
+          });
+        } else {
+          target.listen(targetPort, () => {
+            logger.info(message, { label: 'Server' });
+          });
+        }
+      };
+
+      if (tlsConfiguration.mode === 'disabled') {
+        listen(
+          listener,
+          port,
+          `Server ready on ${host ? `${host} ` : ''}port ${port}`
+        );
+        if (tlsConfiguration.httpAuthAllowed) {
+          logger.warn(
+            'SEERR_ALLOW_HTTP_AUTH is enabled. Browser sessions may be intercepted by anyone who can observe this HTTP connection; use built-in HTTPS or an HTTPS reverse proxy when possible.',
+            { label: 'Security' }
+          );
+        }
+      } else {
+        listen(
+          listener,
+          port,
+          `${tlsConfiguration.redirectsHttpToHttps ? 'HTTP redirect' : 'HTTP upgrade'} listener ready on ${host ? `${host} ` : ''}port ${port}`
+        );
+        listen(
+          secureListener!,
+          tlsConfiguration.httpsPort!,
+          `HTTPS server ready on ${host ? `${host} ` : ''}port ${tlsConfiguration.httpsPort}`
+        );
+        logger.warn(
+          `Built-in HTTPS is enabled. Trust the local CA before signing in. Certificate fingerprint: ${tlsConfiguration.runtime.fingerprint}`,
+          {
+            label: 'Security',
+            tlsMode: tlsConfiguration.mode,
+            tlsHosts: tlsConfiguration.hosts,
+            caCertificatePath: tlsConfiguration.caCertificatePath,
+            httpsPort: tlsConfiguration.httpsPort,
+          }
+        );
+      }
+
+      for (const target of listeners) {
+        target.on('error', (err: Error) => {
+          logger.error('Failed to start server', {
+            label: 'Server',
+            message: err.message,
+          });
+          process.exit(1);
+        });
+      }
+
+      let stoppingJobs: Promise<void> | undefined;
+      const shutdownController = createProcessShutdownController({
+        onStart: (reason) => {
+          logger.info(`Received ${reason}; draining server before shutdown.`, {
+            label: 'Server',
+          });
+          notificationManager.stopOutboxRetryLoop();
+          requestDispatchManager.stop();
+          // Cancel future schedules immediately, while the listener drains.
+          stoppingJobs = stopJobs();
+        },
+        drain: () =>
+          drainForShutdown({
+            server: listeners,
+            tasks: [
+              {
+                name: 'scheduled jobs and background tasks',
+                run: async () => {
+                  await stoppingJobs;
+                  // Active HTTP handlers may have reached a job invocation or
+                  // delayed retry immediately before the listener finished
+                  // draining. A second pass closes that admission race.
+                  await stopJobs();
+                  // Reset deliveries can enqueue tracked recovery work. Drain
+                  // them first so the background-task pass observes that work.
+                  await waitForPendingPasswordResetDeliveries();
+                  await waitForBackgroundTasks();
+                },
+              },
+            ],
+            connectionTimeoutMs: SHUTDOWN_CONNECTION_TIMEOUT_MS,
+            taskTimeoutMs: SHUTDOWN_TASK_TIMEOUT_MS,
+          }),
+        onComplete: (result, failed) => {
+          const log = failed
+            ? logger.error.bind(logger)
+            : logger.info.bind(logger);
+          log(
+            failed
+              ? 'Server shutdown drain finished with incomplete work.'
+              : 'Server shutdown drain completed.',
+            {
+              label: 'Server',
+              forcedConnections: result.forcedConnections,
+              serverError: result.serverError?.message,
+              taskErrors: result.taskErrors.map(({ name, error }) => ({
+                name,
+                errorMessage:
+                  error instanceof Error ? error.message : 'Unknown error',
+              })),
+              timedOutTasks: result.timedOutTasks,
+            }
+          );
+        },
+        onError: (error) => {
+          logger.error('Server shutdown drain failed.', {
+            label: 'Server',
+            ...getErrorLogFields(error),
+          });
+        },
+      });
+
+      requestGracefulShutdown = shutdownController.request;
+    });
   })
   .catch((err) => {
     logger.error(err.stack);
