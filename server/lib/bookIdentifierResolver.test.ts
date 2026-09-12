@@ -59,4 +59,45 @@ describe('Plex audiobook identifier resolution', () => {
       { provider: MediaIdentifierProvider.ISBN, value: '9780306406157' },
     ]);
   });
+
+  it('rejects an unrelated Open Library top hit instead of persisting a wrong match', async () => {
+    const identifiers = await resolveOpenLibraryIdentifiersForPlexAudiobook(
+      'The Midnight Library',
+      'Matt Haig',
+      fakeOpenLibrary({
+        numFound: 1,
+        start: 0,
+        docs: [
+          {
+            key: '/works/OL999W',
+            title: 'A Completely Unrelated Cookbook',
+            isbn: ['9780000000002'],
+          },
+        ],
+      })
+    );
+
+    assert.deepStrictEqual(identifiers, []);
+  });
+
+  it('accepts a match with a subtitle or edition suffix the query lacks', async () => {
+    const identifiers = await resolveOpenLibraryIdentifiersForPlexAudiobook(
+      'Dune',
+      'Frank Herbert',
+      fakeOpenLibrary({
+        numFound: 1,
+        start: 0,
+        docs: [
+          {
+            key: '/works/OL42W',
+            title: 'Dune (Unabridged)',
+          },
+        ],
+      })
+    );
+
+    assert.deepStrictEqual(identifiers, [
+      { provider: MediaIdentifierProvider.OPENLIBRARY, value: 'OL42W' },
+    ]);
+  });
 });

@@ -23,6 +23,51 @@ const getOpenLibraryEditionId = (value?: string): string | undefined => {
   return id && /^OL\d+M$/i.test(id) ? id : undefined;
 };
 
+const normalizeForComparison = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * A cheap, dependency-free relevance gate for a fuzzy title search result.
+ * Open Library's search endpoint has no minimum-relevance cutoff and will
+ * happily return an unrelated book as its top hit for an obscure or
+ * oddly-formatted title -- accepting that blindly would mark the wrong
+ * book "available" in Plex. Requires either title to contain the other,
+ * or at least half of the queried title's significant words to appear in
+ * the candidate's title.
+ */
+const titlesAreReasonablyClose = (
+  queriedTitle: string,
+  candidateTitle: string
+): boolean => {
+  const normalizedQueried = normalizeForComparison(queriedTitle);
+  const normalizedCandidate = normalizeForComparison(candidateTitle);
+  if (!normalizedQueried || !normalizedCandidate) {
+    return false;
+  }
+  if (
+    normalizedCandidate.includes(normalizedQueried) ||
+    normalizedQueried.includes(normalizedCandidate)
+  ) {
+    return true;
+  }
+
+  const queriedWords = normalizedQueried
+    .split(' ')
+    .filter((word) => word.length > 2);
+  if (queriedWords.length === 0) {
+    return false;
+  }
+  const candidateWords = new Set(normalizedCandidate.split(' '));
+  const overlap = queriedWords.filter((word) =>
+    candidateWords.has(word)
+  ).length;
+  return overlap / queriedWords.length >= 0.5;
+};
+
 const uniqIdentifiers = (
   identifiers: (ResolvedIdentifier | undefined)[]
 ): ResolvedIdentifier[] => {
@@ -118,6 +163,15 @@ export const resolveOpenLibraryIdentifiersForPlexAudiobook = async (
     const results = await openLibrary.searchBooks({ query, limit: 1 });
     const bestMatch = results.docs[0];
     if (!bestMatch) {
+      return [];
+    }
+    if (!titlesAreReasonablyClose(title, bestMatch.title)) {
+      logger.debug('Rejecting weak Open Library match for Plex audiobook', {
+        label: 'Plex Audiobook Scan',
+        title,
+        author,
+        candidateTitle: bestMatch.title,
+      });
       return [];
     }
 
