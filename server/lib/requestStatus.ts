@@ -632,20 +632,24 @@ const getStageFromRequest = (
       downloads,
     };
   }
-  if (
-    hasRequestedServiceLink(request) &&
-    (request.type === MediaType.BOOK && request.bookFormat === 'both'
-      ? hasRequestedBookFormat(request.media, 'ebook') !==
-        hasRequestedBookFormat(request.media, 'audiobook')
-      : [MediaStatus.PROCESSING, MediaStatus.PARTIALLY_AVAILABLE].includes(
-          getRequestedMediaStatus(request)
-        ))
-  ) {
-    return {
-      stage: RequestStatusStage.LIBRARY,
-      queueFailure: false,
-      downloads,
-    };
+  if (hasRequestedServiceLink(request)) {
+    const isMixedBookFormatProgress =
+      request.type === MediaType.BOOK &&
+      request.bookFormat === 'both' &&
+      hasRequestedBookFormat(request.media, 'ebook') !==
+        hasRequestedBookFormat(request.media, 'audiobook');
+    const isIncompleteMediaStatus = [
+      MediaStatus.PROCESSING,
+      MediaStatus.PARTIALLY_AVAILABLE,
+    ].includes(getRequestedMediaStatus(request));
+
+    if (isMixedBookFormatProgress || isIncompleteMediaStatus) {
+      return {
+        stage: RequestStatusStage.LIBRARY,
+        queueFailure: false,
+        downloads,
+      };
+    }
   }
   if (options.dispatchPending) {
     return {

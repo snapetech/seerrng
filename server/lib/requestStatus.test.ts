@@ -250,6 +250,29 @@ test('movie, series, music, ebook, audiobook, and mixed book requests share the 
   );
 });
 
+test('reports incomplete for a mixed-format book with both services linked but not yet available', () => {
+  const bothLinkedButProcessing = {
+    ...request().media,
+    mediaType: MediaType.BOOK,
+    status: MediaStatus.PROCESSING,
+    serviceId: 10,
+    externalServiceId: 20,
+    audiobookServiceId: 11,
+    audiobookExternalServiceId: 21,
+  };
+  assert.equal(
+    getRequestStatus(
+      request({
+        type: MediaType.BOOK,
+        media: bothLinkedButProcessing,
+        bookFormat: 'both',
+      }),
+      { downloads: [] }
+    ).stage,
+    RequestStatusStage.LIBRARY
+  );
+});
+
 test('reports music and book queue progress with only the requested services', () => {
   const settings = getSettings();
   const originalLidarr = settings.lidarr;
