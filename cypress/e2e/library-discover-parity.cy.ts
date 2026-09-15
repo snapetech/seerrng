@@ -47,6 +47,26 @@ describe('Books and Music discover parity', () => {
     tags: [],
   });
 
+  const assertStandardManageActions = () => {
+    cy.get('[role="dialog"]').then(($dialog) => {
+      const dialogWidth = $dialog[0].getBoundingClientRect().width;
+
+      cy.get(
+        '[data-testid="manage-advanced-actions"] .app-button, [data-testid="modal-cancel-button"]'
+      )
+        .should('have.length.greaterThan', 0)
+        .each(($button) => {
+          const bounds = $button[0].getBoundingClientRect();
+          const styles = window.getComputedStyle($button[0]);
+
+          expect($button).to.have.class('button-standard');
+          expect(bounds.height).to.eq(30);
+          expect(styles.fontSize).to.eq('12px');
+          expect(bounds.width).to.be.lessThan(dialogWidth - 32);
+        });
+    });
+  };
+
   beforeEach(() => {
     cy.loginAsAdmin();
   });
@@ -229,7 +249,7 @@ describe('Books and Music discover parity', () => {
     cy.contains('button', 'Release Date').click();
     cy.location('search').should('include', 'sortBy=release_date.');
     cy.contains('button', 'Clear Filters').click();
-    cy.location('search').should('include', 'sortBy=release_date.');
+    cy.location('search').should('not.include', 'sortBy=');
     cy.contains('Filters').should('be.visible');
     cy.get('button[aria-label="Release Year"]').should('be.visible');
     cy.get('input[aria-label="Search Music"]')
@@ -250,7 +270,7 @@ describe('Books and Music discover parity', () => {
     cy.location('search').should('include', 'sortBy=release_date.desc');
     cy.contains('button', 'Clear Filters').click();
     cy.location('search').should('not.include', 'genre=');
-    cy.location('search').should('include', 'sortBy=release_date.desc');
+    cy.location('search').should('not.include', 'sortBy=');
 
     cy.intercept('GET', '/api/v1/discover/tv*', {
       page: 1,
@@ -264,7 +284,7 @@ describe('Books and Music discover parity', () => {
     cy.location('search').should('include', 'sortBy=first_air_date.desc');
     cy.contains('button', 'Clear Filters').click();
     cy.location('search').should('not.include', 'status=');
-    cy.location('search').should('include', 'sortBy=first_air_date.desc');
+    cy.location('search').should('not.include', 'sortBy=');
 
     cy.intercept('GET', '/api/v1/discover/books*', {
       page: 1,
@@ -772,23 +792,40 @@ describe('Books and Music discover parity', () => {
     );
     cy.contains('label', 'API Key')
       .scrollIntoView()
-      .contains('Find it in Lidarr')
+      .closest('.form-row')
+      .contains('.settings-form-row-description', 'Find it in Lidarr')
       .should('be.visible');
     cy.contains('label', 'URL Base')
       .scrollIntoView()
-      .contains('If you set a URL Base in Lidarr')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'If you set a URL Base in Lidarr'
+      )
       .should('be.visible');
     cy.contains('label', 'External URL')
       .scrollIntoView()
-      .contains('For clickable links on media pages')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'For clickable links on media pages'
+      )
       .should('be.visible');
     cy.contains('label', 'Enable Scan')
       .scrollIntoView()
-      .contains('Scan Lidarr for existing media')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'Scan Lidarr for existing media'
+      )
       .should('be.visible');
     cy.contains('label', 'Enable Automatic Search')
       .scrollIntoView()
-      .contains('Automatically trigger a search in Lidarr')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'Automatically trigger a search in Lidarr'
+      )
       .should('be.visible');
     cy.get('select[name=activeMetadataProfileId]')
       .scrollIntoView()
@@ -806,23 +843,43 @@ describe('Books and Music discover parity', () => {
     cy.get('select[name=serviceType]').should('be.visible');
     cy.contains('label', 'API Key')
       .scrollIntoView()
-      .contains('Find it in Bookshelf or Readarr')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'Find it in Bookshelf or Readarr'
+      )
       .should('be.visible');
     cy.contains('label', 'URL Base')
       .scrollIntoView()
-      .contains('If you set a URL Base in Bookshelf, Chaptarr, or Readarr')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'If you set a URL Base in Bookshelf, Chaptarr, or Readarr'
+      )
       .should('be.visible');
     cy.contains('label', 'External URL')
       .scrollIntoView()
-      .contains('For clickable links on media pages')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'For clickable links on media pages'
+      )
       .should('be.visible');
     cy.contains('label', 'Enable Scan')
       .scrollIntoView()
-      .contains('Scan Bookshelf for existing books')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'Scan Bookshelf for existing books'
+      )
       .should('be.visible');
     cy.contains('label', 'Enable Automatic Search')
       .scrollIntoView()
-      .contains('Automatically trigger a search in Bookshelf')
+      .closest('.form-row')
+      .contains(
+        '.settings-form-row-description',
+        'Automatically trigger a search in Bookshelf'
+      )
       .should('be.visible');
     cy.get('select[name=activeMetadataProfileId]')
       .scrollIntoView()
@@ -1649,11 +1706,12 @@ describe('Books and Music discover parity', () => {
 
     cy.visit('/book/OLMANAGEW?manage=1');
     cy.wait('@getManagedBook');
-    cy.contains('Manage Book').should('be.visible');
+    cy.get('[role="dialog"][aria-label="Manage Book"]').should('be.visible');
     cy.contains('Downloads').should('be.visible');
     cy.get('[title="Book"]').should('be.visible');
     cy.get('[title="Audiobook"]').should('be.visible');
     cy.contains('Open Book in Bookshelf').should('be.visible');
+    assertStandardManageActions();
     cy.get('body').type('{esc}');
 
     cy.intercept('GET', '/api/v1/music/55555555-5555-5555-5555-555555555555', {
@@ -1688,10 +1746,11 @@ describe('Books and Music discover parity', () => {
 
     cy.visit('/music/55555555-5555-5555-5555-555555555555?manage=1');
     cy.wait('@getManagedMusic');
-    cy.contains('Manage Music').should('be.visible');
+    cy.get('[role="dialog"][aria-label="Manage Music"]').should('be.visible');
     cy.contains('Downloads').should('be.visible');
     cy.contains('Managed Album').should('be.visible');
     cy.contains('Open in Lidarr').should('be.visible');
+    assertStandardManageActions();
   });
 
   it('uses matching book service link labels on issue details', () => {

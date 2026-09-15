@@ -155,12 +155,13 @@ const MusicDetails = () => {
     { type: 'or' }
   );
   const playbackActions = canRequest
-    ? (itemIds: string[]) => (
+    ? (itemIds: string[], useFlac: boolean) => (
         <MediaServerPlayButton
           mediaUrl={data.mediaInfo?.mediaUrl}
           iOSPlexUrl={data.mediaInfo?.iOSPlexUrl}
           mediaId={data.mediaInfo?.id}
           itemIds={itemIds}
+          defaultIs4k={useFlac}
           disabled={itemIds.length === 0}
           disabledReason={intl.formatMessage(messages.selectToPlay)}
         />
@@ -501,7 +502,7 @@ const MusicDetails = () => {
       type: 'or',
     }) && openIssues.length > 0 ? (
       <section className="refreshed-inset-surface mt-[5px] overflow-hidden rounded-lg border border-gray-700">
-        <h2 className="px-3 py-2 text-xs font-semibold text-gray-200">
+        <h2 className="media-inset-heading px-3 py-2">
           {intl.formatMessage(messages.openissues)}
         </h2>
         <ul className="border-t border-gray-700">

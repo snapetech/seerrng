@@ -3,6 +3,7 @@ import PlayOnDeviceButton from '@app/components/Common/PlayOnDeviceButton';
 import AvailabilityValue from '@app/components/MediaDetails/AvailabilityValue';
 import DetailDisclosureButton from '@app/components/MediaDetails/DetailDisclosureButton';
 import PlaybackTrackList from '@app/components/MediaDetails/PlaybackTrackList';
+import useDetailDisclosurePins from '@app/hooks/useDetailDisclosurePins';
 import usePlaybackCatalog from '@app/hooks/usePlaybackCatalog';
 import { encodeApiPathSegment } from '@app/utils/apiPath';
 import { normalizeBookOverviewMarkdown } from '@app/utils/bookMarkdown';
@@ -72,11 +73,15 @@ const BookDetailsLayout = ({
   additionalContent,
 }: BookDetailsLayoutProps) => {
   const intl = useIntl();
+  const { pins, togglePinned } = useDetailDisclosurePins('book');
   const [showGenres, setShowGenres] = useState(false);
   const [selectedPlaybackItemIds, setSelectedPlaybackItemIds] = useState<
     string[]
   >([]);
   const { data: playbackCatalog } = usePlaybackCatalog(data.mediaInfo?.id);
+  useEffect(() => {
+    setShowGenres(pins.subjectTags);
+  }, [pins.subjectTags]);
   useEffect(() => {
     const allowedIds = new Set(
       playbackCatalog?.groups.flatMap((group) =>
@@ -126,7 +131,7 @@ const BookDetailsLayout = ({
 
   return (
     <div className="media-page">
-      <article className="refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
+      <article className="media-detail-card refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
         {data.posterPath && (
           <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
             <CachedImage
@@ -171,7 +176,7 @@ const BookDetailsLayout = ({
 
               <div className="card:grid-cols-3 mt-4 grid min-w-0 flex-1 grid-cols-1">
                 <div className="card:col-span-2 card:pr-3 min-w-0">
-                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
+                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                     <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                       {intl.formatMessage(messages.mediaAndFormat)}:
                     </dt>
@@ -192,15 +197,7 @@ const BookDetailsLayout = ({
                         ? intl.formatNumber(data.numberOfPages)
                         : unavailable}
                     </dd>
-                    <dt className="card:col-start-1 card:row-start-4 font-medium text-gray-100">
-                      {intl.formatMessage(messages.publisher)}:
-                    </dt>
-                    <dd className="card:col-start-3 card:row-start-4 m-0 truncate">
-                      {data.publisher || unavailable}
-                    </dd>
-
-                    <div className="card:col-start-5 card:row-span-4 card:row-start-1 card:block hidden bg-gray-600" />
-                    <div className="card:col-span-1 card:col-start-7 card:row-span-4 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                    <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                       <dt className="font-medium text-gray-100">
                         {intl.formatMessage(messages.author)}:
                       </dt>
@@ -236,11 +233,11 @@ const BookDetailsLayout = ({
                       </dd>
                     </div>
 
-                    <dt className="card:col-start-1 card:row-start-5 mt-0.5 font-medium text-gray-100">
+                    <dt className="card:col-start-1 card:row-start-4 mt-0.5 font-medium text-gray-100">
                       {intl.formatMessage(messages.genres)}:
                     </dt>
                     <dd
-                      className="card:col-span-5 card:col-start-3 card:row-start-5 m-0 mt-0.5 min-w-0 break-words"
+                      className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 min-w-0 break-words"
                       data-testid="media-details-genres"
                     >
                       {genres.length > 0
@@ -260,7 +257,7 @@ const BookDetailsLayout = ({
                   </dl>
                 </div>
 
-                <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4">
+                <dl className="media-detail-column-divider grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                   {formatCoverage.map((coverage) => (
                     <div className="contents" key={coverage.format}>
                       <dt className="font-medium text-gray-100">
@@ -291,7 +288,7 @@ const BookDetailsLayout = ({
             </div>
           </div>
 
-          {playbackCatalog && (
+          {playbackCatalog && availablePlaybackItemIds.length > 0 && (
             <PlaybackTrackList
               catalog={playbackCatalog}
               selectedItemIds={selectedPlaybackItemIds}
@@ -299,7 +296,7 @@ const BookDetailsLayout = ({
             />
           )}
           {playbackActions && (
-            <div className="media-rating-row justify-start">
+            <div className="media-rating-row">
               {playbackActions(effectivePlaybackItemIds)}
               <PlayOnDeviceButton
                 mediaId={data.mediaInfo?.id}
@@ -314,7 +311,7 @@ const BookDetailsLayout = ({
           </div>
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading">
               {intl.formatMessage(messages.overview)}
             </h2>
             <div className="refreshed-detail-text-muted prose prose-sm prose-p:my-0 prose-p:leading-5 prose-a:text-indigo-300 prose-a:underline prose-a:hover:text-indigo-200 mt-4 max-w-none text-sm leading-5">
@@ -342,12 +339,14 @@ const BookDetailsLayout = ({
               label={intl.formatMessage(messages.genres)}
               open={showGenres}
               onClick={() => setShowGenres((open) => !open)}
+              pinned={pins.subjectTags}
+              onPinClick={() => void togglePinned('subjectTags')}
             />
           </div>
 
           {showGenres && (
             <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-              <h2 className="mb-2 text-xs font-semibold text-gray-200">
+              <h2 className="media-inset-heading mb-2">
                 {intl.formatMessage(messages.genres)}
               </h2>
               {genres.length === 0 ? (
@@ -360,7 +359,7 @@ const BookDetailsLayout = ({
                     <Link
                       key={genre}
                       href={`/discover/books?subject=${encodeURIComponent(genre)}&sortBy=ranked`}
-                      className={`inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${
+                      className={`compact-control inline-flex items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${
                         genreTones[index % genreTones.length]
                       }`}
                     >
@@ -373,7 +372,7 @@ const BookDetailsLayout = ({
           )}
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="mb-3 text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading mb-3">
               {intl.formatMessage(messages.bookDetails)}
             </h2>
             <div className="card:grid-cols-3 grid grid-cols-1">
@@ -402,7 +401,7 @@ const BookDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:px-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider card:pr-3 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.publisher)}:
                 </dt>
@@ -436,7 +435,7 @@ const BookDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.openLibrary)}:
                 </dt>

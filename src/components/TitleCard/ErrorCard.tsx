@@ -52,7 +52,9 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
 
   return (
     <div
-      className={canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'}
+      className={`title-card-shell ${
+        canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'
+      }`}
       data-testid="title-card"
     >
       <div className="relative aspect-[2/3] transform-gpu cursor-default overflow-hidden rounded-xl bg-gray-800 bg-cover shadow ring-1 ring-gray-700 transition duration-300 outline-none">

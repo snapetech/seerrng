@@ -679,16 +679,10 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
               type="tmdb"
               src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`}
               alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              className="object-cover"
               fill
             />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, rgba(31, 41, 55, 0.47) 0%, rgba(31, 41, 55, 1) 100%)',
-              }}
-            />
+            <div className="request-card-artwork-gradient" />
           </div>
         )}
         <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">
@@ -710,7 +704,7 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                 }
                 alt=""
                 sizes="100vw"
-                style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
+                className="h-auto w-full object-cover"
                 width={600}
                 height={900}
               />

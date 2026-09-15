@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 describe('preferred playback media root', () => {
-  it('prefers FLAC, then MP3, then the legacy Plex album identifier', () => {
+  it('selects the requested MP3 or FLAC Plex album identifier', () => {
     const media = new Media({
       mediaType: MediaType.MUSIC,
       ratingKey: 'legacy',
@@ -16,12 +16,16 @@ describe('preferred playback media root', () => {
 
     assert.strictEqual(
       getPlaybackMediaRootId(media, MediaServerType.PLEX, false),
+      'mp3'
+    );
+    assert.strictEqual(
+      getPlaybackMediaRootId(media, MediaServerType.PLEX, true),
       'flac'
     );
     media.ratingKeyFlac = null;
     assert.strictEqual(
-      getPlaybackMediaRootId(media, MediaServerType.PLEX, false),
-      'mp3'
+      getPlaybackMediaRootId(media, MediaServerType.PLEX, true),
+      undefined
     );
     media.ratingKeyMp3 = null;
     assert.strictEqual(
@@ -30,7 +34,7 @@ describe('preferred playback media root', () => {
     );
   });
 
-  it('prefers FLAC for Jellyfin and Emby music without changing audiobook roots', () => {
+  it('selects MP3 or FLAC for Jellyfin and Emby without changing audiobook roots', () => {
     const music = new Media({
       mediaType: MediaType.MUSIC,
       jellyfinMediaId: 'legacy',
@@ -45,11 +49,16 @@ describe('preferred playback media root', () => {
 
     assert.strictEqual(
       getPlaybackMediaRootId(music, MediaServerType.JELLYFIN, false),
-      'flac'
+      'mp3'
     );
     assert.strictEqual(
-      getPlaybackMediaRootId(music, MediaServerType.EMBY, false),
+      getPlaybackMediaRootId(music, MediaServerType.EMBY, true),
       'flac'
+    );
+    music.jellyfinMediaIdFlac = null;
+    assert.strictEqual(
+      getPlaybackMediaRootId(music, MediaServerType.EMBY, true),
+      undefined
     );
     assert.strictEqual(
       getPlaybackMediaRootId(book, MediaServerType.JELLYFIN, false),

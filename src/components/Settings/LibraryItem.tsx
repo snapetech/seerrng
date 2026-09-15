@@ -1,9 +1,9 @@
 import MediaTypeBadge, {
   getMediaTypeBadgeType,
 } from '@app/components/Common/MediaTypeBadge';
+import SelectionCircle from '@app/components/Common/SelectionCircle';
 import globalMessages from '@app/i18n/globalMessages';
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { useIntl } from 'react-intl';
 
 interface LibraryItemProps {
@@ -37,9 +37,9 @@ const LibraryItem = ({
   );
 
   return (
-    <li className="col-span-1 flex rounded-md shadow-sm">
-      <div className="flex flex-1 items-center justify-between truncate rounded-md border-t border-r border-b border-gray-700 bg-gray-600">
-        <div className="flex min-w-0 flex-1 cursor-default items-center gap-2 truncate px-4 py-6 text-sm leading-5">
+    <li className="settings-library-card col-span-1 flex shadow-sm">
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+        <div className="settings-library-card-content">
           {badgeType && (
             <MediaTypeBadge
               mediaType={badgeType}
@@ -62,53 +62,18 @@ const LibraryItem = ({
                 e.stopPropagation();
                 reclassify.onReclassify();
               }}
-              className="app-button app-button-default ml-1 h-7 w-7 shrink-0 p-0"
+              className="app-button app-button-default compact-control ml-1 w-5 shrink-0 p-0"
             >
               <ArrowsRightLeftIcon className="h-4 w-4" />
             </button>
           )}
         </div>
-        <div className="flex-shrink-0 pr-2">
-          <span
-            role="checkbox"
-            tabIndex={0}
-            aria-checked={isEnabled}
-            onClick={() => onToggle()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                onToggle();
-              }
-            }}
-            className={`${
-              isEnabled ? 'bg-indigo-600' : 'bg-gray-700'
-            } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring focus:outline-none`}
-          >
-            <span
-              aria-hidden="true"
-              className={`${
-                isEnabled ? 'translate-x-5' : 'translate-x-0'
-              } relative inline-block h-5 w-5 rounded-full bg-white shadow transition duration-200 ease-in-out`}
-            >
-              <span
-                className={`${
-                  isEnabled
-                    ? 'opacity-0 duration-100 ease-out'
-                    : 'opacity-100 duration-200 ease-in'
-                } absolute inset-0 flex h-full w-full items-center justify-center transition-opacity`}
-              >
-                <XMarkIcon className="h-3 w-3 text-gray-400" />
-              </span>
-              <span
-                className={`${
-                  isEnabled
-                    ? 'opacity-100 duration-200 ease-in'
-                    : 'opacity-0 duration-100 ease-out'
-                } absolute inset-0 flex h-full w-full items-center justify-center transition-opacity`}
-              >
-                <CheckIcon className="h-3 w-3 text-indigo-600" />
-              </span>
-            </span>
-          </span>
+        <div className="flex-shrink-0">
+          <SelectionCircle
+            selected={Boolean(isEnabled)}
+            label={name}
+            onClick={onToggle}
+          />
         </div>
       </div>
     </li>

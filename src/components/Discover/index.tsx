@@ -157,7 +157,7 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
   }
 
   return (
-    <>
+    <div className="discover-home">
       <PageTitle title={intl.formatMessage(messages.discover)} />
       {hasPermission(Permission.ADMIN) && (
         <>
@@ -598,7 +598,7 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
           <div key={`discover-slider-${slider.id}`}>{sliderComponent}</div>
         );
       })}
-    </>
+    </div>
   );
 };
 

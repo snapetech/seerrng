@@ -147,4 +147,46 @@ describe('ListenBrainzAPI response normalization', () => {
     assert.strictEqual(result.payload.releases[0]?.artist_mbids.length, 20);
     assert.strictEqual(result.payload.releases[0]?.release_tags.length, 50);
   });
+
+  it('pages fresh releases locally in the requested order', async () => {
+    (
+      mock.method as (
+        object: object,
+        methodName: string,
+        implementation: () => Promise<unknown>
+      ) => unknown
+    )(ExternalAPI.prototype, 'get', async () => ({
+      payload: {
+        releases: Array.from({ length: 5 }, (_, index) => ({
+          artist_credit_name: 'Artist',
+          artist_mbids: ['artist'],
+          release_date: `2026-09-0${index + 1}`,
+          release_group_mbid: `group-${index}`,
+          release_name: `Album ${index}`,
+          release_tags: [],
+        })),
+      },
+    }));
+
+    const api = new ListenBrainzAPI();
+    const ascending = await api.getFreshReleases({
+      count: 2,
+      offset: 1,
+      order: 'asc',
+    });
+    const descending = await api.getFreshReleases({
+      count: 2,
+      offset: 1,
+      order: 'desc',
+    });
+
+    assert.deepStrictEqual(
+      ascending.payload.releases.map((release) => release.release_name),
+      ['Album 1', 'Album 2']
+    );
+    assert.deepStrictEqual(
+      descending.payload.releases.map((release) => release.release_name),
+      ['Album 3', 'Album 2']
+    );
+  });
 });

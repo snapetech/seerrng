@@ -29,7 +29,6 @@ import {
 import type { RatingResponse } from '@server/api/ratings';
 import { IssueStatus } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type { MovieDetails as MovieDetailsType } from '@server/models/Movie';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
@@ -295,34 +294,32 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     [Permission.REQUEST, Permission.REQUEST_MOVIE],
     { type: 'or' }
   );
-  const preferHighQualityPlayback =
-    settings.currentSettings.mediaServerType !== MediaServerType.PLEX &&
-    !!playbackCatalog4k?.rootItem;
-  const devicePlaybackItem = preferHighQualityPlayback
-    ? playbackCatalog4k.rootItem
-    : (playbackCatalog?.rootItem ?? playbackCatalog4k?.rootItem);
-  const devicePlaybackIs4k =
-    !!devicePlaybackItem &&
-    devicePlaybackItem.id === playbackCatalog4k?.rootItem?.id;
-  const playbackActions = canPlayMedia ? (
-    <>
-      <MediaServerPlayButton
-        mediaUrl={data.mediaInfo?.mediaUrl}
-        mediaUrl4k={data.mediaInfo?.mediaUrl4k}
-        iOSPlexUrl={data.mediaInfo?.iOSPlexUrl}
-        iOSPlexUrl4k={data.mediaInfo?.iOSPlexUrl4k}
-        mediaId={data.mediaInfo?.id}
-        itemIds={devicePlaybackItem ? [devicePlaybackItem.id] : []}
-        defaultIs4k={devicePlaybackIs4k}
-        include4k={canUse4kPlayback}
-      />
-      <PlayOnDeviceButton
-        mediaId={data.mediaInfo?.id}
-        itemIds={devicePlaybackItem ? [devicePlaybackItem.id] : []}
-        is4k={devicePlaybackIs4k}
-      />
-    </>
-  ) : null;
+  const playbackActions = canPlayMedia
+    ? (is4k: boolean) => {
+        const selectedCatalog = is4k ? playbackCatalog4k : playbackCatalog;
+        const selectedItem = selectedCatalog?.rootItem;
+
+        return (
+          <>
+            <MediaServerPlayButton
+              mediaUrl={is4k ? undefined : data.mediaInfo?.mediaUrl}
+              mediaUrl4k={is4k ? data.mediaInfo?.mediaUrl4k : undefined}
+              iOSPlexUrl={is4k ? undefined : data.mediaInfo?.iOSPlexUrl}
+              iOSPlexUrl4k={is4k ? data.mediaInfo?.iOSPlexUrl4k : undefined}
+              mediaId={data.mediaInfo?.id}
+              itemIds={selectedItem ? [selectedItem.id] : []}
+              defaultIs4k={is4k}
+              include4k={is4k}
+            />
+            <PlayOnDeviceButton
+              mediaId={data.mediaInfo?.id}
+              itemIds={selectedItem ? [selectedItem.id] : []}
+              is4k={is4k}
+            />
+          </>
+        );
+      }
+    : undefined;
 
   const primaryActions = (
     <>
@@ -414,9 +411,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
           buttonSize="sm"
         >
           <FilmIcon />
-          <span className="ml-1.5">
-            {intl.formatMessage(messages.watchtrailer)}
-          </span>
+          <span>{intl.formatMessage(messages.watchtrailer)}</span>
         </Button>
       )}
       <AssociationBadge mediaType="movie" id={data.id} variant="button" />

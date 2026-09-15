@@ -213,11 +213,22 @@ const getRequestMediaStatus = (
     : request.media.status;
 };
 
-const RequestCardPlaceholder = () => {
+interface RequestCardPlaceholderProps {
+  compact?: boolean;
+}
+
+const RequestCardPlaceholder = ({ compact }: RequestCardPlaceholderProps) => {
   return (
-    <div className="relative min-h-[17rem] w-72 animate-pulse rounded-xl bg-gray-700 p-4 sm:w-96">
-      <div className="w-20 sm:w-28">
-        <div className="w-full" style={{ paddingBottom: '150%' }} />
+    <div
+      className={`relative w-72 animate-pulse rounded-xl bg-gray-700 p-4 sm:w-96 ${
+        compact ? 'h-[9.5rem]' : 'min-h-[17rem]'
+      }`}
+    >
+      <div className={compact ? 'h-full w-20 sm:w-28' : 'w-20 sm:w-28'}>
+        <div
+          className={compact ? 'h-full w-full' : 'w-full'}
+          style={compact ? undefined : { paddingBottom: '150%' }}
+        />
       </div>
     </div>
   );
@@ -381,13 +392,20 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
 
 interface RequestCardProps {
   request: NonFunctionProperties<MediaRequest>;
+  compact?: boolean;
+  showApprovalActions?: boolean;
   onTitleData?: (
     requestId: number,
     title: MovieDetails | TvDetails | MusicDetails | BookDetails
   ) => void;
 }
 
-const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
+const RequestCard = ({
+  request,
+  compact = false,
+  showApprovalActions = true,
+  onTitleData,
+}: RequestCardProps) => {
   const { ref, inView } = useInView({
     triggerOnce: true,
   });
@@ -500,13 +518,21 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
   if (!title && !error) {
     return (
       <div ref={ref}>
-        <RequestCardPlaceholder />
+        <RequestCardPlaceholder compact={compact} />
       </div>
     );
   }
 
   if (!requestData && !requestError) {
     return <RequestCardError />;
+  }
+
+  if (
+    requestError &&
+    axios.isAxiosError(requestError) &&
+    requestError.response?.status === 404
+  ) {
+    return null;
   }
 
   if (!title || !requestData) {
@@ -544,7 +570,9 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         />
       )}
       <div
-        className="relative flex min-h-[17rem] w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
+        className={`relative flex w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96 ${
+          compact ? 'min-h-0' : 'min-h-[17rem]'
+        }`}
         data-testid="request-card"
       >
         {!isMusic(title) && !isBook(title) && title.backdropPath && (
@@ -553,16 +581,10 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               type="tmdb"
               alt=""
               src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              className="object-cover"
               fill
             />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage:
-                  'linear-gradient(135deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 75%)',
-              }}
-            />
+            <div className="request-card-artwork-gradient" />
           </div>
         )}
         <div
@@ -779,7 +801,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                   </span>
                 </Button>
               )}
-            {requestData.status === MediaRequestStatus.PENDING &&
+            {showApprovalActions &&
+              requestData.status === MediaRequestStatus.PENDING &&
               hasPermission(Permission.MANAGE_REQUESTS) && (
                 <>
                   <div>
@@ -902,7 +925,9 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         </div>
         <Link
           href={getRequestDetailHref(requestData)}
-          className="w-20 flex-shrink-0 scale-100 transform-gpu cursor-pointer overflow-hidden rounded-md shadow-sm transition duration-300 hover:scale-105 hover:shadow-md sm:w-28"
+          className={`relative w-20 flex-shrink-0 scale-100 transform-gpu cursor-pointer self-start overflow-hidden rounded-md shadow-sm ring-1 ring-gray-700 transition duration-300 hover:scale-105 hover:shadow-md sm:w-28 ${
+            isMusic(title) ? 'aspect-square' : 'aspect-[2/3]'
+          }`}
         >
           <CachedImage
             type={isBook(title) ? 'book' : isMusic(title) ? 'music' : 'tmdb'}
@@ -915,9 +940,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             }
             alt=""
             sizes="100vw"
-            style={{ width: '100%', height: 'auto' }}
-            width={600}
-            height={900}
+            className="object-cover"
+            fill
           />
         </Link>
       </div>

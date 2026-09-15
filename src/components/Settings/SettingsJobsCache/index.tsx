@@ -519,20 +519,26 @@ const SettingsJobs = () => {
         </p>
       </div>
       <div className="section">
-        <Table>
+        <Table className="settings-jobs-table">
           <thead>
             <tr>
-              <Table.TH>{intl.formatMessage(messages.jobname)}</Table.TH>
-              <Table.TH>{intl.formatMessage(messages.jobtype)}</Table.TH>
-              <Table.TH>{intl.formatMessage(messages.nextexecution)}</Table.TH>
-              <Table.TH />
+              <Table.TH className="settings-jobs-name-column">
+                {intl.formatMessage(messages.jobname)}
+              </Table.TH>
+              <Table.TH className="settings-jobs-type-column">
+                {intl.formatMessage(messages.jobtype)}
+              </Table.TH>
+              <Table.TH className="settings-jobs-next-column">
+                {intl.formatMessage(messages.nextexecution)}
+              </Table.TH>
+              <Table.TH className="settings-jobs-actions-column" />
             </tr>
           </thead>
           <Table.TBody>
             {data?.map((job) => (
               <tr key={`job-list-${job.id}`}>
                 <Table.TD>
-                  <div className="flex items-center text-sm leading-5 text-white">
+                  <div className="flex items-center text-xs leading-4">
                     <span>
                       {intl.formatMessage(
                         messages[job.id] ?? messages.unknownJob
@@ -557,7 +563,7 @@ const SettingsJobs = () => {
                   </Badge>
                 </Table.TD>
                 <Table.TD>
-                  <div className="text-sm leading-5 text-white">
+                  <div className="text-xs leading-4">
                     {job.enabled && job.nextExecutionTime ? (
                       <FormattedRelativeTime
                         value={Math.floor(
@@ -574,39 +580,49 @@ const SettingsJobs = () => {
                   </div>
                 </Table.TD>
                 <Table.TD alignText="right">
-                  <Button
-                    className="mr-2"
-                    buttonType={job.enabled ? 'danger' : 'success'}
-                    onClick={() => toggleJob(job)}
-                  >
-                    {job.enabled ? <NoSymbolIcon /> : <CheckIcon />}
-                    <span>
-                      {intl.formatMessage(
-                        job.enabled ? messages.disablejob : messages.enablejob
-                      )}
-                    </span>
-                  </Button>
-                  {job.interval !== 'fixed' && (
+                  <div className="settings-table-action-row">
                     <Button
-                      className="mr-2"
-                      buttonType="warning"
-                      onClick={() => dispatch({ type: 'open', job })}
+                      buttonType={job.enabled ? 'danger' : 'success'}
+                      buttonSize="standard"
+                      onClick={() => toggleJob(job)}
                     >
-                      <PencilIcon />
-                      <span>{intl.formatMessage(globalMessages.edit)}</span>
+                      {job.enabled ? <NoSymbolIcon /> : <CheckIcon />}
+                      <span>
+                        {intl.formatMessage(
+                          job.enabled ? messages.disablejob : messages.enablejob
+                        )}
+                      </span>
                     </Button>
-                  )}
-                  {job.running ? (
-                    <Button buttonType="danger" onClick={() => cancelJob(job)}>
-                      <StopIcon />
-                      <span>{intl.formatMessage(messages.canceljob)}</span>
-                    </Button>
-                  ) : (
-                    <Button buttonType="primary" onClick={() => runJob(job)}>
-                      <PlayIcon />
-                      <span>{intl.formatMessage(messages.runnow)}</span>
-                    </Button>
-                  )}
+                    {job.interval !== 'fixed' && (
+                      <Button
+                        buttonType="warning"
+                        buttonSize="standard"
+                        onClick={() => dispatch({ type: 'open', job })}
+                      >
+                        <PencilIcon />
+                        <span>{intl.formatMessage(globalMessages.edit)}</span>
+                      </Button>
+                    )}
+                    {job.running ? (
+                      <Button
+                        buttonType="danger"
+                        buttonSize="standard"
+                        onClick={() => cancelJob(job)}
+                      >
+                        <StopIcon />
+                        <span>{intl.formatMessage(messages.canceljob)}</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        buttonType="primary"
+                        buttonSize="standard"
+                        onClick={() => runJob(job)}
+                      >
+                        <PlayIcon />
+                        <span>{intl.formatMessage(messages.runnow)}</span>
+                      </Button>
+                    )}
+                  </div>
                 </Table.TD>
               </tr>
             ))}

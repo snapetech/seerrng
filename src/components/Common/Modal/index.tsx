@@ -14,6 +14,7 @@ import { useIntl } from 'react-intl';
 interface ModalProps {
   title?: string;
   subTitle?: string;
+  ariaLabel?: string;
   onCancel?: (e?: MouseEvent<HTMLElement>) => void;
   onOk?: (e?: MouseEvent<HTMLButtonElement>) => void;
   onSecondary?: (e?: MouseEvent<HTMLButtonElement>) => void;
@@ -37,12 +38,13 @@ interface ModalProps {
   backgroundClickable?: boolean;
   loading?: boolean;
   backdrop?: string;
+  backdropFull?: boolean;
   children?: React.ReactNode;
   dialogClass?: string;
   hideActions?: boolean;
   alignTop?: boolean;
   actionsClass?: string;
-  actionButtonSize?: 'default' | 'md' | 'sm';
+  actionButtonSize?: 'standard' | 'default' | 'md' | 'sm';
 }
 
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
@@ -50,6 +52,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     {
       title,
       subTitle,
+      ariaLabel,
       onCancel,
       onOk,
       cancelText,
@@ -70,6 +73,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       loading = false,
       onTertiary,
       backdrop,
+      backdropFull = false,
       dialogClass,
       hideActions = false,
       alignTop = false,
@@ -78,7 +82,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       secondaryButtonProps,
       tertiaryButtonProps,
       actionsClass = '',
-      actionButtonSize = 'default',
+      actionButtonSize = 'sm',
     },
     parentRef
   ) => {
@@ -99,7 +103,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       <Transition.Child
         as="div"
         data-testid="modal-root"
-        className={`fixed top-0 right-0 bottom-0 left-0 z-[60] flex h-full w-full justify-center overflow-y-auto bg-gray-800/70 ${
+        className={`app-modal-screen-backdrop fixed top-0 right-0 bottom-0 left-0 z-[60] flex h-full w-full justify-center overflow-y-auto ${
           alignTop ? 'items-start pt-[49px] pb-4 sm:pt-[65px]' : 'items-center'
         } transition-opacity duration-300 data-closed:opacity-0`}
         ref={parentRef}
@@ -126,7 +130,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           } ${dialogClass} transition duration-300 data-closed:scale-75 data-closed:opacity-0`}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="modal-headline"
+          aria-labelledby={title || subTitle ? 'modal-headline' : undefined}
+          aria-label={!title && !subTitle ? ariaLabel : undefined}
           style={
             alignTop
               ? undefined
@@ -139,7 +144,13 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           ref={modalRef}
         >
           {backdrop && (
-            <div className="absolute top-0 right-0 left-0 z-0 h-64 max-h-full w-full">
+            <div
+              className={
+                backdropFull
+                  ? 'pointer-events-none absolute inset-0 z-0 overflow-hidden'
+                  : 'absolute top-0 right-0 left-0 z-0 h-64 max-h-full w-full'
+              }
+            >
               <CachedImage
                 type="tmdb"
                 alt=""
@@ -148,7 +159,14 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 fill
                 priority
               />
-              <div className="absolute inset-0 bg-gray-800/75" />
+              {backdropFull ? (
+                <>
+                  <div className="refreshed-artwork-scrim" />
+                  <div className="refreshed-artwork-gradient" />
+                </>
+              ) : (
+                <div className="absolute inset-0 bg-gray-800/75" />
+              )}
             </div>
           )}
           <div className="relative -mx-4 overflow-x-hidden px-4 pt-0.5 sm:flex sm:items-center">

@@ -112,6 +112,7 @@ const requestMediaTypeFilters = [
 ] as const;
 const requestStatusFilters = [
   'all',
+  'recent',
   'approved',
   'processing',
   'pending',
@@ -1371,6 +1372,15 @@ requestRoutes.get<
         break;
       case 'deleted':
         mediaStatusFilter = [MediaStatus.DELETED];
+        break;
+      case 'recent':
+        mediaStatusFilter = [
+          MediaStatus.UNKNOWN,
+          MediaStatus.PENDING,
+          MediaStatus.PROCESSING,
+          MediaStatus.PARTIALLY_AVAILABLE,
+          MediaStatus.AVAILABLE,
+        ];
         break;
       default:
         mediaStatusFilter = [

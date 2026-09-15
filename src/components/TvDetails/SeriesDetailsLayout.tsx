@@ -9,18 +9,19 @@ import Tooltip from '@app/components/Common/Tooltip';
 import AvailabilityValue from '@app/components/MediaDetails/AvailabilityValue';
 import DetailDisclosureButton from '@app/components/MediaDetails/DetailDisclosureButton';
 import ExpandableCreditList from '@app/components/MediaDetails/ExpandableCreditList';
+import MediaDetailArtwork from '@app/components/MediaDetails/MediaDetailArtwork';
+import MediaQualitySelect from '@app/components/MediaDetails/MediaQualitySelect';
 import SeriesSeasonEpisodeBrowser from '@app/components/MediaDetails/SeriesSeasonEpisodeBrowser';
 import MediaSlider from '@app/components/MediaSlider';
+import useDetailDisclosurePins from '@app/hooks/useDetailDisclosurePins';
 import useLocale from '@app/hooks/useLocale';
 import usePlaybackCatalog from '@app/hooks/usePlaybackCatalog';
-import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
 import { resolveCanonicalPlaybackSelection } from '@app/utils/playbackSelection';
 import { getSafeHref } from '@app/utils/safeUrl';
 import type { RTRating } from '@server/api/rating/rottentomatoes';
 import { MediaStatus } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type { TvDetails } from '@server/models/Tv';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -62,6 +63,7 @@ const messages = defineMessages('components.TvDetails.Layout', {
   rtCriticsScore: 'Rotten Tomatoes Tomatometer',
   rtAudienceScore: 'Rotten Tomatoes Audience Score',
   tmdbUserScore: 'TMDB User Score',
+  quality: 'Quality',
 });
 
 interface SeriesDetailsLayoutProps {
@@ -120,11 +122,27 @@ const SeriesDetailsLayout = ({
   playbackActions,
 }: SeriesDetailsLayoutProps) => {
   const intl = useIntl();
-  const settings = useSettings();
   const { locale } = useLocale();
+  const { pins, togglePinned } = useDetailDisclosurePins('tv');
   const [showCast, setShowCast] = useState(false);
   const [showCrew, setShowCrew] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState<'hd' | '4k'>(() =>
+    show4kAvailability &&
+    !availableStatuses.has(data.mediaInfo?.status as MediaStatus) &&
+    availableStatuses.has(data.mediaInfo?.status4k as MediaStatus)
+      ? '4k'
+      : 'hd'
+  );
+  useEffect(() => {
+    setShowCast(pins.cast);
+  }, [pins.cast]);
+  useEffect(() => {
+    setShowCrew(pins.crew);
+  }, [pins.crew]);
+  useEffect(() => {
+    setShowTags(pins.subjectTags);
+  }, [pins.subjectTags]);
   const [selectedPlaybackItemIds, setSelectedPlaybackItemIds] = useState<
     string[]
   >([]);
@@ -135,21 +153,10 @@ const SeriesDetailsLayout = ({
     show4kAvailability ? data.mediaInfo?.id : undefined,
     true
   );
-  const standardHasItems =
-    standardPlaybackCatalog?.groups.some((group) => group.items.length > 0) ??
-    false;
-  const highQualityHasItems =
-    highQualityPlaybackCatalog?.groups.some(
-      (group) => group.items.length > 0
-    ) ?? false;
   const playbackCatalog =
-    settings.currentSettings.mediaServerType === MediaServerType.PLEX
-      ? standardHasItems
-        ? standardPlaybackCatalog
-        : highQualityPlaybackCatalog
-      : highQualityHasItems
-        ? highQualityPlaybackCatalog
-        : standardPlaybackCatalog;
+    selectedQuality === '4k'
+      ? highQualityPlaybackCatalog
+      : standardPlaybackCatalog;
   useEffect(() => {
     const allowedIds = new Set(
       playbackCatalog?.groups.flatMap((group) =>
@@ -234,21 +241,12 @@ const SeriesDetailsLayout = ({
 
   return (
     <div className="media-page">
-      <article className="refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
+      <article className="media-detail-card refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
         {data.backdropPath && (
-          <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-            <CachedImage
-              type="tmdb"
-              src={`https://image.tmdb.org/t/p/original${data.backdropPath}`}
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-top"
-            />
-            <div className="refreshed-artwork-scrim" />
-            <div className="refreshed-artwork-gradient" />
-          </div>
+          <MediaDetailArtwork
+            type="tmdb"
+            src={`https://image.tmdb.org/t/p/original${data.backdropPath}`}
+          />
         )}
 
         <div className="relative z-10">
@@ -282,7 +280,7 @@ const SeriesDetailsLayout = ({
 
               <div className="card:grid-cols-3 mt-4 grid min-w-0 flex-1 grid-cols-1">
                 <div className="card:col-span-2 card:pr-3 min-w-0">
-                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
+                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                     <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                       {intl.formatMessage(messages.mediaAndFormat)}:
                     </dt>
@@ -312,8 +310,7 @@ const SeriesDetailsLayout = ({
                           })
                         : unavailable}
                     </dd>
-                    <div className="card:col-start-5 card:row-span-3 card:row-start-1 card:block hidden bg-gray-600" />
-                    <div className="card:col-span-1 card:col-start-7 card:row-span-3 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                    <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                       <dt className="font-medium text-gray-100">
                         {intl.formatMessage(messages.creator)}:
                       </dt>
@@ -359,7 +356,7 @@ const SeriesDetailsLayout = ({
                       {intl.formatMessage(messages.genres)}:
                     </dt>
                     <dd
-                      className="card:col-span-5 card:col-start-3 card:row-start-4 m-0 mt-0.5 min-w-0 break-words"
+                      className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 min-w-0 break-words"
                       data-testid="media-details-genres"
                     >
                       {data.genres.length > 0
@@ -379,31 +376,36 @@ const SeriesDetailsLayout = ({
                   </dl>
                 </div>
 
-                <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4">
-                  <dt className="font-medium text-gray-100">
-                    {intl.formatMessage(messages.hd)}:
-                  </dt>
-                  <dd className="m-0 truncate">
-                    <AvailabilityValue status={data.mediaInfo?.status}>
-                      {getAvailabilityText(data.mediaInfo?.status, unavailable)}
-                    </AvailabilityValue>
-                  </dd>
-                  {show4kAvailability && (
-                    <>
-                      <dt className="font-medium text-gray-100">
-                        {intl.formatMessage(messages.ultraHd)}:
-                      </dt>
-                      <dd className="m-0 truncate">
-                        <AvailabilityValue status={data.mediaInfo?.status4k}>
-                          {getAvailabilityText(
-                            data.mediaInfo?.status4k,
-                            unavailable
-                          )}
-                        </AvailabilityValue>
-                      </dd>
-                    </>
-                  )}
-                </dl>
+                <div className="media-detail-column-divider flex min-w-0 flex-col text-xs leading-4">
+                  <dl className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
+                    <dt className="font-medium text-gray-100">
+                      {intl.formatMessage(messages.hd)}:
+                    </dt>
+                    <dd className="m-0 truncate">
+                      <AvailabilityValue status={data.mediaInfo?.status}>
+                        {getAvailabilityText(
+                          data.mediaInfo?.status,
+                          unavailable
+                        )}
+                      </AvailabilityValue>
+                    </dd>
+                    {show4kAvailability && (
+                      <>
+                        <dt className="font-medium text-gray-100">
+                          {intl.formatMessage(messages.ultraHd)}:
+                        </dt>
+                        <dd className="m-0 truncate">
+                          <AvailabilityValue status={data.mediaInfo?.status4k}>
+                            {getAvailabilityText(
+                              data.mediaInfo?.status4k,
+                              unavailable
+                            )}
+                          </AvailabilityValue>
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
@@ -421,15 +423,26 @@ const SeriesDetailsLayout = ({
             ratingData?.audienceScore !== undefined ||
             data.voteCount > 0) && (
             <div className="media-rating-row">
+              <MediaQualitySelect
+                value={selectedQuality}
+                options={[
+                  { label: 'HD', value: 'hd' },
+                  ...(show4kAvailability
+                    ? ([{ label: '4K', value: '4k' }] as const)
+                    : []),
+                ]}
+                onChange={setSelectedQuality}
+                label={intl.formatMessage(messages.quality)}
+              />
               {playbackActions?.(
                 effectivePlaybackItemIds,
-                playbackCatalog?.is4k === true
+                selectedQuality === '4k'
               )}
               {playbackActions && (
                 <PlayOnDeviceButton
                   mediaId={data.mediaInfo?.id}
                   itemIds={effectivePlaybackItemIds}
-                  is4k={playbackCatalog?.is4k === true}
+                  is4k={selectedQuality === '4k'}
                 />
               )}
               {ratingData?.criticsRating &&
@@ -500,7 +513,7 @@ const SeriesDetailsLayout = ({
           </div>
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading">
               {intl.formatMessage(messages.overview)}
             </h2>
             {data.tagline && (
@@ -520,7 +533,7 @@ const SeriesDetailsLayout = ({
                     key={`featured-crew-${groupIndex}`}
                     className={`grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4 ${
                       groupIndex > 0
-                        ? 'card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 border-t border-gray-600 pt-2'
+                        ? `media-detail-column-divider ${groupIndex === 1 ? 'card:pr-3' : ''}`
                         : 'card:pr-3'
                     }`}
                   >
@@ -548,21 +561,27 @@ const SeriesDetailsLayout = ({
             )}
           </section>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-[5px] flex flex-wrap items-center gap-2">
             <DetailDisclosureButton
               label={intl.formatMessage(messages.viewCast)}
               open={showCast}
               onClick={() => setShowCast((open) => !open)}
+              pinned={pins.cast}
+              onPinClick={() => void togglePinned('cast')}
             />
             <DetailDisclosureButton
               label={intl.formatMessage(messages.viewCrew)}
               open={showCrew}
               onClick={() => setShowCrew((open) => !open)}
+              pinned={pins.crew}
+              onPinClick={() => void togglePinned('crew')}
             />
             <DetailDisclosureButton
               label={intl.formatMessage(messages.subjectTags)}
               open={showTags}
               onClick={() => setShowTags((open) => !open)}
+              pinned={pins.subjectTags}
+              onPinClick={() => void togglePinned('subjectTags')}
             />
           </div>
 
@@ -582,7 +601,7 @@ const SeriesDetailsLayout = ({
           )}
           {showTags && (
             <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-              <h2 className="mb-2 text-xs font-semibold text-gray-200">
+              <h2 className="media-inset-heading mb-2">
                 {intl.formatMessage(messages.subjectTags)}
               </h2>
               {data.keywords.length === 0 ? (
@@ -595,7 +614,7 @@ const SeriesDetailsLayout = ({
                     <Link
                       key={keyword.id}
                       href={`/discover/tv/keyword?keywords=${keyword.id}`}
-                      className={`inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${
+                      className={`compact-control inline-flex items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${
                         subjectTagTones[keyword.id % subjectTagTones.length]
                       }`}
                     >
@@ -608,7 +627,7 @@ const SeriesDetailsLayout = ({
           )}
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="mb-3 text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading mb-3">
               {intl.formatMessage(messages.seriesDetails)}
             </h2>
             <div className="card:grid-cols-3 grid grid-cols-1">
@@ -637,7 +656,7 @@ const SeriesDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:px-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider card:pr-3 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.seriesType)}:
                 </dt>
@@ -686,7 +705,7 @@ const SeriesDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.networks)}:
                 </dt>

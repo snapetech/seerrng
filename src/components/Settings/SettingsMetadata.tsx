@@ -5,6 +5,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import MetadataSelector, {
   MetadataProviderType,
 } from '@app/components/MetadataSelector';
+import { notifySettingsUserChange } from '@app/components/Settings/settingsEvents';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -268,210 +269,218 @@ const SettingsMetadata = () => {
         ]}
       />
 
-      <div className="mb-6">
+      <section className="settings-group-card">
         <h3 className="heading">
           {intl.formatMessage(messages.metadataProviderSettings)}
         </h3>
         <p className="description">
           {intl.formatMessage(messages.metadataSettings)}
         </p>
-      </div>
-
-      <div className="mb-6 rounded-lg bg-gray-800 p-4">
-        <h4 className="mb-3 text-lg font-medium">
-          {intl.formatMessage(messages.providerStatus)}
-        </h4>
-        <div className="flex flex-col space-y-3">
-          <div className="flex items-center">
-            <span className="mr-2 w-24">TheMovieDB:</span>
-            <span
-              className={`text-sm ${getStatusClass(providerStatus.tmdb)}`}
-              data-testid="tmdb-status-container"
-            >
-              <Badge badgeType={getBadgeType(providerStatus.tmdb)}>
-                {getStatusMessage(providerStatus.tmdb)}
-              </Badge>
-            </span>
+        <div className="settings-group-content">
+          <div className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
+            <h4 className="settings-group-heading">
+              {intl.formatMessage(messages.providerStatus)}
+            </h4>
+            <div className="mt-[5px] flex flex-col gap-[5px]">
+              <div className="flex items-center text-xs leading-4">
+                <span className="mr-2 w-24">TheMovieDB:</span>
+                <span
+                  className={getStatusClass(providerStatus.tmdb)}
+                  data-testid="tmdb-status-container"
+                >
+                  <Badge badgeType={getBadgeType(providerStatus.tmdb)}>
+                    {getStatusMessage(providerStatus.tmdb)}
+                  </Badge>
+                </span>
+              </div>
+              <div className="flex items-center text-xs leading-4">
+                <span className="mr-2 w-24">TheTVDB:</span>
+                <span
+                  className={getStatusClass(providerStatus.tvdb)}
+                  data-testid="tvdb-status"
+                >
+                  <Badge badgeType={getBadgeType(providerStatus.tvdb)}>
+                    {getStatusMessage(providerStatus.tvdb)}
+                  </Badge>
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center">
-            <span className="mr-2 w-24">TheTVDB:</span>
-            <span
-              className={`text-sm ${getStatusClass(providerStatus.tvdb)}`}
-              data-testid="tvdb-status"
+
+          <div className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
+            <Formik
+              initialValues={{ metadata: initialValues }}
+              onSubmit={async (values) => {
+                try {
+                  const result = await saveSettings(values.metadata);
+
+                  if (data) {
+                    data.metadata = result.metadata;
+                  }
+
+                  addToast(intl.formatMessage(messages.metadataSettingsSaved), {
+                    appearance: 'success',
+                    autoDismiss: true,
+                  });
+                } catch {
+                  addToast(
+                    intl.formatMessage(messages.failedToSaveMetadataSettings),
+                    {
+                      appearance: 'error',
+                      autoDismiss: true,
+                    }
+                  );
+                }
+              }}
             >
-              <Badge badgeType={getBadgeType(providerStatus.tvdb)}>
-                {getStatusMessage(providerStatus.tvdb)}
-              </Badge>
-            </span>
+              {({ isSubmitting, isValid, values, setFieldValue }) => {
+                return (
+                  <Form data-testid="settings-main-form">
+                    <h2 className="heading">
+                      {intl.formatMessage(messages.metadataProviderSelection)}
+                    </h2>
+                    <p className="description">
+                      {intl.formatMessage(messages.chooseProvider)}
+                    </p>
+
+                    <div className="form-row mt-[5px]">
+                      <label
+                        htmlFor="tv-metadata-provider"
+                        className="checkbox-label"
+                      >
+                        <span className="mr-2">
+                          {intl.formatMessage(messages.seriesMetadataProvider)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <MetadataSelector
+                          testId="tv-metadata-provider-selector"
+                          value={values.metadata.tv}
+                          onChange={(value) => {
+                            void setFieldValue('metadata.tv', value);
+                            notifySettingsUserChange();
+                          }}
+                          isDisabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-row">
+                      <label
+                        htmlFor="anime-metadata-provider"
+                        className="checkbox-label"
+                      >
+                        <span className="mr-2">
+                          {intl.formatMessage(messages.animeMetadataProvider)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <MetadataSelector
+                          testId="anime-metadata-provider-selector"
+                          value={values.metadata.anime}
+                          onChange={(value) => {
+                            void setFieldValue('metadata.anime', value);
+                            notifySettingsUserChange();
+                          }}
+                          isDisabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="actions">
+                      <div className="flex justify-end">
+                        <span className="ml-3 inline-flex rounded-md shadow-sm">
+                          <Button
+                            data-testid="metadata-test-button"
+                            buttonType="warning"
+                            type="button"
+                            disabled={isSubmitting || !isValid}
+                            onClick={async () => {
+                              setIsTesting(true);
+                              try {
+                                const resp = await testConnection(
+                                  values.metadata
+                                );
+
+                                if (resp.tvdb === 'failed') {
+                                  addToast(
+                                    intl.formatMessage(
+                                      messages.tvdbProviderDoesnotWork
+                                    ),
+                                    {
+                                      appearance: 'error',
+                                      autoDismiss: true,
+                                    }
+                                  );
+                                } else if (resp.tmdb === 'failed') {
+                                  addToast(
+                                    intl.formatMessage(
+                                      messages.tmdbProviderDoesnotWork
+                                    ),
+                                    {
+                                      appearance: 'error',
+                                      autoDismiss: true,
+                                    }
+                                  );
+                                } else {
+                                  addToast(
+                                    intl.formatMessage(
+                                      messages.allChosenProvidersAreOperational
+                                    ),
+                                    {
+                                      appearance: 'success',
+                                      autoDismiss: true,
+                                    }
+                                  );
+                                }
+                              } catch {
+                                addToast(
+                                  intl.formatMessage(
+                                    messages.connectionTestFailed
+                                  ),
+                                  {
+                                    appearance: 'error',
+                                    autoDismiss: true,
+                                  }
+                                );
+                              } finally {
+                                setIsTesting(false);
+                              }
+                            }}
+                          >
+                            <BeakerIcon />
+                            <span>
+                              {isTesting
+                                ? intl.formatMessage(globalMessages.testing)
+                                : intl.formatMessage(globalMessages.test)}
+                            </span>
+                          </Button>
+                        </span>
+
+                        <span className="ml-3 inline-flex rounded-md shadow-sm">
+                          <Button
+                            data-testid="metadata-save-button"
+                            buttonType="primary"
+                            type="submit"
+                            disabled={isSubmitting || !isValid || isTesting}
+                          >
+                            <ArrowDownOnSquareIcon />
+                            <span>
+                              {isSubmitting
+                                ? intl.formatMessage(globalMessages.saving)
+                                : intl.formatMessage(globalMessages.save)}
+                            </span>
+                          </Button>
+                        </span>
+                      </div>
+                    </div>
+                  </Form>
+                );
+              }}
+            </Formik>
           </div>
         </div>
-      </div>
-
-      <div className="section">
-        <Formik
-          initialValues={{ metadata: initialValues }}
-          onSubmit={async (values) => {
-            try {
-              const result = await saveSettings(values.metadata);
-
-              if (data) {
-                data.metadata = result.metadata;
-              }
-
-              addToast(intl.formatMessage(messages.metadataSettingsSaved), {
-                appearance: 'success',
-                autoDismiss: true,
-              });
-            } catch {
-              addToast(
-                intl.formatMessage(messages.failedToSaveMetadataSettings),
-                {
-                  appearance: 'error',
-                  autoDismiss: true,
-                }
-              );
-            }
-          }}
-        >
-          {({ isSubmitting, isValid, values, setFieldValue }) => {
-            return (
-              <Form className="section" data-testid="settings-main-form">
-                <div className="mb-6">
-                  <h2 className="heading">
-                    {intl.formatMessage(messages.metadataProviderSelection)}
-                  </h2>
-                  <p className="description">
-                    {intl.formatMessage(messages.chooseProvider)}
-                  </p>
-                </div>
-
-                <div className="form-row">
-                  <label
-                    htmlFor="tv-metadata-provider"
-                    className="checkbox-label"
-                  >
-                    <span className="mr-2">
-                      {intl.formatMessage(messages.seriesMetadataProvider)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <MetadataSelector
-                      testId="tv-metadata-provider-selector"
-                      value={values.metadata.tv}
-                      onChange={(value) => setFieldValue('metadata.tv', value)}
-                      isDisabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <label
-                    htmlFor="anime-metadata-provider"
-                    className="checkbox-label"
-                  >
-                    <span className="mr-2">
-                      {intl.formatMessage(messages.animeMetadataProvider)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <MetadataSelector
-                      testId="anime-metadata-provider-selector"
-                      value={values.metadata.anime}
-                      onChange={(value) =>
-                        setFieldValue('metadata.anime', value)
-                      }
-                      isDisabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-
-                <div className="actions">
-                  <div className="flex justify-end">
-                    <span className="ml-3 inline-flex rounded-md shadow-sm">
-                      <Button
-                        buttonType="warning"
-                        type="button"
-                        disabled={isSubmitting || !isValid}
-                        onClick={async () => {
-                          setIsTesting(true);
-                          try {
-                            const resp = await testConnection(values.metadata);
-
-                            if (resp.tvdb === 'failed') {
-                              addToast(
-                                intl.formatMessage(
-                                  messages.tvdbProviderDoesnotWork
-                                ),
-                                {
-                                  appearance: 'error',
-                                  autoDismiss: true,
-                                }
-                              );
-                            } else if (resp.tmdb === 'failed') {
-                              addToast(
-                                intl.formatMessage(
-                                  messages.tmdbProviderDoesnotWork
-                                ),
-                                {
-                                  appearance: 'error',
-                                  autoDismiss: true,
-                                }
-                              );
-                            } else {
-                              addToast(
-                                intl.formatMessage(
-                                  messages.allChosenProvidersAreOperational
-                                ),
-                                {
-                                  appearance: 'success',
-                                  autoDismiss: true,
-                                }
-                              );
-                            }
-                          } catch {
-                            addToast(
-                              intl.formatMessage(messages.connectionTestFailed),
-                              {
-                                appearance: 'error',
-                                autoDismiss: true,
-                              }
-                            );
-                          } finally {
-                            setIsTesting(false);
-                          }
-                        }}
-                      >
-                        <BeakerIcon />
-                        <span>
-                          {isTesting
-                            ? intl.formatMessage(globalMessages.testing)
-                            : intl.formatMessage(globalMessages.test)}
-                        </span>
-                      </Button>
-                    </span>
-
-                    <span className="ml-3 inline-flex rounded-md shadow-sm">
-                      <Button
-                        data-testid="metadata-save-button"
-                        buttonType="primary"
-                        type="submit"
-                        disabled={isSubmitting || !isValid || isTesting}
-                      >
-                        <ArrowDownOnSquareIcon />
-                        <span>
-                          {isSubmitting
-                            ? intl.formatMessage(globalMessages.saving)
-                            : intl.formatMessage(globalMessages.save)}
-                        </span>
-                      </Button>
-                    </span>
-                  </div>
-                </div>
-              </Form>
-            );
-          }}
-        </Formik>
-      </div>
+      </section>
     </>
   );
 };

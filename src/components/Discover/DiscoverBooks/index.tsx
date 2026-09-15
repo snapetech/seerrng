@@ -33,7 +33,7 @@ import {
 } from '@heroicons/react/24/solid';
 import type { BookResult } from '@server/models/Book';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverBooks', {
@@ -63,9 +63,17 @@ const messages = defineMessages('components.Discover.DiscoverBooks', {
 
 interface DiscoverBooksProps {
   format?: BookDiscoveryFormat;
+  titleOverride?: string;
+  mediaFilters?: ReactNode;
+  showFormatTabs?: boolean;
 }
 
-const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
+const DiscoverBooks = ({
+  format = 'ebook',
+  titleOverride,
+  mediaFilters,
+  showFormatTabs = true,
+}: DiscoverBooksProps) => {
   const intl = useIntl();
   const router = useRouter();
   const [currentPath, setCurrentPath] = useState<string>();
@@ -129,7 +137,8 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
     },
     {
       enabled: isRouteReady,
-      randomizeOrder: sortBy === 'ranked',
+      randomizeOrder:
+        sortBy === 'ranked' || sortBy === 'ranked.asc' || sortBy === 'random',
       showErrorToast: false,
       hideErrorWithResults: false,
     }
@@ -161,9 +170,11 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
       update({ search: nextSearch || undefined, page: undefined });
     }
   }, [debouncedSearch, update]);
-  const title = intl.formatMessage(
-    activeFormat === 'audiobook' ? messages.audiobooks : messages.books
-  );
+  const title =
+    titleOverride ??
+    intl.formatMessage(
+      activeFormat === 'audiobook' ? messages.audiobooks : messages.books
+    );
   const currentYear = new Date().getFullYear();
   const yearOptions: CompactSelectOption[] = [
     { label: intl.formatMessage(messages.any), value: '' },
@@ -193,7 +204,12 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
     }),
   ];
   const hasActiveFilters = Boolean(
-    query || subject || firstPublishYear || language || minRating
+    query ||
+    subject ||
+    firstPublishYear ||
+    language ||
+    minRating ||
+    sortBy !== 'ranked'
   );
   const providerMessage = (
     discover.error as { response?: { data?: { message?: string } } } | undefined
@@ -203,14 +219,19 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
       <PageTitle title={title} />
       <div className="mb-4">
         <Header>{title}</Header>
-        <div className="app-filter-section-heading">
-          {intl.formatMessage(messages.mediaFilters)}
-        </div>
-        <BookFormatTabs
-          format={activeFormat}
-          query={routeQuery}
-          currentPath={currentPath}
-        />
+        {mediaFilters}
+        {showFormatTabs && (
+          <>
+            <div className="app-filter-section-heading">
+              {intl.formatMessage(messages.mediaFilters)}
+            </div>
+            <BookFormatTabs
+              format={activeFormat}
+              query={routeQuery}
+              currentPath={currentPath}
+            />
+          </>
+        )}
         <div className="app-filter-section-heading">
           {intl.formatMessage(messages.filters)}
         </div>
@@ -227,6 +248,7 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
                 firstPublishYear: undefined,
                 language: undefined,
                 minRating: undefined,
+                sortBy: undefined,
               });
             }}
           >
@@ -256,7 +278,7 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={intl.formatMessage(messages.searchBooks)}
               aria-label={intl.formatMessage(messages.searchBooks)}
-              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
             />
           </form>
           <CompactSelect
@@ -292,11 +314,21 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className={getFilterToggleButtonClass(sortBy === 'ranked')}
-            onClick={() => setParam({ sortBy: 'ranked' })}
+            className={getFilterToggleButtonClass(
+              sortBy === 'ranked' || sortBy === 'ranked.asc'
+            )}
+            onClick={() =>
+              setParam({
+                sortBy: sortBy === 'ranked' ? 'ranked.asc' : 'ranked',
+              })
+            }
           >
             {intl.formatMessage(messages.recommended)}
-            <BarsArrowDownIcon className="h-4 w-4" />
+            {sortBy === 'ranked.asc' ? (
+              <BarsArrowUpIcon className="h-4 w-4" />
+            ) : (
+              <BarsArrowDownIcon className="h-4 w-4" />
+            )}
           </button>
           <button
             className={getFilterToggleButtonClass(
@@ -321,11 +353,21 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
             )}
           </button>
           <button
-            className={getFilterToggleButtonClass(sortBy === 'editions')}
-            onClick={() => setParam({ sortBy: 'editions' })}
+            className={getFilterToggleButtonClass(
+              sortBy === 'editions' || sortBy === 'editions.asc'
+            )}
+            onClick={() =>
+              setParam({
+                sortBy: sortBy === 'editions' ? 'editions.asc' : 'editions',
+              })
+            }
           >
             {intl.formatMessage(messages.editions)}
-            <BarsArrowDownIcon className="h-4 w-4" />
+            {sortBy === 'editions.asc' ? (
+              <BarsArrowUpIcon className="h-4 w-4" />
+            ) : (
+              <BarsArrowDownIcon className="h-4 w-4" />
+            )}
           </button>
           <button
             className={getFilterToggleButtonClass(
@@ -344,7 +386,11 @@ const DiscoverBooks = ({ format = 'ebook' }: DiscoverBooksProps) => {
           </button>
           <button
             className={getFilterToggleButtonClass(sortBy === 'random')}
-            onClick={() => setParam({ sortBy: 'random' })}
+            onClick={() =>
+              sortBy === 'random'
+                ? discover.mutate?.()
+                : setParam({ sortBy: 'random' })
+            }
           >
             {intl.formatMessage(messages.random)}
             <BarsArrowDownIcon className="h-4 w-4" />

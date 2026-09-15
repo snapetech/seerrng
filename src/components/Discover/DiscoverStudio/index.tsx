@@ -1,82 +1,27 @@
-import CachedImage from '@app/components/Common/CachedImage';
-import Header from '@app/components/Common/Header';
-import ListView from '@app/components/Common/ListView';
-import PageTitle from '@app/components/Common/PageTitle';
-import useDiscover from '@app/hooks/useDiscover';
-import globalMessages from '@app/i18n/globalMessages';
+import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import DiscoverMovies from '@app/components/Discover/DiscoverMovies';
 import ErrorPage from '@app/pages/_error';
-import defineMessages from '@app/utils/defineMessages';
 import type { ProductionCompany } from '@server/models/common';
-import type { MovieResult } from '@server/models/Search';
 import { useRouter } from 'next/router';
-import { useIntl } from 'react-intl';
-
-const messages = defineMessages('components.Discover.DiscoverStudio', {
-  studioMovies: '{studio} Movies',
-});
+import useSWR from 'swr';
 
 const DiscoverMovieStudio = () => {
   const router = useRouter();
-  const intl = useIntl();
   const studioId =
     typeof router.query.studioId === 'string' ? router.query.studioId : '';
-
-  const {
-    isLoadingInitialData,
-    isEmpty,
-    isLoadingMore,
-    isReachingEnd,
-    titles,
-    fetchMore,
-    error,
-    firstResultData,
-  } = useDiscover<MovieResult, { studio: ProductionCompany }>(
-    `/api/v1/discover/movies/studio/${studioId}`,
-    undefined,
-    { enabled: !!studioId }
+  const { data: studio, error } = useSWR<ProductionCompany>(
+    studioId ? `/api/v1/studio/${studioId}` : null
   );
 
   if (error) {
     return <ErrorPage statusCode={500} />;
   }
 
-  const title = isLoadingInitialData
-    ? intl.formatMessage(globalMessages.loading)
-    : intl.formatMessage(messages.studioMovies, {
-        studio: firstResultData?.studio.name,
-      });
+  if (!studio) {
+    return <LoadingSpinner />;
+  }
 
-  return (
-    <>
-      <PageTitle title={title} />
-      <div className="mt-1 mb-5">
-        <Header>
-          {firstResultData?.studio.logoPath ? (
-            <div className="relative mb-6 flex h-24 justify-center sm:h-32">
-              <CachedImage
-                type="tmdb"
-                src={`https://image.tmdb.org/t/p/w300_filter(duotone,ffffff,bababa)${firstResultData.studio.logoPath}`}
-                alt={firstResultData.studio.name}
-                className="object-contain"
-                fill
-              />
-            </div>
-          ) : (
-            title
-          )}
-        </Header>
-      </div>
-      <ListView
-        items={titles}
-        isEmpty={isEmpty}
-        isLoading={
-          isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
-        }
-        isReachingEnd={isReachingEnd}
-        onScrollBottom={fetchMore}
-      />
-    </>
-  );
+  return <DiscoverMovies studio={studio} />;
 };
 
 export default DiscoverMovieStudio;

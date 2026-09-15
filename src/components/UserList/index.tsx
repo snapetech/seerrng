@@ -6,24 +6,24 @@ import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
-import PaginationFooter from '@app/components/Common/PaginationFooter';
+import SelectionCircle from '@app/components/Common/SelectionCircle';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
-import Table from '@app/components/Common/Table';
+import {
+  CompactSelect,
+  getFilterToggleButtonClass,
+  type CompactSelectOption,
+} from '@app/components/Discover/FilterPanel/CompactFilterSelect';
 import BulkEditModal from '@app/components/UserList/BulkEditModal';
 import PlexImportModal from '@app/components/UserList/PlexImportModal';
+import useDebouncedState from '@app/hooks/useDebouncedState';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
-import {
-  getPositiveQueryParamNumber,
-  useUpdateQueryParams,
-} from '@app/hooks/useUpdateQueryParams';
 import type { User } from '@app/hooks/useUser';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import {
   isStoredOption,
-  isStoredPageSize,
   readLocalStoredRecord,
   writeLocalStoredRecord,
 } from '@app/utils/localStorage';
@@ -31,9 +31,8 @@ import { Transition } from '@headlessui/react';
 import {
   BarsArrowDownIcon,
   BarsArrowUpIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   InboxArrowDownIcon,
+  MagnifyingGlassIcon,
   PencilIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/solid';
@@ -60,6 +59,17 @@ const messages = defineMessages('components.UserList', {
   accounttype: 'Type',
   role: 'Role',
   created: 'Joined',
+  filters: 'Filters',
+  sortByHeading: 'Sort By',
+  keywordSearch: 'Keyword Search',
+  searchUsers: 'Search Users',
+  any: 'Any',
+  allTypes: 'All Types',
+  allRoles: 'All Roles',
+  userName: 'User Name',
+  selectAllUsers: 'Select all users',
+  selectUser: 'Select {user}',
+  noUsers: 'No users match the selected filters.',
   bulkedit: 'Bulk Edit',
   owner: 'Owner',
   admin: 'Admin',
@@ -104,12 +114,10 @@ const messages = defineMessages('components.UserList', {
     'The <strong>Enable Local Sign-In</strong> setting is currently disabled.',
 });
 
-type Sort =
-  'created' | 'updated' | 'requests' | 'displayname' | 'usertype' | 'role';
+type Sort = 'created' | 'requests' | 'displayname' | 'usertype' | 'role';
 type SortDirection = 'asc' | 'desc';
 const USER_SORT_OPTIONS: readonly Sort[] = [
   'created',
-  'updated',
   'requests',
   'displayname',
   'usertype',
@@ -128,27 +136,53 @@ const UserList = () => {
   const { addToast } = useToasts();
   const { user: currentUser, hasPermission: currentHasPermission } = useUser();
   const [currentSort, setCurrentSort] = useState<Sort>('created');
-  const [currentPageSize, setCurrentPageSize] = useState<number>(10);
-
-  const page = getPositiveQueryParamNumber(router.query.page, 1) ?? 1;
-  const pageIndex = page - 1;
-  const updateQueryParams = useUpdateQueryParams({ page: page.toString() });
+  const [keywordSearch, debouncedKeywordSearch, setKeywordSearch] =
+    useDebouncedState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [filterSettingsHydrated, setFilterSettingsHydrated] = useState(false);
 
   const defaultSortDirection = (sortKey: Sort): SortDirection =>
-    sortKey === 'requests' || sortKey === 'updated' ? 'desc' : 'asc';
+    sortKey === 'requests' ? 'desc' : 'asc';
 
   const [sortDirection, setSortDirection] = useState<SortDirection>(() =>
     defaultSortDirection('created')
   );
+
+  useEffect(() => {
+    const filterSettings = readLocalStoredRecord('ul-filter-settings');
+    if (filterSettings) {
+      if (isStoredOption(filterSettings.currentSort, USER_SORT_OPTIONS)) {
+        setCurrentSort(filterSettings.currentSort);
+      }
+      if (
+        isStoredOption(filterSettings.sortDirection, SORT_DIRECTION_OPTIONS)
+      ) {
+        setSortDirection(filterSettings.sortDirection);
+      }
+    }
+    setFilterSettingsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (filterSettingsHydrated) {
+      writeLocalStoredRecord('ul-filter-settings', {
+        currentSort,
+        sortDirection,
+      });
+    }
+  }, [currentSort, filterSettingsHydrated, sortDirection]);
 
   const {
     data,
     error,
     mutate: revalidate,
   } = useSWR<ClientUserResultsResponse>(
-    `/api/v1/user?take=${currentPageSize}&skip=${
-      pageIndex * currentPageSize
-    }&sort=${currentSort}&sortDirection=${sortDirection}`
+    `/api/v1/user?take=100&skip=0&sort=${currentSort}&sortDirection=${sortDirection}${
+      debouncedKeywordSearch.trim()
+        ? `&q=${encodeURIComponent(debouncedKeywordSearch.trim())}`
+        : ''
+    }`
   );
 
   const handleSortChange = (sortKey: Sort) => {
@@ -158,7 +192,6 @@ const UserList = () => {
       setCurrentSort(sortKey);
       setSortDirection(defaultSortDirection(sortKey));
     }
-    updateQueryParams('page', '1');
   };
 
   const [isDeleting, setDeleting] = useState(false);
@@ -177,117 +210,42 @@ const UserList = () => {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
 
-  useEffect(() => {
-    const filterSettings = readLocalStoredRecord('ul-filter-settings');
-    if (filterSettings) {
-      if (isStoredOption(filterSettings.currentSort, USER_SORT_OPTIONS)) {
-        setCurrentSort(filterSettings.currentSort);
-      }
-      if (isStoredPageSize(filterSettings.currentPageSize)) {
-        setCurrentPageSize(filterSettings.currentPageSize);
-      }
-      if (
-        isStoredOption(filterSettings.sortDirection, SORT_DIRECTION_OPTIONS)
-      ) {
-        setSortDirection(filterSettings.sortDirection);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    writeLocalStoredRecord('ul-filter-settings', {
-      currentSort,
-      currentPageSize,
-      sortDirection,
-    });
-  }, [currentSort, currentPageSize, sortDirection]);
-
-  const SortableColumnHeader = ({
-    sortKey,
-    currentSort,
-    sortDirection,
-    onSortChange,
-    children,
-  }: {
-    sortKey: Sort;
-    currentSort: Sort;
-    sortDirection: SortDirection;
-    onSortChange: (sortKey: Sort) => void;
-    children: React.ReactNode;
-  }) => {
-    const intl = useIntl();
-
-    const getTooltip = () => {
-      if (currentSort === sortKey) {
-        return intl.formatMessage(messages.toggleSortDirection, {
-          direction:
-            sortDirection === 'asc'
-              ? intl.formatMessage(messages.descending)
-              : intl.formatMessage(messages.ascending),
-        });
-      }
-
-      switch (sortKey) {
-        case 'displayname':
-          return intl.formatMessage(messages.sortByUser);
-        case 'requests':
-          return intl.formatMessage(messages.sortByRequests);
-        case 'usertype':
-          return intl.formatMessage(messages.sortByType);
-        case 'role':
-          return intl.formatMessage(messages.sortByRole);
-        case 'created':
-          return intl.formatMessage(messages.sortByJoined);
-        default:
-          return intl.formatMessage(messages.sortBy, { field: sortKey });
-      }
-    };
-
-    return (
-      <Table.TH
-        className="cursor-pointer"
-        onClick={() => onSortChange(sortKey)}
-        data-testid={`column-header-${sortKey}`}
-        title={getTooltip()}
-      >
-        <div className="flex items-center">
-          <span>{children}</span>
-          {currentSort === sortKey && (
-            <span className="ml-1">
-              {sortDirection === 'asc' ? (
-                <ChevronUpIcon className="h-4 w-4" />
-              ) : (
-                <ChevronDownIcon className="h-4 w-4" />
-              )}
-            </span>
-          )}
-        </div>
-      </Table.TH>
-    );
-  };
-
   const isUserPermsEditable = (userId: number) =>
     userId !== 1 && userId !== currentUser?.id;
+  const getUserRole = (user: User) =>
+    user.id === 1
+      ? 'owner'
+      : hasPermission(Permission.ADMIN, user.permissions)
+        ? 'admin'
+        : 'user';
+  const visibleUsers = (data?.results ?? []).filter(
+    (user) =>
+      (typeFilter === 'all' || user.userType.toString() === typeFilter) &&
+      (roleFilter === 'all' || getUserRole(user) === roleFilter)
+  );
+  const editableVisibleUsers = visibleUsers.filter((user) =>
+    isUserPermsEditable(user.id)
+  );
   const isAllUsersSelected = () => {
     return (
-      selectedUsers.length ===
-      data?.results.filter((user) => user.id !== currentUser?.id).length
+      editableVisibleUsers.length > 0 &&
+      editableVisibleUsers.every((user) => selectedUsers.includes(user.id))
     );
   };
+  const areSomeUsersSelected =
+    editableVisibleUsers.some((user) => selectedUsers.includes(user.id)) &&
+    !isAllUsersSelected();
   const isUserSelected = (userId: number) => selectedUsers.includes(userId);
   const toggleAllUsers = () => {
-    if (
-      data &&
-      selectedUsers.length >= 0 &&
-      selectedUsers.length < data?.results.length - 1
-    ) {
-      setSelectedUsers(
-        data.results
-          .filter((user) => isUserPermsEditable(user.id))
-          .map((u) => u.id)
+    if (isAllUsersSelected()) {
+      const visibleIds = new Set(editableVisibleUsers.map((user) => user.id));
+      setSelectedUsers((users) =>
+        users.filter((userId) => !visibleIds.has(userId))
       );
     } else {
-      setSelectedUsers([]);
+      setSelectedUsers((users) => [
+        ...new Set([...users, ...editableVisibleUsers.map((user) => user.id)]),
+      ]);
     }
   };
   const toggleUser = (userId: number) => {
@@ -349,14 +307,45 @@ const UserList = () => {
     return <LoadingSpinner />;
   }
 
-  const changePage = (nextPage: number) => {
-    updateQueryParams('page', String(nextPage));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const passwordGenerationEnabled =
     settings.currentSettings.applicationUrl &&
     settings.currentSettings.emailEnabled;
+  const mediaServerName =
+    settings.currentSettings.mediaServerType === MediaServerType.PLEX
+      ? 'Plex'
+      : settings.currentSettings.mediaServerType === MediaServerType.EMBY
+        ? 'Emby'
+        : 'Jellyfin';
+  const typeOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: 'all' },
+    { label: intl.formatMessage(messages.localuser), value: '2' },
+    { label: intl.formatMessage(messages.plexuser), value: '1' },
+    {
+      label: intl.formatMessage(messages.mediaServerUser, {
+        mediaServerName: 'Jellyfin',
+      }),
+      value: '3',
+    },
+    {
+      label: intl.formatMessage(messages.mediaServerUser, {
+        mediaServerName: 'Emby',
+      }),
+      value: '4',
+    },
+  ];
+  const roleOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: 'all' },
+    { label: intl.formatMessage(messages.owner), value: 'owner' },
+    { label: intl.formatMessage(messages.admin), value: 'admin' },
+    { label: intl.formatMessage(messages.user), value: 'user' },
+  ];
+  const sortOptions: { key: Sort; label: string }[] = [
+    { key: 'created', label: intl.formatMessage(messages.created) },
+    { key: 'displayname', label: intl.formatMessage(messages.userName) },
+    { key: 'requests', label: intl.formatMessage(messages.totalrequests) },
+    { key: 'usertype', label: intl.formatMessage(messages.accounttype) },
+    { key: 'role', label: intl.formatMessage(messages.role) },
+  ];
 
   return (
     <>
@@ -632,309 +621,294 @@ const UserList = () => {
         )}
       </Transition>
 
-      <div className="flex flex-col justify-between lg:flex-row lg:items-end">
-        <Header>{intl.formatMessage(messages.userlist)}</Header>
-        <div className="mt-2 flex flex-grow flex-col lg:flex-grow-0 lg:flex-row">
-          <div className="mb-2 flex flex-grow flex-col justify-between sm:flex-row lg:mb-0 lg:flex-grow-0">
-            <Button
-              className="mb-2 flex-grow sm:mr-2 sm:mb-0"
-              buttonType="primary"
-              onClick={() => setCreateModal({ isOpen: true })}
-            >
-              <UserPlusIcon />
-              <span>{intl.formatMessage(messages.createlocaluser)}</span>
-            </Button>
-            <Button
-              className="flex-grow lg:mr-2"
-              buttonType="primary"
-              onClick={() => setShowImportModal(true)}
-            >
-              <InboxArrowDownIcon />
-              <span>
-                {settings.currentSettings.mediaServerType ===
-                MediaServerType.EMBY
-                  ? intl.formatMessage(messages.importfrommediaserver, {
-                      mediaServerName: 'Emby',
-                    })
-                  : settings.currentSettings.mediaServerType ===
-                      MediaServerType.PLEX
-                    ? intl.formatMessage(messages.importfrommediaserver, {
-                        mediaServerName: 'Plex',
-                      })
-                    : intl.formatMessage(messages.importfrommediaserver, {
-                        mediaServerName: 'Jellyfin',
-                      })}
-              </span>
-            </Button>
-          </div>
+      <Header>{intl.formatMessage(messages.userlist)}</Header>
+      <article className="refreshed-card-surface mt-5 rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
+        <div className="text-sm text-gray-300">
+          {intl.formatMessage(messages.filters)}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <form
+            className="discover-filter-control w-72 max-w-full"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <span className="discover-filter-control-label gap-1.5">
+              <MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
+              {intl.formatMessage(messages.keywordSearch)}
+            </span>
+            <input
+              type="search"
+              value={keywordSearch}
+              onChange={(event) => setKeywordSearch(event.target.value)}
+              placeholder={intl.formatMessage(messages.searchUsers)}
+              aria-label={intl.formatMessage(messages.searchUsers)}
+              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+            />
+          </form>
+          <CompactSelect
+            label={intl.formatMessage(messages.accounttype)}
+            value={typeFilter}
+            options={typeOptions}
+            onChange={setTypeFilter}
+          />
+          <CompactSelect
+            label={intl.formatMessage(messages.role)}
+            value={roleFilter}
+            options={roleOptions}
+            onChange={setRoleFilter}
+          />
+        </div>
 
-          <div className="mb-2 flex flex-grow lg:mb-0 lg:flex-grow-0">
-            <button
-              type="button"
-              className="app-button app-button-default cursor-pointer rounded-r-none border-r-0 px-3 text-sm"
-              onClick={() => {
-                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-                updateQueryParams('page', '1');
-              }}
-              aria-label={intl.formatMessage(messages.toggleSortDirectionAria)}
-              title={
-                sortDirection === 'asc'
-                  ? intl.formatMessage(messages.descending)
-                  : intl.formatMessage(messages.ascending)
-              }
-            >
-              {sortDirection === 'asc' ? (
-                <BarsArrowUpIcon className="h-6 w-6" />
-              ) : (
-                <BarsArrowDownIcon className="h-6 w-6" />
-              )}
-            </button>
-            <select
-              id="sort"
-              name="sort"
-              onChange={(e) => handleSortChange(e.target.value as Sort)}
-              value={currentSort}
-              className="rounded-r-only"
-            >
-              <option value="displayname">
-                {intl.formatMessage(messages.username)}
-              </option>
-              <option value="requests">
-                {intl.formatMessage(messages.totalrequests)}
-              </option>
-              <option value="usertype">
-                {intl.formatMessage(messages.accounttype)}
-              </option>
-              <option value="role">{intl.formatMessage(messages.role)}</option>
-              <option value="created">
-                {intl.formatMessage(messages.created)}
-              </option>
-            </select>
+        <div className="app-filter-section-heading">
+          {intl.formatMessage(messages.sortByHeading)}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {sortOptions.map((option) => {
+            const active = currentSort === option.key;
+            const Icon =
+              active && sortDirection === 'asc'
+                ? BarsArrowUpIcon
+                : BarsArrowDownIcon;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => handleSortChange(option.key)}
+                className={getFilterToggleButtonClass(active)}
+              >
+                {option.label}
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="refreshed-inset-surface mt-5 overflow-hidden rounded-lg border border-gray-700">
+          <div className="user-list-table-scroll scrollable-card overflow-auto">
+            <table className="app-data-table user-list-data-table">
+              <thead className="app-data-table-head">
+                <tr className="app-data-table-header-row">
+                  <th className="app-data-table-heading user-list-select-column">
+                    {editableVisibleUsers.length > 0 && (
+                      <SelectionCircle
+                        selected={isAllUsersSelected()}
+                        partial={areSomeUsersSelected}
+                        label={intl.formatMessage(messages.selectAllUsers)}
+                        onClick={toggleAllUsers}
+                      />
+                    )}
+                  </th>
+                  <th className="app-data-table-heading user-list-name-column">
+                    {intl.formatMessage(messages.user)}
+                  </th>
+                  <th className="app-data-table-heading user-list-requests-column text-center">
+                    {intl.formatMessage(messages.totalrequests)}
+                  </th>
+                  <th className="app-data-table-heading user-list-type-column">
+                    {intl.formatMessage(messages.accounttype)}
+                  </th>
+                  <th className="app-data-table-heading user-list-role-column">
+                    {intl.formatMessage(messages.role)}
+                  </th>
+                  <th className="app-data-table-heading user-list-joined-column">
+                    {intl.formatMessage(messages.created)}
+                  </th>
+                  <th className="app-data-table-heading user-list-actions-column" />
+                </tr>
+              </thead>
+              <tbody>
+                {visibleUsers.map((user) => {
+                  const displayName =
+                    user.username ||
+                    user.jellyfinUsername ||
+                    user.plexUsername ||
+                    user.email;
+                  return (
+                    <tr
+                      key={`user-list-${user.id}`}
+                      className="app-data-table-row"
+                      data-testid="user-list-row"
+                    >
+                      <td className="app-data-table-cell user-list-select-column">
+                        {isUserPermsEditable(user.id) && (
+                          <SelectionCircle
+                            selected={isUserSelected(user.id)}
+                            label={intl.formatMessage(messages.selectUser, {
+                              user: displayName,
+                            })}
+                            onClick={() => toggleUser(user.id)}
+                          />
+                        )}
+                      </td>
+                      <td className="app-data-table-cell">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Link
+                            href={`/users/${user.id}`}
+                            className="h-8 w-8 flex-shrink-0"
+                          >
+                            <CachedImage
+                              type="avatar"
+                              className="h-8 w-8 rounded-full object-cover"
+                              src={user.avatar}
+                              alt=""
+                              width={32}
+                              height={32}
+                            />
+                          </Link>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/users/${user.id}`}
+                              className="block truncate text-xs leading-4 font-semibold transition duration-300 hover:underline"
+                              data-testid="user-list-username-link"
+                            >
+                              {displayName}
+                            </Link>
+                            {(
+                              user.username ||
+                              user.jellyfinUsername ||
+                              user.plexUsername
+                            )?.toLowerCase() !== user.email && (
+                              <div className="refreshed-detail-text-muted truncate text-xs leading-4">
+                                {user.email}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="app-data-table-cell text-center">
+                        {user.id === currentUser?.id ||
+                        currentHasPermission(
+                          [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+                          { type: 'or' }
+                        ) ? (
+                          <Link
+                            href={`/users/${user.id}/requests`}
+                            className="transition duration-300 hover:underline"
+                          >
+                            {user.requestCount}
+                          </Link>
+                        ) : (
+                          user.requestCount
+                        )}
+                      </td>
+                      <td className="app-data-table-cell">
+                        {user.userType === UserType.PLEX ? (
+                          <Badge badgeType="warning">
+                            {intl.formatMessage(messages.plexuser)}
+                          </Badge>
+                        ) : user.userType === UserType.LOCAL ? (
+                          <Badge badgeType="default">
+                            {intl.formatMessage(messages.localuser)}
+                          </Badge>
+                        ) : user.userType === UserType.EMBY ? (
+                          <Badge badgeType="success">
+                            {intl.formatMessage(messages.mediaServerUser, {
+                              mediaServerName: 'Emby',
+                            })}
+                          </Badge>
+                        ) : user.userType === UserType.JELLYFIN ? (
+                          <Badge badgeType="default">
+                            {intl.formatMessage(messages.mediaServerUser, {
+                              mediaServerName: 'Jellyfin',
+                            })}
+                          </Badge>
+                        ) : null}
+                      </td>
+                      <td className="app-data-table-cell">
+                        {user.id === 1
+                          ? intl.formatMessage(messages.owner)
+                          : hasPermission(Permission.ADMIN, user.permissions)
+                            ? intl.formatMessage(messages.admin)
+                            : intl.formatMessage(messages.user)}
+                      </td>
+                      <td className="app-data-table-cell">
+                        {intl.formatDate(user.createdAt, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </td>
+                      <td className="app-data-table-cell">
+                        <div className="flex justify-end gap-[5px]">
+                          <Button
+                            buttonType="warning"
+                            buttonSize="standard"
+                            disabled={user.id === 1 && currentUser?.id !== 1}
+                            onClick={() =>
+                              router.push(
+                                '/users/[userId]/settings',
+                                `/users/${user.id}/settings`
+                              )
+                            }
+                          >
+                            {intl.formatMessage(globalMessages.edit)}
+                          </Button>
+                          <Button
+                            buttonType="danger"
+                            buttonSize="standard"
+                            disabled={
+                              user.id === 1 ||
+                              (currentUser?.id !== 1 &&
+                                hasPermission(
+                                  Permission.ADMIN,
+                                  user.permissions
+                                ))
+                            }
+                            onClick={() =>
+                              setDeleteModal({ isOpen: true, user })
+                            }
+                          >
+                            {intl.formatMessage(globalMessages.delete)}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {visibleUsers.length === 0 && (
+                  <tr className="app-data-table-row">
+                    <td className="app-data-table-cell text-center" colSpan={7}>
+                      {intl.formatMessage(messages.noUsers)}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-      <Table>
-        <thead>
-          <tr>
-            <Table.TH>
-              {(data.results ?? []).length > 1 && (
-                <input
-                  type="checkbox"
-                  id="selectAll"
-                  name="selectAll"
-                  checked={isAllUsersSelected()}
-                  onChange={() => {
-                    toggleAllUsers();
-                  }}
-                />
-              )}
-            </Table.TH>
-            <SortableColumnHeader
-              sortKey="displayname"
-              currentSort={currentSort}
-              sortDirection={sortDirection}
-              onSortChange={handleSortChange}
-            >
-              {intl.formatMessage(messages.user)}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              sortKey="requests"
-              currentSort={currentSort}
-              sortDirection={sortDirection}
-              onSortChange={handleSortChange}
-            >
-              {intl.formatMessage(messages.totalrequests)}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              sortKey="usertype"
-              currentSort={currentSort}
-              sortDirection={sortDirection}
-              onSortChange={handleSortChange}
-            >
-              {intl.formatMessage(messages.accounttype)}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              sortKey="role"
-              currentSort={currentSort}
-              sortDirection={sortDirection}
-              onSortChange={handleSortChange}
-            >
-              {intl.formatMessage(messages.role)}
-            </SortableColumnHeader>
-            <SortableColumnHeader
-              sortKey="created"
-              currentSort={currentSort}
-              sortDirection={sortDirection}
-              onSortChange={handleSortChange}
-            >
-              {intl.formatMessage(messages.created)}
-            </SortableColumnHeader>
-            <Table.TH className="w-1/12 min-w-[12rem] text-right whitespace-nowrap">
-              {(data.results ?? []).length > 1 && (
-                <div className="flex justify-end">
-                  <Button
-                    buttonType="warning"
-                    className="w-full"
-                    onClick={() => setShowBulkEditModal(true)}
-                    disabled={selectedUsers.length === 0}
-                  >
-                    <PencilIcon />
-                    <span>{intl.formatMessage(messages.bulkedit)}</span>
-                  </Button>
-                </div>
-              )}
-            </Table.TH>
-          </tr>
-        </thead>
-        <Table.TBody>
-          {data?.results.map((user) => (
-            <tr key={`user-list-${user.id}`} data-testid="user-list-row">
-              <Table.TD>
-                {isUserPermsEditable(user.id) && (
-                  <input
-                    type="checkbox"
-                    id={`user-list-select-${user.id}`}
-                    name={`user-list-select-${user.id}`}
-                    checked={isUserSelected(user.id)}
-                    onChange={() => {
-                      toggleUser(user.id);
-                    }}
-                  />
-                )}
-              </Table.TD>
-              <Table.TD>
-                <div className="flex items-center">
-                  <Link
-                    href={`/users/${user.id}`}
-                    className="h-10 w-10 flex-shrink-0"
-                  >
-                    <CachedImage
-                      type="avatar"
-                      className="h-10 w-10 rounded-full object-cover"
-                      src={user.avatar}
-                      alt=""
-                      width={40}
-                      height={40}
-                    />
-                  </Link>
-                  <div className="ml-4">
-                    <Link
-                      href={`/users/${user.id}`}
-                      className="text-base leading-5 font-bold transition duration-300 hover:underline"
-                      data-testid="user-list-username-link"
-                    >
-                      {user.username ||
-                        user.jellyfinUsername ||
-                        user.plexUsername ||
-                        user.email}
-                    </Link>
-                    {(
-                      user.username ||
-                      user.jellyfinUsername ||
-                      user.plexUsername
-                    )?.toLowerCase() !== user.email && (
-                      <div className="text-sm leading-5 text-gray-300">
-                        {user.email}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Table.TD>
-              <Table.TD>
-                {user.id === currentUser?.id ||
-                currentHasPermission(
-                  [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
-                  { type: 'or' }
-                ) ? (
-                  <Link
-                    href={`/users/${user.id}/requests`}
-                    className="text-sm leading-5 transition duration-300 hover:underline"
-                  >
-                    {user.requestCount}
-                  </Link>
-                ) : (
-                  user.requestCount
-                )}
-              </Table.TD>
-              <Table.TD>
-                {user.userType === UserType.PLEX ? (
-                  <Badge badgeType="warning">
-                    {intl.formatMessage(messages.plexuser)}
-                  </Badge>
-                ) : user.userType === UserType.LOCAL ? (
-                  <Badge badgeType="default">
-                    {intl.formatMessage(messages.localuser)}
-                  </Badge>
-                ) : user.userType === UserType.EMBY ? (
-                  <Badge badgeType="success">
-                    {intl.formatMessage(messages.mediaServerUser, {
-                      mediaServerName: 'Emby',
-                    })}
-                  </Badge>
-                ) : user.userType === UserType.JELLYFIN ? (
-                  <Badge badgeType="default">
-                    {intl.formatMessage(messages.mediaServerUser, {
-                      mediaServerName: 'Jellyfin',
-                    })}
-                  </Badge>
-                ) : null}
-              </Table.TD>
-              <Table.TD>
-                {user.id === 1
-                  ? intl.formatMessage(messages.owner)
-                  : hasPermission(Permission.ADMIN, user.permissions)
-                    ? intl.formatMessage(messages.admin)
-                    : intl.formatMessage(messages.user)}
-              </Table.TD>
-              <Table.TD>
-                {intl.formatDate(user.createdAt, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Table.TD>
-              <Table.TD alignText="right">
-                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 sm:gap-2">
-                  <Button
-                    buttonType="warning"
-                    disabled={user.id === 1 && currentUser?.id !== 1}
-                    onClick={() =>
-                      router.push(
-                        '/users/[userId]/settings',
-                        `/users/${user.id}/settings`
-                      )
-                    }
-                  >
-                    {intl.formatMessage(globalMessages.edit)}
-                  </Button>
-                  <Button
-                    buttonType="danger"
-                    disabled={
-                      user.id === 1 ||
-                      (currentUser?.id !== 1 &&
-                        hasPermission(Permission.ADMIN, user.permissions))
-                    }
-                    onClick={() => setDeleteModal({ isOpen: true, user })}
-                  >
-                    {intl.formatMessage(globalMessages.delete)}
-                  </Button>
-                </div>
-              </Table.TD>
-            </tr>
-          ))}
-        </Table.TBody>
-      </Table>
-      <PaginationFooter
-        page={page}
-        pageSize={currentPageSize}
-        pageSizeOptions={[5, 10, 25, 50, 100]}
-        totalPages={data.pageInfo.pages}
-        onPageChange={changePage}
-        onPageSizeChange={(size) => {
-          setCurrentPageSize(size);
-          void router.push(router.pathname).then(() => window.scrollTo(0, 0));
-        }}
-      />
+
+        <div className="mt-2 flex flex-wrap justify-end gap-2">
+          <Button
+            buttonType="primary"
+            buttonSize="standard"
+            onClick={() => setCreateModal({ isOpen: true })}
+          >
+            <UserPlusIcon />
+            <span>{intl.formatMessage(messages.createlocaluser)}</span>
+          </Button>
+          <Button
+            buttonType="primary"
+            buttonSize="standard"
+            onClick={() => setShowImportModal(true)}
+          >
+            <InboxArrowDownIcon />
+            <span>
+              {intl.formatMessage(messages.importfrommediaserver, {
+                mediaServerName,
+              })}
+            </span>
+          </Button>
+          <Button
+            buttonType="warning"
+            buttonSize="standard"
+            onClick={() => setShowBulkEditModal(true)}
+            disabled={selectedUsers.length === 0}
+          >
+            <PencilIcon />
+            <span>{intl.formatMessage(messages.bulkedit)}</span>
+          </Button>
+        </div>
+      </article>
     </>
   );
 };

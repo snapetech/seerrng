@@ -8,7 +8,7 @@ type ButtonWithDropdownProps = {
   text: React.ReactNode;
   dropdownIcon?: React.ReactNode;
   buttonType?: 'primary' | 'ghost' | 'success' | 'detailRequest' | 'playback';
-  buttonSize?: 'default' | 'sm';
+  buttonSize?: 'standard' | 'default' | 'sm';
   disabledReason?: string;
 } & (
   | ({ as?: 'button' } & ButtonHTMLAttributes<HTMLButtonElement>)
@@ -21,7 +21,7 @@ const ButtonWithDropdown = ({
   dropdownIcon,
   className,
   buttonType = 'primary',
-  buttonSize = 'default',
+  buttonSize = 'standard',
   disabledReason,
   ...props
 }: ButtonWithDropdownProps) => {
@@ -34,7 +34,7 @@ const ButtonWithDropdown = ({
     playback: 'app-button-playback',
   };
   const sharedClasses = `app-button ${buttonTypeClassNames[buttonType]} ${
-    isSmall ? 'button-sm' : 'button-md'
+    isSmall ? 'button-sm' : 'button-standard'
   }`;
 
   const TriggerElement = props.as ?? 'button';

@@ -1,19 +1,21 @@
 import MeshNetworkIcon from '@app/assets/mesh-network.svg';
 import Button from '@app/components/Common/Button';
+import Modal from '@app/components/Common/Modal';
 import Tooltip from '@app/components/Common/Tooltip';
 import type { AssociationMediaType } from '@app/hooks/useAssociations';
 import useAssociations, {
   toAssociationMediaType,
 } from '@app/hooks/useAssociations';
 import defineMessages from '@app/utils/defineMessages';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Transition } from '@headlessui/react';
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import ReactDOM from 'react-dom';
 import { useIntl } from 'react-intl';
 import AssociationPopover from './AssociationPopover';
 
 const messages = defineMessages('components.Association', {
   associations: 'Associations',
+  browseMore: 'Browse More...',
 });
 
 interface AssociationBadgeProps {
@@ -31,6 +33,7 @@ const AssociationBadge = ({
   hideWhenEmpty = false,
 }: AssociationBadgeProps) => {
   const intl = useIntl();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const associationType: AssociationMediaType | null =
     toAssociationMediaType(mediaType);
@@ -69,7 +72,7 @@ const AssociationBadge = ({
   const associationLabel = intl.formatMessage(messages.associations);
   const buttonClass =
     variant === 'card'
-      ? 'inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-100/95 bg-gradient-to-br from-cyan-600/70 via-teal-600/70 to-blue-600/70 text-white shadow-md shadow-cyan-950/40 backdrop-blur transition hover:border-white hover:from-cyan-500 hover:via-teal-500 hover:to-blue-500'
+      ? 'app-button app-button-association h-6 w-6 rounded-full p-0 shadow-md shadow-cyan-950/40 backdrop-blur'
       : 'flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-gray-300 ring-1 ring-gray-700 transition hover:text-white';
 
   const toggleAssociations = (event: React.MouseEvent) => {
@@ -94,7 +97,7 @@ const AssociationBadge = ({
             onClick={toggleAssociations}
           >
             <MeshNetworkIcon className="h-4 w-4" aria-hidden="true" />
-            <span className="ml-1.5">{associationLabel}</span>
+            <span>{associationLabel}</span>
           </Button>
         ) : (
           <button
@@ -112,37 +115,31 @@ const AssociationBadge = ({
           </button>
         )}
       </Tooltip>
-      {isOpen &&
-        ReactDOM.createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-            data-testid="association-popover"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 cursor-default"
-              aria-label="Close associations"
-              onClick={() => setIsOpen(false)}
+      <Transition show={isOpen} as="div">
+        <Modal
+          title={associationLabel}
+          onCancel={() => setIsOpen(false)}
+          onOk={() => {
+            setIsOpen(false);
+            void router.push(
+              `/associations/${associationType}/${encodeURIComponent(String(id))}`
+            );
+          }}
+          okText={intl.formatMessage(messages.browseMore)}
+          cancelButtonType="danger"
+          okButtonType="success"
+          actionButtonSize="standard"
+          dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-4xl"
+        >
+          <div data-testid="association-popover">
+            <AssociationPopover
+              mediaType={associationType}
+              id={id}
+              onSelect={() => setIsOpen(false)}
             />
-            <div
-              className="relative z-10 max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)]"
-              role="dialog"
-              aria-modal="true"
-              aria-label={intl.formatMessage(messages.associations)}
-            >
-              <button
-                type="button"
-                className="app-button app-button-default absolute top-2 right-2 z-10 h-8 w-8 rounded-full p-0"
-                aria-label="Close associations"
-                onClick={() => setIsOpen(false)}
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-              <AssociationPopover mediaType={associationType} id={id} />
-            </div>
-          </div>,
-          document.body
-        )}
+          </div>
+        </Modal>
+      </Transition>
     </>
   );
 };

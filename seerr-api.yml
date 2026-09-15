@@ -230,6 +230,18 @@ components:
           example: true
         cardTextVisibility:
           $ref: '#/components/schemas/CardTextVisibilitySettings'
+        detailDisclosureCastPinned:
+          type: boolean
+          description: 'Keep Cast open by default on supported detail pages'
+          example: false
+        detailDisclosureCrewPinned:
+          type: boolean
+          description: 'Keep Crew open by default on supported detail pages'
+          example: false
+        detailDisclosureSubjectTagsPinned:
+          type: boolean
+          description: 'Keep Subject Tags open by default on supported detail pages'
+          example: false
     CardTextVisibilitySettings:
       type: object
       properties:
@@ -261,6 +273,21 @@ components:
             - always
             - hover
           example: always
+    DetailDisclosurePinSettings:
+      type: object
+      properties:
+        cast:
+          type: boolean
+          example: false
+        crew:
+          type: boolean
+          example: false
+        artists:
+          type: boolean
+          example: false
+        subjectTags:
+          type: boolean
+          example: false
     MainSettings:
       type: object
       properties:
@@ -988,6 +1015,20 @@ components:
               quality:
                 type: string
                 example: FLAC
+        trackAvailability:
+          type: object
+          description: Recording MusicBrainz IDs with files in each configured Lidarr quality.
+          properties:
+            mp3:
+              type: array
+              items:
+                type: string
+                format: uuid
+            flac:
+              type: array
+              items:
+                type: string
+                format: uuid
         mediaInfo:
           $ref: '#/components/schemas/MediaInfo'
     ArtistResult:
@@ -6825,6 +6866,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CardTextVisibilitySettings'
+  /user/{userId}/settings/detail-disclosures:
+    get:
+      summary: Get pinned detail disclosure settings for a user
+      description: Returns persistent Cast, Crew, Artists, and Subject Tags pin preferences for a specific user. Requires `MANAGE_USERS` permission if viewing another user.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Pinned detail disclosure settings returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailDisclosurePinSettings'
+    post:
+      summary: Update pinned detail disclosure settings for a user
+      description: Updates and returns persistent Cast, Crew, and Subject Tags pin preferences for a specific user. Requires `MANAGE_USERS` permission if editing another user.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetailDisclosurePinSettings'
+      responses:
+        '200':
+          description: Updated pinned detail disclosure settings returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailDisclosurePinSettings'
+  /user/{userId}/settings/detail-disclosures/{mediaType}:
+    get:
+      summary: Get pinned detail disclosure settings for one media category
+      description: Returns persistent disclosure pins scoped independently to Movie, Series, Music, or Book details. Requires `MANAGE_USERS` permission if viewing another user.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv, music, book]
+      responses:
+        '200':
+          description: Category-scoped detail disclosure settings returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailDisclosurePinSettings'
+    post:
+      summary: Update pinned detail disclosure settings for one media category
+      description: Updates persistent disclosure pins without changing the pin state of another media category. Requires `MANAGE_USERS` permission if editing another user.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv, music, book]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetailDisclosurePinSettings'
+      responses:
+        '200':
+          description: Updated category-scoped detail disclosure settings returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailDisclosurePinSettings'
   /user/{userId}/settings/password:
     get:
       summary: Get password page informatiom
@@ -8192,10 +8331,15 @@ paths:
             type: string
             enum:
               - ranked
+              - ranked.asc
               - popular.week
+              - popular.week.asc
               - popular.month
+              - popular.month.asc
               - popular.year
+              - popular.year.asc
               - listen_count.desc
+              - listen_count.asc
               - release_date.desc
               - release_date.asc
             default: ranked
@@ -8295,6 +8439,7 @@ paths:
             type: string
             enum:
               - ranked
+              - ranked.asc
               - newest
               - oldest
               - random
@@ -8302,6 +8447,7 @@ paths:
               - rating.asc
               - rating.desc
               - editions
+              - editions.asc
             default: ranked
         - in: query
           name: firstPublishYear
@@ -9102,6 +9248,7 @@ paths:
             enum:
               [
                 all,
+                recent,
                 approved,
                 available,
                 pending,

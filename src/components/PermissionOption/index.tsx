@@ -102,7 +102,7 @@ const PermissionOption = ({
   return (
     <>
       <div
-        className={`relative mt-4 flex items-start first:mt-0 ${
+        className={`permission-option-row relative flex items-start ${
           disabled ? 'opacity-50' : ''
         }`}
       >
@@ -134,7 +134,10 @@ const PermissionOption = ({
         </div>
       </div>
       {(option.children ?? []).map((child) => (
-        <div key={`permission-child-${child.id}`} className="mt-4 pl-10">
+        <div
+          key={`permission-child-${child.id}`}
+          className="permission-option-child pl-10"
+        >
           <PermissionOption
             option={child}
             currentPermission={currentPermission}

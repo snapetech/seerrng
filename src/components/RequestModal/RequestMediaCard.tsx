@@ -13,7 +13,7 @@ const RequestMediaCard = ({
   artworkType,
   children,
 }: RequestMediaCardProps) => (
-  <article className="refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
+  <article className="media-detail-card refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
     {artwork && (
       <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
         <CachedImage

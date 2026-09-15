@@ -758,7 +758,7 @@ const BulkRequestModal = ({
   };
 
   const renderFailures = (failures: BulkMediaRequestResult[]) => (
-    <div className="mt-4 max-h-48 overflow-y-auto rounded-md border border-gray-700">
+    <div className="scrollable-card mt-4 max-h-48 overflow-y-auto rounded-md border border-gray-700">
       {failures.map((failure) => (
         <div
           key={`${failure.mediaId}-${failure.reason}`}
@@ -822,7 +822,7 @@ const BulkRequestModal = ({
             selectedExceedsQuota ||
             !!formatWarning)
         }
-        dialogClass="sm:max-w-5xl"
+        dialogClass="request-modal-site-surface sm:max-w-5xl"
       >
         {summary ? (
           <div className="mt-6 text-gray-200">
@@ -952,7 +952,7 @@ const BulkRequestModal = ({
             )}
             <div className="mt-4 overflow-hidden border border-gray-700 sm:rounded-lg">
               <table className="min-w-full">
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-gray-900/70">
                   {items.map((item) => {
                     const reason = getIneligibleReason(item);
                     const selected = selectedIds.includes(item.id);

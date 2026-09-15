@@ -119,7 +119,7 @@ const IssueComment = ({
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="inline-flex h-[22px] items-center gap-1 rounded-md border border-indigo-500/80 bg-indigo-700/35 px-2 text-[11px] font-semibold text-indigo-100 hover:border-indigo-300 hover:bg-indigo-600/50 hover:text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                className="compact-control inline-flex items-center gap-1 rounded-md border border-indigo-500/80 bg-indigo-700/35 px-2 text-[11px] font-semibold text-indigo-100 hover:border-indigo-300 hover:bg-indigo-600/50 hover:text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none"
               >
                 <PencilSquareIcon className="h-3.5 w-3.5" />
                 {intl.formatMessage(messages.edit)}
@@ -129,7 +129,7 @@ const IssueComment = ({
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
-                className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] font-semibold text-red-200 hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
+                className="compact-control inline-flex items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] font-semibold text-red-200 hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
               >
                 <TrashIcon className="h-3.5 w-3.5" />
                 {intl.formatMessage(messages.delete)}
@@ -180,7 +180,7 @@ const IssueComment = ({
                   <button
                     type="button"
                     onClick={() => setIsEditing(false)}
-                    className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] font-semibold text-red-200 hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="compact-control inline-flex items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] font-semibold text-red-200 hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
                   >
                     <XMarkIcon className="h-3.5 w-3.5" />
                     {intl.formatMessage(globalMessages.cancel)}
@@ -188,7 +188,7 @@ const IssueComment = ({
                   <button
                     type="submit"
                     disabled={!isValid || isSubmitting}
-                    className="inline-flex h-[22px] items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] font-semibold text-emerald-200 hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-40"
+                    className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] font-semibold text-emerald-200 hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-40"
                   >
                     <CheckIcon className="h-3.5 w-3.5" />
                     {intl.formatMessage(globalMessages.save)}

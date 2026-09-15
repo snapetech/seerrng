@@ -6,9 +6,7 @@ type TBodyProps = {
 };
 
 const TBody = memo(({ children }: TBodyProps) => {
-  return (
-    <tbody className="divide-y divide-gray-700 bg-gray-800">{children}</tbody>
-  );
+  return <tbody className="app-data-table-body">{children}</tbody>;
 });
 
 TBody.displayName = 'TBody';
@@ -16,13 +14,7 @@ TBody.displayName = 'TBody';
 const TH = memo(
   ({ children, className, ...props }: React.ComponentPropsWithoutRef<'th'>) => {
     const style = useMemo(
-      () =>
-        [
-          'px-4 py-3 bg-gray-500 text-left text-xs leading-4 font-medium text-gray-200 uppercase tracking-wider truncate',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' '),
+      () => ['app-data-table-heading', className].filter(Boolean).join(' '),
       [className]
     );
 
@@ -52,13 +44,13 @@ const TD = memo(
     const style = useMemo(
       () =>
         [
-          'text-sm leading-5 text-white',
+          'app-data-table-cell',
           alignText === 'center'
             ? 'text-center'
             : alignText === 'right'
               ? 'text-right'
               : 'text-left',
-          noPadding ? undefined : 'px-4 py-4',
+          noPadding ? 'p-0' : undefined,
           className,
         ]
           .filter(Boolean)
@@ -78,15 +70,18 @@ TD.displayName = 'TD';
 
 type TableProps = {
   children: React.ReactNode;
+  className?: string;
 };
 
-const Table = memo(({ children }: TableProps) => {
+const Table = memo(({ children, className }: TableProps) => {
   return (
-    <div className="flex flex-col">
-      <div className="-mx-4 my-2 overflow-x-auto md:mx-0 lg:mx-0">
-        <div className="inline-block min-w-full py-2 align-middle">
-          <div className="overflow-hidden rounded-lg shadow md:mx-0 lg:mx-0">
-            <table className="min-w-full">{children}</table>
+    <div className="app-data-table-container">
+      <div className="app-data-table-scroll scrollable-card">
+        <div className="app-data-table-frame">
+          <div className="overflow-hidden rounded-lg">
+            <table className={`app-data-table ${className ?? ''}`}>
+              {children}
+            </table>
           </div>
         </div>
       </div>

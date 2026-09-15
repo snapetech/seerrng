@@ -64,11 +64,11 @@ export const CompactSelect = ({
         </span>
         <Listbox.Button
           aria-label={label}
-          className="flex min-w-0 flex-none items-center gap-1.5 px-2 py-1 text-left text-xs font-medium text-gray-300 focus:outline-none"
+          className="app-control-shadow-exempt app-filter-select-trigger"
         >
           <span className="max-w-48 truncate">{selected.label}</span>
           <ChevronDownIcon
-            className="h-4 w-4 flex-none text-gray-500"
+            className="app-filter-select-chevron"
             aria-hidden="true"
           />
         </Listbox.Button>
@@ -78,14 +78,14 @@ export const CompactSelect = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Listbox.Options className="absolute top-full left-0 z-50 mt-1 max-h-60 w-max max-w-80 min-w-full overflow-auto rounded-md border border-gray-600 bg-gray-800 py-1 text-xs shadow-xl focus:outline-none">
+          <Listbox.Options className="app-filter-select-menu">
             {options.map((option) => (
               <Listbox.Option
                 key={option.value}
                 value={option}
                 className={({ active }) =>
-                  `relative cursor-default py-1 pr-2 pl-7 select-none ${
-                    active ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                  `app-filter-select-option ${
+                    active ? 'app-filter-select-option-active' : ''
                   }`
                 }
               >
@@ -93,7 +93,7 @@ export const CompactSelect = ({
                   <>
                     {optionSelected && (
                       <CheckIcon
-                        className="absolute top-1 left-1.5 h-4 w-4 text-indigo-200"
+                        className="app-filter-select-check"
                         aria-hidden="true"
                       />
                     )}
@@ -173,7 +173,7 @@ export const CompactRatingSelect = ({
         </span>
         <Listbox.Button
           aria-label={label}
-          className="flex min-w-0 flex-none items-center gap-1 px-2 py-1 text-xs font-medium text-gray-300 focus:outline-none"
+          className="app-control-shadow-exempt app-filter-select-trigger app-filter-select-trigger-rating"
         >
           {selectedHasScore ? (
             <RatingStars score={selected.score ?? 0} maxScore={maxScore} />
@@ -183,7 +183,7 @@ export const CompactRatingSelect = ({
             </span>
           )}
           <ChevronDownIcon
-            className="h-4 w-4 flex-none text-gray-500"
+            className="app-filter-select-chevron"
             aria-hidden="true"
           />
         </Listbox.Button>
@@ -193,7 +193,7 @@ export const CompactRatingSelect = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Listbox.Options className="absolute top-full left-0 z-50 mt-1 w-max max-w-80 min-w-full overflow-visible rounded-md border border-gray-600 bg-gray-800 py-1 text-xs shadow-xl focus:outline-none">
+          <Listbox.Options className="app-filter-select-menu app-filter-rating-menu">
             {options.map((option) => {
               const hasScore = option.score !== undefined;
 
@@ -202,8 +202,8 @@ export const CompactRatingSelect = ({
                   key={option.value}
                   value={option}
                   className={({ active }) =>
-                    `relative flex cursor-default items-center gap-1 py-1 pr-2 pl-7 select-none ${
-                      active ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                    `app-filter-select-option app-filter-rating-option ${
+                      active ? 'app-filter-select-option-active' : ''
                     }`
                   }
                 >
@@ -211,7 +211,7 @@ export const CompactRatingSelect = ({
                     <>
                       {optionSelected && (
                         <CheckIcon
-                          className="absolute top-1 left-1.5 h-4 w-4 text-indigo-200"
+                          className="app-filter-select-check"
                           aria-hidden="true"
                         />
                       )}

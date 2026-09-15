@@ -32,7 +32,7 @@ type Element<P extends ElementTypes = 'button'> = P extends 'a'
 
 type BaseProps<P> = {
   buttonType?: ButtonType;
-  buttonSize?: 'default' | 'lg' | 'md' | 'sm';
+  buttonSize?: 'standard' | 'default' | 'lg' | 'md' | 'sm';
   /** Explains a state-based disabled action. Displayed as a native tooltip. */
   disabledReason?: string;
   // Had to do declare this manually as typescript would assume e was of type any otherwise
@@ -66,7 +66,8 @@ const buttonSizeStyles: Record<
   NonNullable<BaseProps<unknown>['buttonSize']>,
   string
 > = {
-  default: 'button-md',
+  standard: 'button-standard',
+  default: 'button-standard',
   md: 'button-md',
   sm: 'button-sm',
   lg: 'button-lg',
@@ -75,7 +76,7 @@ const buttonSizeStyles: Record<
 function Button<P extends ElementTypes = 'button'>(
   {
     buttonType = 'default',
-    buttonSize = 'default',
+    buttonSize = 'standard',
     as,
     children,
     className,

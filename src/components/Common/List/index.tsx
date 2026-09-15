@@ -9,10 +9,10 @@ interface ListItemProps {
 
 const ListItem = memo(({ title, className, children }: ListItemProps) => {
   return (
-    <div>
-      <div className="max-w-6xl py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-        <dt className="block text-sm font-bold text-gray-400">{title}</dt>
-        <dd className="flex text-sm text-white sm:col-span-2 sm:mt-0">
+    <div className="app-list-row">
+      <div className="max-w-6xl sm:grid sm:grid-cols-3 sm:gap-4">
+        <dt className="app-list-label">{title}</dt>
+        <dd className="app-list-value sm:col-span-2 sm:mt-0">
           <span className={`flex-grow ${className}`}>{children}</span>
         </dd>
       </div>
@@ -35,8 +35,8 @@ const List = memo(({ title, subTitle, children }: ListProps) => {
         <h3 className="heading">{title}</h3>
         {subTitle && <p className="description">{subTitle}</p>}
       </div>
-      <div className="section border-t border-gray-800">
-        <dl className="divide-y divide-gray-800">{children}</dl>
+      <div className="app-list-items section">
+        <dl className="app-list">{children}</dl>
       </div>
     </>
   );

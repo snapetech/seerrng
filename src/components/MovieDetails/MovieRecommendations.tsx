@@ -1,13 +1,17 @@
 import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
+import { prepareFilterValues } from '@app/components/Discover/constants';
+import MediaDiscoveryControls from '@app/components/Discover/MediaDiscoveryControls';
 import useDiscover from '@app/hooks/useDiscover';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { filterAndSortRelatedMedia } from '@app/utils/relatedMediaFilters';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MovieResult } from '@server/models/Search';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -20,12 +24,12 @@ const MovieRecommendations = () => {
   const router = useRouter();
   const movieId =
     typeof router.query.movieId === 'string' ? router.query.movieId : '';
+  const preparedFilters = prepareFilterValues(router.query);
   const { data: movieData } = useSWR<MovieDetails>(
     movieId ? `/api/v1/movie/${movieId}` : null
   );
   const {
     isLoadingInitialData,
-    isEmpty,
     isLoadingMore,
     isReachingEnd,
     titles,
@@ -33,8 +37,17 @@ const MovieRecommendations = () => {
     error,
   } = useDiscover<MovieResult>(
     `/api/v1/movie/${movieId}/recommendations`,
-    undefined,
-    { enabled: !!movieId, randomizeOrder: true }
+    { language: preparedFilters.language },
+    {
+      enabled: !!movieId,
+      randomizeOrder: !preparedFilters.sortBy,
+      availableQuality: preparedFilters.availability,
+      hideAvailable: !preparedFilters.availability,
+    }
+  );
+  const filteredTitles = useMemo(
+    () => filterAndSortRelatedMedia(titles, preparedFilters),
+    [preparedFilters, titles]
   );
 
   if (error) {
@@ -57,9 +70,12 @@ const MovieRecommendations = () => {
           {intl.formatMessage(messages.recommendations)}
         </Header>
       </div>
+      <div className="mb-4">
+        <MediaDiscoveryControls type="movie" currentFilters={preparedFilters} />
+      </div>
       <ListView
-        items={titles}
-        isEmpty={isEmpty}
+        items={filteredTitles}
+        isEmpty={!isLoadingInitialData && filteredTitles.length === 0}
         isReachingEnd={isReachingEnd}
         isLoading={
           isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)

@@ -14,8 +14,10 @@ import PageTitle from '@app/components/Common/PageTitle';
 import PaginationFooter from '@app/components/Common/PaginationFooter';
 import Tooltip from '@app/components/Common/Tooltip';
 import {
+  CompactSelect,
   getFilterResetButtonClass,
   getFilterToggleButtonClass,
+  type CompactSelectOption,
 } from '@app/components/Discover/FilterPanel/CompactFilterSelect';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import useRequestStatusScrollRestoration from '@app/hooks/useRequestStatusScrollRestoration';
@@ -1116,7 +1118,7 @@ const RequestStatusCard = ({
           <Tooltip content={intl.formatMessage(messages.approveTooltip)}>
             <button
               type="button"
-              className="inline-flex h-[22px] items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-40"
+              className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-40"
               disabled={isModifying}
               onClick={() => void modifyPendingRequest('approve')}
             >
@@ -1127,7 +1129,7 @@ const RequestStatusCard = ({
           <Tooltip content={intl.formatMessage(messages.declineTooltip)}>
             <button
               type="button"
-              className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:opacity-40"
+              className="compact-control inline-flex items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:opacity-40"
               disabled={isModifying}
               onClick={() => void modifyPendingRequest('decline')}
             >
@@ -1138,7 +1140,7 @@ const RequestStatusCard = ({
           <Tooltip content={intl.formatMessage(messages.editTooltip)}>
             <button
               type="button"
-              className="inline-flex h-[22px] items-center gap-1 rounded-md border border-amber-600/80 bg-amber-800/25 px-2 text-[11px] leading-none font-semibold text-amber-200 transition hover:border-amber-500 hover:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none disabled:opacity-40"
+              className="compact-control inline-flex items-center gap-1 rounded-md border border-amber-600/80 bg-amber-800/25 px-2 text-[11px] leading-none font-semibold text-amber-200 transition hover:border-amber-500 hover:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none disabled:opacity-40"
               disabled={isModifying}
               onClick={() => setShowEditModal(true)}
             >
@@ -1151,7 +1153,7 @@ const RequestStatusCard = ({
       <Tooltip content={intl.formatMessage(messages.retryTooltip)}>
         <button
           type="button"
-          className="inline-flex h-[22px] items-center gap-1 rounded-md border border-amber-600/80 bg-amber-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-amber-300 transition hover:border-amber-400 hover:text-white focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          className="compact-control inline-flex items-center gap-1 rounded-md border border-amber-600/80 bg-amber-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-amber-300 transition hover:border-amber-400 hover:text-white focus:ring-2 focus:ring-amber-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canRetry || isRetrying || isDeleting || isRemoving}
           onClick={() => void onRetry(item.request.id)}
         >
@@ -1163,7 +1165,7 @@ const RequestStatusCard = ({
         <Tooltip content={intl.formatMessage(messages.deleteTooltip)}>
           <button
             type="button"
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="compact-control inline-flex items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             disabled={isDeleting || isRetrying || isRemoving}
             onClick={() => onDelete(item.request.id)}
           >
@@ -1184,7 +1186,7 @@ const RequestStatusCard = ({
         >
           <button
             type="button"
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-rose-400 bg-rose-500/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-rose-100 transition hover:border-rose-200 hover:bg-rose-500/45 hover:text-white focus:ring-2 focus:ring-rose-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="compact-control inline-flex items-center gap-1 rounded-md border border-rose-400 bg-rose-500/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-rose-100 transition hover:border-rose-200 hover:bg-rose-500/45 hover:text-white focus:ring-2 focus:ring-rose-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canRemove || isRemoving || isRetrying || isDeleting}
             onClick={() =>
               onRemove(
@@ -1231,7 +1233,7 @@ const RequestStatusCard = ({
         />
       )}
       <article
-        className="refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20"
+        className="media-detail-card refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20"
         data-testid={`request-status-${item.request.id}`}
       >
         {backdrop && (
@@ -1375,7 +1377,7 @@ const RequestStatusCard = ({
                 </dl>
               </div>
 
-              <dl className="refreshed-detail-text card:relative card:mt-0 card:border-l-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-1 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="refreshed-detail-text media-detail-column-divider grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.requestedByLabel)}:
                 </dt>
@@ -1559,10 +1561,10 @@ const RequestStatusCard = ({
           </div>
         )}
 
-        <div className="relative z-10 flex flex-wrap items-center gap-2 pt-[5px]">
+        <div className="request-status-action-row">
           <Tooltip content={current.message}>
             <span
-              className={`inline-flex h-[22px] w-32 flex-shrink-0 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold ${stageTone[currentStage] ?? stageTone.cancelled}`}
+              className={`compact-control inline-flex w-32 flex-shrink-0 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold ${stageTone[currentStage] ?? stageTone.cancelled}`}
               aria-label={`${getStageLabel(intl, currentStage)}: ${current.message}`}
               tabIndex={0}
             >
@@ -1573,7 +1575,7 @@ const RequestStatusCard = ({
           {actionControls}
           <button
             type="button"
-            className="detail-disclosure-button"
+            className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-emerald-200 transition hover:border-emerald-500 hover:bg-emerald-800/45 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             aria-expanded={isHistoryOpen}
             onClick={() => onToggleHistory(item.request.id)}
           >
@@ -2067,6 +2069,20 @@ const RequestStatus = () => {
 
   const totalPages = Math.max(data.pageInfo.pages, 1);
   const sortOptions = getSortOptions(mediaFilter);
+  const timeFrameOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.allTime), value: 'all' },
+    { label: intl.formatMessage(messages.last7Days), value: '7d' },
+    { label: intl.formatMessage(messages.last14Days), value: '14d' },
+    { label: intl.formatMessage(messages.last30Days), value: '30d' },
+    { label: intl.formatMessage(messages.last6Months), value: '6m' },
+  ];
+  const requestUserOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.allUsers), value: 'all' },
+    ...userOptions.map((user) => ({
+      label: user.displayName,
+      value: String(user.id),
+    })),
+  ];
   const mediaFilters: {
     value: MediaFilter;
     label: keyof typeof messages;
@@ -2133,8 +2149,12 @@ const RequestStatus = () => {
             loading={deletingRequestId !== null}
             onOk={() => void deleteRequest()}
             onCancel={() => setDeleteRequestId(null)}
+            actionButtonSize="standard"
+            dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-lg"
           >
-            <p>{intl.formatMessage(messages.deleteDescription)}</p>
+            <p className="refreshed-inset-surface rounded-lg border border-gray-700 p-3">
+              {intl.formatMessage(messages.deleteDescription)}
+            </p>
           </Modal>
         </Transition>
       )}
@@ -2158,8 +2178,10 @@ const RequestStatus = () => {
             loading={removingRequestId !== null}
             onOk={() => void removeRequestFromLibrary()}
             onCancel={() => setRemoveSelection(null)}
+            actionButtonSize="standard"
+            dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-lg"
           >
-            <p>
+            <p className="refreshed-inset-surface rounded-lg border border-gray-700 p-3">
               {intl.formatMessage(messages.removeDescription, {
                 title: removeSelection.title,
                 service: removeSelection.service,
@@ -2179,32 +2201,14 @@ const RequestStatus = () => {
           </span>
         </h2>
         {isAdminView && canViewOtherUsers && (
-          <label className="discover-filter-control h-8 flex-shrink-0 self-center">
-            <span
-              className={`discover-filter-control-label ${
-                selectedUser !== 'all'
-                  ? 'discover-filter-control-label-active'
-                  : ''
-              }`}
-            >
-              {intl.formatMessage(messages.userFilter)}
-            </span>
-            <select
-              className="w-28 border-0 bg-transparent px-1.5 py-1 text-xs font-medium text-gray-300 focus:ring-0"
-              value={selectedUser ?? currentUser?.id ?? ''}
-              onChange={(event) => updateUser(event.target.value)}
-              aria-label={intl.formatMessage(messages.selectUser)}
-            >
-              <option value="all">
-                {intl.formatMessage(messages.allUsers)}
-              </option>
-              {userOptions.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CompactSelect
+            label={intl.formatMessage(messages.userFilter)}
+            value={String(selectedUser ?? currentUser?.id ?? 'all')}
+            options={requestUserOptions}
+            onChange={updateUser}
+            className="flex-shrink-0 self-center"
+            defaultValue="all"
+          />
         )}
       </div>
       {error && (
@@ -2335,42 +2339,13 @@ const RequestStatus = () => {
           {intl.formatMessage(messages.filter)}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="discover-filter-control h-8 flex-shrink-0 self-center">
-            <span
-              className={`discover-filter-control-label ${
-                timeFrame !== 'all'
-                  ? 'discover-filter-control-label-active'
-                  : ''
-              }`}
-            >
-              {intl.formatMessage(messages.timeFrame)}
-            </span>
-            <select
-              className="w-28 border-0 bg-transparent px-1.5 py-1 text-xs font-medium text-gray-300 focus:ring-0"
-              value={timeFrame}
-              onChange={(event) =>
-                updateTimeFrame(event.target.value as TimeFrame)
-              }
-              aria-label={intl.formatMessage(messages.timeFrame)}
-            >
-              <option value="all">
-                {intl.formatMessage(messages.allTime)}
-              </option>
-              <option value="7d">
-                {intl.formatMessage(messages.last7Days)}
-              </option>
-              <option value="14d">
-                {intl.formatMessage(messages.last14Days)}
-              </option>
-              <option value="30d">
-                {intl.formatMessage(messages.last30Days)}
-              </option>
-              <option value="6m">
-                {intl.formatMessage(messages.last6Months)}
-              </option>
-            </select>
-          </label>
-          <label className="discover-filter-control h-8 w-72 flex-none self-center">
+          <CompactSelect
+            label={intl.formatMessage(messages.timeFrame)}
+            value={timeFrame}
+            options={timeFrameOptions}
+            onChange={(value) => updateTimeFrame(value as TimeFrame)}
+          />
+          <label className="discover-filter-control w-72 flex-none self-center">
             <span
               className={`discover-filter-control-label gap-1 ${
                 searchFilter.trim()
@@ -2387,7 +2362,7 @@ const RequestStatus = () => {
               onChange={(event) => setSearchFilter(event.target.value)}
               placeholder={intl.formatMessage(messages.searchRequests)}
               aria-label={intl.formatMessage(messages.searchRequests)}
-              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
             />
           </label>
         </div>

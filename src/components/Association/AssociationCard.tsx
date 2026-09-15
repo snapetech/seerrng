@@ -47,6 +47,7 @@ const AssociationCard = ({ node }: { node: AssociationNode }) => {
           year={node['first-release-date']?.split('-')[0]}
           mediaType="album"
           availableQualities={node.availableQualities}
+          qualityStatuses={node.qualityStatuses}
           needsCoverArt={node.needsCoverArt}
           hideAssociationWhenEmpty
         />

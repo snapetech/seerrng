@@ -124,7 +124,7 @@ const BookRequestModal = ({
   const [selectedIsbn, setSelectedIsbn] = useState<string>('');
   const [requestOverrides, setRequestOverrides] =
     useState<RequestOverrides | null>(null);
-  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
+  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(true);
   const [requestedByPortal, setRequestedByPortal] =
     useState<HTMLDivElement | null>(null);
   const normalizedBookId = normalizeOpenLibraryWorkId(bookId);
@@ -615,13 +615,20 @@ const BookRequestModal = ({
         }
         secondaryButtonType="danger"
         cancelText={intl.formatMessage(messages.close)}
+        cancelButtonType="danger"
         backdrop={data?.posterPath}
+        backdropFull
+        alignTop
+        actionButtonSize="standard"
+        dialogClass="refreshed-card-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-5xl"
       >
-        {isOwner
-          ? intl.formatMessage(messages.pendingapproval)
-          : intl.formatMessage(messages.requestfrom, {
-              username: editRequest.requestedBy.displayName,
-            })}
+        <div className="refreshed-inset-surface rounded-lg border border-gray-700 p-3">
+          {isOwner
+            ? intl.formatMessage(messages.pendingapproval)
+            : intl.formatMessage(messages.requestfrom, {
+                username: editRequest.requestedBy.displayName,
+              })}
+        </div>
         <BookFormatSelector
           value={bookFormat}
           available={formatAvailable}
@@ -683,7 +690,7 @@ const BookRequestModal = ({
       title={requestLabel}
       okText={requestButtonLabel}
       okButtonType="primary"
-      dialogClass="sm:max-w-5xl"
+      dialogClass="request-modal-site-surface sm:max-w-5xl"
     >
       {(quota?.book?.limit ?? 0) > 0 && (
         <QuotaDisplay
@@ -717,7 +724,7 @@ const BookRequestModal = ({
 
             <div className="card:grid-cols-3 mt-4 grid min-h-0 min-w-0 flex-1 grid-cols-1 items-stretch">
               <div className="card:col-span-2 card:pr-3 min-w-0">
-                <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4 text-gray-400">
+                <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4 text-gray-400">
                   <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                     {intl.formatMessage(messages.mediaAndFormat)}:
                   </dt>
@@ -739,9 +746,7 @@ const BookRequestModal = ({
                       : notAvailable}
                   </dd>
 
-                  <div className="card:col-start-5 card:row-span-3 card:row-start-1 card:block hidden bg-gray-600" />
-
-                  <div className="card:col-span-1 card:col-start-7 card:row-span-3 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                  <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                     <dt className="font-medium text-gray-100">
                       {intl.formatMessage(messages.author)}:
                     </dt>
@@ -759,13 +764,13 @@ const BookRequestModal = ({
                   <dt className="card:col-start-1 card:row-start-4 mt-0.5 font-medium text-gray-100">
                     {intl.formatMessage(messages.genres)}:
                   </dt>
-                  <dd className="card:col-span-5 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
+                  <dd className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
                     {genres}
                   </dd>
                 </dl>
               </div>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-1 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4 text-gray-400">
+              <dl className="media-detail-column-divider grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4 text-gray-400">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.status)}:
                 </dt>
@@ -866,7 +871,7 @@ const BookRequestModal = ({
             {canUseAdvancedOptions && (
               <button
                 type="button"
-                className="detail-disclosure-button"
+                className="request-form-control compact-control inline-flex items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:ring-inset"
                 aria-expanded={advancedOptionsOpen}
                 onClick={() => setAdvancedOptionsOpen((open) => !open)}
               >
@@ -883,14 +888,14 @@ const BookRequestModal = ({
             )}
           </div>
           <div
-            className="flex h-[22px] items-center"
+            className="compact-control flex items-center"
             ref={setRequestedByPortal}
           />
           <button
             type="button"
             onClick={onCancel}
             data-testid="modal-cancel-button"
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
+            className="compact-control inline-flex items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
           >
             <XMarkIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {intl.formatMessage(globalMessages.cancel)}
@@ -905,7 +910,7 @@ const BookRequestModal = ({
               quota?.book?.restricted ||
               !!formatWarning
             }
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowDownTrayIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {requestButtonLabel}

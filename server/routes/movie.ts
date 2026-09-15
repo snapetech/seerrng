@@ -15,6 +15,7 @@ import { mapMovieDetails } from '@server/models/Movie';
 import { mapMovieResult } from '@server/models/Search';
 import { filterEntityResponse } from '@server/utils/entityResponse';
 import {
+  parseNonNegativeInt,
   parseOptionalPositiveInt,
   parsePositiveInt,
 } from '@server/utils/pagination';
@@ -186,15 +187,43 @@ movieRoutes.get('/:id/cover', async (req, res) => {
       : req.query.is4k === 'false'
         ? false
         : undefined;
+  const explicitServiceId = parseNonNegativeInt(
+    req.query.serviceId,
+    -1,
+    1_000_000_000
+  );
+  const explicitExternalServiceId = parseOptionalPositiveInt(
+    req.query.externalServiceId,
+    1_000_000_000
+  );
 
-  if (!mediaId) {
-    return res.status(404).send('Movie cover not found');
+  let coverService:
+    { server: RadarrSettings; movieId: number; is4k: boolean } | undefined;
+
+  if (
+    explicitServiceId >= 0 &&
+    explicitExternalServiceId !== undefined &&
+    is4k !== undefined
+  ) {
+    const server = getSettings().radarr.find(
+      (candidate) =>
+        candidate.id === explicitServiceId && Boolean(candidate.is4k) === is4k
+    );
+    if (server) {
+      coverService = {
+        server,
+        movieId: explicitExternalServiceId,
+        is4k,
+      };
+    }
   }
 
-  const media = await getRepository(Media).findOne({
-    where: { id: mediaId, mediaType: MediaType.MOVIE, tmdbId: movieId },
-  });
-  const coverService = getMovieCoverService(media ?? undefined, is4k);
+  if (!coverService && mediaId) {
+    const media = await getRepository(Media).findOne({
+      where: { id: mediaId, mediaType: MediaType.MOVIE, tmdbId: movieId },
+    });
+    coverService = getMovieCoverService(media ?? undefined, is4k);
+  }
 
   if (!coverService) {
     return res.status(404).send('Movie cover not found');
@@ -215,7 +244,7 @@ movieRoutes.get('/:id/cover', async (req, res) => {
     logger.warn('Failed to retrieve Radarr cover fallback', {
       label: 'Movie',
       movieId,
-      mediaId,
+      mediaId: mediaId ?? null,
       is4k: coverService.is4k,
       errorMessage: e instanceof Error ? e.message : 'Unknown error',
     });

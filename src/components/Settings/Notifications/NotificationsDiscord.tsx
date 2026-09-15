@@ -1,6 +1,7 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import NotificationTypeSelector from '@app/components/NotificationTypeSelector';
+import Field from '@app/components/Settings/SettingsField';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -10,7 +11,7 @@ import { isRedactedSecret } from '@app/utils/secret';
 import { isValidURL } from '@app/utils/urlValidationHelper';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -221,20 +222,6 @@ const NotificationsDiscord = () => {
               <label htmlFor="name" className="text-label">
                 {intl.formatMessage(messages.webhookUrl)}
                 <span className="label-required">*</span>
-                <span className="label-tip">
-                  {intl.formatMessage(messages.webhookUrlTip, {
-                    DiscordWebhookLink: (msg: React.ReactNode) => (
-                      <a
-                        href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks"
-                        className="text-white transition duration-300 hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {msg}
-                      </a>
-                    ),
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -251,6 +238,20 @@ const NotificationsDiscord = () => {
                     <div className="error">{errors.webhookUrl}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.webhookUrlTip, {
+                  DiscordWebhookLink: (msg: React.ReactNode) => (
+                    <a
+                      href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks"
+                      className="text-white transition duration-300 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {msg}
+                    </a>
+                  ),
+                })}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="botUsername" className="text-label">
@@ -315,9 +316,6 @@ const NotificationsDiscord = () => {
             <div className="form-row">
               <label htmlFor="webhookThreadId" className="text-label">
                 {intl.formatMessage(messages.webhookThreadId)}
-                <span className="label-tip">
-                  {intl.formatMessage(messages.webhookThreadIdTip)}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -333,6 +331,9 @@ const NotificationsDiscord = () => {
                     <div className="error">{errors.webhookThreadId}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.webhookThreadIdTip)}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="enableMentions" className="checkbox-label">

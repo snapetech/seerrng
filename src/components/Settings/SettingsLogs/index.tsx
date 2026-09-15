@@ -271,69 +271,73 @@ const SettingsLogs = () => {
             appDataPath: appData ? appData.appDataPath : '/app/config',
           })}
         </p>
-        <div className="mt-2 flex flex-grow flex-col sm:flex-grow-0 sm:flex-row sm:justify-end">
-          <div className="mb-2 flex flex-grow sm:mr-2 sm:mb-0 md:flex-grow-0">
-            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-sm text-gray-100">
-              <MagnifyingGlassIcon className="h-6 w-6" />
+        <div className="settings-log-toolbar">
+          <div className="settings-log-search-control">
+            <span className="settings-log-control-icon">
+              <MagnifyingGlassIcon />
             </span>
             <input
               type="text"
-              className="rounded-r-only"
+              className="settings-log-search-input"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value as string)}
             />
           </div>
-          <div className="mb-2 flex flex-1 flex-row justify-between sm:mb-0 sm:flex-none">
-            <Button
-              className="mr-2 flex flex-grow"
-              buttonType={refreshInterval ? 'default' : 'primary'}
-              onClick={() => toggleLogs()}
+          <Button
+            buttonType={refreshInterval ? 'default' : 'primary'}
+            buttonSize="standard"
+            onClick={() => toggleLogs()}
+          >
+            {refreshInterval ? <PauseIcon /> : <PlayIcon />}
+            <span>
+              {intl.formatMessage(
+                refreshInterval ? messages.pauseLogs : messages.resumeLogs
+              )}
+            </span>
+          </Button>
+          <div className="settings-log-filter-control">
+            <span className="settings-log-control-icon">
+              <FunnelIcon />
+            </span>
+            <select
+              id="filter"
+              name="filter"
+              onChange={(e) => {
+                setCurrentFilter(e.target.value as Filter);
+                router.push(router.pathname);
+              }}
+              value={currentFilter}
+              className="settings-log-filter-select"
             >
-              {refreshInterval ? <PauseIcon /> : <PlayIcon />}
-              <span>
-                {intl.formatMessage(
-                  refreshInterval ? messages.pauseLogs : messages.resumeLogs
-                )}
-              </span>
-            </Button>
-            <div className="flex flex-grow">
-              <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-sm text-gray-100">
-                <FunnelIcon className="h-6 w-6" />
-              </span>
-              <select
-                id="filter"
-                name="filter"
-                onChange={(e) => {
-                  setCurrentFilter(e.target.value as Filter);
-                  router.push(router.pathname);
-                }}
-                value={currentFilter}
-                className="rounded-r-only"
-              >
-                <option value="debug">
-                  {intl.formatMessage(messages.filterDebug)}
-                </option>
-                <option value="info">
-                  {intl.formatMessage(messages.filterInfo)}
-                </option>
-                <option value="warn">
-                  {intl.formatMessage(messages.filterWarn)}
-                </option>
-                <option value="error">
-                  {intl.formatMessage(messages.filterError)}
-                </option>
-              </select>
-            </div>
+              <option value="debug">
+                {intl.formatMessage(messages.filterDebug)}
+              </option>
+              <option value="info">
+                {intl.formatMessage(messages.filterInfo)}
+              </option>
+              <option value="warn">
+                {intl.formatMessage(messages.filterWarn)}
+              </option>
+              <option value="error">
+                {intl.formatMessage(messages.filterError)}
+              </option>
+            </select>
           </div>
         </div>
-        <Table>
+        <Table className="settings-logs-table">
           <thead>
             <tr>
-              <Table.TH>{intl.formatMessage(messages.time)}</Table.TH>
-              <Table.TH>{intl.formatMessage(messages.level)}</Table.TH>
-              <Table.TH>{intl.formatMessage(messages.label)}</Table.TH>
+              <Table.TH className="w-52">
+                {intl.formatMessage(messages.time)}
+              </Table.TH>
+              <Table.TH className="w-28">
+                {intl.formatMessage(messages.level)}
+              </Table.TH>
+              <Table.TH className="w-40">
+                {intl.formatMessage(messages.label)}
+              </Table.TH>
               <Table.TH>{intl.formatMessage(messages.message)}</Table.TH>
-              <Table.TH />
+              <Table.TH className="w-28" />
             </tr>
           </thead>
           <Table.TBody>
@@ -347,7 +351,7 @@ const SettingsLogs = () => {
               data.results.map((row: LogMessage, index: number) => {
                 return (
                   <tr key={`log-list-${index}`}>
-                    <Table.TD className="text-gray-300">
+                    <Table.TD className="settings-log-primary-cell text-gray-300">
                       {intl.formatDate(row.timestamp, {
                         year: 'numeric',
                         month: 'short',
@@ -357,7 +361,7 @@ const SettingsLogs = () => {
                         second: 'numeric',
                       })}
                     </Table.TD>
-                    <Table.TD className="text-gray-300">
+                    <Table.TD className="settings-log-primary-cell text-gray-300">
                       <Badge
                         badgeType={
                           row.level === 'error'
@@ -372,7 +376,7 @@ const SettingsLogs = () => {
                         {row.level.toUpperCase()}
                       </Badge>
                     </Table.TD>
-                    <Table.TD className="text-gray-300">
+                    <Table.TD className="settings-log-primary-cell text-gray-300">
                       {row.label ?? ''}
                     </Table.TD>
                     <Table.TD className="text-gray-300">{row.message}</Table.TD>

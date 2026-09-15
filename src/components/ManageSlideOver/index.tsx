@@ -2,10 +2,12 @@ import BlocklistBlock from '@app/components/BlocklistBlock';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
-import SlideOver from '@app/components/Common/SlideOver';
+import Modal from '@app/components/Common/Modal';
 import Tooltip from '@app/components/Common/Tooltip';
 import DownloadBlock from '@app/components/DownloadBlock';
-import IssueBlock from '@app/components/IssueBlock';
+import IssueMediaSummary from '@app/components/IssueDetails/IssueMediaSummary';
+import IssueItem from '@app/components/IssueList/IssueItem';
+import AvailabilityValue from '@app/components/MediaDetails/AvailabilityValue';
 import RequestBlock from '@app/components/RequestBlock';
 import SelectableDownloadList from '@app/components/SelectableDownloadList';
 import useSettings from '@app/hooks/useSettings';
@@ -14,6 +16,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { getSafeHref } from '@app/utils/safeUrl';
+import { Transition } from '@headlessui/react';
 import { Bars4Icon, ServerIcon } from '@heroicons/react/24/outline';
 import {
   CheckCircleIcon,
@@ -37,7 +40,7 @@ import Link from 'next/link';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
-import type { JSX } from 'react';
+import { Fragment, type JSX } from 'react';
 
 const filterDuplicateDownloads = (
   items: DownloadingItem[] = []
@@ -54,8 +57,6 @@ const messages = defineMessages('components.ManageSlideOver', {
   manageModalTitle: 'Manage {mediaType}',
   manageModalIssues: 'Open Issues',
   manageModalRequests: 'Requests',
-  manageModalMedia: 'Media',
-  manageModalMedia4k: '4K Media',
   manageModalAdvanced: 'Advanced',
   manageModalNoRequests: 'No requests',
   manageModalClearMedia: 'Clear Data',
@@ -83,10 +84,6 @@ const messages = defineMessages('components.ManageSlideOver', {
   movie: 'movie',
   tvshow: 'series',
 });
-
-const isMovie = (movie: MovieDetails | TvDetails): movie is MovieDetails => {
-  return (movie as MovieDetails).title !== undefined;
-};
 
 interface ManageSlideOverProps {
   // mediaType: 'movie' | 'tv';
@@ -133,6 +130,9 @@ const ManageSlideOver = ({
   const safeServiceUrl4k = getSafeHref(data.mediaInfo?.serviceUrl4k);
   const safeTautulliUrl = getSafeHref(data.mediaInfo?.tautulliUrl);
   const safeTautulliUrl4k = getSafeHref(data.mediaInfo?.tautulliUrl4k);
+  const manageBackdrop = data.backdropPath
+    ? `https://image.tmdb.org/t/p/original${data.backdropPath}`
+    : undefined;
 
   const deleteMedia = async () => {
     if (data.mediaInfo) {
@@ -237,6 +237,27 @@ const ManageSlideOver = ({
     data.mediaInfo?.issues?.filter(
       (issue) => issue.status === IssueStatus.OPEN
     ) ?? [];
+  const canViewIssues = hasPermission(
+    [Permission.MANAGE_ISSUES, Permission.VIEW_ISSUES],
+    { type: 'or' }
+  );
+
+  const getManageStatus = (status: MediaStatus | undefined) => {
+    switch (status) {
+      case MediaStatus.AVAILABLE:
+        return intl.formatMessage(globalMessages.available);
+      case MediaStatus.PARTIALLY_AVAILABLE:
+        return intl.formatMessage(globalMessages.partiallyavailable);
+      case MediaStatus.PROCESSING:
+        return intl.formatMessage(globalMessages.processing);
+      case MediaStatus.PENDING:
+        return intl.formatMessage(globalMessages.requested);
+      case MediaStatus.BLOCKLISTED:
+        return intl.formatMessage(globalMessages.blocklisted);
+      default:
+        return intl.formatMessage(globalMessages.unavailable);
+    }
+  };
 
   const styledPlayCount = (playCount: number): JSX.Element => {
     return (
@@ -252,494 +273,555 @@ const ManageSlideOver = ({
   };
 
   return (
-    <SlideOver
-      show={show}
-      title={intl.formatMessage(messages.manageModalTitle, {
-        mediaType: intl.formatMessage(
-          mediaType === 'movie' ? globalMessages.movie : globalMessages.tvshow
-        ),
-      })}
-      onClose={() => onClose()}
-      subText={isMovie(data) ? data.title : data.name}
-    >
-      <div className="space-y-6">
-        {((data?.mediaInfo?.downloadStatus ?? []).length > 0 ||
-          (data?.mediaInfo?.downloadStatus4k ?? []).length > 0) && (
-          <div>
-            <h3 className="mb-2 text-xl font-bold">
-              {intl.formatMessage(messages.downloadstatus)}
-            </h3>
-            <div className="overflow-hidden rounded-md border border-gray-700 shadow">
-              <SelectableDownloadList
-                items={[
-                  ...filterDuplicateDownloads(
-                    data.mediaInfo?.downloadStatus
-                  ).map((status, index) => ({
-                    id: `standard-${status.downloadId ?? status.externalId ?? index}`,
-                    tooltip: status.title,
-                    content: <DownloadBlock downloadItem={status} />,
-                  })),
-                  ...filterDuplicateDownloads(
-                    data.mediaInfo?.downloadStatus4k
-                  ).map((status, index) => ({
-                    id: `4k-${status.downloadId ?? status.externalId ?? index}`,
-                    tooltip: status.title,
-                    content: <DownloadBlock downloadItem={status} is4k />,
-                  })),
-                ]}
-              />
+    <Transition appear show={Boolean(show)} as={Fragment}>
+      <Modal
+        ariaLabel={intl.formatMessage(messages.manageModalTitle, {
+          mediaType: intl.formatMessage(
+            mediaType === 'movie' ? globalMessages.movie : globalMessages.tvshow
+          ),
+        })}
+        onCancel={onClose}
+        cancelButtonType="danger"
+        actionButtonSize="standard"
+        actionsClass="!mt-[5px] !justify-start"
+        backdrop={manageBackdrop}
+        backdropFull
+        dialogClass="refreshed-card-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-5xl"
+      >
+        <div className="-mt-4 space-y-[5px]">
+          {canViewIssues && openIssues.length > 0 ? (
+            <div className="space-y-[5px]">
+              {openIssues.map((issue) => (
+                <IssueItem key={`manage-issue-${issue.id}`} issue={issue} />
+              ))}
             </div>
-          </div>
-        )}
-        {hasPermission([Permission.MANAGE_ISSUES, Permission.VIEW_ISSUES], {
-          type: 'or',
-        }) &&
-          openIssues.length > 0 && (
-            <div>
-              <h3 className="mb-2 text-xl font-bold">
-                {intl.formatMessage(messages.manageModalIssues)}
-              </h3>
-              <div className="overflow-hidden rounded-md border border-gray-700 shadow">
-                <ul>
-                  {openIssues.map((issue) => (
-                    <li
-                      key={`manage-issue-${issue.id}`}
-                      className="border-b border-gray-700 last:border-b-0"
-                    >
-                      <IssueBlock issue={issue} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+          ) : (
+            <IssueMediaSummary
+              data={data}
+              mediaType={mediaType}
+              embedded
+              rightDetails={[
+                {
+                  label: 'HD',
+                  value: (
+                    <AvailabilityValue status={data.mediaInfo?.status}>
+                      {getManageStatus(data.mediaInfo?.status)}
+                    </AvailabilityValue>
+                  ),
+                },
+                {
+                  label: '4K',
+                  value: (
+                    <AvailabilityValue status={data.mediaInfo?.status4k}>
+                      {getManageStatus(data.mediaInfo?.status4k)}
+                    </AvailabilityValue>
+                  ),
+                },
+                {
+                  label: 'Requests',
+                  value: intl.formatNumber(requests.length),
+                },
+                {
+                  label: intl.formatMessage(messages.manageModalIssues),
+                  value: intl.formatNumber(openIssues.length),
+                },
+              ]}
+            />
           )}
-        {requests.length > 0 && (
-          <div>
-            <h3 className="mb-2 text-xl font-bold">
-              {intl.formatMessage(messages.manageModalRequests)}
-            </h3>
-            <div className="overflow-hidden rounded-md border border-gray-700 shadow">
-              <ul>
-                {requests.map((request) => (
-                  <li
-                    key={`manage-request-${request.id}`}
-                    className="border-b border-gray-700 last:border-b-0"
-                  >
-                    <RequestBlock
-                      request={request}
-                      onUpdate={() => revalidate()}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-        {data.mediaInfo?.status === MediaStatus.BLOCKLISTED && (
-          <div>
-            <h3 className="mb-2 text-xl font-bold">
-              {intl.formatMessage(globalMessages.blocklist)}
-            </h3>
-            <div className="overflow-hidden rounded-md border border-gray-700 shadow">
-              <BlocklistBlock
-                tmdbId={data.mediaInfo.tmdbId}
-                mediaType={data.mediaInfo.mediaType}
-                onUpdate={() => revalidate()}
-                onDelete={() => onClose()}
-              />
-            </div>
-          </div>
-        )}
-        {hasPermission(Permission.ADMIN) &&
-          (safeServiceUrl || safeTautulliUrl || watchData?.data) && (
-            <div>
-              <h3 className="mb-2 text-xl font-bold">
-                {intl.formatMessage(messages.manageModalMedia)}
-              </h3>
-              <div className="space-y-2">
-                {(watchData?.data || safeTautulliUrl) && (
-                  <div>
-                    {!!watchData?.data && (
-                      <div
-                        className={`grid grid-cols-1 divide-y divide-gray-700 overflow-hidden border-gray-700 text-sm text-gray-300 shadow ${
-                          safeTautulliUrl
-                            ? 'rounded-t-md border-x border-t'
-                            : 'rounded-md border'
-                        }`}
+          <div className="manage-media-card-sections space-y-[5px]">
+            {((data?.mediaInfo?.downloadStatus ?? []).length > 0 ||
+              (data?.mediaInfo?.downloadStatus4k ?? []).length > 0) && (
+              <div>
+                <h3 className="manage-media-section-title">
+                  {intl.formatMessage(messages.downloadstatus)}
+                </h3>
+                <div className="overflow-hidden rounded-md border border-gray-700 shadow">
+                  <SelectableDownloadList
+                    items={[
+                      ...filterDuplicateDownloads(
+                        data.mediaInfo?.downloadStatus
+                      ).map((status, index) => ({
+                        id: `standard-${status.downloadId ?? status.externalId ?? index}`,
+                        tooltip: status.title,
+                        content: <DownloadBlock downloadItem={status} />,
+                      })),
+                      ...filterDuplicateDownloads(
+                        data.mediaInfo?.downloadStatus4k
+                      ).map((status, index) => ({
+                        id: `4k-${status.downloadId ?? status.externalId ?? index}`,
+                        tooltip: status.title,
+                        content: <DownloadBlock downloadItem={status} is4k />,
+                      })),
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+            {requests.length > 0 && (
+              <div>
+                <h3 className="manage-media-section-title">
+                  {intl.formatMessage(messages.manageModalRequests)}
+                </h3>
+                <div className="overflow-hidden rounded-md border border-gray-700 shadow">
+                  <ul>
+                    {requests.map((request) => (
+                      <li
+                        key={`manage-request-${request.id}`}
+                        className="border-b border-gray-700 last:border-b-0"
                       >
-                        <div className="grid grid-cols-3 divide-x divide-gray-700">
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.pastdays, {
-                                days: 7,
-                              })}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(watchData.data.playCount7Days)}
-                            </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.pastdays, {
-                                days: 30,
-                              })}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(watchData.data.playCount30Days)}
-                            </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.alltime)}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(watchData.data.playCount)}
-                            </div>
-                          </div>
-                        </div>
-                        {!!watchData.data.users.length && (
-                          <div className="flex flex-row space-x-2 px-4 pt-3 pb-2">
-                            <span className="shrink-0 leading-8 font-bold">
-                              {intl.formatMessage(messages.playedby)}
-                            </span>
-                            <span className="flex flex-row flex-wrap">
-                              {watchData.data.users.map((user) => (
-                                <Link
-                                  href={
-                                    currentUser?.id === user.id
-                                      ? '/profile'
-                                      : `/users/${user.id}`
-                                  }
-                                  key={`watch-user-${user.id}`}
-                                  className="z-0 -mr-2 mb-1 shrink-0 hover:z-50"
+                        <RequestBlock
+                          request={request}
+                          onUpdate={() => revalidate()}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+            {data.mediaInfo?.status === MediaStatus.BLOCKLISTED && (
+              <div>
+                <h3 className="manage-media-section-title">
+                  {intl.formatMessage(globalMessages.blocklist)}
+                </h3>
+                <div className="overflow-hidden rounded-md border border-gray-700 shadow">
+                  <BlocklistBlock
+                    tmdbId={data.mediaInfo.tmdbId}
+                    mediaType={data.mediaInfo.mediaType}
+                    onUpdate={() => revalidate()}
+                    onDelete={() => onClose()}
+                  />
+                </div>
+              </div>
+            )}
+            {hasPermission(Permission.ADMIN) &&
+              (safeServiceUrl ||
+                safeTautulliUrl ||
+                watchData?.data ||
+                safeServiceUrl4k ||
+                safeTautulliUrl4k ||
+                watchData?.data4k ||
+                (data.mediaInfo &&
+                  data.mediaInfo.status !== MediaStatus.BLOCKLISTED)) && (
+                <div>
+                  <h3 className="manage-media-section-title">
+                    {intl.formatMessage(messages.manageModalAdvanced)}
+                  </h3>
+                  <div
+                    className="space-y-[5px]"
+                    data-testid="manage-advanced-actions"
+                  >
+                    {(safeServiceUrl || safeTautulliUrl || watchData?.data) && (
+                      <div className="flex flex-wrap items-start gap-2">
+                        {(watchData?.data || safeTautulliUrl) && (
+                          <div className="basis-full">
+                            {!!watchData?.data && (
+                              <div
+                                className={`grid grid-cols-1 divide-y divide-gray-700 overflow-hidden border-gray-700 text-sm text-gray-300 shadow ${
+                                  safeTautulliUrl
+                                    ? 'rounded-t-md border-x border-t'
+                                    : 'rounded-md border'
+                                }`}
+                              >
+                                <div className="grid grid-cols-3 divide-x divide-gray-700">
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.pastdays, {
+                                        days: 7,
+                                      })}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data.playCount7Days
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.pastdays, {
+                                        days: 30,
+                                      })}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data.playCount30Days
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.alltime)}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data.playCount
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                {!!watchData.data.users.length && (
+                                  <div className="flex flex-row space-x-2 px-4 pt-3 pb-2">
+                                    <span className="shrink-0 leading-8 font-bold">
+                                      {intl.formatMessage(messages.playedby)}
+                                    </span>
+                                    <span className="flex flex-row flex-wrap">
+                                      {watchData.data.users.map((user) => (
+                                        <Link
+                                          href={
+                                            currentUser?.id === user.id
+                                              ? '/profile'
+                                              : `/users/${user.id}`
+                                          }
+                                          key={`watch-user-${user.id}`}
+                                          className="z-0 -mr-2 mb-1 shrink-0 hover:z-50"
+                                        >
+                                          <Tooltip
+                                            key={`watch-user-${user.id}`}
+                                            content={user.displayName}
+                                          >
+                                            <CachedImage
+                                              type="avatar"
+                                              src={user.avatar}
+                                              alt={user.displayName}
+                                              className="h-8 w-8 scale-100 transform-gpu rounded-full object-cover ring-1 ring-gray-500 transition duration-300 hover:scale-105"
+                                              width={32}
+                                              height={32}
+                                            />
+                                          </Tooltip>
+                                        </Link>
+                                      ))}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {safeTautulliUrl && (
+                              <a
+                                href={safeTautulliUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <Button
+                                  buttonType="ghost"
+                                  buttonSize="standard"
                                 >
-                                  <Tooltip
-                                    key={`watch-user-${user.id}`}
-                                    content={user.displayName}
-                                  >
-                                    <CachedImage
-                                      type="avatar"
-                                      src={user.avatar}
-                                      alt={user.displayName}
-                                      className="h-8 w-8 scale-100 transform-gpu rounded-full object-cover ring-1 ring-gray-500 transition duration-300 hover:scale-105"
-                                      width={32}
-                                      height={32}
-                                    />
-                                  </Tooltip>
-                                </Link>
-                              ))}
-                            </span>
+                                  <Bars4Icon />
+                                  <span>
+                                    {intl.formatMessage(messages.opentautulli)}
+                                  </span>
+                                </Button>
+                              </a>
+                            )}
                           </div>
                         )}
-                      </div>
-                    )}
-                    {safeTautulliUrl && (
-                      <a
-                        href={safeTautulliUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <Button
-                          buttonType="ghost"
-                          className={`w-full ${
-                            watchData?.data ? 'rounded-t-none' : ''
-                          }`}
-                        >
-                          <Bars4Icon />
-                          <span>
-                            {intl.formatMessage(messages.opentautulli)}
-                          </span>
-                        </Button>
-                      </a>
-                    )}
-                  </div>
-                )}
-                {safeServiceUrl && (
-                  <a
-                    href={safeServiceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block"
-                  >
-                    <Button buttonType="ghost" className="w-full">
-                      <ServerIcon />
-                      <span>
-                        {intl.formatMessage(messages.openarr, {
-                          arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                        })}
-                      </span>
-                    </Button>
-                  </a>
-                )}
+                        {safeServiceUrl && (
+                          <a
+                            href={safeServiceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block"
+                          >
+                            <Button buttonType="ghost" buttonSize="standard">
+                              <ServerIcon />
+                              <span>
+                                {intl.formatMessage(messages.openarr, {
+                                  arr:
+                                    mediaType === 'movie' ? 'Radarr' : 'Sonarr',
+                                })}
+                              </span>
+                            </Button>
+                          </a>
+                        )}
 
-                {hasPermission(Permission.ADMIN) &&
-                  safeServiceUrl &&
-                  isDefaultService() && (
-                    <div>
-                      <ConfirmButton
-                        onClick={() => deleteMediaFile(false)}
-                        confirmText={intl.formatMessage(
-                          globalMessages.areyousure
+                        {hasPermission(Permission.ADMIN) &&
+                          safeServiceUrl &&
+                          isDefaultService() && (
+                            <div className="flex min-w-0 flex-col items-start">
+                              <ConfirmButton
+                                buttonSize="standard"
+                                onClick={() => deleteMediaFile(false)}
+                                confirmText={intl.formatMessage(
+                                  globalMessages.areyousure
+                                )}
+                              >
+                                <TrashIcon />
+                                <span>
+                                  {intl.formatMessage(messages.removearr, {
+                                    arr:
+                                      mediaType === 'movie'
+                                        ? 'Radarr'
+                                        : 'Sonarr',
+                                  })}
+                                </span>
+                              </ConfirmButton>
+                              <div className="mt-1 text-xs text-gray-400">
+                                {intl.formatMessage(
+                                  messages.manageModalRemoveMediaWarning,
+                                  {
+                                    mediaType: intl.formatMessage(
+                                      mediaType === 'movie'
+                                        ? messages.movie
+                                        : messages.tvshow
+                                    ),
+                                    arr:
+                                      mediaType === 'movie'
+                                        ? 'Radarr'
+                                        : 'Sonarr',
+                                  }
+                                )}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                    {(safeServiceUrl4k ||
+                      safeTautulliUrl4k ||
+                      watchData?.data4k) && (
+                      <div className="flex flex-wrap items-start gap-2">
+                        {(watchData?.data4k || safeTautulliUrl4k) && (
+                          <div className="basis-full">
+                            {watchData?.data4k && (
+                              <div
+                                className={`grid grid-cols-1 divide-y divide-gray-700 overflow-hidden border-gray-700 text-sm text-gray-300 shadow ${
+                                  safeTautulliUrl4k
+                                    ? 'rounded-t-md border-x border-t'
+                                    : 'rounded-md border'
+                                }`}
+                              >
+                                <div className="grid grid-cols-3 divide-x divide-gray-700">
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.pastdays, {
+                                        days: 7,
+                                      })}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data4k.playCount7Days
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.pastdays, {
+                                        days: 30,
+                                      })}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data4k.playCount30Days
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="px-4 py-3">
+                                    <div className="font-bold">
+                                      {intl.formatMessage(messages.alltime)}
+                                    </div>
+                                    <div className="text-white">
+                                      {styledPlayCount(
+                                        watchData.data4k.playCount
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                {!!watchData.data4k.users.length && (
+                                  <div className="flex flex-row space-x-2 px-4 pt-3 pb-2">
+                                    <span className="shrink-0 leading-8 font-bold">
+                                      {intl.formatMessage(messages.playedby)}
+                                    </span>
+                                    <span className="flex flex-row flex-wrap">
+                                      {watchData.data4k.users.map((user) => (
+                                        <Link
+                                          href={
+                                            currentUser?.id === user.id
+                                              ? '/profile'
+                                              : `/users/${user.id}`
+                                          }
+                                          key={`watch-user-${user.id}`}
+                                          className="z-0 -mr-2 mb-1 shrink-0 hover:z-50"
+                                        >
+                                          <Tooltip
+                                            key={`watch-user-${user.id}`}
+                                            content={user.displayName}
+                                          >
+                                            <CachedImage
+                                              type="avatar"
+                                              src={user.avatar}
+                                              alt={user.displayName}
+                                              className="h-8 w-8 scale-100 transform-gpu rounded-full object-cover ring-1 ring-gray-500 transition duration-300 hover:scale-105"
+                                              width={32}
+                                              height={32}
+                                            />
+                                          </Tooltip>
+                                        </Link>
+                                      ))}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {safeTautulliUrl4k && (
+                              <a
+                                href={safeTautulliUrl4k}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <Button
+                                  buttonType="ghost"
+                                  buttonSize="standard"
+                                >
+                                  <Bars4Icon />
+                                  <span>
+                                    {intl.formatMessage(messages.opentautulli)}
+                                  </span>
+                                </Button>
+                              </a>
+                            )}
+                          </div>
                         )}
-                        className="w-full"
-                      >
-                        <TrashIcon />
-                        <span>
-                          {intl.formatMessage(messages.removearr, {
-                            arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                          })}
-                        </span>
-                      </ConfirmButton>
-                      <div className="mt-1 text-xs text-gray-400">
-                        {intl.formatMessage(
-                          messages.manageModalRemoveMediaWarning,
-                          {
-                            mediaType: intl.formatMessage(
-                              mediaType === 'movie'
-                                ? messages.movie
-                                : messages.tvshow
-                            ),
-                            arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                          }
+                        {safeServiceUrl4k && (
+                          <>
+                            <a
+                              href={safeServiceUrl4k}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block"
+                            >
+                              <Button buttonType="ghost" buttonSize="standard">
+                                <ServerIcon />
+                                <span>
+                                  {intl.formatMessage(messages.openarr4k, {
+                                    arr:
+                                      mediaType === 'movie'
+                                        ? 'Radarr'
+                                        : 'Sonarr',
+                                  })}
+                                </span>
+                              </Button>
+                            </a>
+                            {isDefault4kService() && (
+                              <div className="flex min-w-0 flex-col items-start">
+                                <ConfirmButton
+                                  buttonSize="standard"
+                                  onClick={() => deleteMediaFile(true)}
+                                  confirmText={intl.formatMessage(
+                                    globalMessages.areyousure
+                                  )}
+                                >
+                                  <TrashIcon />
+                                  <span>
+                                    {intl.formatMessage(messages.removearr4k, {
+                                      arr:
+                                        mediaType === 'movie'
+                                          ? 'Radarr'
+                                          : 'Sonarr',
+                                    })}
+                                  </span>
+                                </ConfirmButton>
+                                <div className="mt-1 text-xs text-gray-400">
+                                  {intl.formatMessage(
+                                    messages.manageModalRemoveMediaWarning,
+                                    {
+                                      mediaType: intl.formatMessage(
+                                        mediaType === 'movie'
+                                          ? messages.movie
+                                          : messages.tvshow
+                                      ),
+                                      arr:
+                                        mediaType === 'movie'
+                                          ? 'Radarr'
+                                          : 'Sonarr',
+                                    }
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
-                    </div>
-                  )}
-              </div>
-            </div>
-          )}
-        {hasPermission(Permission.ADMIN) &&
-          (safeServiceUrl4k || safeTautulliUrl4k || watchData?.data4k) && (
-            <div>
-              <h3 className="mb-2 text-xl font-bold">
-                {intl.formatMessage(messages.manageModalMedia4k)}
-              </h3>
-              <div className="space-y-2">
-                {(watchData?.data4k || safeTautulliUrl4k) && (
-                  <div>
-                    {watchData?.data4k && (
-                      <div
-                        className={`grid grid-cols-1 divide-y divide-gray-700 overflow-hidden border-gray-700 text-sm text-gray-300 shadow ${
-                          safeTautulliUrl4k
-                            ? 'rounded-t-md border-x border-t'
-                            : 'rounded-md border'
-                        }`}
-                      >
-                        <div className="grid grid-cols-3 divide-x divide-gray-700">
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.pastdays, {
-                                days: 7,
-                              })}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(watchData.data4k.playCount7Days)}
-                            </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.pastdays, {
-                                days: 30,
-                              })}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(
-                                watchData.data4k.playCount30Days
+                    )}
+                    {data.mediaInfo &&
+                      data.mediaInfo.status !== MediaStatus.BLOCKLISTED && (
+                        <div className="flex flex-wrap gap-2">
+                          {data?.mediaInfo.status !== MediaStatus.AVAILABLE && (
+                            <Button
+                              buttonSize="standard"
+                              onClick={() => markAvailable()}
+                              buttonType="success"
+                            >
+                              <CheckCircleIcon />
+                              <span>
+                                {intl.formatMessage(
+                                  mediaType === 'movie'
+                                    ? messages.markavailable
+                                    : messages.markallseasonsavailable
+                                )}
+                              </span>
+                            </Button>
+                          )}
+                          {data?.mediaInfo.status4k !== MediaStatus.AVAILABLE &&
+                            settings.currentSettings.series4kEnabled && (
+                              <Button
+                                buttonSize="standard"
+                                onClick={() => markAvailable(true)}
+                                buttonType="success"
+                              >
+                                <CheckCircleIcon />
+                                <span>
+                                  {intl.formatMessage(
+                                    mediaType === 'movie'
+                                      ? messages.mark4kavailable
+                                      : messages.markallseasons4kavailable
+                                  )}
+                                </span>
+                              </Button>
+                            )}
+                          <div className="flex min-w-0 basis-full flex-col items-start">
+                            <ConfirmButton
+                              buttonSize="standard"
+                              onClick={() => deleteMedia()}
+                              confirmText={intl.formatMessage(
+                                globalMessages.areyousure
+                              )}
+                            >
+                              <DocumentMinusIcon />
+                              <span>
+                                {intl.formatMessage(
+                                  messages.manageModalClearMedia
+                                )}
+                              </span>
+                            </ConfirmButton>
+                            <div className="mt-2 text-xs text-gray-400">
+                              {intl.formatMessage(
+                                messages.manageModalClearMediaWarning,
+                                {
+                                  mediaType: intl.formatMessage(
+                                    mediaType === 'movie'
+                                      ? messages.movie
+                                      : messages.tvshow
+                                  ),
+                                  mediaServerName:
+                                    settings.currentSettings.mediaServerType ===
+                                    MediaServerType.EMBY
+                                      ? 'Emby'
+                                      : settings.currentSettings
+                                            .mediaServerType ===
+                                          MediaServerType.PLEX
+                                        ? 'Plex'
+                                        : 'Jellyfin',
+                                }
                               )}
                             </div>
                           </div>
-                          <div className="px-4 py-3">
-                            <div className="font-bold">
-                              {intl.formatMessage(messages.alltime)}
-                            </div>
-                            <div className="text-white">
-                              {styledPlayCount(watchData.data4k.playCount)}
-                            </div>
-                          </div>
                         </div>
-                        {!!watchData.data4k.users.length && (
-                          <div className="flex flex-row space-x-2 px-4 pt-3 pb-2">
-                            <span className="shrink-0 leading-8 font-bold">
-                              {intl.formatMessage(messages.playedby)}
-                            </span>
-                            <span className="flex flex-row flex-wrap">
-                              {watchData.data4k.users.map((user) => (
-                                <Link
-                                  href={
-                                    currentUser?.id === user.id
-                                      ? '/profile'
-                                      : `/users/${user.id}`
-                                  }
-                                  key={`watch-user-${user.id}`}
-                                  className="z-0 -mr-2 mb-1 shrink-0 hover:z-50"
-                                >
-                                  <Tooltip
-                                    key={`watch-user-${user.id}`}
-                                    content={user.displayName}
-                                  >
-                                    <CachedImage
-                                      type="avatar"
-                                      src={user.avatar}
-                                      alt={user.displayName}
-                                      className="h-8 w-8 scale-100 transform-gpu rounded-full object-cover ring-1 ring-gray-500 transition duration-300 hover:scale-105"
-                                      width={32}
-                                      height={32}
-                                    />
-                                  </Tooltip>
-                                </Link>
-                              ))}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {safeTautulliUrl4k && (
-                      <a
-                        href={safeTautulliUrl4k}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <Button
-                          buttonType="ghost"
-                          className={`w-full ${
-                            watchData?.data4k ? 'rounded-t-none' : ''
-                          }`}
-                        >
-                          <Bars4Icon />
-                          <span>
-                            {intl.formatMessage(messages.opentautulli)}
-                          </span>
-                        </Button>
-                      </a>
-                    )}
-                  </div>
-                )}
-                {safeServiceUrl4k && (
-                  <>
-                    <a
-                      href={safeServiceUrl4k}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
-                    >
-                      <Button buttonType="ghost" className="w-full">
-                        <ServerIcon />
-                        <span>
-                          {intl.formatMessage(messages.openarr4k, {
-                            arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                          })}
-                        </span>
-                      </Button>
-                    </a>
-                    {isDefault4kService() && (
-                      <div>
-                        <ConfirmButton
-                          onClick={() => deleteMediaFile(true)}
-                          confirmText={intl.formatMessage(
-                            globalMessages.areyousure
-                          )}
-                          className="w-full"
-                        >
-                          <TrashIcon />
-                          <span>
-                            {intl.formatMessage(messages.removearr4k, {
-                              arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                            })}
-                          </span>
-                        </ConfirmButton>
-                        <div className="mt-1 text-xs text-gray-400">
-                          {intl.formatMessage(
-                            messages.manageModalRemoveMediaWarning,
-                            {
-                              mediaType: intl.formatMessage(
-                                mediaType === 'movie'
-                                  ? messages.movie
-                                  : messages.tvshow
-                              ),
-                              arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
-                            }
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        {hasPermission(Permission.ADMIN) &&
-          data?.mediaInfo &&
-          data.mediaInfo.status !== MediaStatus.BLOCKLISTED && (
-            <div>
-              <h3 className="mb-2 text-xl font-bold">
-                {intl.formatMessage(messages.manageModalAdvanced)}
-              </h3>
-              <div className="space-y-2">
-                {data?.mediaInfo.status !== MediaStatus.AVAILABLE && (
-                  <Button
-                    onClick={() => markAvailable()}
-                    className="w-full"
-                    buttonType="success"
-                  >
-                    <CheckCircleIcon />
-                    <span>
-                      {intl.formatMessage(
-                        mediaType === 'movie'
-                          ? messages.markavailable
-                          : messages.markallseasonsavailable
                       )}
-                    </span>
-                  </Button>
-                )}
-                {data?.mediaInfo.status4k !== MediaStatus.AVAILABLE &&
-                  settings.currentSettings.series4kEnabled && (
-                    <Button
-                      onClick={() => markAvailable(true)}
-                      className="w-full"
-                      buttonType="success"
-                    >
-                      <CheckCircleIcon />
-                      <span>
-                        {intl.formatMessage(
-                          mediaType === 'movie'
-                            ? messages.mark4kavailable
-                            : messages.markallseasons4kavailable
-                        )}
-                      </span>
-                    </Button>
-                  )}
-                <div>
-                  <ConfirmButton
-                    onClick={() => deleteMedia()}
-                    confirmText={intl.formatMessage(globalMessages.areyousure)}
-                    className="w-full"
-                  >
-                    <DocumentMinusIcon />
-                    <span>
-                      {intl.formatMessage(messages.manageModalClearMedia)}
-                    </span>
-                  </ConfirmButton>
-                  <div className="mt-2 text-xs text-gray-400">
-                    {intl.formatMessage(messages.manageModalClearMediaWarning, {
-                      mediaType: intl.formatMessage(
-                        mediaType === 'movie' ? messages.movie : messages.tvshow
-                      ),
-                      mediaServerName:
-                        settings.currentSettings.mediaServerType ===
-                        MediaServerType.EMBY
-                          ? 'Emby'
-                          : settings.currentSettings.mediaServerType ===
-                              MediaServerType.PLEX
-                            ? 'Plex'
-                            : 'Jellyfin',
-                    })}
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-      </div>
-    </SlideOver>
+              )}
+          </div>
+        </div>
+      </Modal>
+    </Transition>
   );
 };
 

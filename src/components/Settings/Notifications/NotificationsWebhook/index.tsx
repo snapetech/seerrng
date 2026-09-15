@@ -2,6 +2,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import NotificationTypeSelector from '@app/components/NotificationTypeSelector';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
+import Field from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -18,7 +19,7 @@ import {
   QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -355,9 +356,6 @@ const NotificationsWebhook = () => {
                   {intl.formatMessage(messages.supportVariables)}
                 </span>
                 <SettingsBadge badgeType="experimental" />
-                <span className="label-tip">
-                  {intl.formatMessage(messages.supportVariablesTip)}
-                </span>
               </label>
               <div className="form-input-area">
                 <Field
@@ -369,6 +367,9 @@ const NotificationsWebhook = () => {
                   }
                 />
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.supportVariablesTip)}
+              </span>
             </div>
             {values.supportVariables && (
               <div className="mt-2">
@@ -395,13 +396,6 @@ const NotificationsWebhook = () => {
               <label htmlFor="webhookUrl" className="text-label">
                 {intl.formatMessage(messages.webhookUrl)}
                 <span className="label-required">*</span>
-                {values.supportVariables && (
-                  <div className="label-tip">
-                    {intl.formatMessage(messages.webhookUrlTip, {
-                      testUrl: '/test',
-                    })}
-                  </div>
-                )}
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -418,6 +412,13 @@ const NotificationsWebhook = () => {
                     <div className="error">{errors.webhookUrl}</div>
                   )}
               </div>
+              {values.supportVariables && (
+                <div className="settings-form-row-description">
+                  {intl.formatMessage(messages.webhookUrlTip, {
+                    testUrl: '/test',
+                  })}
+                </div>
+              )}
             </div>
             <div className="form-row">
               <label htmlFor="authHeader" className="text-label">
@@ -432,9 +433,6 @@ const NotificationsWebhook = () => {
             <div className="form-row">
               <label htmlFor="customHeaders" className="text-label">
                 {intl.formatMessage(messages.customHeaders)}
-                <span className="label-tip">
-                  {intl.formatMessage(messages.customHeadersTip)}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="space-y-2">
@@ -508,6 +506,9 @@ const NotificationsWebhook = () => {
                     <div className="error">{errors.customHeaders}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.customHeadersTip)}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="webhook-json-payload" className="text-label">

@@ -4,7 +4,7 @@ import { getSafeHref } from '@app/utils/safeUrl';
 
 interface PlayButtonProps {
   links: PlayButtonLink[];
-  buttonSize?: 'default' | 'sm';
+  buttonSize?: 'standard' | 'default' | 'sm';
   unavailableLink?: Omit<PlayButtonLink, 'url'>;
   disabledReason?: string;
 }
@@ -17,7 +17,7 @@ export interface PlayButtonLink {
 
 const PlayButton = ({
   links,
-  buttonSize = 'default',
+  buttonSize = 'standard',
   unavailableLink,
   disabledReason,
 }: PlayButtonProps) => {

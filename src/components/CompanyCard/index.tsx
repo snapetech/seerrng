@@ -6,9 +6,15 @@ interface CompanyCardProps {
   name: string;
   image: string;
   url: string;
+  logoTone?: 'color' | 'white';
 }
 
-const CompanyCard = ({ image, url, name }: CompanyCardProps) => {
+const CompanyCard = ({
+  image,
+  url,
+  name,
+  logoTone = 'color',
+}: CompanyCardProps) => {
   const [isHovered, setHovered] = useState(false);
 
   return (
@@ -37,7 +43,9 @@ const CompanyCard = ({ image, url, name }: CompanyCardProps) => {
           type="tmdb"
           src={image}
           alt={name}
-          className="relative z-40 h-full w-full"
+          className={`relative z-40 h-full w-full ${
+            logoTone === 'white' ? 'brightness-0 invert' : ''
+          }`}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           fill
         />

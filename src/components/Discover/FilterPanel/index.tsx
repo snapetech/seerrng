@@ -13,7 +13,6 @@ import { tvNetworks } from '@app/components/Discover/NetworkSlider';
 import type { FilterOptions } from '@app/components/Discover/constants';
 import {
   CompanySelector,
-  GenreSelector,
   StatusSelector,
   WatchProviderSelector,
 } from '@app/components/Selector';
@@ -23,6 +22,7 @@ import { useBatchUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import defineMessages from '@app/utils/defineMessages';
 import { MagnifyingGlassIcon, TvIcon } from '@heroicons/react/24/outline';
 import { ChevronDownIcon } from '@heroicons/react/24/solid';
+import type { TmdbGenre } from '@server/api/themoviedb/interfaces';
 import type { Language } from '@server/lib/settings';
 import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -111,6 +111,9 @@ const FilterPanel = ({
   );
   const [isStreamingOpen, setIsStreamingOpen] = useState(false);
   const { data: languages } = useSWR<Language[]>('/api/v1/languages');
+  const { data: availableGenres } = useSWR<TmdbGenre[]>(
+    `/api/v1/genres/${type}`
+  );
 
   useEffect(() => {
     routedSearchRef.current = (currentFilters.search ?? '').trim();
@@ -135,15 +138,14 @@ const FilterPanel = ({
     type === 'movie' ? 'primaryReleaseDateGte' : 'firstAirDateGte';
   const dateLte =
     type === 'movie' ? 'primaryReleaseDateLte' : 'firstAirDateLte';
-  const hasActiveFilters = Object.keys(currentFilters).some(
-    (key) => key !== 'sortBy'
-  );
+  const hasActiveFilters = Object.keys(currentFilters).length > 0;
   const clearAllFilters = () => {
     routedSearchRef.current = '';
     setSearchValue('');
     batchUpdateQueryParams({
       ...clearedFilters,
       [searchQueryKey]: undefined,
+      sortBy: undefined,
     });
   };
   const updateFilter = (key: string, value?: string) => {
@@ -167,6 +169,14 @@ const FilterPanel = ({
     }),
     { label: '<1970', value: 'before-1970' },
   ];
+  const genreOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: 'any' },
+    ...(availableGenres ?? []).map((genre) => ({
+      label: genre.name,
+      value: genre.id.toString(),
+    })),
+  ];
+  const selectedGenre = currentFilters.genre?.split(',')[0] ?? 'any';
   const selectedYear = yearOptions.find((option) => {
     if (option.value === 'any') {
       return !currentFilters[dateGte] && !currentFilters[dateLte];
@@ -386,29 +396,30 @@ const FilterPanel = ({
       aria-label={intl.formatMessage(messages.filters)}
       className={variant === 'search' ? 'contents' : undefined}
     >
+      {variant === 'discover' && (
+        <div className="discover-filter-primary-row">
+          <button
+            type="button"
+            aria-pressed={!hasActiveFilters}
+            onClick={clearAllFilters}
+            className={`${getFilterResetButtonClass(!hasActiveFilters)} order-1`}
+          >
+            {intl.formatMessage(messages.clearFilters)}
+          </button>
+          <CardTextVisibilityToggle mediaType={type} className="order-2" />
+          <AvailabilityQualityControl
+            mediaType={type}
+            value={currentFilters.availability}
+            onChange={(value) => updateFilter('availability', value)}
+            className="order-3"
+          />
+        </div>
+      )}
       <div
-        className={variant === 'search' ? 'contents' : 'flex flex-wrap gap-2'}
+        className={
+          variant === 'search' ? 'contents' : 'discover-filter-secondary-row'
+        }
       >
-        {variant === 'discover' && (
-          <>
-            <button
-              type="button"
-              aria-pressed={!hasActiveFilters}
-              onClick={clearAllFilters}
-              className={`${getFilterResetButtonClass(!hasActiveFilters)} order-1`}
-            >
-              {intl.formatMessage(messages.clearFilters)}
-            </button>
-            <CardTextVisibilityToggle mediaType={type} className="order-2" />
-            <AvailabilityQualityControl
-              mediaType={type}
-              value={currentFilters.availability}
-              onChange={(value) => updateFilter('availability', value)}
-              className="order-3"
-            />
-            <div className="order-4 basis-full" aria-hidden="true" />
-          </>
-        )}
         <form
           className="discover-filter-control order-5 w-72 max-w-full flex-none"
           onSubmit={(event) => {
@@ -437,7 +448,7 @@ const FilterPanel = ({
             aria-label={intl.formatMessage(
               type === 'movie' ? messages.searchMovies : messages.searchSeries
             )}
-            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
           />
         </form>
         {type === 'tv' && (
@@ -502,28 +513,15 @@ const FilterPanel = ({
             />
           </div>
         )}
-        <div
-          className={`discover-filter-control ${
-            type === 'movie' ? 'order-7' : 'order-8'
-          }`}
-        >
-          <span
-            className={`discover-filter-control-label ${
-              currentFilters.genre ? 'discover-filter-control-label-active' : ''
-            }`}
-          >
-            {intl.formatMessage(messages.genres)}
-          </span>
-          <GenreSelector
-            compact
-            type={type}
-            defaultValue={currentFilters.genre}
-            isMulti
-            onChange={(value) => {
-              updateFilter('genre', value?.map((v) => v.value).join(','));
-            }}
-          />
-        </div>
+        <CompactSelect
+          className={type === 'movie' ? 'order-7' : 'order-8'}
+          label={intl.formatMessage(messages.genres)}
+          value={selectedGenre}
+          options={genreOptions}
+          onChange={(value) =>
+            updateFilter('genre', value === 'any' ? undefined : value)
+          }
+        />
         <CompactSelect
           className="order-12"
           label={intl.formatMessage(messages.language)}
@@ -612,7 +610,7 @@ const FilterPanel = ({
         <section
           className={`${
             variant === 'search' ? 'w-full basis-full' : ''
-          } mt-2 max-h-80 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900/40 p-3 pb-7`}
+          } scrollable-card mt-2 max-h-80 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900/40 p-3 pb-7`}
         >
           <WatchProviderSelector
             type={type}

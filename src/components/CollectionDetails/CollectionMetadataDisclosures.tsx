@@ -3,13 +3,15 @@ import DetailDisclosureButton from '@app/components/MediaDetails/DetailDisclosur
 import ExpandableCreditList, {
   type ExpandableCredit,
 } from '@app/components/MediaDetails/ExpandableCreditList';
+import useDetailDisclosurePins from '@app/hooks/useDetailDisclosurePins';
 import { mapWithConcurrency } from '@app/utils/concurrency';
 import defineMessages from '@app/utils/defineMessages';
+import type { DetailDisclosurePin } from '@server/interfaces/api/userSettingsInterfaces';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MovieResult } from '@server/models/Search';
 import axios from 'axios';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.CollectionDetails.Metadata', {
@@ -33,12 +35,14 @@ const tones = [
 
 const CollectionMetadataDisclosures = ({ parts }: { parts: MovieResult[] }) => {
   const intl = useIntl();
-  const [open, setOpen] = useState<'cast' | 'crew' | 'tags'>();
+  const { pins, togglePinned } = useDetailDisclosurePins('movie');
+  const [open, setOpen] = useState<Set<DetailDisclosurePin>>(() => new Set());
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<MovieDetails[]>();
+  const previousPins = useRef<typeof pins | undefined>(undefined);
+  const { cast: castPinned, crew: crewPinned, subjectTags: tagsPinned } = pins;
 
-  const toggle = async (section: 'cast' | 'crew' | 'tags') => {
-    setOpen((current) => (current === section ? undefined : section));
+  const loadDetails = useCallback(async () => {
     if (details || loading) return;
     setLoading(true);
     const loaded = await mapWithConcurrency(parts, 5, async (part) => {
@@ -50,7 +54,50 @@ const CollectionMetadataDisclosures = ({ parts }: { parts: MovieResult[] }) => {
     });
     setDetails(loaded.filter((item): item is MovieDetails => !!item));
     setLoading(false);
+  }, [details, loading, parts]);
+
+  const toggle = (section: DetailDisclosurePin) => {
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+    void loadDetails();
   };
+
+  useEffect(() => {
+    const supportedSections = [
+      'cast',
+      'crew',
+      'subjectTags',
+    ] as const satisfies readonly DetailDisclosurePin[];
+    const currentPins = {
+      cast: castPinned,
+      crew: crewPinned,
+      subjectTags: tagsPinned,
+    };
+    const changedSections = supportedSections.filter(
+      (section) => previousPins.current?.[section] !== currentPins[section]
+    );
+    previousPins.current = { ...pins, ...currentPins };
+    if (changedSections.length === 0) return;
+
+    setOpen((current) => {
+      const next = new Set(current);
+      changedSections.forEach((section) => {
+        if (currentPins[section]) next.add(section);
+        else next.delete(section);
+      });
+      return next;
+    });
+    if (changedSections.some((section) => currentPins[section])) {
+      void loadDetails();
+    }
+  }, [castPinned, crewPinned, loadDetails, pins, tagsPinned]);
   const uniqueCredits = (type: 'cast' | 'crew'): ExpandableCredit[] => {
     const unique = new Map<number, ExpandableCredit>();
     details?.forEach((movie) => {
@@ -84,45 +131,51 @@ const CollectionMetadataDisclosures = ({ parts }: { parts: MovieResult[] }) => {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-[5px] flex flex-wrap items-center gap-2">
         <DetailDisclosureButton
           label={intl.formatMessage(messages.viewCast)}
-          open={open === 'cast'}
-          onClick={() => void toggle('cast')}
+          open={open.has('cast')}
+          onClick={() => toggle('cast')}
+          pinned={pins.cast}
+          onPinClick={() => void togglePinned('cast')}
         />
         <DetailDisclosureButton
           label={intl.formatMessage(messages.viewCrew)}
-          open={open === 'crew'}
-          onClick={() => void toggle('crew')}
+          open={open.has('crew')}
+          onClick={() => toggle('crew')}
+          pinned={pins.crew}
+          onPinClick={() => void togglePinned('crew')}
         />
         <DetailDisclosureButton
           label={intl.formatMessage(messages.subjectTags)}
-          open={open === 'tags'}
-          onClick={() => void toggle('tags')}
+          open={open.has('subjectTags')}
+          onClick={() => toggle('subjectTags')}
+          pinned={pins.subjectTags}
+          onPinClick={() => void togglePinned('subjectTags')}
         />
       </div>
-      {open && loading && (
+      {open.size > 0 && loading && (
         <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-6">
           <LoadingSpinner />
         </section>
       )}
-      {open === 'cast' && !loading && (
+      {open.has('cast') && !loading && (
         <ExpandableCreditList
           title={intl.formatMessage(messages.fullCastList)}
           credits={uniqueCredits('cast')}
           emptyLabel={intl.formatMessage(messages.noCast)}
         />
       )}
-      {open === 'crew' && !loading && (
+      {open.has('crew') && !loading && (
         <ExpandableCreditList
           title={intl.formatMessage(messages.fullCrewList)}
           credits={uniqueCredits('crew')}
           emptyLabel={intl.formatMessage(messages.noCrew)}
         />
       )}
-      {open === 'tags' && !loading && (
+      {open.has('subjectTags') && !loading && (
         <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-          <h2 className="mb-2 text-xs font-semibold text-gray-200">
+          <h2 className="media-inset-heading mb-2">
             {intl.formatMessage(messages.subjectTags)}
           </h2>
           {keywords.size === 0 ? (
@@ -135,7 +188,7 @@ const CollectionMetadataDisclosures = ({ parts }: { parts: MovieResult[] }) => {
                 <Link
                   key={id}
                   href={`/discover/movies/keyword?keywords=${id}`}
-                  className={`inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-medium transition ${tones[index % tones.length]}`}
+                  className={`compact-control inline-flex items-center rounded-full border px-2 text-[11px] font-medium transition ${tones[index % tones.length]}`}
                 >
                   {name}
                 </Link>

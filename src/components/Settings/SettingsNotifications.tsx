@@ -151,16 +151,18 @@ const SettingsNotifications = ({ children }: SettingsNotificationsProps) => {
           intl.formatMessage(globalMessages.settings),
         ]}
       />
-      <div className="mb-6">
-        <h3 className="heading">
+      <section className="settings-group-card">
+        <h3 className="settings-group-heading">
           {intl.formatMessage(messages.notificationsettings)}
         </h3>
-        <p className="description">
+        <p className="settings-group-description">
           {intl.formatMessage(messages.notificationAgentSettingsDescription)}
         </p>
-      </div>
-      <SettingsTabs tabType="button" settingsRoutes={settingsRoutes} />
-      <div className="section">{children}</div>
+        <div className="mt-2">
+          <SettingsTabs tabType="button" settingsRoutes={settingsRoutes} />
+        </div>
+        <div className="settings-group-content mt-2">{children}</div>
+      </section>
     </>
   );
 };

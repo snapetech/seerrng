@@ -155,6 +155,61 @@ describe('shouldSyncSearchInput', () => {
 });
 
 describe('useSearchInput routing', () => {
+  it('preserves a deep-linked query while the router hydrates', async () => {
+    dom = new JSDOM('<div id="root"></div>', {
+      url: 'http://localhost/search?query=pride%20and%20prejudice',
+    });
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: dom.window,
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: dom.window.document,
+    });
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+
+    const replacements: unknown[] = [];
+    let router = createRouter({
+      asPath: '/search',
+      isReady: false,
+      query: {},
+      replace: async (...args) => {
+        replacements.push(args);
+        return true;
+      },
+    });
+    let search: ReturnType<typeof useSearchInput> | undefined;
+    const Probe = () => {
+      search = useSearchInput();
+      return null;
+    };
+    const render = () =>
+      root?.render(
+        createElement(RouterProvider, { router }, createElement(Probe))
+      );
+
+    root = createRoot(dom.window.document.getElementById('root')!);
+    await act(async () => render());
+
+    router = createRouter({
+      asPath: '/search?query=pride%20and%20prejudice',
+      isReady: true,
+      query: { query: 'pride and prejudice' },
+      replace: async (...args) => {
+        replacements.push(args);
+        return true;
+      },
+    });
+    await act(async () => render());
+
+    strictEqual(search?.searchValue, 'pride and prejudice');
+    strictEqual(search?.searchOpen, true);
+    strictEqual(replacements.length, 0);
+  });
+
   it('carries the book filter from book discovery into search', async () => {
     dom = new JSDOM('<div id="root"></div>', {
       url: 'http://localhost/discover/books',

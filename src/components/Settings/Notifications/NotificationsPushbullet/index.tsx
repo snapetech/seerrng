@@ -2,12 +2,13 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import NotificationTypeSelector from '@app/components/NotificationTypeSelector';
+import Field from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -158,20 +159,6 @@ const NotificationsPushbullet = () => {
               <label htmlFor="accessToken" className="text-label">
                 {intl.formatMessage(messages.accessToken)}
                 <span className="label-required">*</span>
-                <span className="label-tip">
-                  {intl.formatMessage(messages.accessTokenTip, {
-                    PushbulletSettingsLink: (msg: React.ReactNode) => (
-                      <a
-                        href="https://www.pushbullet.com/#settings/account"
-                        className="text-white transition duration-300 hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {msg}
-                      </a>
-                    ),
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -188,6 +175,20 @@ const NotificationsPushbullet = () => {
                     <div className="error">{errors.accessToken}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.accessTokenTip, {
+                  PushbulletSettingsLink: (msg: React.ReactNode) => (
+                    <a
+                      href="https://www.pushbullet.com/#settings/account"
+                      className="text-white transition duration-300 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {msg}
+                    </a>
+                  ),
+                })}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="channelTag" className="text-label">

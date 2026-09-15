@@ -3,7 +3,6 @@ import defineMessages from '@app/utils/defineMessages';
 import type { Language } from '@server/lib/settings';
 import { useMemo } from 'react';
 import { useIntl } from 'react-intl';
-import type { CSSObjectWithLabel } from 'react-select';
 import Select from 'react-select';
 import useSWR from 'swr';
 
@@ -17,15 +16,6 @@ type OptionType = {
   value: string;
   label: string;
   isFixed?: boolean;
-};
-
-const selectStyles = {
-  multiValueLabel: (base: CSSObjectWithLabel, props: { data: OptionType }) => {
-    return props.data?.isFixed ? { ...base, paddingRight: 6 } : base;
-  },
-  multiValueRemove: (base: CSSObjectWithLabel, props: { data: OptionType }) => {
-    return props.data?.isFixed ? { ...base, display: 'none' } : base;
-  },
 };
 
 interface LanguageSelectorProps {
@@ -105,8 +95,14 @@ const LanguageSelector = ({
       options={options}
       isMulti
       isDisabled={isDisabled}
-      className={`react-select-container ${compact ? 'discover-compact-select' : ''}`}
+      className={`react-select-container language-selector ${compact ? 'discover-compact-select' : 'settings-compatible-react-select'}`}
       classNamePrefix="react-select"
+      classNames={{
+        multiValueLabel: ({ data }) =>
+          data.isFixed ? 'react-select__multi-value__label--fixed' : '',
+        multiValueRemove: ({ data }) =>
+          data.isFixed ? 'react-select__multi-value__remove--fixed' : '',
+      }}
       value={
         (isUserSettings && value === 'all') || (!isUserSettings && !value)
           ? {
@@ -179,7 +175,6 @@ const LanguageSelector = ({
             .join('|')
         );
       }}
-      styles={selectStyles}
     />
   );
 };

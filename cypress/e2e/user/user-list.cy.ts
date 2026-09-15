@@ -79,7 +79,7 @@ describe('User List', () => {
     cy.visit('/users');
     cy.wait('@userListFetch');
 
-    cy.get('[data-testid=column-header-displayname]').click();
+    cy.contains('button', 'User Name').click();
     cy.wait('@userListFetch').then((interception) => {
       const url = interception.request.url;
       expect(url).to.include('sort=displayname');
@@ -96,7 +96,7 @@ describe('User List', () => {
       expect(displayNames).to.deep.equal(sortedAsc);
     });
 
-    cy.get('[data-testid=column-header-created]').click();
+    cy.contains('button', 'Joined').click();
 
     cy.window().then((win) => {
       const rawSettings = win.localStorage.getItem('ul-filter-settings');

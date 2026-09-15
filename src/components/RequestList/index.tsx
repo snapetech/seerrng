@@ -340,7 +340,7 @@ const RequestList = () => {
             <Tooltip content={intl.formatMessage(messages.sortDirection)}>
               <Button
                 buttonType="default"
-                className="z-40 mr-2 rounded-l-none px-3"
+                className="app-control-shadow-exempt z-40 mr-2 rounded-l-none px-3"
                 buttonSize="md"
                 onClick={() =>
                   setCurrentSortDirection(

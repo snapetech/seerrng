@@ -479,6 +479,7 @@ const MediaSlider = ({
               }
               mediaType={title.mediaType}
               availableQualities={title.availableQualities}
+              qualityStatuses={title.qualityStatuses}
               inProgress={(title.mediaInfo?.downloadStatus ?? []).length > 0}
               needsCoverArt={title.needsCoverArt}
               showText={visibility.album === 'always'}
@@ -575,7 +576,7 @@ const MediaSlider = ({
           <Tooltip content={`Refresh ${title}`}>
             <Button
               type="button"
-              buttonType="default"
+              buttonType="trailer"
               buttonSize="sm"
               onClick={refreshRandomizedOrder}
               className="h-8 w-8 p-0"

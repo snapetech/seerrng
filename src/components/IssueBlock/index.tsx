@@ -27,7 +27,7 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
   }
 
   return (
-    <div className="px-4 py-3 text-gray-300">
+    <div className="px-3 py-2 text-gray-300">
       <div className="flex items-center justify-between">
         <div className="mr-6 min-w-0 flex-1 flex-col items-center text-sm leading-5">
           <div className="flex flex-nowrap">
@@ -64,7 +64,7 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
         </div>
         <div className="ml-2 flex flex-shrink-0 flex-wrap">
           <Link href={`/issues/${issue.id}`} passHref legacyBehavior>
-            <Button buttonType="primary" as="a">
+            <Button buttonType="primary" buttonSize="standard" as="a">
               <EyeIcon />
             </Button>
           </Link>

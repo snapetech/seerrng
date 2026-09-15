@@ -58,9 +58,14 @@ const useSearchInput = (): SearchObject => {
    * in a new route. If we are, then we only replace the history.
    */
   useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
     if (
       isSearchPage &&
       searchOpen &&
+      searchValue === '' &&
       debouncedValue === '' &&
       routeQuery !== '' &&
       pendingSearchQuery.current !== ''
@@ -121,8 +126,10 @@ const useSearchInput = (): SearchObject => {
     isSearchPage,
     routeQuery,
     router,
+    router.isReady,
     router.pathname,
     searchOpen,
+    searchValue,
   ]);
 
   /**
@@ -166,6 +173,7 @@ const useSearchInput = (): SearchObject => {
   useEffect(() => {
     const restoringSearchRoute =
       isSearchPage &&
+      router.isReady &&
       !searchOpen &&
       !closingSearch.current &&
       routeQuery !== '';
@@ -196,13 +204,14 @@ const useSearchInput = (): SearchObject => {
       }
     }
 
-    if (isSearchPage && !closingSearch.current) {
+    if (isSearchPage && router.isReady && !closingSearch.current) {
       setSearchOpen(true);
     }
   }, [
     debouncedValue,
     isSearchPage,
     routeQuery,
+    router.isReady,
     router.pathname,
     searchOpen,
     searchValue,

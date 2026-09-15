@@ -15,7 +15,7 @@ export interface SettingsRoute {
 }
 
 type SettingsLinkProps = {
-  tabType: 'default' | 'button';
+  tabType: 'default' | 'button' | 'filter';
   currentPath: string;
   route: string;
   regex: RegExp;
@@ -48,10 +48,15 @@ const SettingsLink = ({
     'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-400 focus:text-gray-300 focus:border-gray-400';
 
   if (tabType === 'button') {
-    linkClasses =
-      'px-3 py-2 text-sm font-medium transition duration-300 rounded-md whitespace-nowrap mx-2 my-1';
-    activeLinkColor = 'bg-indigo-700';
-    inactiveLinkColor = 'bg-gray-800 hover:bg-gray-700 focus:bg-gray-700';
+    linkClasses = 'app-filter-button whitespace-nowrap';
+    activeLinkColor = 'app-filter-button-active';
+    inactiveLinkColor = 'app-filter-button-idle';
+  }
+
+  if (tabType === 'filter') {
+    linkClasses = 'app-filter-button settings-page-filter-link';
+    activeLinkColor = 'app-filter-button-active';
+    inactiveLinkColor = 'app-filter-button-idle';
   }
 
   return (
@@ -60,7 +65,7 @@ const SettingsLink = ({
       className={`${linkClasses} ${
         currentPath.match(regex) ? activeLinkColor : inactiveLinkColor
       }`}
-      aria-current="page"
+      aria-current={currentPath.match(regex) ? 'page' : undefined}
     >
       {children}
     </Link>
@@ -71,7 +76,7 @@ const SettingsTabs = ({
   tabType = 'default',
   settingsRoutes,
 }: {
-  tabType?: 'default' | 'button';
+  tabType?: 'default' | 'button' | 'filter';
   settingsRoutes: SettingsRoute[];
 }) => {
   const router = useRouter();
@@ -79,7 +84,7 @@ const SettingsTabs = ({
 
   return (
     <>
-      <div className="sm:hidden">
+      <div className={tabType === 'filter' ? 'hidden' : 'sm:hidden'}>
         <label htmlFor="tabs" className="sr-only">
           Select a Tab
         </label>
@@ -124,21 +129,46 @@ const SettingsTabs = ({
             ))}
         </select>
       </div>
-      {tabType === 'button' ? (
-        <div className="hidden sm:block">
-          <nav className="-mx-2 -my-1 flex flex-wrap" aria-label="Tabs">
-            {settingsRoutes.map((route, index) => (
-              <SettingsLink
-                tabType={tabType}
-                currentPath={router.pathname}
-                route={route.route}
-                regex={route.regex}
-                hidden={route.hidden ?? false}
-                key={`button-settings-link-${index}`}
-              >
-                {route.content ?? route.text}
-              </SettingsLink>
-            ))}
+      {tabType === 'button' || tabType === 'filter' ? (
+        <div
+          className={
+            tabType === 'filter'
+              ? 'settings-page-filter-nav flex'
+              : 'hidden sm:block'
+          }
+        >
+          <nav
+            className={
+              tabType === 'filter'
+                ? 'flex w-full min-w-0 flex-wrap justify-between gap-[5px]'
+                : 'flex flex-wrap gap-[5px]'
+            }
+            aria-label="Tabs"
+          >
+            {settingsRoutes
+              .filter(
+                (route) =>
+                  !route.hidden &&
+                  (route.requiredPermission
+                    ? hasPermission(
+                        route.requiredPermission,
+                        currentUser?.permissions ?? 0,
+                        route.permissionType
+                      )
+                    : true)
+              )
+              .map((route, index) => (
+                <SettingsLink
+                  tabType={tabType}
+                  currentPath={router.pathname}
+                  route={route.route}
+                  regex={route.regex}
+                  hidden={route.hidden ?? false}
+                  key={`button-settings-link-${index}`}
+                >
+                  {route.content ?? route.text}
+                </SettingsLink>
+              ))}
           </nav>
         </div>
       ) : (

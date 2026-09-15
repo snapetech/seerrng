@@ -209,6 +209,7 @@ const ListView = ({
                 }
                 mediaType={title.mediaType}
                 availableQualities={title.availableQualities}
+                qualityStatuses={title.qualityStatuses}
                 inProgress={(title.mediaInfo?.downloadStatus ?? []).length > 0}
                 needsCoverArt={title.needsCoverArt}
                 canExpand

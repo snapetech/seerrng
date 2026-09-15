@@ -86,11 +86,12 @@ const CollectionAssociationsButton = ({ parts }: { parts: MovieResult[] }) => {
               {intl.formatMessage(messages.empty)}
             </p>
           ) : (
-            <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+            <div className="scrollable-card grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
               {edges.map((edge) => (
                 <Link
                   key={`${edge.node.mediaType}-${edge.node.id}`}
                   href={getAssociationHref(edge)}
+                  onClick={() => setShow(false)}
                   className="refreshed-inset-surface rounded-lg border border-gray-700 px-3 py-2 transition hover:border-cyan-400 hover:text-white"
                 >
                   <span className="block truncate font-semibold">

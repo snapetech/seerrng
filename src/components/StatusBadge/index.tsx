@@ -191,10 +191,10 @@ const StatusBadge = ({
     <div
       className={`absolute top-0 left-0 z-10 flex h-full ${
         status === MediaStatus.DELETED
-          ? 'bg-red-600/80'
+          ? 'bg-red-600/35'
           : status === MediaStatus.PROCESSING
-            ? 'bg-indigo-500/80'
-            : 'bg-green-500/80'
+            ? 'bg-indigo-500/35'
+            : 'bg-green-500/35'
       } transition-all duration-200 ease-in-out`}
       style={{
         width: `${
@@ -210,7 +210,8 @@ const StatusBadge = ({
         <Tooltip
           content={inProgress ? tooltipContent : mediaLinkDescription}
           className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
+            inProgress &&
+            'scrollable-card hidden max-h-96 w-96 overflow-y-auto sm:block'
           }`}
           tooltipConfig={{
             ...(inProgress && { interactive: true, delayHide: 100 }),
@@ -220,7 +221,8 @@ const StatusBadge = ({
             badgeType="success"
             href={mediaLink}
             className={`${className ?? ''} ${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+              inProgress &&
+              'relative !bg-gray-700/35 !px-0 hover:!bg-gray-700/55'
             } overflow-hidden`}
           >
             {inProgress && badgeDownloadProgress}
@@ -275,7 +277,8 @@ const StatusBadge = ({
         <Tooltip
           content={inProgress ? tooltipContent : mediaLinkDescription}
           className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
+            inProgress &&
+            'scrollable-card hidden max-h-96 w-96 overflow-y-auto sm:block'
           }`}
           tooltipConfig={{
             ...(inProgress && { interactive: true, delayHide: 100 }),
@@ -285,7 +288,8 @@ const StatusBadge = ({
             badgeType="success"
             href={mediaLink}
             className={`${className ?? ''} ${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+              inProgress &&
+              'relative !bg-gray-700/35 !px-0 hover:!bg-gray-700/55'
             } overflow-hidden`}
           >
             {inProgress && badgeDownloadProgress}
@@ -340,7 +344,8 @@ const StatusBadge = ({
         <Tooltip
           content={inProgress ? tooltipContent : mediaLinkDescription}
           className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
+            inProgress &&
+            'scrollable-card hidden max-h-96 w-96 overflow-y-auto sm:block'
           }`}
           tooltipConfig={{
             ...(inProgress && { interactive: true, delayHide: 100 }),
@@ -350,7 +355,8 @@ const StatusBadge = ({
             badgeType="primary"
             href={mediaLink}
             className={`${className ?? ''} ${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+              inProgress &&
+              'relative !bg-gray-700/35 !px-0 hover:!bg-gray-700/55'
             } overflow-hidden`}
           >
             {inProgress && badgeDownloadProgress}
@@ -429,7 +435,8 @@ const StatusBadge = ({
         <Tooltip
           content={inProgress ? tooltipContent : mediaLinkDescription}
           className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
+            inProgress &&
+            'scrollable-card hidden max-h-96 w-96 overflow-y-auto sm:block'
           }`}
           tooltipConfig={{
             ...(inProgress && { interactive: true, delayHide: 100 }),
@@ -439,7 +446,8 @@ const StatusBadge = ({
             badgeType="danger"
             href={mediaLink}
             className={`${className ?? ''} ${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+              inProgress &&
+              'relative !bg-gray-700/35 !px-0 hover:!bg-gray-700/55'
             } overflow-hidden`}
           >
             {inProgress && badgeDownloadProgress}

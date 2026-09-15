@@ -35,10 +35,9 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browseaudiobooks: 'Audiobooks',
   browsetv: 'Series',
   requests: 'Requests',
-  requeststatus: 'Requests',
   blocklist: 'Blocklist',
   issues: 'Issues',
-  users: 'Users',
+  users: 'User List',
   settings: 'Settings',
 });
 
@@ -100,16 +99,10 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/audiobooks$/,
   },
   {
-    href: '/discover/audiobooks',
-    messagesKey: 'browseaudiobooks',
-    svgIcon: <SpeakerWaveIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/discover\/audiobooks$/,
-  },
-  {
-    href: '/requests/status',
-    messagesKey: 'requeststatus',
+    href: '/requests',
+    messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/requests\/status/,
+    activeRegExp: /^\/requests\/?$/,
   },
   {
     href: '/blocklist',

@@ -160,6 +160,16 @@ describe('Issue route validation', () => {
     assert.match(res.body.message, /Issue type must be valid/);
   });
 
+  it('rejects malformed media-specific issue filters', async () => {
+    const agent = await login();
+    const res = await agent
+      .get('/issue')
+      .query({ mediaType: MediaType.MOVIE, releaseYear: 'next-year' });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /Release year must be a four-digit year/);
+  });
+
   it('accepts sorting issues by added date', async () => {
     const agent = await login();
     const res = await agent.get('/issue').query({ sort: 'added' });
@@ -235,6 +245,122 @@ describe('Issue route validation', () => {
       open: 0,
       resolved: 0,
     });
+  });
+
+  it('filters movie issues through the media-specific metadata controls', async () => {
+    const matchingIssue = await createIssue(
+      'admin@seerr.dev',
+      111,
+      IssueType.VIDEO,
+      IssueStatus.OPEN,
+      MediaType.MOVIE
+    );
+    const otherIssue = await createIssue(
+      'admin@seerr.dev',
+      112,
+      IssueType.VIDEO,
+      IssueStatus.OPEN,
+      MediaType.MOVIE
+    );
+    await getRepository(MediaSearchMetadata).save([
+      {
+        mediaId: matchingIssue.media.id,
+        media: matchingIssue.media,
+        title: 'Matching Movie Issue',
+        releaseDate: '2024-03-15',
+        genres: 'Action, Thriller',
+        studio: 'Universal Pictures',
+        searchText: 'matching movie issue 2024 action thriller universal',
+      },
+      {
+        mediaId: otherIssue.media.id,
+        media: otherIssue.media,
+        title: 'Other Movie Issue',
+        releaseDate: '2023-06-01',
+        genres: 'Drama',
+        studio: 'Disney',
+        searchText: 'other movie issue 2023 drama disney',
+      },
+    ]);
+    const agent = await login();
+
+    const res = await agent.get('/issue').query({
+      mediaType: MediaType.MOVIE,
+      releaseYear: '2024',
+      genre: 'action',
+      studio: 'universal',
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(
+      res.body.results.map(({ id }: { id: number }) => id),
+      [matchingIssue.id]
+    );
+    assert.deepStrictEqual(res.body.counts, {
+      all: 1,
+      open: 1,
+      resolved: 0,
+    });
+  });
+
+  it('filters series and music issues by their dynamic controls', async () => {
+    const seriesIssue = await createIssue(
+      'admin@seerr.dev',
+      113,
+      IssueType.VIDEO,
+      IssueStatus.OPEN,
+      MediaType.TV
+    );
+    const musicIssue = await createIssue(
+      'admin@seerr.dev',
+      114,
+      IssueType.AUDIO,
+      IssueStatus.OPEN,
+      MediaType.MUSIC
+    );
+    await getRepository(MediaSearchMetadata).save([
+      {
+        mediaId: seriesIssue.media.id,
+        media: seriesIssue.media,
+        title: 'Network Series Issue',
+        releaseDate: '2022-01-01',
+        genres: 'Drama',
+        network: 'Prime Video',
+        searchText: 'network series issue 2022 drama prime video',
+      },
+      {
+        mediaId: musicIssue.media.id,
+        media: musicIssue.media,
+        title: 'Album Type Issue',
+        releaseDate: '2021-01-01',
+        genres: 'Rock',
+        albumType: 'Album',
+        searchText: 'album type issue 2021 rock album',
+      },
+    ]);
+    const agent = await login();
+
+    const [seriesResponse, musicResponse] = await Promise.all([
+      agent.get('/issue').query({
+        mediaType: MediaType.TV,
+        network: 'prime video',
+      }),
+      agent.get('/issue').query({
+        mediaType: MediaType.MUSIC,
+        albumType: 'album',
+      }),
+    ]);
+
+    assert.strictEqual(seriesResponse.status, 200);
+    assert.deepStrictEqual(
+      seriesResponse.body.results.map(({ id }: { id: number }) => id),
+      [seriesIssue.id]
+    );
+    assert.strictEqual(musicResponse.status, 200);
+    assert.deepStrictEqual(
+      musicResponse.body.results.map(({ id }: { id: number }) => id),
+      [musicIssue.id]
+    );
   });
 
   it('filters issues and task counts by issue type', async () => {

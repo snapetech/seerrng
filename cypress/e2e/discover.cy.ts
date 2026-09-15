@@ -192,11 +192,14 @@ describe('Discover', () => {
         },
       ],
     }).as('getRequests');
+    cy.intercept('GET', '/api/v1/request/582', { statusCode: 500 });
 
     cy.visit('/');
     cy.wait('@getRequests');
     cy.contains('.slider-header', 'Recent Requests')
       .next('[data-testid=media-slider]')
+      .scrollIntoView()
+      .should('be.visible')
       .find('[data-testid=request-card]')
       .first()
       .find('[data-testid=request-card-title]')
@@ -291,6 +294,8 @@ describe('Discover', () => {
         readarr: [],
       },
     }).as('getRequests');
+    cy.intercept('GET', '/api/v1/request/701', { statusCode: 500 });
+    cy.intercept('GET', '/api/v1/request/702', { statusCode: 500 });
     cy.intercept('GET', '/api/v1/book/OLCARDFAILEDW', {
       id: 'OLCARDFAILEDW',
       mediaType: 'book',
@@ -318,11 +323,15 @@ describe('Discover', () => {
     cy.wait('@getRequests');
     cy.contains('.slider-header', 'Recent Requests')
       .next('[data-testid=media-slider]')
+      .scrollIntoView()
+      .should('be.visible')
       .contains('[data-testid=request-card]', 'Failed Card Book')
       .find('a[href="/book/OLCARDFAILEDW?manage=1&format=ebook"]')
       .should('contain', 'Failed');
     cy.contains('.slider-header', 'Recent Requests')
       .next('[data-testid=media-slider]')
+      .scrollIntoView()
+      .should('be.visible')
       .contains('[data-testid=request-card]', 'Failed Card Album')
       .find('a[href="/music/56565656-5656-5656-5656-565656565656?manage=1"]')
       .should('contain', 'Failed');

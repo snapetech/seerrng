@@ -1,3 +1,4 @@
+import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import MediaTypeBadge, {
   getMediaTypeBadgeType,
@@ -345,8 +346,8 @@ const IssueItem = ({ issue }: IssueItemProps) => {
   );
   const statusClass =
     issue.status === IssueStatus.OPEN
-      ? 'border-red-500 bg-red-800/60 text-red-100'
-      : 'border-emerald-500 bg-emerald-800/60 text-emerald-100';
+      ? 'compact-detail-status-badge-danger'
+      : 'compact-detail-status-badge-success';
 
   return (
     <article className="refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
@@ -397,7 +398,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
           </Link>
           <div className="card:grid-cols-3 mt-4 grid min-h-0 min-w-0 flex-1 grid-cols-1">
             <div className="card:col-span-2 card:pr-3 min-w-0">
-              <dl className="refreshed-detail-text card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
+              <dl className="refreshed-detail-text card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                 <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                   {intl.formatMessage(messages.mediaAndFormat)}:
                 </dt>
@@ -424,8 +425,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                 <dd className="card:col-start-3 card:row-start-3 m-0 truncate">
                   {getRuntime(title, unavailable)}
                 </dd>
-                <div className="card:col-start-5 card:row-span-3 card:row-start-1 card:block hidden bg-gray-600" />
-                <div className="card:col-span-1 card:col-start-7 card:row-span-3 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                   {secondaryDetails.map((detail) => (
                     <div className="contents" key={detail.label}>
                       <dt className="font-medium text-gray-100">
@@ -454,13 +454,13 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                 <dt className="card:col-start-1 card:row-start-4 mt-0.5 font-medium text-gray-100">
                   {intl.formatMessage(messages.description)}:
                 </dt>
-                <dd className="card:col-span-5 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
+                <dd className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
                   {description || unavailable}
                 </dd>
               </dl>
             </div>
 
-            <dl className="refreshed-detail-text card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-1 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4">
+            <dl className="refreshed-detail-text media-detail-column-divider grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
               <dt className="font-medium text-gray-100">
                 {intl.formatMessage(messages.createdBy)}:
               </dt>
@@ -504,16 +504,17 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                 {intl.formatMessage(messages.issuestatus)}:
               </dt>
               <dd className="m-0 truncate">
-                <Link
+                <Badge
                   href={`/issues/${issue.id}`}
-                  className={`inline-flex h-4 max-w-full items-center justify-center self-center rounded-full border px-1 text-[8px] leading-none font-semibold ${statusClass}`}
+                  badgeType="dark"
+                  className={`compact-detail-status-badge ${statusClass}`}
                 >
                   {intl.formatMessage(
                     issue.status === IssueStatus.OPEN
                       ? globalMessages.open
                       : globalMessages.resolved
                   )}
-                </Link>
+                </Badge>
               </dd>
             </dl>
           </div>
@@ -523,7 +524,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
       <div className="relative z-10 mt-[5px] flex justify-end">
         <Link
           href={`/issues/${issue.id}`}
-          className="inline-flex h-[22px] items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+          className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
         >
           <EyeIcon className="h-3.5 w-3.5" aria-hidden="true" />
           <span>{intl.formatMessage(messages.viewissue)}</span>

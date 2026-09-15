@@ -1,3 +1,4 @@
+import Button from '@app/components/Common/Button';
 import type { DVRTestResponse } from '@app/components/Settings/SettingsServices';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -201,166 +202,164 @@ const OverrideRuleTiles = ({
       {rules.map((rule) => (
         <li
           key={rule.id}
-          className="flex h-full flex-col rounded-lg bg-gray-800 text-left shadow ring-1 ring-gray-500"
+          className="settings-service-card refreshed-inset-surface text-left"
         >
-          <div className="flex w-full flex-1 items-center justify-between space-x-6 p-6">
-            <div className="flex-1 truncate">
-              <span className="text-lg">
-                {intl.formatMessage(messages.conditions)}
-              </span>
+          <div className="settings-rule-card-content">
+            <h3 className="settings-service-title">
+              {intl.formatMessage(messages.conditions)}
+            </h3>
+            <dl className="settings-service-details">
               {rule.users && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.users)}
-                  </span>
-                  <div className="inline-flex gap-2">
-                    {rule.users.split(',').map((userId) => {
-                      return (
-                        <span key={userId}>
-                          {users?.find((user) => user.id === Number(userId))
-                            ?.displayName ?? userId}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.users)}</dt>
+                  <dd>
+                    <span className="inline-flex flex-wrap gap-x-2">
+                      {rule.users.split(',').map((userId) => {
+                        return (
+                          <span key={userId}>
+                            {users?.find((user) => user.id === Number(userId))
+                              ?.displayName ?? userId}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  </dd>
+                </>
               )}
               {rule.genre && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.genre)}
-                  </span>
-                  <div className="inline-flex gap-2">
-                    {rule.genre.split(',').map((genreId) => (
-                      <span key={genreId}>
-                        {genres?.find((g) => g.id === Number(genreId))?.name}
-                      </span>
-                    ))}
-                  </div>
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.genre)}</dt>
+                  <dd>
+                    <span className="inline-flex flex-wrap gap-x-2">
+                      {rule.genre.split(',').map((genreId) => (
+                        <span key={genreId}>
+                          {genres?.find((g) => g.id === Number(genreId))?.name}
+                        </span>
+                      ))}
+                    </span>
+                  </dd>
+                </>
               )}
               {rule.language && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.language)}
-                  </span>
-                  <div className="inline-flex gap-2">
-                    {rule.language
-                      .split('|')
-                      .filter((languageId) => languageId !== 'server')
-                      .map((languageId) => {
-                        const language = languages?.find(
-                          (language) => language.iso_639_1 === languageId
-                        );
-                        if (!language) return null;
-                        const languageName =
-                          intl.formatDisplayName(language.iso_639_1, {
-                            type: 'language',
-                            fallback: 'none',
-                          }) ?? language.english_name;
-                        return <span key={languageId}>{languageName}</span>;
-                      })}
-                  </div>
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.language)}</dt>
+                  <dd>
+                    <span className="inline-flex flex-wrap gap-x-2">
+                      {rule.language
+                        .split('|')
+                        .filter((languageId) => languageId !== 'server')
+                        .map((languageId) => {
+                          const language = languages?.find(
+                            (language) => language.iso_639_1 === languageId
+                          );
+                          if (!language) return null;
+                          const languageName =
+                            intl.formatDisplayName(language.iso_639_1, {
+                              type: 'language',
+                              fallback: 'none',
+                            }) ?? language.english_name;
+                          return <span key={languageId}>{languageName}</span>;
+                        })}
+                    </span>
+                  </dd>
+                </>
               )}
               {rule.keywords && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.keywords)}
-                  </span>
-                  <div className="inline-flex gap-2">
-                    {rule.keywords.split(',').map((keywordId) => {
-                      return (
-                        <span key={keywordId}>
-                          {keywords?.find(
-                            (keyword) => keyword.id === Number(keywordId)
-                          )?.name ?? keywordId}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.keywords)}</dt>
+                  <dd>
+                    <span className="inline-flex flex-wrap gap-x-2">
+                      {rule.keywords.split(',').map((keywordId) => {
+                        return (
+                          <span key={keywordId}>
+                            {keywords?.find(
+                              (keyword) => keyword.id === Number(keywordId)
+                            )?.name ?? keywordId}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  </dd>
+                </>
               )}
-              <span className="text-lg">
-                {intl.formatMessage(messages.settings)}
-              </span>
+            </dl>
+            <h3 className="settings-rule-subheading">
+              {intl.formatMessage(messages.settings)}
+            </h3>
+            <dl className="settings-service-details">
               {rule.profileId != null && (
-                <p className="runcate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.qualityprofile)}
-                  </span>
-                  {testResponses
-                    .find(
-                      (r) =>
-                        (r.id === rule.radarrServiceId &&
-                          r.type === 'radarr') ||
-                        (r.id === rule.sonarrServiceId &&
-                          r.type === 'sonarr') ||
-                        (r.id === rule.lidarrServiceId && r.type === 'lidarr')
-                    )
-                    ?.profiles.find((profile) => rule.profileId === profile.id)
-                    ?.name || rule.profileId}
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.qualityprofile)}</dt>
+                  <dd>
+                    {testResponses
+                      .find(
+                        (r) =>
+                          (r.id === rule.radarrServiceId &&
+                            r.type === 'radarr') ||
+                          (r.id === rule.sonarrServiceId &&
+                            r.type === 'sonarr') ||
+                          (r.id === rule.lidarrServiceId && r.type === 'lidarr')
+                      )
+                      ?.profiles.find(
+                        (profile) => rule.profileId === profile.id
+                      )?.name || rule.profileId}
+                  </dd>
+                </>
               )}
               {rule.rootFolder && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.rootfolder)}
-                  </span>
-                  {rule.rootFolder}
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.rootfolder)}</dt>
+                  <dd>{rule.rootFolder}</dd>
+                </>
               )}
               {rule.tags && rule.tags.length > 0 && (
-                <p className="truncate text-sm leading-5 text-gray-300">
-                  <span className="mr-2 font-bold">
-                    {intl.formatMessage(messages.tags)}
-                  </span>
-                  <div className="inline-flex gap-2">
-                    {rule.tags.split(',').map((tag) => (
-                      <span key={tag}>
-                        {testResponses
-                          .find(
-                            (r) =>
-                              (r.id === rule.radarrServiceId &&
-                                r.type === 'radarr') ||
-                              (r.id === rule.sonarrServiceId &&
-                                r.type === 'sonarr') ||
-                              (r.id === rule.lidarrServiceId &&
-                                r.type === 'lidarr')
-                          )
-                          ?.tags?.find((t) => t.id === Number(tag))?.label ||
-                          tag}
-                      </span>
-                    ))}
-                  </div>
-                </p>
+                <>
+                  <dt>{intl.formatMessage(messages.tags)}</dt>
+                  <dd>
+                    <span className="inline-flex flex-wrap gap-x-2">
+                      {rule.tags.split(',').map((tag) => (
+                        <span key={tag}>
+                          {testResponses
+                            .find(
+                              (r) =>
+                                (r.id === rule.radarrServiceId &&
+                                  r.type === 'radarr') ||
+                                (r.id === rule.sonarrServiceId &&
+                                  r.type === 'sonarr') ||
+                                (r.id === rule.lidarrServiceId &&
+                                  r.type === 'lidarr')
+                            )
+                            ?.tags?.find((t) => t.id === Number(tag))?.label ||
+                            tag}
+                        </span>
+                      ))}
+                    </span>
+                  </dd>
+                </>
               )}
-            </div>
+            </dl>
           </div>
-          <div className="border-t border-gray-500">
-            <div className="-mt-px flex">
-              <div className="flex w-0 flex-1 border-r border-gray-500">
-                <button
-                  onClick={() => setOverrideRuleModal({ open: true, rule })}
-                  className="focus:ring-blue relative -mr-px inline-flex w-0 flex-1 items-center justify-center rounded-bl-lg border border-transparent py-4 text-sm leading-5 font-medium text-gray-200 transition duration-150 ease-in-out hover:text-white focus:z-10 focus:border-gray-500 focus:outline-none"
-                >
-                  <PencilIcon className="mr-2 h-5 w-5" />
-                  <span>{intl.formatMessage(globalMessages.edit)}</span>
-                </button>
-              </div>
-              <div className="-ml-px flex w-0 flex-1">
-                <button
-                  onClick={async () => {
-                    await axios.delete(`/api/v1/overrideRule/${rule.id}`);
-                    revalidate();
-                  }}
-                  className="focus:ring-blue relative inline-flex w-0 flex-1 items-center justify-center rounded-br-lg border border-transparent py-4 text-sm leading-5 font-medium text-gray-200 transition duration-150 ease-in-out hover:text-white focus:z-10 focus:border-gray-500 focus:outline-none"
-                >
-                  <TrashIcon className="mr-2 h-5 w-5" />
-                  <span>{intl.formatMessage(globalMessages.delete)}</span>
-                </button>
-              </div>
-            </div>
+          <div className="settings-card-actions">
+            <Button
+              buttonType="warning"
+              buttonSize="standard"
+              onClick={() => setOverrideRuleModal({ open: true, rule })}
+            >
+              <PencilIcon />
+              <span>{intl.formatMessage(globalMessages.edit)}</span>
+            </Button>
+            <Button
+              buttonType="danger"
+              buttonSize="standard"
+              className="settings-service-delete-action"
+              onClick={async () => {
+                await axios.delete(`/api/v1/overrideRule/${rule.id}`);
+                revalidate();
+              }}
+            >
+              <TrashIcon />
+              <span>{intl.formatMessage(globalMessages.delete)}</span>
+            </Button>
           </div>
         </li>
       ))}

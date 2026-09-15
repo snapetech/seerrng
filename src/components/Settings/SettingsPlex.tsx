@@ -6,11 +6,18 @@ import PageTitle from '@app/components/Common/PageTitle';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LibraryItem from '@app/components/Settings/LibraryItem';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
+import Field, {
+  default as SettingsField,
+} from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { isValidURL } from '@app/utils/urlValidationHelper';
-import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownOnSquareIcon,
+  CheckCircleIcon,
+  MinusCircleIcon,
+} from '@heroicons/react/24/outline';
 import {
   ArrowPathIcon,
   MagnifyingGlassIcon,
@@ -19,7 +26,7 @@ import {
 import type { PlexDevice } from '@server/interfaces/api/plexInterfaces';
 import type { PlexSettings, TautulliSettings } from '@server/lib/settings';
 import axios from 'axios';
-import { Field, Formik } from 'formik';
+import { Formik } from 'formik';
 import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -54,6 +61,8 @@ const messages = defineMessages('components.Settings', {
     'The libraries Seerr scans for titles. Set up and save your Plex connection settings, then click the button below if no libraries are listed.',
   scanning: 'Syncing…',
   scan: 'Sync Libraries',
+  selectAllLibraries: 'Select All',
+  selectNoLibraries: 'Select None',
   manualscan: 'Manual Library Scan',
   manualscanDescription:
     "Normally, this will only be run once every 24 hours. Seerr will check your Plex server's recently added more aggressively. If this is your first time configuring Plex, a one-time full manual library scan is recommended!",
@@ -357,6 +366,33 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
     }
   };
 
+  const setAllLibrariesEnabled = async (enabled: boolean) => {
+    setIsSyncing(true);
+
+    try {
+      const enable = enabled
+        ? data?.libraries.map((library) => library.id).join(',')
+        : undefined;
+
+      await axios.post(
+        '/api/v1/settings/plex/library',
+        enable ? { enable } : {}
+      );
+
+      if (onComplete) {
+        onComplete();
+      }
+      revalidate();
+    } catch {
+      addToast(intl.formatMessage(messages.toastPlexLibraryUpdateFailure), {
+        autoDismiss: true,
+        appearance: 'error',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const reclassifyLibrary = async (
     libraryId: string,
     nextType: 'music' | 'book'
@@ -582,7 +618,7 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
                   <span className="label-required">*</span>
                 </label>
                 <div className="form-input-area">
-                  <Field
+                  <SettingsField
                     type="text"
                     inputMode="numeric"
                     id="port"
@@ -625,9 +661,6 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
                     ),
                   })}
                   <SettingsBadge badgeType="advanced" className="ml-2" />
-                  <span className="label-tip">
-                    {intl.formatMessage(messages.webAppUrlTip)}
-                  </span>
                 </label>
                 <div className="form-input-area">
                   <div className="form-input-field">
@@ -645,6 +678,9 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
                       <div className="error">{errors.webAppUrl}</div>
                     )}
                 </div>
+                <span className="settings-form-row-description">
+                  {intl.formatMessage(messages.webAppUrlTip)}
+                </span>
               </div>
               <div className="actions">
                 <div className="flex justify-end">
@@ -668,30 +704,51 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
           );
         }}
       </Formik>
-      <div className="mt-10 mb-6">
+      <section className="settings-group-card">
         <h3 className="heading">
           {intl.formatMessage(messages.plexlibraries)}
         </h3>
         <p className="description">
           {intl.formatMessage(messages.plexlibrariesDescription)}
         </p>
-      </div>
-      <div className="section">
-        <Button
-          onClick={() => syncLibraries()}
-          disabled={isSyncing || !data?.ip || !data?.port}
-        >
-          <ArrowPathIcon
-            className={isSyncing ? 'animate-spin' : ''}
-            style={{ animationDirection: 'reverse' }}
-          />
-          <span>
-            {isSyncing
-              ? intl.formatMessage(messages.scanning)
-              : intl.formatMessage(messages.scan)}
-          </span>
-        </Button>
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
+        <div className="settings-library-actions mt-[5px]">
+          <Button
+            buttonSize="standard"
+            onClick={() => syncLibraries()}
+            disabled={isSyncing || !data?.ip || !data?.port}
+          >
+            <ArrowPathIcon
+              className={isSyncing ? 'animate-spin' : ''}
+              style={{ animationDirection: 'reverse' }}
+            />
+            <span>
+              {isSyncing
+                ? intl.formatMessage(messages.scanning)
+                : intl.formatMessage(messages.scan)}
+            </span>
+          </Button>
+          <Button
+            buttonSize="standard"
+            onClick={() => setAllLibrariesEnabled(true)}
+            disabled={
+              isSyncing ||
+              !data?.libraries.length ||
+              activeLibraries.length === data.libraries.length
+            }
+          >
+            <CheckCircleIcon />
+            <span>{intl.formatMessage(messages.selectAllLibraries)}</span>
+          </Button>
+          <Button
+            buttonSize="standard"
+            onClick={() => setAllLibrariesEnabled(false)}
+            disabled={isSyncing || activeLibraries.length === 0}
+          >
+            <MinusCircleIcon />
+            <span>{intl.formatMessage(messages.selectNoLibraries)}</span>
+          </Button>
+        </div>
+        <ul className="settings-library-grid">
           {data?.libraries.map((library) => (
             <LibraryItem
               name={library.name}
@@ -723,7 +780,7 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
             />
           ))}
         </ul>
-      </div>
+      </section>
       <div className="mt-10 mb-6">
         <h3 className="heading">{intl.formatMessage(messages.manualscan)}</h3>
         <p className="description">
@@ -892,7 +949,7 @@ const SettingsPlex = ({ onComplete }: SettingsPlexProps) => {
                       <span className="label-required">*</span>
                     </label>
                     <div className="form-input-area">
-                      <Field
+                      <SettingsField
                         type="text"
                         inputMode="numeric"
                         id="tautulliPort"

@@ -99,6 +99,19 @@ const CreateIssueModal = ({
   }
 
   const resolvedMediaId = mediaId ?? data?.mediaInfo?.id;
+  const resolvedBackdrop =
+    backdrop ??
+    (data
+      ? isMusic(data)
+        ? (data.artistBackdrop ?? data.artistThumb ?? data.posterPath)
+        : isBook(data)
+          ? data.posterPath
+          : data.backdropPath
+            ? `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.backdropPath}`
+            : data.posterPath
+              ? `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.posterPath}`
+              : undefined
+      : undefined);
   const resolvedTitle =
     title ??
     (data
@@ -240,8 +253,6 @@ const CreateIssueModal = ({
         touched,
         isSubmitting,
       }) => {
-        const actionButton =
-          'inline-flex h-[22px] items-center gap-1 rounded-md border px-2 text-[11px] font-semibold leading-none transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-40';
         const issueTypeSelect = (
           <CompactSelect
             label={intl.formatMessage(messages.issueType)}
@@ -261,6 +272,9 @@ const CreateIssueModal = ({
             title={intl.formatMessage(messages.reportissue)}
             hideActions
             loading={!!detailUrl && !data && !error}
+            backdrop={resolvedBackdrop}
+            backdropFull
+            dialogClass="artwork-form-main-card refreshed-card-surface refreshed-detail-text"
           >
             {data && (
               <IssueMediaSummary
@@ -268,6 +282,7 @@ const CreateIssueModal = ({
                 mediaType={mediaType}
                 is4k={values.is4k}
                 artwork={backdrop}
+                embedded
                 rightDetails={[
                   { label: 'Status', value: 'Ready to Report' },
                   {
@@ -365,29 +380,35 @@ const CreateIssueModal = ({
             </div>
 
             <div className="mt-[5px] flex flex-wrap items-center justify-end gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={onCancel}
                 data-testid="modal-cancel-button"
-                className={`${actionButton} border-red-600/80 bg-red-800/25 text-red-200 hover:border-red-500 hover:text-white focus:ring-red-500`}
+                buttonType="danger"
+                buttonSize="standard"
               >
-                <XMarkIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {intl.formatMessage(globalMessages.cancel)}
-              </button>
-              <button
+                <span className="inline-flex items-center gap-1.5 [&_svg]:!m-0">
+                  <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+                  <span>{intl.formatMessage(globalMessages.cancel)}</span>
+                </span>
+              </Button>
+              <Button
                 type="button"
                 onClick={() => handleSubmit()}
                 data-testid="modal-ok-button"
+                buttonType="success"
+                buttonSize="standard"
                 disabled={
                   isSubmitting ||
                   ((mediaType === 'movie' || mediaType === 'tv') &&
                     !hasAvailableVideoQuality)
                 }
-                className={`${actionButton} border-emerald-600/80 bg-emerald-800/25 text-emerald-200 hover:border-emerald-500 hover:text-white focus:ring-emerald-500`}
               >
-                <PaperAirplaneIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {intl.formatMessage(messages.submitissue)}
-              </button>
+                <span className="inline-flex items-center gap-1.5 [&_svg]:!m-0">
+                  <PaperAirplaneIcon className="h-4 w-4" aria-hidden="true" />
+                  <span>{intl.formatMessage(messages.submitissue)}</span>
+                </span>
+              </Button>
             </div>
           </Modal>
         );

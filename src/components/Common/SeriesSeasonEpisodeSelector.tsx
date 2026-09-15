@@ -180,7 +180,7 @@ const SeriesSeasonEpisodeSelector = ({
   return (
     <div className="mt-[5px] grid min-w-0 gap-2 sm:grid-cols-[max-content_minmax(0,1fr)]">
       <section className="refreshed-inset-surface min-w-[12rem] rounded-lg border border-gray-700 p-2">
-        <div className="grid grid-cols-[1.25rem_minmax(5.5rem,1fr)_4rem] items-center gap-x-2 border-b border-gray-600 px-1 pb-2 text-xs font-semibold text-gray-200">
+        <div className="request-divider-dark grid grid-cols-[1.25rem_minmax(5.5rem,1fr)_4rem] items-center gap-x-2 border-b px-1 pb-2 text-xs font-semibold text-gray-200">
           <SelectionCircle
             selected={allSeasonsSelected}
             label={
@@ -191,7 +191,7 @@ const SeriesSeasonEpisodeSelector = ({
           <span>Season</span>
           <span className="text-center">Episodes</span>
         </div>
-        <div className="max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-1">
+        <div className="scrollable-card -mr-2 max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-2">
           {seasons.map((season) => {
             const seasonSelection = selections.find(
               (selection) => selection.seasonNumber === season.seasonNumber
@@ -233,7 +233,7 @@ const SeriesSeasonEpisodeSelector = ({
       </section>
 
       <section className="refreshed-inset-surface min-w-0 rounded-lg border border-gray-700 p-2">
-        <div className="grid grid-cols-[1.25rem_4.5rem_minmax(0,1fr)] items-center gap-x-2 border-b border-gray-600 px-1 pb-2 text-xs font-semibold text-gray-200">
+        <div className="request-divider-dark grid grid-cols-[1.25rem_4.5rem_minmax(0,1fr)] items-center gap-x-2 border-b px-1 pb-2 text-xs font-semibold text-gray-200">
           <SelectionCircle
             selected={allEpisodesSelected}
             disabled={activeSeason < 0 || episodeNumbers.length === 0}
@@ -245,7 +245,7 @@ const SeriesSeasonEpisodeSelector = ({
           <span>Episodes</span>
           <span>Title</span>
         </div>
-        <div className="max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-1">
+        <div className="scrollable-card -mr-2 max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-2">
           {!data && !error && activeSeason >= 0 && (
             <div className="flex h-20 items-center justify-center">
               <LoadingSpinner />

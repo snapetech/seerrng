@@ -15,7 +15,7 @@ describe('General Settings', () => {
     cy.get('[data-testid=sidebar-toggle]').click();
     cy.get('[data-testid=sidebar-menu-settings-mobile]').click();
 
-    cy.get('.heading').should('contain', 'General Settings');
+    cy.contains('h3', 'General Settings').should('be.visible');
   });
 
   it('modifies setting that requires restart', () => {
@@ -26,7 +26,7 @@ describe('General Settings', () => {
     cy.visit('/settings/network');
     cy.wait('@getStatus');
 
-    cy.get('#trustProxy').click();
+    cy.get('button#trustProxy').scrollIntoView().should('be.visible').click();
     cy.get('[data-testid=settings-network-form]').submit();
     cy.wait('@saveNetwork').then(({ request, response }) => {
       expect(
@@ -43,7 +43,7 @@ describe('General Settings', () => {
     cy.get('[data-testid=modal-ok-button]').click();
     cy.get('[data-testid=modal-root]').should('not.exist');
 
-    cy.get('[type=checkbox]#trustProxy').click();
+    cy.get('button#trustProxy').scrollIntoView().should('be.visible').click();
     cy.get('[data-testid=settings-network-form]').submit();
     cy.wait('@saveNetwork');
     cy.wait('@getStatus');

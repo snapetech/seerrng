@@ -1202,17 +1202,36 @@ describe('GET /request', () => {
   });
 
   it('accepts the recent requests slider query', async () => {
+    const deletedRequest = await seedRequest(
+      MediaRequestStatus.COMPLETED,
+      undefined,
+      987654
+    );
+    deletedRequest.media.status = MediaStatus.DELETED;
+    await getRepository(Media).save(deletedRequest.media);
+
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const res = await agent.get('/request').query({
-      filter: 'all',
+      filter: 'recent',
       take: 10,
-      sort: 'modified',
+      sort: 'added',
       sortDirection: 'desc',
       skip: 0,
     });
 
     assert.strictEqual(res.status, 200);
     assert.ok(Array.isArray(res.body.results));
+    assert.ok(
+      !res.body.results.some(
+        (item: { id: number }) => item.id === deletedRequest.id
+      )
+    );
+    assert.ok(
+      res.body.results.every(
+        (item: { is4k: boolean; media: Media }) =>
+          item.media[item.is4k ? 'status4k' : 'status'] !== MediaStatus.DELETED
+      )
+    );
   });
 
   it('rejects malformed request list query filters', async () => {
@@ -1907,7 +1926,7 @@ describe('POST /request', () => {
     assert.equal(persistedMedia.status, MediaStatus.PROCESSING);
   });
 
-  it('uses the selected request owner permissions instead of the acting administrator permissions', async (t) => {
+  it("lets an administrator request any tier for another user while preserving that user's approval permissions", async (t) => {
     Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
       configurable: true,
       get: () => async () =>
@@ -1931,7 +1950,7 @@ describe('POST /request', () => {
       {
         mediaType: MediaType.MOVIE,
         mediaId: 553,
-        is4k: false,
+        is4k: true,
         userId: requestOwner.id,
       },
       adminUser
@@ -1940,7 +1959,8 @@ describe('POST /request', () => {
     assert.equal(mediaRequest.requestedBy.id, requestOwner.id);
     assert.equal(mediaRequest.status, MediaRequestStatus.PENDING);
     assert.equal(mediaRequest.modifiedBy == null, true);
-    assert.equal(mediaRequest.media.status, MediaStatus.PENDING);
+    assert.equal(mediaRequest.media.status, MediaStatus.UNKNOWN);
+    assert.equal(mediaRequest.media.status4k, MediaStatus.PENDING);
   });
 
   it('promotes matching pending Movie, Series, Music, and Book requests without replacing their requester or timeline', async (t) => {
@@ -2890,6 +2910,57 @@ describe('POST /request', () => {
 
     assert.strictEqual(duplicateResponse.status, 409);
     assert.match(duplicateResponse.body.message, /already available/i);
+  });
+
+  it('allows simultaneous active music requests for different Lidarr destinations', async (t) => {
+    const settings = getSettings();
+    settings.lidarr = [
+      {
+        ...createLidarrSettings(10),
+        name: 'Lidarr MP3',
+        activeProfileName: 'MP3',
+      },
+      {
+        ...createLidarrSettings(0, false),
+        name: 'Lidarr FLAC',
+        activeProfileName: 'FLAC',
+      },
+    ];
+    const mbId = 'simultaneous-quality-music-release-group';
+    const getAlbumMock = mock.method(
+      ListenBrainzAPI.prototype,
+      'getAlbum',
+      async () =>
+        ({
+          release_group_mbid: mbId,
+          release_group_metadata: {
+            release_group: { name: 'Two Quality Album' },
+            artist: { name: 'Two Quality Artist' },
+          },
+        }) as Awaited<ReturnType<ListenBrainzAPI['getAlbum']>>
+    );
+    t.after(() => {
+      getAlbumMock.mock.restore();
+      settings.lidarr = [];
+    });
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const mp3Response = await agent.post('/request').send({
+      mediaType: MediaType.MUSIC,
+      mediaId: mbId,
+      serverId: 10,
+    });
+    const flacResponse = await agent.post('/request').send({
+      mediaType: MediaType.MUSIC,
+      mediaId: mbId,
+      serverId: 0,
+    });
+
+    assert.strictEqual(mp3Response.status, 201);
+    assert.strictEqual(flacResponse.status, 201);
+    assert.strictEqual(mp3Response.body.serverId, 10);
+    assert.strictEqual(flacResponse.body.serverId, 0);
+    assert.strictEqual(await getRepository(MediaRequest).count(), 2);
   });
 
   it('allows an MP3 request when the FLAC destination is already available', async (t) => {

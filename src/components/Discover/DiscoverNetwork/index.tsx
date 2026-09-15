@@ -1,82 +1,27 @@
-import CachedImage from '@app/components/Common/CachedImage';
-import Header from '@app/components/Common/Header';
-import ListView from '@app/components/Common/ListView';
-import PageTitle from '@app/components/Common/PageTitle';
-import useDiscover from '@app/hooks/useDiscover';
-import globalMessages from '@app/i18n/globalMessages';
+import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import DiscoverTv from '@app/components/Discover/DiscoverTv';
 import ErrorPage from '@app/pages/_error';
-import defineMessages from '@app/utils/defineMessages';
 import type { TvNetwork } from '@server/models/common';
-import type { TvResult } from '@server/models/Search';
 import { useRouter } from 'next/router';
-import { useIntl } from 'react-intl';
-
-const messages = defineMessages('components.Discover.DiscoverNetwork', {
-  networkSeries: '{network} Series',
-});
+import useSWR from 'swr';
 
 const DiscoverTvNetwork = () => {
   const router = useRouter();
-  const intl = useIntl();
   const networkId =
     typeof router.query.networkId === 'string' ? router.query.networkId : '';
-
-  const {
-    isLoadingInitialData,
-    isEmpty,
-    isLoadingMore,
-    isReachingEnd,
-    titles,
-    fetchMore,
-    error,
-    firstResultData,
-  } = useDiscover<TvResult, { network: TvNetwork }>(
-    `/api/v1/discover/tv/network/${networkId}`,
-    undefined,
-    { enabled: !!networkId }
+  const { data: network, error } = useSWR<TvNetwork>(
+    networkId ? `/api/v1/network/${networkId}` : null
   );
 
   if (error) {
     return <ErrorPage statusCode={500} />;
   }
 
-  const title = isLoadingInitialData
-    ? intl.formatMessage(globalMessages.loading)
-    : intl.formatMessage(messages.networkSeries, {
-        network: firstResultData?.network.name,
-      });
+  if (!network) {
+    return <LoadingSpinner />;
+  }
 
-  return (
-    <>
-      <PageTitle title={title} />
-      <div className="mt-1 mb-5">
-        <Header>
-          {firstResultData?.network.logoPath ? (
-            <div className="relative mb-6 flex h-24 justify-center sm:h-32">
-              <CachedImage
-                type="tmdb"
-                src={`https://image.tmdb.org/t/p/w300_filter(duotone,ffffff,bababa)${firstResultData.network.logoPath}`}
-                alt={firstResultData.network.name}
-                className="object-contain"
-                fill
-              />
-            </div>
-          ) : (
-            title
-          )}
-        </Header>
-      </div>
-      <ListView
-        items={titles}
-        isEmpty={isEmpty}
-        isLoading={
-          isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
-        }
-        isReachingEnd={isReachingEnd}
-        onScrollBottom={fetchMore}
-      />
-    </>
-  );
+  return <DiscoverTv network={network} />;
 };
 
 export default DiscoverTvNetwork;

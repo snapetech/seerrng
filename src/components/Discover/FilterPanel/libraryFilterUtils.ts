@@ -1,5 +1,6 @@
 export const bookSortOptions = new Set([
   'ranked',
+  'ranked.asc',
   'newest',
   'oldest',
   'random',
@@ -7,14 +8,20 @@ export const bookSortOptions = new Set([
   'rating.desc',
   'rating.asc',
   'editions',
+  'editions.asc',
 ]);
 
 export const musicSortOptions = new Set([
   'ranked',
+  'ranked.asc',
   'popular.week',
+  'popular.week.asc',
   'popular.month',
+  'popular.month.asc',
   'popular.year',
+  'popular.year.asc',
   'listen_count.desc',
+  'listen_count.asc',
   'release_date.desc',
   'release_date.asc',
 ]);

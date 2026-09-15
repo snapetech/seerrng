@@ -30,7 +30,7 @@ import {
 import type { PlaylistResolutionResponse } from '@server/interfaces/api/playlistInterfaces';
 import type { AlbumResult } from '@server/models/Search';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverMusic', {
@@ -67,7 +67,43 @@ const genres = [
   'Pop',
   'Rock',
 ];
-const DiscoverMusic = () => {
+const musicSorts = [
+  { label: messages.recommended, asc: 'ranked.asc', desc: 'ranked' },
+  {
+    label: messages.week,
+    asc: 'popular.week.asc',
+    desc: 'popular.week',
+  },
+  {
+    label: messages.month,
+    asc: 'popular.month.asc',
+    desc: 'popular.month',
+  },
+  {
+    label: messages.year,
+    asc: 'popular.year.asc',
+    desc: 'popular.year',
+  },
+  {
+    label: messages.listened,
+    asc: 'listen_count.asc',
+    desc: 'listen_count.desc',
+  },
+  {
+    label: messages.releaseDate,
+    asc: 'release_date.asc',
+    desc: 'release_date.desc',
+  },
+] as const;
+interface DiscoverMusicProps {
+  titleOverride?: string;
+  mediaFilters?: ReactNode;
+}
+
+const DiscoverMusic = ({
+  titleOverride,
+  mediaFilters,
+}: DiscoverMusicProps = {}) => {
   const intl = useIntl();
   const router = useRouter();
   const update = useBatchUpdateQueryParams({});
@@ -131,7 +167,7 @@ const DiscoverMusic = () => {
       discover.isSearchingAvailableQuality,
     'music-discovery'
   );
-  const title = intl.formatMessage(messages.music);
+  const title = titleOverride ?? intl.formatMessage(messages.music);
   const setParam = (values: Record<string, string | undefined>) =>
     update({ ...values, page: undefined });
   useEffect(() => {
@@ -176,7 +212,8 @@ const DiscoverMusic = () => {
     genre ||
     releaseType ||
     releaseDateGte ||
-    releaseDateLte
+    releaseDateLte ||
+    sortBy !== 'ranked'
   );
   return (
     <>
@@ -195,10 +232,11 @@ const DiscoverMusic = () => {
             </Button>
           </div>
         </div>
+        {mediaFilters}
         <div className="app-filter-section-heading">
           {intl.formatMessage(messages.filters)}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="discover-filter-primary-row">
           <button
             type="button"
             aria-pressed={!hasActiveFilters}
@@ -211,6 +249,7 @@ const DiscoverMusic = () => {
                 releaseType: undefined,
                 primaryReleaseDateGte: undefined,
                 primaryReleaseDateLte: undefined,
+                sortBy: undefined,
               });
             }}
             className={`${getFilterResetButtonClass(!hasActiveFilters)} order-1`}
@@ -224,9 +263,10 @@ const DiscoverMusic = () => {
             onChange={(value) => setParam({ availability: value })}
             className="order-3"
           />
-          <div className="order-4 basis-full" aria-hidden="true" />
+        </div>
+        <div className="discover-filter-secondary-row">
           <form
-            className="discover-filter-control order-5 h-8 w-72 flex-none"
+            className="discover-filter-control order-5 w-72 flex-none"
             onSubmit={(e) => {
               e.preventDefault();
               const nextSearch = search.trim();
@@ -248,7 +288,7 @@ const DiscoverMusic = () => {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={intl.formatMessage(messages.searchMusic)}
               aria-label={intl.formatMessage(messages.searchMusic)}
-              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
             />
           </form>
           <CompactSelect
@@ -294,44 +334,28 @@ const DiscoverMusic = () => {
           {intl.formatMessage(messages.sortBy)}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ['ranked', messages.recommended],
-              ['popular.week', messages.week],
-              ['popular.month', messages.month],
-              ['popular.year', messages.year],
-              ['listen_count.desc', messages.listened],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              className={getFilterToggleButtonClass(sortBy === value)}
-              onClick={() => setParam({ sortBy: value })}
-            >
-              {intl.formatMessage(label)}
-              <BarsArrowDownIcon className="h-4 w-4" />
-            </button>
-          ))}
-          <button
-            className={getFilterToggleButtonClass(
-              sortBy.startsWith('release_date')
-            )}
-            onClick={() =>
-              setParam({
-                sortBy:
-                  sortBy === 'release_date.desc'
-                    ? 'release_date.asc'
-                    : 'release_date.desc',
-              })
-            }
-          >
-            {intl.formatMessage(messages.releaseDate)}
-            {sortBy === 'release_date.asc' ? (
-              <BarsArrowUpIcon className="h-4 w-4" />
-            ) : (
-              <BarsArrowDownIcon className="h-4 w-4" />
-            )}
-          </button>
+          {musicSorts.map((option) => {
+            const active = sortBy === option.asc || sortBy === option.desc;
+            const ascending = sortBy === option.asc;
+            const Icon = ascending ? BarsArrowUpIcon : BarsArrowDownIcon;
+
+            return (
+              <button
+                key={option.desc}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setParam({
+                    sortBy: active && !ascending ? option.asc : option.desc,
+                  })
+                }
+                className={getFilterToggleButtonClass(active)}
+              >
+                {intl.formatMessage(option.label)}
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
         </div>
       </div>
       {discover.error &&

@@ -1,3 +1,4 @@
+import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import Modal from '@app/components/Common/Modal';
 import SeriesSeasonEpisodeSelector from '@app/components/Common/SeriesSeasonEpisodeSelector';
@@ -5,7 +6,6 @@ import type { RequestOverrides } from '@app/components/RequestModal/AdvancedRequ
 import AdvancedRequester from '@app/components/RequestModal/AdvancedRequester';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestFooterStatus from '@app/components/RequestModal/RequestFooterStatus';
-import RequestMediaCard from '@app/components/RequestModal/RequestMediaCard';
 import SearchByNameModal from '@app/components/RequestModal/SearchByNameModal';
 import {
   canPromotePendingDestinationRequests,
@@ -119,7 +119,7 @@ const TvRequestModal = ({
   const selectedSeasons = seasonSelections.map(
     (selection) => selection.seasonNumber
   );
-  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
+  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(true);
   const [requestedByPortal, setRequestedByPortal] =
     useState<HTMLDivElement | null>(null);
   const effectiveIs4k = requestOverrides?.is4k ?? is4k;
@@ -538,15 +538,25 @@ const TvRequestModal = ({
             ? intl.formatMessage(globalMessages.back)
             : intl.formatMessage(globalMessages.cancel)
       }
-      dialogClass="sm:max-w-5xl"
+      cancelButtonType={editRequest ? 'danger' : 'default'}
+      backdrop={
+        data?.backdropPath
+          ? `https://image.tmdb.org/t/p/original${data.backdropPath}`
+          : getTmdbPosterImageUrl(data?.posterPath, 'original')
+      }
+      backdropFull
+      actionButtonSize={editRequest ? 'standard' : 'sm'}
+      dialogClass="artwork-form-main-card refreshed-card-surface refreshed-detail-text"
     >
-      {editRequest
-        ? isOwner
-          ? intl.formatMessage(messages.pendingapproval)
-          : intl.formatMessage(messages.requestfrom, {
-              username: editRequest?.requestedBy.displayName,
-            })
-        : null}
+      {editRequest && (
+        <div className="refreshed-inset-surface mb-[5px] rounded-lg border border-gray-700 p-3">
+          {isOwner
+            ? intl.formatMessage(messages.pendingapproval)
+            : intl.formatMessage(messages.requestfrom, {
+                username: editRequest.requestedBy.displayName,
+              })}
+        </div>
+      )}
       {(quota?.tv.limit ?? 0) > 0 && (
         <QuotaDisplay
           mediaType="tv"
@@ -570,14 +580,7 @@ const TvRequestModal = ({
           }
         />
       )}
-      <RequestMediaCard
-        artwork={
-          data?.backdropPath
-            ? `https://image.tmdb.org/t/p/original${data.backdropPath}`
-            : getTmdbPosterImageUrl(data?.posterPath, 'original')
-        }
-        artworkType="tmdb"
-      >
+      <div className="refreshed-inset-surface rounded-lg border border-gray-700 p-3">
         <div className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-3 sm:grid-cols-[80px_minmax(0,1fr)]">
           <div className="relative h-24 w-16 overflow-hidden rounded-lg ring-1 ring-gray-600 sm:h-[120px] sm:w-20">
             <CachedImage
@@ -601,7 +604,7 @@ const TvRequestModal = ({
 
             <div className="card:grid-cols-3 mt-4 grid min-h-0 min-w-0 flex-1 grid-cols-1 items-stretch">
               <div className="card:col-span-2 card:pr-3 min-w-0">
-                <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4 text-gray-400">
+                <dl className="refreshed-detail-text-muted card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                   <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                     {intl.formatMessage(messages.mediaAndFormat)}:
                   </dt>
@@ -622,8 +625,7 @@ const TvRequestModal = ({
                       ? `${intl.formatNumber(runtime)} minutes`
                       : notAvailable}
                   </dd>
-                  <div className="card:col-start-5 card:row-span-3 card:row-start-1 card:block hidden bg-gray-600" />
-                  <div className="card:col-span-1 card:col-start-7 card:row-span-3 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                  <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                     {featuredCrew.map((person) => (
                       <div
                         className="contents"
@@ -643,7 +645,7 @@ const TvRequestModal = ({
                   <dt className="card:col-start-1 card:row-start-4 mt-0.5 font-medium text-gray-100">
                     {intl.formatMessage(messages.genres)}:
                   </dt>
-                  <dd className="card:col-span-5 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
+                  <dd className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 line-clamp-2 min-w-0 break-words">
                     {data?.genres?.length
                       ? data.genres
                           .slice(0, 3)
@@ -653,7 +655,7 @@ const TvRequestModal = ({
                   </dd>
                 </dl>
               </div>
-              <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-1 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4 text-gray-400">
+              <dl className="refreshed-detail-text-muted media-detail-column-divider grid h-full min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.status)}:
                 </dt>
@@ -688,109 +690,111 @@ const TvRequestModal = ({
             </div>
           </div>
         </div>
+      </div>
 
-        {settings.currentSettings.partialRequestsEnabled && data && (
-          <SeriesSeasonEpisodeSelector
-            tvId={data.id}
-            seasons={visibleSeasons}
-            selections={seasonSelections}
-            activeSeason={
-              activeSeason >= 0
-                ? activeSeason
-                : (visibleSeasons[0]?.seasonNumber ?? -1)
+      {settings.currentSettings.partialRequestsEnabled && data && (
+        <SeriesSeasonEpisodeSelector
+          tvId={data.id}
+          seasons={visibleSeasons}
+          selections={seasonSelections}
+          activeSeason={
+            activeSeason >= 0
+              ? activeSeason
+              : (visibleSeasons[0]?.seasonNumber ?? -1)
+          }
+          disabledSeasons={getAllRequestedSeasons()}
+          disabledEpisodes={getAllRequestedEpisodes()}
+          onActiveSeasonChange={setActiveSeason}
+          onSelectionsChange={(nextSelections) => {
+            const allowedSelections =
+              (quota?.tv.remaining ?? 0) + (editRequest?.seasons.length ?? 0);
+            if (
+              !quota?.tv.limit ||
+              requestOverrides?.ignoreQuota ||
+              nextSelections.length <= allowedSelections
+            ) {
+              setSeasonSelections(nextSelections);
             }
-            disabledSeasons={getAllRequestedSeasons()}
-            disabledEpisodes={getAllRequestedEpisodes()}
-            onActiveSeasonChange={setActiveSeason}
-            onSelectionsChange={(nextSelections) => {
-              const allowedSelections =
-                (quota?.tv.remaining ?? 0) + (editRequest?.seasons.length ?? 0);
-              if (
-                !quota?.tv.limit ||
-                requestOverrides?.ignoreQuota ||
-                nextSelections.length <= allowedSelections
-              ) {
-                setSeasonSelections(nextSelections);
-              }
-            }}
-          />
-        )}
+          }}
+        />
+      )}
 
-        {canUseAdvancedOptions && (
-          <AdvancedRequester
-            type="tv"
-            is4k={is4k}
-            allow4kServerSelection={allow4kServerSelection && !editRequest}
-            isAnime={isAnime}
-            quota={quota}
-            requestUser={editRequest?.requestedBy}
-            defaultOverrides={
-              editRequest
-                ? {
-                    folder: editRequest.rootFolder,
-                    profile: editRequest.profileId,
-                    server: editRequest.serverId,
-                    language: editRequest.languageProfileId,
-                    tags: editRequest.tags,
-                  }
-                : undefined
-            }
-            expanded={advancedOptionsOpen}
-            panelOnly
-            rootFolderTable
-            requestedByPortal={requestedByPortal}
-            onChange={(overrides) => setRequestOverrides(overrides)}
-          />
-        )}
+      {canUseAdvancedOptions && (
+        <AdvancedRequester
+          type="tv"
+          is4k={is4k}
+          allow4kServerSelection={allow4kServerSelection && !editRequest}
+          isAnime={isAnime}
+          quota={quota}
+          requestUser={editRequest?.requestedBy}
+          defaultOverrides={
+            editRequest
+              ? {
+                  folder: editRequest.rootFolder,
+                  profile: editRequest.profileId,
+                  server: editRequest.serverId,
+                  language: editRequest.languageProfileId,
+                  tags: editRequest.tags,
+                }
+              : undefined
+          }
+          expanded={advancedOptionsOpen}
+          panelOnly
+          rootFolderTable
+          requestedByPortal={requestedByPortal}
+          onChange={(overrides) => setRequestOverrides(overrides)}
+        />
+      )}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
-          <div className="mr-auto flex items-center gap-2">
-            {canUseAdvancedOptions && (
-              <button
-                type="button"
-                className="detail-disclosure-button"
-                aria-expanded={advancedOptionsOpen}
-                onClick={() => setAdvancedOptionsOpen((open) => !open)}
-              >
-                <AdjustmentsHorizontalIcon
-                  className="h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-                {intl.formatMessage(messages.advancedOptions)}
-                <ChevronDownIcon
-                  className={`h-3.5 w-3.5 transition-transform ${advancedOptionsOpen ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
-              </button>
-            )}
-          </div>
-          <div
-            className="flex h-[22px] items-center"
-            ref={setRequestedByPortal}
-          />
-          <button
-            type="button"
-            onClick={closeAction}
-            data-testid="modal-cancel-button"
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-red-600/80 bg-red-800/25 px-2 text-[11px] leading-none font-semibold text-red-200 transition hover:border-red-500 hover:text-white focus:ring-2 focus:ring-red-500 focus:outline-none"
-          >
-            <XMarkIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {editRequest
-              ? intl.formatMessage(globalMessages.close)
-              : intl.formatMessage(globalMessages.cancel)}
-          </button>
-          <button
-            type="button"
-            disabled={requestDisabled}
-            onClick={() => void submitAction()}
-            data-testid="modal-ok-button"
-            className="inline-flex h-[22px] items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold text-emerald-200 transition hover:border-emerald-500 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ArrowDownTrayIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {requestButtonLabel}
-          </button>
+      <div className="mt-[5px] flex flex-wrap items-center justify-end gap-2">
+        <div className="mr-auto flex items-center gap-2">
+          {canUseAdvancedOptions && (
+            <button
+              type="button"
+              className="request-form-control compact-control inline-flex items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:ring-inset"
+              aria-expanded={advancedOptionsOpen}
+              onClick={() => setAdvancedOptionsOpen((open) => !open)}
+            >
+              <AdjustmentsHorizontalIcon
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+              />
+              {intl.formatMessage(messages.advancedOptions)}
+              <ChevronDownIcon
+                className={`h-3.5 w-3.5 transition-transform ${advancedOptionsOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
         </div>
-      </RequestMediaCard>
+        <div
+          className="compact-control flex items-center"
+          ref={setRequestedByPortal}
+        />
+        <Button
+          type="button"
+          onClick={closeAction}
+          data-testid="modal-cancel-button"
+          buttonType="danger"
+          buttonSize="standard"
+        >
+          <XMarkIcon aria-hidden="true" />
+          {editRequest
+            ? intl.formatMessage(globalMessages.close)
+            : intl.formatMessage(globalMessages.cancel)}
+        </Button>
+        <Button
+          type="button"
+          disabled={requestDisabled}
+          onClick={() => void submitAction()}
+          data-testid="modal-ok-button"
+          buttonType="success"
+          buttonSize="standard"
+        >
+          <ArrowDownTrayIcon aria-hidden="true" />
+          {requestButtonLabel}
+        </Button>
+      </div>
     </Modal>
   );
 };

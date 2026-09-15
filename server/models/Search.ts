@@ -11,7 +11,10 @@ import type {
   TmdbTvDetails,
   TmdbTvResult,
 } from '@server/api/themoviedb/interfaces';
-import { MediaType as MainMediaType } from '@server/constants/media';
+import {
+  MediaType as MainMediaType,
+  type MediaStatus,
+} from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import type { BookResult } from '@server/models/Book';
@@ -114,6 +117,10 @@ export interface AlbumResult extends MbSearchResult {
   posterPath?: string;
   needsCoverArt?: boolean;
   availableQualities?: ('MP3' | 'FLAC')[];
+  qualityStatuses?: {
+    quality: 'MP3' | 'FLAC';
+    status: MediaStatus;
+  }[];
   mediaInfo?: Media;
 }
 

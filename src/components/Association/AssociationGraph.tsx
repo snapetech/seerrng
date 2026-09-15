@@ -18,18 +18,33 @@ import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
 import { nodeHref, nodeImage, nodeImageType, nodeTitle } from './helpers';
 
-const EDGE_COLOR: Record<AssociationEdgeType, string> = {
-  similar: '#6366f1',
-  recommended: '#22d3ee',
-  'shared-person': '#f59e0b',
-  'shared-genre': '#64748b',
-};
-
 const EDGE_LABEL: Record<AssociationEdgeType, string> = {
   similar: 'Similar',
   recommended: 'Recommended',
   'shared-person': 'Shared person',
   'shared-genre': 'Weak connection',
+};
+
+const EDGE_CLASS: Record<
+  AssociationEdgeType,
+  { edge: string; swatch: string }
+> = {
+  similar: {
+    edge: 'association-edge-similar',
+    swatch: 'association-edge-swatch-similar',
+  },
+  recommended: {
+    edge: 'association-edge-recommended',
+    swatch: 'association-edge-swatch-recommended',
+  },
+  'shared-person': {
+    edge: 'association-edge-shared-person',
+    swatch: 'association-edge-swatch-shared-person',
+  },
+  'shared-genre': {
+    edge: 'association-edge-shared-genre',
+    swatch: 'association-edge-swatch-shared-genre',
+  },
 };
 
 const MEDIA_TONE: Record<string, string> = {
@@ -176,7 +191,7 @@ const AssociationGraph = ({ graph }: { graph: GraphData }) => {
         source: 'root',
         target: id,
         animated: edge.type === 'shared-person',
-        style: { stroke: EDGE_COLOR[edge.type], strokeWidth: 2 },
+        className: EDGE_CLASS[edge.type].edge,
       });
     });
 
@@ -192,10 +207,7 @@ const AssociationGraph = ({ graph }: { graph: GraphData }) => {
         {Object.entries(EDGE_LABEL).map(([type, label]) => (
           <span key={type} className="flex items-center gap-1.5">
             <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{
-                backgroundColor: EDGE_COLOR[type as AssociationEdgeType],
-              }}
+              className={`${EDGE_CLASS[type as AssociationEdgeType].swatch} h-2.5 w-2.5 rounded-full`}
             />
             {label}
           </span>

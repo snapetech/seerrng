@@ -41,7 +41,7 @@ const MovieGenreList = () => {
               image={`https://image.tmdb.org/t/p/w780_filter(duotone,${
                 genreColorMap[genre.id] ?? genreColorMap[0]
               })${genre.backdrops[4]}`}
-              url={`/discover/movies/genre/${genre.id}`}
+              url={`/discover/movies?genre=${genre.id}`}
               canExpand
             />
           </li>

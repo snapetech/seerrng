@@ -7,6 +7,25 @@ const {
   validateRefreshedUiStyleBoundaries,
 } = require('./check-refreshed-ui-style-lib.js');
 
+const validSharedStyles = `
+  .app-button {}
+  .app-button-primary {}
+  .app-button-warning {}
+  .app-button-danger {}
+  .app-button-success {}
+  .button-standard, .button-sm {}
+  .detail-disclosure-control {}
+  .media-quality-select-control {}
+  .media-detail-column-divider {}
+  .media-rating-row {}
+  .media-primary-action-row {}
+  .scrollable-card {}
+  .refreshed-card-surface {}
+  .refreshed-inset-surface {}
+  .refreshed-artwork-scrim {}
+  .request-card-artwork-gradient {}
+`;
+
 test('accepts shared blue surfaces and semantic card text', () => {
   const result = validateRefreshedUiStyleBoundaries({
     'src/components/Example/index.tsx': `
@@ -64,27 +83,67 @@ test('allows data-driven geometry without permitting visual overrides', () => {
   assert.deepStrictEqual(result.errors, []);
 });
 
-test('requires disclosure buttons to use the shared blue control palette', () => {
+test('requires every approved shared style reference to exist', () => {
   const rejected = validateRefreshedUiStyleBoundaries({
     'src/styles/globals.css': `
-      .detail-disclosure-button {
-        @apply border-gray-600 bg-gray-900 text-gray-300;
-      }
+      .app-button {}
     `,
   });
-  assert.ok(rejected.errors.some((error) => error.includes('near-black')));
   assert.ok(
-    rejected.errors.some((error) => error.includes('blue control palette'))
+    rejected.errors.some((error) => error.includes('required shared style'))
   );
 
   const accepted = validateRefreshedUiStyleBoundaries({
-    'src/styles/globals.css': `
-      .detail-disclosure-button {
-        color: rgb(var(--theme-control-text) / 0.9);
-        border-color: rgb(var(--theme-control-border) / 0.7);
-        background-color: rgb(var(--theme-control-surface) / 0.28);
-      }
+    'src/styles/globals.css': validSharedStyles,
+  });
+  assert.deepStrictEqual(accepted.errors, []);
+});
+
+test('does not duplicate CSS property values in the reference validator', () => {
+  const result = validateRefreshedUiStyleBoundaries({
+    'src/styles/globals.css': validSharedStyles.replace(
+      '.app-button-primary {}',
+      '.app-button-primary { background: anything; }'
+    ),
+  });
+  assert.deepStrictEqual(result.errors, []);
+});
+
+test('rejects pseudo-element dividers and the larger legacy action token', () => {
+  const result = validateRefreshedUiStyleBoundaries({
+    'src/components/Example/index.tsx': `
+      export const Example = () => (
+        <Button
+          buttonSize="default"
+          className="before:absolute before:left-0 before:w-px"
+        />
+      );
+    `,
+  });
+  assert.ok(
+    result.errors.some((error) => error.includes('ordinary border class'))
+  );
+  assert.ok(
+    result.errors.some((error) => error.includes('larger legacy size'))
+  );
+});
+
+test('allows the marked runtime Theme Picker swatch only', () => {
+  const accepted = validateRefreshedUiStyleBoundaries({
+    'src/components/Layout/ThemePicker/index.tsx': `
+      export const Swatch = ({ swatch }) => (
+        <span data-theme-swatch style={{ backgroundColor: swatch }} />
+      );
     `,
   });
   assert.deepStrictEqual(accepted.errors, []);
+
+  const rejected = validateRefreshedUiStyleBoundaries({
+    'src/components/Example/index.tsx': `
+      export const Swatch = ({ swatch }) => (
+        <span style={{ backgroundColor: swatch }} />
+      );
+    `,
+  });
+  assert.ok(rejected.errors.some((error) => error.includes('visual inline')));
 });

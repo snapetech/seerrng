@@ -25,7 +25,8 @@ const messages = defineMessages('components.MediaDetails.SeriesBrowser', {
   noSeasons: 'No Seasons Available',
   selectSeason: 'Select a season to view its episodes',
   loadError: 'Episodes could not be loaded. Try selecting the season again.',
-  availabilityLegend: 'Green check: available. Red X: not available.',
+  availabilityLegend:
+    'Bright green check: fully available. Dark green check: partially available. Red X: not available.',
   selection: 'Select items to play',
   selectSeasonEpisodes: 'Select every available episode in this season',
   deselectSeasonEpisodes: 'Clear this season from the playback selection',
@@ -129,10 +130,21 @@ const SeriesSeasonEpisodeBrowser = ({
       </span>
     </Tooltip>
   );
-  const AvailabilityIcon = ({ available }: { available: boolean }) => (
+  const AvailabilityIcon = ({
+    available,
+    partial = false,
+  }: {
+    available: boolean;
+    partial?: boolean;
+  }) => (
     <span className="media-availability-cell">
       {available ? (
-        <CheckCircleIcon className="h-4 w-4 text-green-400" aria-hidden />
+        <CheckCircleIcon
+          className={`h-4 w-4 ${
+            partial ? 'text-emerald-600' : 'text-green-400'
+          }`}
+          aria-hidden
+        />
       ) : (
         <XCircleIcon className="h-4 w-4 text-red-400" aria-hidden />
       )}
@@ -142,7 +154,7 @@ const SeriesSeasonEpisodeBrowser = ({
   return (
     <div className="mt-[5px] grid min-w-0 gap-2 sm:grid-cols-[max-content_minmax(0,1fr)]">
       <section className="refreshed-inset-surface min-w-[12rem] rounded-lg border border-gray-700 p-2">
-        <div className="grid grid-cols-[2rem_minmax(5.5rem,1fr)_4rem_2.5rem] items-center gap-x-2 border-b border-gray-600 pr-2 pb-2 pl-1 text-xs font-semibold text-gray-200">
+        <div className="media-inset-table-heading media-scroll-grid-header request-divider-dark grid grid-cols-[2rem_minmax(5.5rem,1fr)_4rem_2.5rem] items-center gap-x-2 border-b pb-2 pl-1">
           <SelectionCircle
             disabled={allPlayableItemIds.length === 0}
             onClick={() => toggleItems(allPlayableItemIds)}
@@ -158,7 +170,7 @@ const SeriesSeasonEpisodeBrowser = ({
           <AvailabilityHeading />
         </div>
         <div
-          className="max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-1"
+          className="scrollable-card -mr-2 max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-2"
           data-testid="season-list"
         >
           {visibleSeasons.length === 0 && (
@@ -170,7 +182,11 @@ const SeriesSeasonEpisodeBrowser = ({
             const group = catalog?.groups.find(
               (candidate) => candidate.index === season.seasonNumber
             );
-            const available = group?.available === true;
+            const availableEpisodeCount = group?.items.length ?? 0;
+            const available = availableEpisodeCount > 0;
+            const partiallyAvailable =
+              availableEpisodeCount > 0 &&
+              availableEpisodeCount < season.episodeCount;
             const selectedCount =
               group?.items.filter((item) => selection.has(item.id)).length ?? 0;
             const allSelected =
@@ -209,7 +225,10 @@ const SeriesSeasonEpisodeBrowser = ({
                 <span className="refreshed-detail-text text-center text-xs">
                   {season.episodeCount}
                 </span>
-                <AvailabilityIcon available={available} />
+                <AvailabilityIcon
+                  available={available}
+                  partial={partiallyAvailable}
+                />
               </div>
             );
           })}
@@ -217,7 +236,7 @@ const SeriesSeasonEpisodeBrowser = ({
       </section>
 
       <section className="refreshed-inset-surface min-w-0 rounded-lg border border-gray-700 p-2">
-        <div className="grid grid-cols-[2rem_4.5rem_minmax(0,1fr)_2.5rem] items-center gap-x-2 border-b border-gray-600 pr-2 pb-2 pl-1 text-xs font-semibold text-gray-200">
+        <div className="media-inset-table-heading media-scroll-grid-header request-divider-dark grid grid-cols-[2rem_4.5rem_minmax(0,1fr)_2.5rem] items-center gap-x-2 border-b pb-2 pl-1">
           <SelectionCircle
             disabled={activeItemIds.length === 0}
             onClick={() => toggleItems(activeItemIds)}
@@ -233,7 +252,7 @@ const SeriesSeasonEpisodeBrowser = ({
           <AvailabilityHeading />
         </div>
         <div
-          className="max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-1"
+          className="scrollable-card -mr-2 max-h-[214px] space-y-0.5 overflow-y-auto pt-1 pr-2"
           data-testid="episode-list"
         >
           {!data && !error && activeSeason >= 0 && (

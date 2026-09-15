@@ -9,7 +9,10 @@ import Tooltip from '@app/components/Common/Tooltip';
 import AvailabilityValue from '@app/components/MediaDetails/AvailabilityValue';
 import DetailDisclosureButton from '@app/components/MediaDetails/DetailDisclosureButton';
 import ExpandableCreditList from '@app/components/MediaDetails/ExpandableCreditList';
+import MediaDetailArtwork from '@app/components/MediaDetails/MediaDetailArtwork';
+import MediaQualitySelect from '@app/components/MediaDetails/MediaQualitySelect';
 import MediaSlider from '@app/components/MediaSlider';
+import useDetailDisclosurePins from '@app/hooks/useDetailDisclosurePins';
 import useLocale from '@app/hooks/useLocale';
 import defineMessages from '@app/utils/defineMessages';
 import { getTmdbPosterImageUrl } from '@app/utils/imageCache';
@@ -18,7 +21,7 @@ import type { RatingResponse } from '@server/api/ratings';
 import { MediaStatus } from '@server/constants/media';
 import type { MovieDetails } from '@server/models/Movie';
 import Link from 'next/link';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MovieDetails.Layout', {
@@ -60,6 +63,7 @@ const messages = defineMessages('components.MovieDetails.Layout', {
   theatrical: 'Theatrical',
   digital: 'Digital',
   physical: 'Physical',
+  quality: 'Quality',
 });
 
 interface MovieDetailsLayoutProps {
@@ -73,7 +77,7 @@ interface MovieDetailsLayoutProps {
   show4kAvailability: boolean;
   primaryActions: ReactNode;
   secondaryActions: ReactNode;
-  playbackActions?: ReactNode;
+  playbackActions?: (is4k: boolean) => ReactNode;
 }
 
 const availableStatuses = new Set([
@@ -122,9 +126,26 @@ const MovieDetailsLayout = ({
 }: MovieDetailsLayoutProps) => {
   const intl = useIntl();
   const { locale } = useLocale();
+  const { pins, togglePinned } = useDetailDisclosurePins('movie');
   const [showCast, setShowCast] = useState(false);
   const [showCrew, setShowCrew] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState<'hd' | '4k'>(() =>
+    show4kAvailability &&
+    !availableStatuses.has(data.mediaInfo?.status as MediaStatus) &&
+    availableStatuses.has(data.mediaInfo?.status4k as MediaStatus)
+      ? '4k'
+      : 'hd'
+  );
+  useEffect(() => {
+    setShowCast(pins.cast);
+  }, [pins.cast]);
+  useEffect(() => {
+    setShowCrew(pins.crew);
+  }, [pins.crew]);
+  useEffect(() => {
+    setShowTags(pins.subjectTags);
+  }, [pins.subjectTags]);
   const unavailable = intl.formatMessage(messages.notAvailable);
   const directors = sortedCrew.filter((person) => person.job === 'Director');
   const screenplay = sortedCrew.find((person) =>
@@ -193,21 +214,12 @@ const MovieDetailsLayout = ({
 
   return (
     <div className="media-page">
-      <article className="refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
+      <article className="media-detail-card refreshed-card-surface refreshed-detail-text relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20">
         {data.backdropPath && (
-          <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-            <CachedImage
-              type="tmdb"
-              src={`https://image.tmdb.org/t/p/original${data.backdropPath}`}
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover object-top"
-            />
-            <div className="refreshed-artwork-scrim" />
-            <div className="refreshed-artwork-gradient" />
-          </div>
+          <MediaDetailArtwork
+            type="tmdb"
+            src={`https://image.tmdb.org/t/p/original${data.backdropPath}`}
+          />
         )}
 
         <div className="relative z-10">
@@ -241,7 +253,7 @@ const MovieDetailsLayout = ({
 
               <div className="card:grid-cols-3 mt-4 grid min-w-0 flex-1 grid-cols-1">
                 <div className="card:col-span-2 card:pr-3 min-w-0">
-                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
+                  <dl className="card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)] card:gap-x-0 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 text-xs leading-4">
                     <dt className="card:col-start-1 card:row-start-1 font-medium text-gray-100">
                       {intl.formatMessage(messages.mediaAndFormat)}:
                     </dt>
@@ -271,8 +283,7 @@ const MovieDetailsLayout = ({
                           })
                         : unavailable}
                     </dd>
-                    <div className="card:col-start-5 card:row-span-3 card:row-start-1 card:block hidden bg-gray-600" />
-                    <div className="card:col-span-1 card:col-start-7 card:row-span-3 card:row-start-1 card:mt-0 card:border-t-0 card:pt-0 col-span-2 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2">
+                    <div className="media-detail-column-divider card:col-span-1 card:col-start-5 card:row-span-3 card:row-start-1 col-span-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
                       <dt className="font-medium text-gray-100">
                         {intl.formatMessage(messages.director)}:
                       </dt>
@@ -327,7 +338,7 @@ const MovieDetailsLayout = ({
                       {intl.formatMessage(messages.genres)}:
                     </dt>
                     <dd
-                      className="card:col-span-5 card:col-start-3 card:row-start-4 m-0 mt-0.5 min-w-0 break-words"
+                      className="card:col-span-3 card:col-start-3 card:row-start-4 m-0 mt-0.5 min-w-0 break-words"
                       data-testid="media-details-genres"
                     >
                       {data.genres.length > 0
@@ -347,129 +358,135 @@ const MovieDetailsLayout = ({
                   </dl>
                 </div>
 
-                <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5 border-t border-gray-600 pt-2 text-xs leading-4">
-                  <dt className="font-medium text-gray-100">
-                    {intl.formatMessage(messages.hd)}:
-                  </dt>
-                  <dd className="m-0 truncate">
-                    <AvailabilityValue status={data.mediaInfo?.status}>
-                      {getAvailabilityText(data.mediaInfo?.status, unavailable)}
-                    </AvailabilityValue>
-                  </dd>
-                  {show4kAvailability && (
-                    <>
-                      <dt className="font-medium text-gray-100">
-                        {intl.formatMessage(messages.ultraHd)}:
-                      </dt>
-                      <dd className="m-0 truncate">
-                        <AvailabilityValue status={data.mediaInfo?.status4k}>
-                          {getAvailabilityText(
-                            data.mediaInfo?.status4k,
-                            unavailable
-                          )}
-                        </AvailabilityValue>
-                      </dd>
-                    </>
-                  )}
-                </dl>
+                <div className="media-detail-column-divider flex min-w-0 flex-col text-xs leading-4">
+                  <dl className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-0.5">
+                    <dt className="font-medium text-gray-100">
+                      {intl.formatMessage(messages.hd)}:
+                    </dt>
+                    <dd className="m-0 truncate">
+                      <AvailabilityValue status={data.mediaInfo?.status}>
+                        {getAvailabilityText(
+                          data.mediaInfo?.status,
+                          unavailable
+                        )}
+                      </AvailabilityValue>
+                    </dd>
+                    {show4kAvailability && (
+                      <>
+                        <dt className="font-medium text-gray-100">
+                          {intl.formatMessage(messages.ultraHd)}:
+                        </dt>
+                        <dd className="m-0 truncate">
+                          <AvailabilityValue status={data.mediaInfo?.status4k}>
+                            {getAvailabilityText(
+                              data.mediaInfo?.status4k,
+                              unavailable
+                            )}
+                          </AvailabilityValue>
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
 
-          {(playbackActions ||
-            ratingData?.rt?.criticsScore !== undefined ||
-            ratingData?.rt?.audienceScore !== undefined ||
-            ratingData?.imdb?.criticsScore !== undefined ||
-            data.voteCount > 0) && (
-            <div className="media-rating-row">
-              {playbackActions}
-              {ratingData?.rt?.criticsRating &&
-                typeof ratingData.rt.criticsScore === 'number' && (
-                  <Tooltip
-                    content={intl.formatMessage(messages.rtCriticsScore)}
+          <div className="media-rating-row">
+            <MediaQualitySelect
+              value={selectedQuality}
+              options={[
+                { label: 'HD', value: 'hd' },
+                ...(show4kAvailability
+                  ? ([{ label: '4K', value: '4k' }] as const)
+                  : []),
+              ]}
+              onChange={setSelectedQuality}
+              label={intl.formatMessage(messages.quality)}
+            />
+            {playbackActions?.(selectedQuality === '4k')}
+            {ratingData?.rt?.criticsRating &&
+              typeof ratingData.rt.criticsScore === 'number' && (
+                <Tooltip content={intl.formatMessage(messages.rtCriticsScore)}>
+                  <a
+                    href={getSafeHref(ratingData.rt.url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="media-rating-link"
                   >
-                    <a
-                      href={getSafeHref(ratingData.rt.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="media-rating-link"
-                    >
-                      {ratingData.rt.criticsRating === 'Rotten' ? (
-                        <RTRotten className="media-rating-icon" />
-                      ) : (
-                        <RTFresh className="media-rating-icon" />
-                      )}
-                      <span className="media-rating-value">
-                        {ratingData.rt.criticsScore}%
-                      </span>
-                    </a>
-                  </Tooltip>
-                )}
-              {ratingData?.rt?.audienceRating &&
-                typeof ratingData.rt.audienceScore === 'number' && (
-                  <Tooltip
-                    content={intl.formatMessage(messages.rtAudienceScore)}
+                    {ratingData.rt.criticsRating === 'Rotten' ? (
+                      <RTRotten className="media-rating-icon" />
+                    ) : (
+                      <RTFresh className="media-rating-icon" />
+                    )}
+                    <span className="media-rating-value">
+                      {ratingData.rt.criticsScore}%
+                    </span>
+                  </a>
+                </Tooltip>
+              )}
+            {ratingData?.rt?.audienceRating &&
+              typeof ratingData.rt.audienceScore === 'number' && (
+                <Tooltip content={intl.formatMessage(messages.rtAudienceScore)}>
+                  <a
+                    href={getSafeHref(ratingData.rt.url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="media-rating-link"
                   >
-                    <a
-                      href={getSafeHref(ratingData.rt.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="media-rating-link"
-                    >
-                      {ratingData.rt.audienceRating === 'Spilled' ? (
-                        <RTAudRotten className="media-rating-icon media-rating-icon-audience" />
-                      ) : (
-                        <RTAudFresh className="media-rating-icon media-rating-icon-audience" />
-                      )}
-                      <span className="media-rating-value">
-                        {ratingData.rt.audienceScore}%
-                      </span>
-                    </a>
-                  </Tooltip>
-                )}
-              {ratingData?.imdb?.criticsScore !== undefined && (
-                <Tooltip
-                  content={intl.formatMessage(messages.imdbUserScore, {
-                    formattedCount: intl.formatNumber(
-                      ratingData.imdb.criticsScoreCount,
-                      {
-                        notation: 'compact',
-                        compactDisplay: 'short',
-                        maximumFractionDigits: 1,
-                      }
-                    ),
-                  })}
+                    {ratingData.rt.audienceRating === 'Spilled' ? (
+                      <RTAudRotten className="media-rating-icon media-rating-icon-audience" />
+                    ) : (
+                      <RTAudFresh className="media-rating-icon media-rating-icon-audience" />
+                    )}
+                    <span className="media-rating-value">
+                      {ratingData.rt.audienceScore}%
+                    </span>
+                  </a>
+                </Tooltip>
+              )}
+            {ratingData?.imdb?.criticsScore !== undefined && (
+              <Tooltip
+                content={intl.formatMessage(messages.imdbUserScore, {
+                  formattedCount: intl.formatNumber(
+                    ratingData.imdb.criticsScoreCount,
+                    {
+                      notation: 'compact',
+                      compactDisplay: 'short',
+                      maximumFractionDigits: 1,
+                    }
+                  ),
+                })}
+              >
+                <a
+                  href={getSafeHref(ratingData.imdb.url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="media-rating-link"
                 >
-                  <a
-                    href={getSafeHref(ratingData.imdb.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="media-rating-link"
-                  >
-                    <ImdbLogo className="media-rating-wordmark" />
-                    <span className="media-rating-value">
-                      {ratingData.imdb.criticsScore}
-                    </span>
-                  </a>
-                </Tooltip>
-              )}
-              {data.voteCount > 0 && (
-                <Tooltip content={intl.formatMessage(messages.tmdbUserScore)}>
-                  <a
-                    href={`https://www.themoviedb.org/movie/${data.id}?language=${locale}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="media-rating-link"
-                  >
-                    <TmdbLogo className="media-rating-wordmark" />
-                    <span className="media-rating-value">
-                      {Math.round(data.voteAverage * 10)}%
-                    </span>
-                  </a>
-                </Tooltip>
-              )}
-            </div>
-          )}
+                  <ImdbLogo className="media-rating-wordmark" />
+                  <span className="media-rating-value">
+                    {ratingData.imdb.criticsScore}
+                  </span>
+                </a>
+              </Tooltip>
+            )}
+            {data.voteCount > 0 && (
+              <Tooltip content={intl.formatMessage(messages.tmdbUserScore)}>
+                <a
+                  href={`https://www.themoviedb.org/movie/${data.id}?language=${locale}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="media-rating-link"
+                >
+                  <TmdbLogo className="media-rating-wordmark" />
+                  <span className="media-rating-value">
+                    {Math.round(data.voteAverage * 10)}%
+                  </span>
+                </a>
+              </Tooltip>
+            )}
+          </div>
 
           <div className="media-primary-action-row">
             {primaryActions}
@@ -477,7 +494,7 @@ const MovieDetailsLayout = ({
           </div>
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading">
               {intl.formatMessage(messages.overview)}
             </h2>
             {data.tagline && (
@@ -495,7 +512,7 @@ const MovieDetailsLayout = ({
                 {featuredCrewGroups.map((group, groupIndex) => (
                   <dl
                     key={`featured-crew-${groupIndex}`}
-                    className={`grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4 ${groupIndex > 0 ? 'card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 border-t border-gray-600 pt-2' : 'card:pr-3'}`}
+                    className={`grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4 ${groupIndex > 0 ? `media-detail-column-divider ${groupIndex === 1 ? 'card:pr-3' : ''}` : 'card:pr-3'}`}
                   >
                     {group.map((person) => (
                       <div
@@ -523,9 +540,7 @@ const MovieDetailsLayout = ({
 
           {data.collection && (
             <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-              <h2 className="text-xs font-semibold text-gray-200">
-                {data.collection.name}
-              </h2>
+              <h2 className="media-inset-heading">{data.collection.name}</h2>
               <Link
                 href={`/collection/${data.collection.id}`}
                 aria-label={data.collection.name}
@@ -546,21 +561,27 @@ const MovieDetailsLayout = ({
             </section>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-[5px] flex flex-wrap items-center gap-2">
             <DetailDisclosureButton
               label={intl.formatMessage(messages.viewCast)}
               open={showCast}
               onClick={() => setShowCast((open) => !open)}
+              pinned={pins.cast}
+              onPinClick={() => void togglePinned('cast')}
             />
             <DetailDisclosureButton
               label={intl.formatMessage(messages.viewCrew)}
               open={showCrew}
               onClick={() => setShowCrew((open) => !open)}
+              pinned={pins.crew}
+              onPinClick={() => void togglePinned('crew')}
             />
             <DetailDisclosureButton
               label={intl.formatMessage(messages.subjectTags)}
               open={showTags}
               onClick={() => setShowTags((open) => !open)}
+              pinned={pins.subjectTags}
+              onPinClick={() => void togglePinned('subjectTags')}
             />
           </div>
 
@@ -580,7 +601,7 @@ const MovieDetailsLayout = ({
           )}
           {showTags && (
             <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-              <h2 className="mb-2 text-xs font-semibold text-gray-200">
+              <h2 className="media-inset-heading mb-2">
                 {intl.formatMessage(messages.subjectTags)}
               </h2>
               {data.keywords.length === 0 ? (
@@ -593,7 +614,7 @@ const MovieDetailsLayout = ({
                     <Link
                       key={keyword.id}
                       href={`/discover/movies/keyword?keywords=${keyword.id}`}
-                      className={`inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${subjectTagTones[keyword.id % subjectTagTones.length]}`}
+                      className={`compact-control inline-flex items-center rounded-full border px-2 text-[11px] font-medium transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${subjectTagTones[keyword.id % subjectTagTones.length]}`}
                     >
                       {keyword.name}
                     </Link>
@@ -604,7 +625,7 @@ const MovieDetailsLayout = ({
           )}
 
           <section className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3">
-            <h2 className="mb-3 text-xs font-semibold text-gray-200">
+            <h2 className="media-inset-heading mb-3">
               {intl.formatMessage(messages.movieDetails)}
             </h2>
             <div className="card:grid-cols-3 grid grid-cols-1">
@@ -636,7 +657,7 @@ const MovieDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:px-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider card:pr-3 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.revenue)}:
                 </dt>
@@ -679,7 +700,7 @@ const MovieDetailsLayout = ({
                 </dd>
               </dl>
 
-              <dl className="card:relative card:mt-0 card:border-t-0 card:pl-3 card:pt-0 card:before:absolute card:before:bottom-0 card:before:left-0 card:before:top-0 card:before:w-px card:before:bg-gray-600 mt-2 grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 border-t border-gray-600 pt-2 text-xs leading-4">
+              <dl className="media-detail-column-divider grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-3 gap-y-1 text-xs leading-4">
                 <dt className="font-medium text-gray-100">
                   {intl.formatMessage(messages.studios)}:
                 </dt>

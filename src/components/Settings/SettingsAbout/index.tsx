@@ -81,9 +81,9 @@ const SettingsAbout = () => {
             title={intl.formatMessage(messages.version)}
             className="flex flex-row items-center truncate"
           >
-            <code className="truncate">
+            <span className="settings-plain-value truncate">
               {data.version.replace('main-', '')}
-            </code>
+            </span>
             {settings.currentSettings.versionCheck ? (
               status && status.commitTag !== 'local' ? (
                 status.updateAvailable ? (
@@ -148,18 +148,18 @@ const SettingsAbout = () => {
             {intl.formatNumber(data.totalRequests)}
           </List.Item>
           <List.Item title="Legal Use">
-            <span className="text-sm text-gray-400">
+            <span className="text-xs leading-4 text-gray-400">
               {intl.formatMessage(messages.legalUse)}
             </span>
           </List.Item>
           <List.Item title={intl.formatMessage(messages.appDataPath)}>
-            <code>{data.appDataPath}</code>
+            <span className="settings-plain-value">{data.appDataPath}</span>
           </List.Item>
-          {data.tz && (
-            <List.Item title={intl.formatMessage(messages.timezone)}>
-              <code>{data.tz}</code>
-            </List.Item>
-          )}
+          <List.Item title={intl.formatMessage(messages.timezone)}>
+            <span className="settings-plain-value">
+              {data.tz || 'Not available'}
+            </span>
+          </List.Item>
         </List>
       </div>
       <div className="section">
@@ -199,12 +199,12 @@ const SettingsAbout = () => {
       <div className="section">
         <List title={intl.formatMessage(messages.supportseerr)}>
           <List.Item title={intl.formatMessage(messages.supportdevelopment)}>
-            <div className="flex flex-wrap gap-2 py-1">
+            <div className="flex flex-wrap gap-[5px]">
               <a
                 href="https://www.paypal.com/donate/?business=donations%40snape.tech"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-blue-400/40 bg-blue-500/10 px-3 py-1.5 text-sm font-semibold text-blue-700 transition hover:border-blue-500 hover:bg-blue-500/20 focus:ring-2 focus:ring-blue-400 focus:outline-none dark:text-blue-300"
+                className="compact-control inline-flex items-center rounded-full border border-blue-400/40 bg-blue-500/10 px-2 text-xs leading-4 font-semibold text-blue-700 transition hover:border-blue-500 hover:bg-blue-500/20 focus:ring-2 focus:ring-blue-400 focus:outline-none dark:text-blue-300"
               >
                 {intl.formatMessage(messages.paypal)}
               </a>
@@ -212,7 +212,7 @@ const SettingsAbout = () => {
                 href="https://ko-fi.com/snapetech"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-sm font-semibold text-rose-700 transition hover:border-rose-500 hover:bg-rose-500/20 focus:ring-2 focus:ring-rose-400 focus:outline-none dark:text-rose-300"
+                className="compact-control inline-flex items-center rounded-full border border-rose-400/40 bg-rose-500/10 px-2 text-xs leading-4 font-semibold text-rose-700 transition hover:border-rose-500 hover:bg-rose-500/20 focus:ring-2 focus:ring-rose-400 focus:outline-none dark:text-rose-300"
               >
                 {intl.formatMessage(messages.kofi)}
               </a>

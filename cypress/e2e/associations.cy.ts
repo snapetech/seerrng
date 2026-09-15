@@ -153,45 +153,31 @@ describe('Associations', () => {
       cy.contains('Same author').should('be.visible');
       cy.contains('Related books').should('be.visible');
     });
-    cy.get('a[href="/associations/book/OLRELATEDW"]')
-      .contains('Explore connections')
+    cy.get('a[href="/book/OLRELATEDW"]')
+      .contains('Related Book')
       .and('be.visible');
   });
 
-  it('opens card association popovers outside clipped title cards', () => {
+  it('renders association results as unclipped compact detail cards', () => {
     cy.visit('/associations/book/OLROOTW');
     cy.wait('@getAssociations');
 
     cy.get('[data-testid=association-wall]').within(() => {
-      cy.get('a[href="/associations/book/OLRELATEDW"]')
-        .parents('.space-y-2')
-        .find('[data-testid=title-card]')
-        .trigger('mouseover');
-      cy.get('a[href="/associations/book/OLRELATEDW"]')
-        .parents('.space-y-2')
-        .find('[data-testid=association-badge]')
-        .should('not.contain.text', 'Similar')
-        .and(($badge) => {
-          const rect = $badge[0].getBoundingClientRect();
-          expect(rect.width).to.be.greaterThan(24);
-          expect(rect.width).to.be.lessThan(36);
-          expect(rect.height).to.be.greaterThan(24);
-          expect(rect.height).to.be.lessThan(36);
+      cy.get('a[href="/book/OLRELATEDW"]')
+        .contains('Related Book')
+        .closest('article')
+        .should('be.visible')
+        .and(($card) => {
+          const rect = $card[0].getBoundingClientRect();
+          expect(rect.width).to.be.greaterThan(250);
+          expect(rect.height).to.be.greaterThan(100);
         })
-        .click();
+        .within(() => {
+          cy.contains('Book').should('be.visible');
+          cy.contains('2024').should('be.visible');
+          cy.contains('Also by Book Author').should('be.visible');
+        });
     });
-
-    cy.wait('@getRelatedAssociations');
-    cy.get('body > [data-testid=association-popover]')
-      .should('be.visible')
-      .and(($popover) => {
-        expect($popover[0].getBoundingClientRect().width).to.be.greaterThan(
-          250
-        );
-      });
-    cy.contains('[data-testid=association-popover]', 'Root Book').should(
-      'be.visible'
-    );
   });
 
   it('hides card badges when a title has no strong associations', () => {
@@ -199,15 +185,12 @@ describe('Associations', () => {
     cy.wait('@getAssociations');
 
     cy.get('[data-testid=association-wall]').within(() => {
-      cy.get('a[href="/associations/book/OLOTHERW"]')
-        .parents('.space-y-2')
-        .find('[data-testid=title-card]')
-        .trigger('mouseover');
-      cy.wait(500);
-      cy.get('a[href="/associations/book/OLOTHERW"]')
-        .parents('.space-y-2')
-        .find('[data-testid=association-badge]')
-        .should('not.exist');
+      cy.get('a[href="/book/OLOTHERW"]')
+        .contains('Adjacent Book')
+        .closest('article')
+        .within(() => {
+          cy.get('[data-testid=association-badge]').should('not.exist');
+        });
     });
   });
 
@@ -243,20 +226,14 @@ describe('Associations', () => {
     cy.get('[data-testid=association-wall]').within(() => {
       cy.contains('Similar artists').should('be.visible');
       cy.contains('More like this').should('not.exist');
-      cy.get('a[href="/associations/artist/ARTISTRELATED"]')
-        .parents('.space-y-2')
-        .find('[data-testid=title-card]')
-        .trigger('mouseover');
-      cy.contains('Related Artist').should('be.visible');
-      cy.get('a[href="/associations/artist/ARTISTRELATED"]')
-        .parents('.space-y-2')
-        .find('[data-testid=association-badge]')
-        .click();
+      cy.get('a[href="/artist/ARTISTRELATED"]')
+        .contains('Related Artist')
+        .should('be.visible')
+        .closest('article')
+        .within(() => {
+          cy.contains('Listeners also play this artist').should('be.visible');
+          cy.get('[data-testid=association-badge]').should('not.exist');
+        });
     });
-
-    cy.wait('@getArtistAssociations');
-    cy.contains('[data-testid=association-popover]', 'Similar artists').should(
-      'be.visible'
-    );
   });
 });

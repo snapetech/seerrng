@@ -301,11 +301,13 @@ class ListenBrainzAPI extends ExternalAPI {
   public async getFreshReleases({
     days = 7,
     sort = 'release_date',
+    order = 'asc',
     offset = 0,
     count = 20,
   }: {
     days?: number;
     sort?: string;
+    order?: 'asc' | 'desc';
     offset?: number;
     count?: number;
   } = {}): Promise<LbFreshReleasesResponse> {
@@ -326,14 +328,21 @@ class ListenBrainzAPI extends ExternalAPI {
     const payload =
       isRecord(data) && isRecord(data.payload) ? data.payload : {};
 
+    const releases = (
+      Array.isArray(payload.releases) ? payload.releases : []
+    ).flatMap((value) => {
+      const release = sanitizeRelease(value);
+      return release ? [release] : [];
+    });
+    const orderedReleases = order === 'desc' ? releases.reverse() : releases;
+    const boundedOffset = clampOffset(offset);
+
     return {
       payload: {
-        releases: (Array.isArray(payload.releases) ? payload.releases : [])
-          .slice(0, boundedCount)
-          .flatMap((value) => {
-            const release = sanitizeRelease(value);
-            return release ? [release] : [];
-          }),
+        releases: orderedReleases.slice(
+          boundedOffset,
+          boundedOffset + boundedCount
+        ),
       },
     };
   }

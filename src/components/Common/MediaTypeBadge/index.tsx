@@ -15,12 +15,12 @@ export type MediaTypeBadgeType =
   'movie' | 'tv' | 'collection' | 'album' | 'artist' | 'book';
 
 export const mediaTypeBadgeTone: Record<MediaTypeBadgeType, string> = {
-  movie: 'border-blue-500/70 bg-blue-700/70 text-blue-50',
-  tv: 'border-violet-300/90 bg-purple-700/70 text-purple-50',
-  collection: 'border-blue-500/70 bg-blue-700/70 text-blue-50',
-  album: 'border-emerald-500/70 bg-emerald-700/70 text-emerald-50',
-  artist: 'border-fuchsia-500/70 bg-fuchsia-700/70 text-fuchsia-50',
-  book: 'border-amber-500/70 bg-amber-700/70 text-amber-50',
+  movie: 'border-blue-500/70 bg-blue-700/35 text-blue-50',
+  tv: 'border-violet-300/90 bg-purple-700/35 text-purple-50',
+  collection: 'border-blue-500/70 bg-blue-700/35 text-blue-50',
+  album: 'border-emerald-500/70 bg-emerald-700/35 text-emerald-50',
+  artist: 'border-fuchsia-500/70 bg-fuchsia-700/35 text-fuchsia-50',
+  book: 'border-amber-500/70 bg-amber-700/35 text-amber-50',
 };
 
 export const getMediaTypeBadgeType = (

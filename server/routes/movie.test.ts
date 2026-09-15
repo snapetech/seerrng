@@ -165,4 +165,53 @@ describe('GET /movie/:id/cover', () => {
       settings.radarr = priorRadarr;
     }
   });
+
+  it('serves a live Radarr discovery cover without persisted service links', async () => {
+    const settings = getSettings();
+    const priorRadarr = settings.radarr;
+    settings.radarr = [
+      {
+        id: 9,
+        name: 'Radarr-4K',
+        hostname: 'radarr.test',
+        port: 7879,
+        apiKey: 'radarr-key',
+        useSsl: false,
+        baseUrl: '',
+        activeProfileId: 1,
+        activeProfileName: 'Ultra-HD 4K',
+        activeDirectory: '/movies/4k',
+        tags: [],
+        is4k: true,
+        isDefault: true,
+        externalUrl: '',
+        syncEnabled: true,
+        preventSearch: false,
+        tagRequests: false,
+        overrideRule: [],
+        minimumAvailability: 'released',
+      },
+    ];
+    const getMovieCoverMock = mock.method(
+      RadarrAPI.prototype,
+      'getMovieCover',
+      async () => ({
+        imageBuffer: Buffer.from('live-movie-cover'),
+        contentType: 'image/jpeg',
+      })
+    );
+
+    try {
+      const res = await request(app).get(
+        '/movie/710002/cover?serviceId=9&externalServiceId=82&is4k=true'
+      );
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.headers['content-type'], 'image/jpeg');
+      assert.deepStrictEqual(res.body, Buffer.from('live-movie-cover'));
+      assert.strictEqual(getMovieCoverMock.mock.calls[0].arguments[0], 82);
+    } finally {
+      settings.radarr = priorRadarr;
+    }
+  });
 });

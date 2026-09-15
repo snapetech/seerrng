@@ -222,10 +222,7 @@ const Login = ({ initialBackdrops }: { initialBackdrops?: string[] }) => {
         <TransportSecurityNotice onReadinessChange={setTransportReady} />
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div
-          className="overflow-hidden bg-gray-800/50 shadow sm:rounded-lg"
-          style={{ backdropFilter: 'blur(5px)' }}
-        >
+        <div className="auth-frosted-surface overflow-hidden bg-gray-800/50 shadow sm:rounded-lg">
           <>
             <Transition
               as="div"

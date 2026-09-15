@@ -141,6 +141,11 @@ const canUsePlayback = (user: User, mediaType: MediaType, is4k = false) => {
   ) {
     return false;
   }
+  // Music reuses the existing standard/high-quality transport flag for its
+  // MP3/FLAC catalog choice. FLAC does not require a video 4K permission.
+  if (mediaType === MediaType.MUSIC) {
+    return true;
+  }
   if (!is4k) {
     return true;
   }
@@ -411,8 +416,8 @@ const resolvePlaylistItemIds = async (
 ): Promise<string[]> => {
   const targetCatalog = await createCatalog(media, user, is4k);
   const sourceCatalog =
-    is4k && media.mediaType !== MediaType.MOVIE && requestedItemIds.length > 0
-      ? await createCatalog(media, user, false)
+    media.mediaType !== MediaType.MOVIE && requestedItemIds.length > 0
+      ? await createCatalog(media, user, !is4k)
       : undefined;
 
   return resolvePlaybackCatalogItemIds({

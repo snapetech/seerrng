@@ -2429,6 +2429,92 @@ describe('User route input validation', () => {
     assert.strictEqual(user.settings?.cardTextVisibilityBook, 'hover');
   });
 
+  it('persists independent detail disclosure pins per user', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const firstSave = await agent
+      .post('/user/1/settings/detail-disclosures')
+      .send({ cast: true, artists: true, subjectTags: true });
+
+    assert.strictEqual(firstSave.status, 200);
+    assert.deepStrictEqual(firstSave.body, {
+      cast: true,
+      crew: false,
+      artists: true,
+      subjectTags: true,
+    });
+
+    const secondSave = await agent
+      .post('/user/1/settings/detail-disclosures')
+      .send({ cast: false, crew: true });
+    assert.strictEqual(secondSave.status, 200);
+    assert.deepStrictEqual(secondSave.body, {
+      cast: false,
+      crew: true,
+      artists: true,
+      subjectTags: true,
+    });
+
+    const getRes = await agent.get('/user/1/settings/detail-disclosures');
+    assert.strictEqual(getRes.status, 200);
+    assert.deepStrictEqual(getRes.body, secondSave.body);
+
+    const user = await getRepository(User).findOneOrFail({
+      where: { id: 1 },
+    });
+    assert.strictEqual(user.settings?.detailDisclosureCastPinned, false);
+    assert.strictEqual(user.settings?.detailDisclosureCrewPinned, true);
+    assert.strictEqual(user.settings?.detailDisclosureArtistsPinned, true);
+    assert.strictEqual(user.settings?.detailDisclosureSubjectTagsPinned, true);
+  });
+
+  it('persists detail disclosure pins independently per media category', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const movieSave = await agent
+      .post('/user/1/settings/detail-disclosures/movie')
+      .send({ cast: true, subjectTags: true });
+    const tvSave = await agent
+      .post('/user/1/settings/detail-disclosures/tv')
+      .send({ crew: true });
+
+    assert.strictEqual(movieSave.status, 200);
+    assert.deepStrictEqual(movieSave.body, {
+      cast: true,
+      crew: false,
+      artists: false,
+      subjectTags: true,
+    });
+    assert.strictEqual(tvSave.status, 200);
+    assert.deepStrictEqual(tvSave.body, {
+      cast: false,
+      crew: true,
+      artists: false,
+      subjectTags: false,
+    });
+
+    const movieGet = await agent.get(
+      '/user/1/settings/detail-disclosures/movie'
+    );
+    const tvGet = await agent.get('/user/1/settings/detail-disclosures/tv');
+    assert.deepStrictEqual(movieGet.body, movieSave.body);
+    assert.deepStrictEqual(tvGet.body, tvSave.body);
+
+    const user = await getRepository(User).findOneOrFail({
+      where: { id: 1 },
+    });
+    assert.deepStrictEqual(user.settings?.detailDisclosurePins?.movie, {
+      cast: true,
+      crew: false,
+      artists: false,
+      subjectTags: true,
+    });
+    assert.deepStrictEqual(user.settings?.detailDisclosurePins?.tv, {
+      cast: false,
+      crew: true,
+      artists: false,
+      subjectTags: false,
+    });
+  });
+
   it('saves card text visibility through main user settings without clearing other media types', async () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     await agent.post('/user/1/settings/card-text').send({
@@ -2674,6 +2760,16 @@ describe('User route input validation', () => {
 
     assert.strictEqual(res.status, 400);
     assert.match(res.body.message, /album must be "always" or "hover"/i);
+  });
+
+  it('rejects non-boolean detail disclosure pins', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent
+      .post('/user/1/settings/detail-disclosures')
+      .send({ cast: 'yes' });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /cast must be a boolean/i);
   });
 
   it('rejects malformed card text visibility bodies', async () => {

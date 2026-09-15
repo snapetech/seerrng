@@ -3,6 +3,9 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LibraryItem from '@app/components/Settings/LibraryItem';
+import Field, {
+  default as SettingsField,
+} from '@app/components/Settings/SettingsField';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -13,7 +16,7 @@ import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import type { JellyfinSettings } from '@server/lib/settings';
 import axios from 'axios';
-import { Field, Formik } from 'formik';
+import { Formik } from 'formik';
 import { useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -554,7 +557,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
                       <span className="label-required">*</span>
                     </label>
                     <div className="form-input-area">
-                      <Field
+                      <SettingsField
                         type="text"
                         inputMode="numeric"
                         id="port"

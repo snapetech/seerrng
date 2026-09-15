@@ -21,7 +21,12 @@ import {
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { upsertMediaSearchMetadata } from '@server/lib/mediaSearchMetadata';
 import { hydrateMediaSummaryRelations } from '@server/lib/mediaSummaryHydration';
-import { getAvailableMusicServices } from '@server/lib/musicQualityAvailability';
+import {
+  getAvailableMusicQualities,
+  getAvailableMusicServices,
+  getMusicQualityStatuses,
+} from '@server/lib/musicQualityAvailability';
+import { getMusicTrackAvailability } from '@server/lib/musicTrackAvailability';
 import { runWithServarrServiceSnapshot } from '@server/lib/serviceAdmission';
 import logger from '@server/logger';
 import {
@@ -488,6 +493,11 @@ musicRoutes.get('/:id', async (req, res, next) => {
         : resolvedMetadataArtist;
 
     const mappedDetails = mapMusicDetails(albumDetails, media, onUserWatchlist);
+    const lidarrServices = getExternalRuntimeConfig().lidarr;
+    const trackAvailabilityPromise = getMusicTrackAvailability(
+      mbId,
+      lidarrServices
+    );
     const destinationRequests = media?.id
       ? await getRepository(MediaRequest)
           .createQueryBuilder('request')
@@ -499,8 +509,9 @@ musicRoutes.get('/:id', async (req, res, next) => {
     const availableServices = getAvailableMusicServices(
       media,
       destinationRequests,
-      getExternalRuntimeConfig().lidarr
+      lidarrServices
     );
+    const trackAvailability = await trackAvailabilityPromise;
     const finalTrackArtistMetadata =
       updatedArtistMetadata || resolvedTrackArtistMetadata;
 
@@ -541,6 +552,7 @@ musicRoutes.get('/:id', async (req, res, next) => {
             ? Number(updatedMetadataArtist.tmdbPersonId)
             : null,
           availableServices,
+          trackAvailability,
           tracks: mappedDetails.tracks.map((track) => ({
             ...track,
             artists: track.artists.map((artist) => {
@@ -742,11 +754,13 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
         .filter((media) => media.mbId)
         .map((media) => [normalizeMusicBrainzId(media.mbId as string), media])
     );
+    const lidarrServices = getExternalRuntimeConfig().lidarr;
 
     const transformedReleaseGroups = paginatedReleaseGroups.map(
       (releaseGroup) => {
         const releaseGroupId = normalizeMusicBrainzId(releaseGroup.mbid);
         const posterPath = coverArtByAlbumId[releaseGroupId] ?? null;
+        const media = relatedMediaMap.get(releaseGroupId);
         return {
           id: releaseGroupId,
           mediaType: 'album',
@@ -756,7 +770,17 @@ musicRoutes.get('/:id/artist-discography', async (req, res, next) => {
           'primary-type': releaseGroup.type || 'Other',
           posterPath,
           needsCoverArt: !posterPath,
-          mediaInfo: relatedMediaMap.get(releaseGroupId),
+          mediaInfo: media,
+          availableQualities: getAvailableMusicQualities(
+            media,
+            media?.requests ?? [],
+            lidarrServices
+          ),
+          qualityStatuses: getMusicQualityStatuses(
+            media,
+            media?.requests ?? [],
+            lidarrServices
+          ),
         };
       }
     );

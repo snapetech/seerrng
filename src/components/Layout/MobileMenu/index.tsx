@@ -145,18 +145,11 @@ const MobileMenu = ({
         activeRegExp: /^\/discover\/audiobooks$/,
       },
       {
-        href: '/discover/audiobooks',
-        content: intl.formatMessage(menuMessages.browseaudiobooks),
-        svgIcon: <SpeakerWaveIcon className="h-6 w-6" />,
-        svgIconSelected: <FilledSpeakerWaveIcon className="h-6 w-6" />,
-        activeRegExp: /^\/discover\/audiobooks$/,
-      },
-      {
-        href: '/requests/status',
-        content: intl.formatMessage(menuMessages.requeststatus),
+        href: '/requests',
+        content: intl.formatMessage(menuMessages.requests),
         svgIcon: <ClockIcon className="h-6 w-6" />,
         svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
-        activeRegExp: /^\/requests\/status/,
+        activeRegExp: /^\/requests\/?$/,
       },
       {
         href: '/blocklist',

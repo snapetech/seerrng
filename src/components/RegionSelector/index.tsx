@@ -100,10 +100,10 @@ const RegionSelector = ({
               className={`inline-block w-full ${compact ? '' : 'rounded-md shadow-sm'}`}
             >
               <Listbox.Button
-                className={`focus:shadow-outline-blue relative flex w-full cursor-default items-center text-left text-white transition duration-150 ease-in-out focus:outline-none sm:text-sm sm:leading-5 ${
+                className={`settings-compatible-listbox-button focus:shadow-outline-blue relative flex w-full cursor-default items-center text-left text-white transition duration-150 ease-in-out focus:outline-none ${
                   compact
-                    ? 'h-[30px] rounded-none border-0 bg-transparent py-1 pr-8 pl-2'
-                    : 'rounded-md border border-gray-500 bg-gray-700 py-2 pr-10 pl-3 focus:border-blue-300'
+                    ? 'rounded-none border-0 bg-transparent pr-8 pl-2'
+                    : 'rounded-md border pr-8 pl-2'
                 }`}
               >
                 {((selectedRegion &&

@@ -17,7 +17,10 @@ import {
   normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
-import { getAvailableMusicQualities } from '@server/lib/musicQualityAvailability';
+import {
+  getAvailableMusicQualities,
+  getMusicQualityStatuses,
+} from '@server/lib/musicQualityAvailability';
 import {
   findSearchProvider,
   type CombinedSearchResponse,
@@ -728,6 +731,11 @@ searchRoutes.get('/', async (req, res, next) => {
         ? {
             ...result,
             availableQualities: getAvailableMusicQualities(
+              result.mediaInfo,
+              result.mediaInfo?.requests ?? [],
+              getSettings().lidarr
+            ),
+            qualityStatuses: getMusicQualityStatuses(
               result.mediaInfo,
               result.mediaInfo?.requests ?? [],
               getSettings().lidarr

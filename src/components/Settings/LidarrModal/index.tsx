@@ -1,5 +1,8 @@
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
+import Field, {
+  default as SettingsField,
+} from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -7,7 +10,7 @@ import { isValidURL } from '@app/utils/urlValidationHelper';
 import { Transition } from '@headlessui/react';
 import type { LidarrSettings } from '@server/lib/settings';
 import axios from 'axios';
-import { Field, Formik } from 'formik';
+import { Formik } from 'formik';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { OnChangeValue } from 'react-select';
@@ -366,7 +369,11 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                     {intl.formatMessage(messages.defaultserver)}
                   </label>
                   <div className="form-input-area">
-                    <Field type="checkbox" id="isDefault" name="isDefault" />
+                    <SettingsField
+                      type="checkbox"
+                      id="isDefault"
+                      name="isDefault"
+                    />
                   </div>
                 </div>
                 <div className="form-row">
@@ -428,7 +435,7 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                     <span className="label-required">*</span>
                   </label>
                   <div className="form-input-area">
-                    <Field
+                    <SettingsField
                       id="port"
                       name="port"
                       type="text"
@@ -451,7 +458,7 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                     {intl.formatMessage(messages.ssl)}
                   </label>
                   <div className="form-input-area">
-                    <Field
+                    <SettingsField
                       type="checkbox"
                       id="ssl"
                       name="ssl"
@@ -466,9 +473,6 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                   <label htmlFor="apiKey" className="text-label">
                     {intl.formatMessage(messages.apiKey)}
                     <span className="label-required">*</span>
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.apiKeyHelp)}
-                    </span>
                   </label>
                   <div className="form-input-area">
                     <div className="form-input-field">
@@ -489,13 +493,13 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                         <div className="error">{errors.apiKey}</div>
                       )}
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.apiKeyHelp)}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="baseUrl" className="text-label">
                     {intl.formatMessage(messages.baseUrl)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.baseUrlHelp)}
-                    </span>
                   </label>
                   <div className="form-input-area">
                     <div className="form-input-field">
@@ -516,6 +520,9 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                         <div className="error">{errors.baseUrl}</div>
                       )}
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.baseUrlHelp)}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="activeProfileId" className="text-label">
@@ -711,9 +718,6 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                 <div className="form-row">
                   <label htmlFor="externalUrl" className="text-label">
                     {intl.formatMessage(messages.externalUrl)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.externalUrlHelp)}
-                    </span>
                   </label>
                   <div className="form-input-area">
                     <div className="form-input-field">
@@ -730,43 +734,43 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                         <div className="error">{errors.externalUrl}</div>
                       )}
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.externalUrlHelp)}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="syncEnabled" className="checkbox-label">
                     {intl.formatMessage(messages.syncEnabled)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.syncEnabledHelp)}
-                    </span>
                   </label>
                   <div className="form-input-area">
-                    <Field
+                    <SettingsField
                       type="checkbox"
                       id="syncEnabled"
                       name="syncEnabled"
                     />
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.syncEnabledHelp)}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="enableSearch" className="checkbox-label">
                     {intl.formatMessage(messages.enableSearch)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.enableSearchHelp)}
-                    </span>
                   </label>
                   <div className="form-input-area">
-                    <Field
+                    <SettingsField
                       type="checkbox"
                       id="enableSearch"
                       name="enableSearch"
                     />
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.enableSearchHelp)}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="tagRequests" className="checkbox-label">
                     {intl.formatMessage(messages.tagRequests)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.tagRequestsInfo)}
-                    </span>
                   </label>
                   <div className="form-input-area">
                     <Field
@@ -775,6 +779,9 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
                       name="tagRequests"
                     />
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(messages.tagRequestsInfo)}
+                  </span>
                 </div>
               </div>
             </Modal>

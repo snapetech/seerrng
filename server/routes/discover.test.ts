@@ -7,6 +7,7 @@ import ListenBrainzAPI from '@server/api/listenbrainz';
 import MusicBrainz from '@server/api/musicbrainz';
 import OpenLibraryAPI from '@server/api/openlibrary';
 import PlexTvAPI from '@server/api/plextv';
+import RadarrAPI from '@server/api/servarr/radarr';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -23,7 +24,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaSearchMetadata } from '@server/entity/MediaSearchMetadata';
 import { User } from '@server/entity/User';
 import { Watchlist } from '@server/entity/Watchlist';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, type RadarrSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { checkUser } from '@server/middleware/auth';
 import { setupTestDb } from '@server/test/db';
@@ -81,6 +82,28 @@ afterEach(() => {
 });
 
 setupTestDb();
+
+const createRadarrSettings = (id: number, is4k: boolean): RadarrSettings => ({
+  id,
+  name: is4k ? 'Radarr-4K' : 'Radarr-HD',
+  hostname: 'radarr.test',
+  port: is4k ? 7879 : 7878,
+  apiKey: 'radarr-key',
+  useSsl: false,
+  baseUrl: '',
+  activeProfileId: 1,
+  activeProfileName: is4k ? 'Ultra-HD 4K' : 'HD-1080p',
+  activeDirectory: is4k ? '/movies/4k' : '/movies/hd',
+  tags: [],
+  is4k,
+  isDefault: true,
+  externalUrl: '',
+  syncEnabled: true,
+  preventSearch: false,
+  tagRequests: false,
+  overrideRule: [],
+  minimumAvailability: 'released',
+});
 
 describe('genre slider provider bounds', () => {
   it('bounds external music and book discovery fan-out', () => {
@@ -191,6 +214,159 @@ describe('GET /discover/movies', () => {
       (tmdbGet as { mock: { callCount: () => number } }).mock.callCount(),
       0
     );
+  });
+
+  it('uses current Radarr file state and metadata for quality availability', async (t) => {
+    const settings = getSettings();
+    const priorRadarr = settings.radarr;
+    settings.radarr = [createRadarrSettings(41, true)];
+    await getRepository(Media).save([
+      new Media({
+        tmdbId: 710001,
+        mediaType: MediaType.MOVIE,
+        status4k: MediaStatus.AVAILABLE,
+      }),
+      new Media({
+        tmdbId: 710002,
+        mediaType: MediaType.MOVIE,
+        status4k: MediaStatus.UNKNOWN,
+      }),
+    ]);
+    const liveMovies = [
+      {
+        id: 81,
+        title: 'Monitored Without File',
+        originalTitle: 'Monitored Without File',
+        year: 2025,
+        overview: '',
+        studio: '',
+        runtime: 90,
+        certification: '',
+        genres: [],
+        ratings: { votes: 0, value: 0 },
+        isAvailable: false,
+        monitored: true,
+        tmdbId: 710001,
+        imdbId: '',
+        titleSlug: 'monitored-without-file',
+        folderName: 'Monitored Without File',
+        path: '/movies/4k/Monitored Without File',
+        profileId: 1,
+        qualityProfileId: 1,
+        added: '2026-01-01',
+        hasFile: false,
+        tags: [],
+      },
+      {
+        id: 82,
+        title: 'Current 4K File',
+        originalTitle: 'Current 4K File',
+        year: 2026,
+        overview: 'Available from Radarr.',
+        studio: 'Test Studio',
+        runtime: 101,
+        certification: '',
+        genres: ['Adventure'],
+        ratings: { votes: 12, value: 7.5 },
+        isAvailable: true,
+        monitored: true,
+        tmdbId: 710002,
+        imdbId: 'tt710002',
+        titleSlug: 'current-4k-file',
+        folderName: 'Current 4K File',
+        path: '/movies/4k/Current 4K File',
+        profileId: 1,
+        qualityProfileId: 1,
+        added: '2026-01-02',
+        hasFile: true,
+        tags: [],
+      },
+    ];
+    Object.defineProperty(RadarrAPI.prototype, 'getMovies', {
+      configurable: true,
+      get: () => async () => liveMovies,
+      set: () => undefined,
+    });
+    t.after(() => {
+      delete (RadarrAPI.prototype as Partial<RadarrAPI>).getMovies;
+    });
+    const tmdbGet = mockPrivate(ExternalAPI.prototype, 'get', async () => {
+      throw new Error('TMDB must not be called for Radarr availability');
+    });
+
+    try {
+      const agent = await login();
+      const res = await agent.get('/discover/movies?availability=4k');
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.totalResults, 1);
+      assert.strictEqual(res.body.results[0].id, 710002);
+      assert.strictEqual(res.body.results[0].title, 'Current 4K File');
+      assert.match(
+        res.body.results[0].posterPath,
+        /serviceId=41&externalServiceId=82&is4k=true/
+      );
+      assert.strictEqual(
+        res.body.results[0].mediaInfo.status4k,
+        MediaStatus.AVAILABLE
+      );
+      assert.strictEqual(
+        (tmdbGet as { mock: { callCount: () => number } }).mock.callCount(),
+        0
+      );
+    } finally {
+      settings.radarr = priorRadarr;
+    }
+  });
+
+  it('falls back to indexed movie availability when Radarr is unavailable', async (t) => {
+    const settings = getSettings();
+    const priorRadarr = settings.radarr;
+    settings.radarr = [createRadarrSettings(42, false)];
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 710003,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.AVAILABLE,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    const metadataRepository = getRepository(MediaSearchMetadata);
+    await metadataRepository.save(
+      metadataRepository.create({
+        mediaId: media.id,
+        title: 'Indexed HD Movie',
+        releaseDate: '2026',
+        genres: 'Adventure',
+        runtime: '99 minutes',
+        searchText: 'indexed hd movie adventure',
+      })
+    );
+    Object.defineProperty(RadarrAPI.prototype, 'getMovies', {
+      configurable: true,
+      get: () => async () => {
+        throw new Error('Radarr is unavailable');
+      },
+      set: () => undefined,
+    });
+    t.after(() => {
+      delete (RadarrAPI.prototype as Partial<RadarrAPI>).getMovies;
+    });
+
+    try {
+      const agent = await login();
+      const res = await agent.get('/discover/movies?availability=hd');
+
+      assert.strictEqual(res.status, 200);
+      assert.ok(
+        res.body.results.some(
+          (result: { id: number; title: string }) =>
+            result.id === 710003 && result.title === 'Indexed HD Movie'
+        )
+      );
+    } finally {
+      settings.radarr = priorRadarr;
+    }
   });
 
   it('rejects malformed movie genre IDs before provider lookup', async () => {
@@ -1833,6 +2009,57 @@ describe('GET /discover/music', () => {
     );
   });
 
+  it('returns all-time ListenBrainz top albums for most-listened music discovery', async () => {
+    const topAlbumsMock = mock.method(
+      ListenBrainzAPI.prototype,
+      'getTopAlbums',
+      async ({ range }: { range: string }) => {
+        assert.strictEqual(range, 'all_time');
+
+        return {
+          payload: {
+            count: 2,
+            from_ts: 0,
+            last_updated: 0,
+            offset: 0,
+            range,
+            to_ts: 0,
+            release_groups: [
+              {
+                artist_mbids: ['artist-most-listened'],
+                artist_name: 'Most Listened Artist',
+                caa_id: 1,
+                caa_release_mbid: 'release-most-listened',
+                listen_count: 900,
+                release_group_mbid: 'album-most-listened',
+                release_group_name: 'Most Listened Album',
+              },
+              {
+                artist_mbids: ['artist-second'],
+                artist_name: 'Second Artist',
+                caa_id: 2,
+                caa_release_mbid: 'release-second',
+                listen_count: 800,
+                release_group_mbid: 'album-second',
+                release_group_name: 'Second Album',
+              },
+            ],
+          },
+        };
+      }
+    );
+
+    const agent = await login();
+    const res = await agent.get('/discover/music?sortBy=listen_count.desc');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(topAlbumsMock.mock.callCount(), 1);
+    assert.deepStrictEqual(
+      res.body.results.map((result: { title: string }) => result.title),
+      ['Most Listened Album', 'Second Album']
+    );
+  });
+
   it('returns ListenBrainz top albums for popular music discovery', async () => {
     const topAlbumsMock = mock.method(
       ListenBrainzAPI.prototype,
@@ -3124,6 +3351,84 @@ describe('GET /discover/books', () => {
     assert.deepStrictEqual(
       res.body.results.map((result: { title: string }) => result.title),
       ['Low Rating', 'High Rating']
+    );
+  });
+
+  it('supports ascending recommended book order', async () => {
+    const searchBooksMock = mock.method(
+      OpenLibraryAPI.prototype,
+      'searchBooks',
+      async ({ sort }: { sort?: string }) => {
+        assert.strictEqual(sort, 'random');
+
+        return {
+          numFound: 2,
+          start: 0,
+          docs: [
+            {
+              key: '/works/OL-high-signal',
+              title: 'High Signal',
+              ratings_average: 4.8,
+              ratings_count: 10000,
+              edition_count: 100,
+            },
+            {
+              key: '/works/OL-low-signal',
+              title: 'Low Signal',
+              ratings_average: 1,
+              ratings_count: 1,
+              edition_count: 1,
+            },
+          ],
+        };
+      }
+    );
+
+    const agent = await login();
+    const res = await agent.get('/discover/books?sortBy=ranked.asc');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(searchBooksMock.mock.callCount(), 1);
+    assert.deepStrictEqual(
+      res.body.results.map((result: { title: string }) => result.title),
+      ['Low Signal', 'High Signal']
+    );
+  });
+
+  it('supports ascending book edition order within the provider result window', async () => {
+    const searchBooksMock = mock.method(
+      OpenLibraryAPI.prototype,
+      'searchBooks',
+      async ({ sort }: { sort?: string }) => {
+        assert.strictEqual(sort, 'editions');
+
+        return {
+          numFound: 2,
+          start: 0,
+          docs: [
+            {
+              key: '/works/OL-many-editions',
+              title: 'Many Editions',
+              edition_count: 100,
+            },
+            {
+              key: '/works/OL-few-editions',
+              title: 'Few Editions',
+              edition_count: 1,
+            },
+          ],
+        };
+      }
+    );
+
+    const agent = await login();
+    const res = await agent.get('/discover/books?sortBy=editions.asc');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(searchBooksMock.mock.callCount(), 1);
+    assert.deepStrictEqual(
+      res.body.results.map((result: { title: string }) => result.title),
+      ['Few Editions', 'Many Editions']
     );
   });
 

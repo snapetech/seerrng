@@ -1,6 +1,7 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import NotificationTypeSelector from '@app/components/NotificationTypeSelector';
+import Field from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -8,7 +9,7 @@ import { REDACTED_SECRET } from '@app/utils/secret';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import type { PushoverSound } from '@server/api/pushover';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -207,20 +208,6 @@ const NotificationsPushover = () => {
               <label htmlFor="accessToken" className="text-label">
                 {intl.formatMessage(messages.accessToken)}
                 <span className="label-required">*</span>
-                <span className="label-tip">
-                  {intl.formatMessage(messages.accessTokenTip, {
-                    ApplicationRegistrationLink: (msg: React.ReactNode) => (
-                      <a
-                        href="https://pushover.net/api#registration"
-                        className="text-white transition duration-300 hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {msg}
-                      </a>
-                    ),
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -232,25 +219,25 @@ const NotificationsPushover = () => {
                     <div className="error">{errors.accessToken}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.accessTokenTip, {
+                  ApplicationRegistrationLink: (msg: React.ReactNode) => (
+                    <a
+                      href="https://pushover.net/api#registration"
+                      className="text-white transition duration-300 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {msg}
+                    </a>
+                  ),
+                })}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="userToken" className="text-label">
                 {intl.formatMessage(messages.userToken)}
                 <span className="label-required">*</span>
-                <span className="label-tip">
-                  {intl.formatMessage(messages.userTokenTip, {
-                    UsersGroupsLink: (msg: React.ReactNode) => (
-                      <a
-                        href="https://pushover.net/api#identifiers"
-                        className="text-white transition duration-300 hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {msg}
-                      </a>
-                    ),
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -262,6 +249,20 @@ const NotificationsPushover = () => {
                     <div className="error">{errors.userToken}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.userTokenTip, {
+                  UsersGroupsLink: (msg: React.ReactNode) => (
+                    <a
+                      href="https://pushover.net/api#identifiers"
+                      className="text-white transition duration-300 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {msg}
+                    </a>
+                  ),
+                })}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="sound" className="text-label">

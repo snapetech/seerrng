@@ -2,6 +2,7 @@ import type { LbAlbumDetails } from '@server/api/listenbrainz/interfaces';
 import type Media from '@server/entity/Media';
 import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import type { AvailableMusicService } from '@server/lib/musicQualityAvailability';
+import type { MusicTrackAvailability } from '@server/lib/musicTrackAvailability';
 
 export interface MusicDetails {
   id: string;
@@ -68,6 +69,7 @@ export interface MusicDetails {
   artistBackdrop?: string;
   artistThumb?: string;
   availableServices?: AvailableMusicService[];
+  trackAvailability?: MusicTrackAvailability;
 }
 
 export interface MusicRatingResponse {

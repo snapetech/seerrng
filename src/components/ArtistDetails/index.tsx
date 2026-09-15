@@ -14,6 +14,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import { MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
+import type { AlbumResult } from '@server/models/Search';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -46,6 +47,7 @@ interface Album {
   secondary_types?: string[];
   'artist-credit'?: { name: string }[];
   availableQualities?: ('MP3' | 'FLAC')[];
+  qualityStatuses?: AlbumResult['qualityStatuses'];
   mediaInfo?: Media;
 }
 
@@ -326,6 +328,7 @@ const ArtistDetails = () => {
                         type={album['primary-type']}
                         status={album.mediaInfo?.status ?? MediaStatus.UNKNOWN}
                         availableQualities={album.availableQualities}
+                        qualityStatuses={album.qualityStatuses}
                         inProgress={
                           (album.mediaInfo?.downloadStatus ?? []).length > 0
                         }

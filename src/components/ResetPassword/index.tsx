@@ -81,10 +81,7 @@ const ResetPassword = () => {
         </h2>
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div
-          className="bg-gray-800/50 shadow sm:rounded-lg"
-          style={{ backdropFilter: 'blur(5px)' }}
-        >
+        <div className="auth-frosted-surface bg-gray-800/50 shadow sm:rounded-lg">
           <div className="px-10 py-8">
             {hasSubmitted ? (
               <>

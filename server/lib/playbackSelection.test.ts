@@ -24,6 +24,31 @@ const movieCatalog = (rootItemId?: string): PlaybackCatalogResponse => ({
   groups: [],
 });
 
+const musicCatalog = (
+  is4k: boolean,
+  itemIds: string[]
+): PlaybackCatalogResponse => ({
+  mediaId: 4677,
+  serverType: MediaServerType.PLEX,
+  is4k,
+  groups: [
+    {
+      id: is4k ? 'flac-album' : 'mp3-album',
+      title: 'Like a Prayer',
+      index: 1,
+      available: true,
+      items: itemIds.map((id, index) => ({
+        id,
+        title: `Track ${index + 1}`,
+        index: index + 1,
+        parentIndex: 1,
+        kind: 'track',
+        available: true,
+      })),
+    },
+  ],
+});
+
 describe('playback catalog selection', () => {
   it('accepts both validated boolean and raw string 4K query flags', () => {
     assert.strictEqual(isPlaybackQuality4k(true), true);
@@ -62,6 +87,30 @@ describe('playback catalog selection', () => {
         requestedItemIds: ['stale-rating-key'],
       }),
       []
+    );
+  });
+
+  it('translates a music selection into only the selected quality catalog', () => {
+    const mp3Catalog = musicCatalog(false, ['mp3-1', 'mp3-2', 'mp3-3']);
+    const flacCatalog = musicCatalog(true, ['flac-1', 'flac-2', 'flac-3']);
+
+    assert.deepStrictEqual(
+      resolvePlaybackCatalogItemIds({
+        mediaType: MediaType.MUSIC,
+        targetCatalog: flacCatalog,
+        sourceCatalog: mp3Catalog,
+        requestedItemIds: ['mp3-1', 'mp3-3'],
+      }),
+      ['flac-1', 'flac-3']
+    );
+    assert.deepStrictEqual(
+      resolvePlaybackCatalogItemIds({
+        mediaType: MediaType.MUSIC,
+        targetCatalog: mp3Catalog,
+        sourceCatalog: flacCatalog,
+        requestedItemIds: ['flac-2'],
+      }),
+      ['mp3-2']
     );
   });
 });

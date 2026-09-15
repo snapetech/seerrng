@@ -3,9 +3,14 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import PaginationFooter from '@app/components/Common/PaginationFooter';
 import {
+  CompactSelect,
   getFilterResetButtonClass,
   getFilterToggleButtonClass,
+  type CompactSelectOption,
 } from '@app/components/Discover/FilterPanel/CompactFilterSelect';
+import { BOOK_GENRES } from '@app/components/Discover/FilterPanel/libraryFilterUtils';
+import { tvNetworks } from '@app/components/Discover/NetworkSlider';
+import { studios } from '@app/components/Discover/StudioSlider';
 import IssueItem from '@app/components/IssueList/IssueItem';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import { useSearchActivityReporter } from '@app/hooks/useSearchActivity';
@@ -22,6 +27,7 @@ import {
   MagnifyingGlassIcon,
   NoSymbolIcon,
 } from '@heroicons/react/24/outline';
+import type { TmdbGenre } from '@server/api/themoviedb/interfaces';
 import type { IssueResultsResponse } from '@server/interfaces/api/issueInterfaces';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -53,6 +59,16 @@ const messages = defineMessages('components.IssueList', {
   music: 'Music',
   books: 'Books',
   issueType: 'Issue Type',
+  releaseDate: 'Release Date',
+  releaseYear: 'Release Year',
+  firstPublished: 'First Published',
+  genres: 'Genres',
+  studio: 'Studio',
+  network: 'Network',
+  albumType: 'Album Type',
+  album: 'Album',
+  ep: 'EP',
+  single: 'Single',
   any: 'Any',
   audio: 'Audio',
   video: 'Video',
@@ -78,6 +94,11 @@ const IssueList = () => {
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
   const [issueTypeFilter, setIssueTypeFilter] =
     useState<IssueTypeFilter>('all');
+  const [releaseYearFilter, setReleaseYearFilter] = useState('any');
+  const [genreFilter, setGenreFilter] = useState('');
+  const [studioFilter, setStudioFilter] = useState('');
+  const [networkFilter, setNetworkFilter] = useState('');
+  const [albumTypeFilter, setAlbumTypeFilter] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [search, debouncedSearch, setSearch] = useDebouncedState('');
   const page = getPositiveQueryParamNumber(router.query.page, 1) ?? 1;
@@ -93,6 +114,21 @@ const IssueList = () => {
     mediaType: mediaFilter,
     issueType: issueTypeFilter,
   });
+  if (mediaFilter !== 'all') {
+    if (releaseYearFilter !== 'any') {
+      params.set('releaseYear', releaseYearFilter);
+    }
+    if (genreFilter) params.set('genre', genreFilter);
+    if (mediaFilter === 'movie' && studioFilter) {
+      params.set('studio', studioFilter);
+    }
+    if (mediaFilter === 'tv' && networkFilter) {
+      params.set('network', networkFilter);
+    }
+    if (mediaFilter === 'music' && albumTypeFilter) {
+      params.set('albumType', albumTypeFilter);
+    }
+  }
   if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
   const { data, error, isValidating } = useSWR<IssueResultsResponse>(
     `/api/v1/issue?${params.toString()}`
@@ -102,11 +138,23 @@ const IssueList = () => {
       (search.trim() !== debouncedSearch.trim() || isValidating),
     'issues-keyword'
   );
+  const { data: availableGenres } = useSWR<TmdbGenre[]>(
+    mediaFilter === 'movie' || mediaFilter === 'tv'
+      ? `/api/v1/genres/${mediaFilter}`
+      : null
+  );
 
   if (!data && !error) return <LoadingSpinner />;
   if (!data) return <ErrorPage statusCode={500} />;
 
   const resetPage = () => page !== 1 && updateQueryParams('page', '1');
+  const clearMediaSpecificFilters = () => {
+    setReleaseYearFilter('any');
+    setGenreFilter('');
+    setStudioFilter('');
+    setNetworkFilter('');
+    setAlbumTypeFilter('');
+  };
   const changePage = (nextPage: number) => {
     updateQueryParams('page', String(nextPage));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -123,10 +171,63 @@ const IssueList = () => {
     setTimeFrame('all');
     setMediaFilter('all');
     setIssueTypeFilter('all');
+    clearMediaSpecificFilters();
     setSearch('');
+    setSort('added');
+    setDirection('desc');
     resetPage();
   };
   const totalPages = Math.max(data.pageInfo.pages, 1);
+  const currentYear = new Date().getFullYear();
+  const yearOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: 'any' },
+    ...Array.from({ length: currentYear - 1969 }, (_, index) => {
+      const year = currentYear - index;
+      return { label: year.toString(), value: year.toString() };
+    }),
+    { label: '<1970', value: 'before-1970' },
+  ];
+  const genreOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: '' },
+    ...(mediaFilter === 'movie' || mediaFilter === 'tv'
+      ? (availableGenres ?? []).map((genre) => ({
+          label: genre.name,
+          value: genre.name.toLocaleLowerCase(),
+        }))
+      : mediaFilter === 'music'
+        ? [
+            'Alternative',
+            'Classical',
+            'Country',
+            'Electronic',
+            'Hip-Hop',
+            'Jazz',
+            'Metal',
+            'Pop',
+            'Rock',
+          ].map((genre) => ({
+            label: genre,
+            value: genre.toLocaleLowerCase(),
+          }))
+        : BOOK_GENRES.map(([, label]) => ({
+            label,
+            value: label.toLocaleLowerCase(),
+          }))),
+  ];
+  const issueTypeOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.any), value: 'all' },
+    { label: intl.formatMessage(messages.audio), value: 'audio' },
+    { label: intl.formatMessage(messages.video), value: 'video' },
+    { label: intl.formatMessage(messages.subtitle), value: 'subtitle' },
+    { label: intl.formatMessage(messages.other), value: 'other' },
+  ];
+  const timeFrameOptions: CompactSelectOption[] = [
+    { label: intl.formatMessage(messages.allTime), value: 'all' },
+    { label: intl.formatMessage(messages.sevenDays), value: '7d' },
+    { label: intl.formatMessage(messages.fourteenDays), value: '14d' },
+    { label: intl.formatMessage(messages.thirtyDays), value: '30d' },
+    { label: intl.formatMessage(messages.sixMonths), value: '6m' },
+  ];
 
   return (
     <>
@@ -172,40 +273,15 @@ const IssueList = () => {
               </span>
             </button>
           ))}
-          <label className="discover-filter-control h-8 self-center">
-            <span
-              className={`discover-filter-control-label ${
-                issueTypeFilter !== 'all'
-                  ? 'discover-filter-control-label-active'
-                  : ''
-              }`}
-            >
-              {intl.formatMessage(messages.issueType)}
-            </span>
-            <select
-              value={issueTypeFilter}
-              onChange={(event) => {
-                setIssueTypeFilter(event.target.value as IssueTypeFilter);
-                resetPage();
-              }}
-              className="w-24 border-0 bg-transparent px-1.5 py-1 text-xs text-gray-300 focus:ring-0"
-              aria-label={intl.formatMessage(messages.issueType)}
-            >
-              {(
-                [
-                  ['all', messages.any],
-                  ['audio', messages.audio],
-                  ['video', messages.video],
-                  ['subtitle', messages.subtitle],
-                  ['other', messages.other],
-                ] as const
-              ).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {intl.formatMessage(label)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CompactSelect
+            label={intl.formatMessage(messages.issueType)}
+            value={issueTypeFilter}
+            options={issueTypeOptions}
+            onChange={(value) => {
+              setIssueTypeFilter(value as IssueTypeFilter);
+              resetPage();
+            }}
+          />
         </div>
       </section>
       <section
@@ -231,6 +307,7 @@ const IssueList = () => {
               aria-pressed={mediaFilter === value}
               onClick={() => {
                 setMediaFilter(value);
+                clearMediaSpecificFilters();
                 resetPage();
               }}
               className={getFilterToggleButtonClass(mediaFilter === value)}
@@ -248,42 +325,16 @@ const IssueList = () => {
           {intl.formatMessage(messages.filters)}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="discover-filter-control h-8 self-center">
-            <span
-              className={`discover-filter-control-label ${
-                timeFrame !== 'all'
-                  ? 'discover-filter-control-label-active'
-                  : ''
-              }`}
-            >
-              {intl.formatMessage(messages.timePeriod)}
-            </span>
-            <select
-              value={timeFrame}
-              onChange={(event) => {
-                setTimeFrame(event.target.value as TimeFrame);
-                resetPage();
-              }}
-              className="border-0 bg-transparent px-1.5 py-1 text-xs text-gray-300 focus:ring-0"
-            >
-              <option value="all">
-                {intl.formatMessage(messages.allTime)}
-              </option>
-              <option value="7d">
-                {intl.formatMessage(messages.sevenDays)}
-              </option>
-              <option value="14d">
-                {intl.formatMessage(messages.fourteenDays)}
-              </option>
-              <option value="30d">
-                {intl.formatMessage(messages.thirtyDays)}
-              </option>
-              <option value="6m">
-                {intl.formatMessage(messages.sixMonths)}
-              </option>
-            </select>
-          </label>
-          <label className="discover-filter-control h-8 w-72 flex-none self-center">
+          <CompactSelect
+            label={intl.formatMessage(messages.timePeriod)}
+            value={timeFrame}
+            options={timeFrameOptions}
+            onChange={(value) => {
+              setTimeFrame(value as TimeFrame);
+              resetPage();
+            }}
+          />
+          <label className="discover-filter-control w-72 flex-none self-center">
             <span
               className={`discover-filter-control-label gap-1 ${
                 search.trim() ? 'discover-filter-control-label-active' : ''
@@ -301,9 +352,87 @@ const IssueList = () => {
               }}
               placeholder={intl.formatMessage(messages.searchIssues)}
               aria-label={intl.formatMessage(messages.searchIssues)}
-              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-1 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
+              className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
             />
           </label>
+          {mediaFilter !== 'all' && (
+            <>
+              <CompactSelect
+                label={intl.formatMessage(
+                  mediaFilter === 'music'
+                    ? messages.releaseYear
+                    : mediaFilter === 'book'
+                      ? messages.firstPublished
+                      : messages.releaseDate
+                )}
+                value={releaseYearFilter}
+                options={yearOptions}
+                onChange={(value) => {
+                  setReleaseYearFilter(value);
+                  resetPage();
+                }}
+              />
+              <CompactSelect
+                label={intl.formatMessage(messages.genres)}
+                value={genreFilter}
+                options={genreOptions}
+                onChange={(value) => {
+                  setGenreFilter(value);
+                  resetPage();
+                }}
+              />
+            </>
+          )}
+          {mediaFilter === 'movie' && (
+            <CompactSelect
+              label={intl.formatMessage(messages.studio)}
+              value={studioFilter}
+              options={[
+                { label: intl.formatMessage(messages.any), value: '' },
+                ...studios.map((studio) => ({
+                  label: studio.name,
+                  value: studio.name.toLocaleLowerCase(),
+                })),
+              ]}
+              onChange={(value) => {
+                setStudioFilter(value);
+                resetPage();
+              }}
+            />
+          )}
+          {mediaFilter === 'tv' && (
+            <CompactSelect
+              label={intl.formatMessage(messages.network)}
+              value={networkFilter}
+              options={[
+                { label: intl.formatMessage(messages.any), value: '' },
+                ...tvNetworks.map((network) => ({
+                  label: network.name,
+                  value: network.name.toLocaleLowerCase(),
+                })),
+              ]}
+              onChange={(value) => {
+                setNetworkFilter(value);
+                resetPage();
+              }}
+            />
+          )}
+          {mediaFilter === 'music' && (
+            <CompactSelect
+              label={intl.formatMessage(messages.albumType)}
+              value={albumTypeFilter}
+              options={[
+                { label: intl.formatMessage(messages.any), value: '' },
+                { label: intl.formatMessage(messages.album), value: 'album' },
+                { label: intl.formatMessage(messages.ep), value: 'ep' },
+                { label: intl.formatMessage(messages.single), value: 'single' },
+              ]}
+              onChange={(value) => {
+                setAlbumTypeFilter(value);
+                resetPage();
+              }}
+            />
+          )}
         </div>
       </section>
       <section className="app-filter-section-gap">

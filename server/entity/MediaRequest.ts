@@ -425,14 +425,12 @@ export class MediaRequest {
     }
     user = currentUser;
     let requestUser = user;
+    const canSelectRequestUser = user.hasPermission([
+      Permission.MANAGE_USERS,
+      Permission.MANAGE_REQUESTS,
+    ]);
 
-    if (
-      requestBody.userId &&
-      !requestUser.hasPermission([
-        Permission.MANAGE_USERS,
-        Permission.MANAGE_REQUESTS,
-      ])
-    ) {
+    if (requestBody.userId && !canSelectRequestUser) {
       throw new RequestPermissionError(
         'You do not have permission to modify the request user.'
       );
@@ -446,8 +444,12 @@ export class MediaRequest {
       throw new Error('User missing from request context.');
     }
 
+    const isManagedRequestForAnotherUser =
+      canSelectRequestUser && requestUser.id !== user.id;
+
     if (
       requestBody.mediaType === MediaType.MOVIE &&
+      !isManagedRequestForAnotherUser &&
       !hasMediaRequestPermission(
         requestUser,
         requestBody.mediaType,
@@ -461,6 +463,7 @@ export class MediaRequest {
       );
     } else if (
       requestBody.mediaType === MediaType.TV &&
+      !isManagedRequestForAnotherUser &&
       !hasMediaRequestPermission(
         requestUser,
         requestBody.mediaType,
@@ -474,6 +477,7 @@ export class MediaRequest {
       );
     } else if (
       requestBody.mediaType === MediaType.MUSIC &&
+      !isManagedRequestForAnotherUser &&
       !hasMediaRequestPermission(requestUser, requestBody.mediaType)
     ) {
       throw new RequestPermissionError(
@@ -481,6 +485,7 @@ export class MediaRequest {
       );
     } else if (
       requestBody.mediaType === MediaType.BOOK &&
+      !isManagedRequestForAnotherUser &&
       !hasMediaRequestPermission(requestUser, requestBody.mediaType)
     ) {
       throw new RequestPermissionError(

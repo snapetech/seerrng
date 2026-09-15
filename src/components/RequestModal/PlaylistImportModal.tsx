@@ -108,8 +108,12 @@ const PlaylistImportModal = ({
         }
         okDisabled={!url.trim() || isResolving}
         loading={isResolving}
+        cancelButtonType="danger"
+        okButtonType="success"
+        actionButtonSize="standard"
+        dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-2xl"
       >
-        <p className="text-gray-300">
+        <p className="refreshed-detail-text">
           {intl.formatMessage(messages.description)}
         </p>
         {error && (
@@ -117,16 +121,17 @@ const PlaylistImportModal = ({
             <Alert title={error} type="warning" />
           </div>
         )}
-        <label className="mt-5 block" htmlFor="playlist-url">
-          <span className="text-label">
+        <div className="mt-5">
+          <label className="text-label" htmlFor="playlist-url">
             {intl.formatMessage(messages.urlLabel)}
-          </span>
+          </label>
           <input
             id="playlist-url"
             type="url"
             inputMode="url"
             value={url}
             placeholder={intl.formatMessage(messages.urlPlaceholder)}
+            className="request-form-control mt-2 block h-10 w-full min-w-0 rounded-md border px-3 text-sm transition duration-150 ease-in-out focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
             onChange={(event) => setUrl(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -135,34 +140,39 @@ const PlaylistImportModal = ({
               }
             }}
           />
-        </label>
-        <div className="mt-5 space-y-2 text-sm text-gray-400">
-          <p>
-            <a
+        </div>
+        <section className="refreshed-inset-surface mt-5 rounded-lg border border-gray-700 p-3 text-sm">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+            <Button
+              as="a"
               href="/api/v1/playlist/spotify/connect"
-              className="text-indigo-300 hover:text-indigo-200"
+              buttonType="association"
+              buttonSize="sm"
             >
               {intl.formatMessage(
                 spotifyStatus?.connected
                   ? messages.spotifyReconnect
                   : messages.spotifyConnect
               )}
-            </a>{' '}
-            {intl.formatMessage(messages.spotifyHelp)}
+            </Button>
+            <p className="refreshed-detail-text-muted flex-1">
+              {intl.formatMessage(messages.spotifyHelp)}
+            </p>
             {spotifyStatus?.connected && (
               <Button
-                buttonType="ghost"
+                buttonType="default"
                 buttonSize="sm"
-                className="ml-2"
                 onClick={() => void disconnectSpotify()}
                 disabled={isDisconnecting}
               >
                 {intl.formatMessage(messages.spotifyDisconnect)}
               </Button>
             )}
+          </div>
+          <p className="refreshed-detail-text-muted mt-3 border-t border-gray-700 pt-3">
+            {intl.formatMessage(messages.youtubeHelp)}
           </p>
-          <p>{intl.formatMessage(messages.youtubeHelp)}</p>
-        </div>
+        </section>
       </Modal>
     </Transition>
   );

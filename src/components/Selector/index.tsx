@@ -6,7 +6,7 @@ import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import type {
   TmdbCompanySearchResponse,
   TmdbGenre,
@@ -22,7 +22,12 @@ import type {
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { MultiValue, SingleValue } from 'react-select';
+import type {
+  ControlProps,
+  DropdownIndicatorProps,
+  MultiValue,
+  SingleValue,
+} from 'react-select';
 import AsyncSelect from 'react-select/async';
 import useSWR from 'swr';
 import { getGenreSelectorOptions } from './genreOptions';
@@ -49,6 +54,40 @@ const messages = defineMessages('components.Selector', {
 type SingleVal = {
   label: string;
   value: number;
+};
+
+const CompactSelectControl = ({
+  children,
+  innerRef,
+  innerProps,
+  isDisabled,
+  isFocused,
+  menuIsOpen,
+}: ControlProps<SingleVal, boolean>) => (
+  <div
+    ref={innerRef}
+    {...innerProps}
+    className={`react-select__control${
+      isDisabled ? 'react-select__control--is-disabled' : ''
+    }${isFocused ? 'react-select__control--is-focused' : ''}${
+      menuIsOpen ? 'react-select__control--menu-is-open' : ''
+    }`}
+  >
+    {children}
+  </div>
+);
+
+const CompactDropdownIndicator = ({
+  innerProps,
+}: DropdownIndicatorProps<SingleVal, boolean>) => (
+  <div {...innerProps} className="react-select__dropdown-indicator">
+    <ChevronDownIcon className="app-filter-select-chevron" aria-hidden="true" />
+  </div>
+);
+
+const compactSelectComponents = {
+  Control: CompactSelectControl,
+  DropdownIndicator: CompactDropdownIndicator,
 };
 
 type BaseSelectorMultiProps = {
@@ -142,7 +181,10 @@ export const CompanySelector = ({
       key={`company-selector-${defaultDataValue}`}
       className={`react-select-container ${compact ? 'discover-compact-select' : ''}`}
       classNamePrefix="react-select"
+      unstyled={compact}
+      components={compact ? compactSelectComponents : undefined}
       isMulti={isMulti}
+      hideSelectedOptions={!isMulti}
       isDisabled={isDisabled}
       defaultValue={defaultDataValue}
       defaultOptions
@@ -244,10 +286,13 @@ export const GenreSelector = ({
       key={`genre-select-${type}-${defaultDataValue}-${availableGenreOptions.length}`}
       className={`react-select-container ${compact ? 'discover-compact-select' : ''}`}
       classNamePrefix="react-select"
+      unstyled={compact}
+      components={compact ? compactSelectComponents : undefined}
       defaultValue={isMulti ? defaultDataValue : defaultDataValue?.[0]}
       defaultOptions={availableGenreOptions}
       cacheOptions
       isMulti={isMulti}
+      hideSelectedOptions={!isMulti}
       isDisabled={isDisabled}
       loadOptions={loadGenreOptions}
       placeholder={intl.formatMessage(
@@ -316,9 +361,12 @@ export const StatusSelector = ({
       key={`status-select-${defaultDataValue}`}
       className={`react-select-container ${compact ? 'discover-compact-select' : ''}`}
       classNamePrefix="react-select"
+      unstyled={compact}
+      components={compact ? compactSelectComponents : undefined}
       defaultValue={isMulti ? defaultDataValue : defaultDataValue?.[0]}
       defaultOptions
       isMulti={isMulti}
+      hideSelectedOptions={!isMulti}
       isDisabled={isDisabled}
       loadOptions={loadStatusOptions}
       placeholder={intl.formatMessage(
@@ -413,6 +461,7 @@ export const KeywordSelector = ({
     <AsyncSelect
       inputId="data"
       isMulti={isMulti}
+      hideSelectedOptions={!isMulti}
       isDisabled={isDisabled}
       className="react-select-container"
       classNamePrefix="react-select"
@@ -727,6 +776,7 @@ export const UserSelector = ({
       defaultOptions
       cacheOptions
       isMulti={isMulti}
+      hideSelectedOptions={!isMulti}
       isDisabled={isDisabled}
       loadOptions={loadUserOptions}
       placeholder={intl.formatMessage(messages.searchUsers)}

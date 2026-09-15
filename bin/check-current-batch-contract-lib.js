@@ -29,6 +29,15 @@ const validateCurrentBatchContract = (files) => {
       errors.push(`${fileName}: ${reason}`);
     }
   };
+  const requireCount = (fileName, text, expected, reason) => {
+    const source = requireFile(fileName);
+    const actual = source.split(text).length - 1;
+    if (actual !== expected) {
+      errors.push(
+        `${fileName}: ${reason} (expected ${expected}, found ${actual})`
+      );
+    }
+  };
   const requireOrder = (fileName, tokens, reason) => {
     const source = requireFile(fileName);
     let previous = -1;
@@ -45,18 +54,18 @@ const validateCurrentBatchContract = (files) => {
   const ledger = 'docs/maintainers/current-batch-acceptance-ledger.md';
   requireText(
     ledger,
-    'Task-capture rule: a message prefixed with `feature:`, `bug:`, or `issue:`',
+    'Task-capture rule: a message prefixed with `task:`, `feature:`, `bug:`, or',
     'must preserve the tagged-prompt capture rule'
   );
   requireText(
     ledger,
-    'Status: Future feature, explicitly deferred by the user',
-    'must keep the music artist refresh deferred'
+    'Completed work belongs in Git history and release notes, not',
+    'must remain an outstanding-work-only ledger'
   );
   requireText(
     ledger,
-    'Every item above must be classified as verified, corrected, intentionally deferred',
-    'must retain the exact final acceptance rule'
+    '## Hardcover-enriched Book search',
+    'must retain the future Hardcover Book-search integration'
   );
   requireText(
     '.dockerignore',
@@ -80,7 +89,7 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     'docs/maintainers/ui-style-standard.md',
-    'use the shared 22-pixel `DetailDisclosureButton`',
+    'use the shared 20-pixel `DetailDisclosureButton`',
     'must document the intentional disclosure-button size exception'
   );
   requireText(
@@ -90,13 +99,18 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     ledger,
-    "rename every instance of 'Ebook' to 'Book' excluding the name of our services.",
-    'must preserve the Book terminology decision'
+    '## Music artist page refresh',
+    'must keep the music artist refresh deferred'
   );
   requireText(
     ledger,
-    'Are you sure you want to blocklist this item?',
-    'must preserve the exact shared Blocklist confirmation copy'
+    '## Pinned Cast, Crew, Artists, and Tags disclosures',
+    'must retain the pinned media-detail disclosure feature'
+  );
+  requireText(
+    ledger,
+    '## Series collections and franchise groups',
+    'must retain the future Series collections feature'
   );
   requireText(
     ledger,
@@ -110,23 +124,120 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     ledger,
-    '## Contextual Global Search filters',
-    'must preserve the accepted contextual Global Search filter work'
+    '## Collection request-page refresh and cross-media collections',
+    'must retain the future cross-media Collection request work'
   );
   requireText(
     ledger,
-    '## Series and Books discovery filter corrections',
-    'must preserve the accepted Series and Books filter corrections'
+    '## Deferred refresh of pages not yet redesigned',
+    'must retain the deferred-page refresh inventory'
   );
   requireText(
     ledger,
-    '## Workflow-page Media Filters sections',
-    'must preserve the accepted workflow-page Media Filters grouping'
+    '## Keith-requested feature',
+    'must retain the pending Keith feature intake'
   );
   requireText(
     ledger,
-    'all consume the single shared `SelectionCircle` component and its global CSS contract',
-    'the acceptance ledger must preserve the cross-page selector standard'
+    '## New v3.21.2 corrections',
+    'must retain the pending v3.21.2 correction intake'
+  );
+  requireText(
+    ledger,
+    '### Poster overlay alignment',
+    'must retain the poster overlay alignment task'
+  );
+  requireText(
+    ledger,
+    '### Poster overlay shadows',
+    'must retain the poster overlay shadow task'
+  );
+  requireText(
+    ledger,
+    '### Main-menu cleanup',
+    'must retain the main-menu cleanup task'
+  );
+  for (const navigationFile of [
+    'src/components/Layout/Sidebar/index.tsx',
+    'src/components/Layout/MobileMenu/index.tsx',
+  ]) {
+    requireCount(
+      navigationFile,
+      "href: '/discover/audiobooks'",
+      1,
+      'primary navigation must contain exactly one Audiobooks entry'
+    );
+    requireCount(
+      navigationFile,
+      "href: '/requests'",
+      1,
+      'primary navigation must retain exactly one main Requests entry'
+    );
+    rejectText(
+      navigationFile,
+      "href: '/requests/status'",
+      'primary navigation must not contain the removed Request Status entry'
+    );
+  }
+  requireText(
+    'src/components/Layout/Sidebar/index.tsx',
+    "users: 'User List',",
+    'the shared desktop and mobile main-menu label must read User List'
+  );
+  rejectText(
+    'src/components/Layout/Sidebar/index.tsx',
+    "users: 'Users',",
+    'the main-menu label must not revert to Users'
+  );
+  requireText(
+    'src/styles/globals.css',
+    'background-color: transparent !important;',
+    'compact discovery selectors must override the white third-party control surface'
+  );
+  for (const [fileName, tokens] of [
+    ['src/components/Discover/FilterPanel/index.tsx', ['sortBy: undefined,']],
+    [
+      'src/components/Discover/DiscoverBooks/index.tsx',
+      ["sortBy !== 'ranked'", 'sortBy: undefined,'],
+    ],
+    [
+      'src/components/Discover/DiscoverMusic/index.tsx',
+      ["sortBy !== 'ranked'", 'sortBy: undefined,'],
+    ],
+    [
+      'src/components/Blocklist/index.tsx',
+      ["setSort('date');", "setSortDirection('desc');"],
+    ],
+    [
+      'src/components/IssueList/index.tsx',
+      ["setSort('added');", "setDirection('desc');"],
+    ],
+    [
+      'src/components/RequestStatus/index.tsx',
+      ["setSort('added');", "setSortDirection('desc');"],
+    ],
+    [
+      'src/components/Search/index.tsx',
+      ['query: { query: query || undefined }'],
+    ],
+  ]) {
+    for (const token of tokens) {
+      requireText(
+        fileName,
+        token,
+        'Clear Filters must restore the default sort order on every filtered page'
+      );
+    }
+  }
+  rejectText(
+    ledger,
+    '## Keith v3.20.2 upstream integration',
+    'must not list completed release integration work'
+  );
+  rejectText(
+    ledger,
+    '## Final visual-correction batch before laptop preview',
+    'must not list completed visual-correction work'
   );
   requireText(
     'docs/maintainers/ui-style-standard.md',
@@ -174,7 +285,6 @@ const validateCurrentBatchContract = (files) => {
   );
   for (const fileName of [
     'src/components/RequestModal/MovieRequestModal.tsx',
-    'src/components/RequestModal/TvRequestModal.tsx',
     'src/components/RequestModal/MusicRequestModal.tsx',
     'src/components/RequestModal/BookRequestModal.tsx',
   ]) {
@@ -206,7 +316,6 @@ const validateCurrentBatchContract = (files) => {
   );
   for (const fileName of [
     'src/components/RequestModal/MovieRequestModal.tsx',
-    'src/components/RequestModal/TvRequestModal.tsx',
     'src/components/RequestModal/MusicRequestModal.tsx',
     'src/components/RequestModal/BookRequestModal.tsx',
   ]) {
@@ -246,8 +355,8 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     blocklistConfirmation,
-    'actionButtonSize="sm"',
-    'shared Blocklist confirmation buttons must use standard small sizing'
+    'actionButtonSize="standard"',
+    'shared Blocklist confirmation buttons must reference the standard action style'
   );
   for (const fileName of [
     'src/components/BlocklistModal/index.tsx',
@@ -394,8 +503,28 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     'src/components/Layout/index.tsx',
-    'pointer-events-none absolute top-1 left-0',
-    'Global Search progress must use the existing title margin without reflowing the header or page'
+    'className="global-search-progress-region"',
+    'Global Search progress must use the shared non-collapsing title-margin region'
+  );
+  requireText(
+    'src/components/Layout/index.tsx',
+    'className="global-search-progress-indicator"',
+    'Global Search progress must reference its shared indicator style'
+  );
+  requireText(
+    'src/styles/globals.css',
+    '.global-search-progress-region {\n    @apply relative flow-root;',
+    'the Global Search progress region must prevent page-title margin collapse'
+  );
+  requireText(
+    'src/styles/globals.css',
+    '.global-search-progress-indicator {\n    @apply pointer-events-none absolute top-1 left-0',
+    'Global Search progress must occupy the reserved margin above the page title'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'occupies the reserved top margin above the page title and must never overlap the title',
+    'the shared UI standard must preserve Search progress above page titles'
   );
   rejectText(
     'src/components/Layout/SearchInput/index.tsx',
@@ -424,6 +553,26 @@ const validateCurrentBatchContract = (files) => {
   );
 
   const globals = 'src/styles/globals.css';
+  requireText(
+    'src/components/Common/Modal/index.tsx',
+    'className={`app-modal-screen-backdrop fixed top-0',
+    'every shared modal must reference the site-wide screen-backdrop style'
+  );
+  rejectText(
+    'src/components/Common/Modal/index.tsx',
+    'bg-gray-800/70',
+    'the shared modal must not restore the blue-gray screen tint'
+  );
+  requireText(
+    globals,
+    '.app-modal-screen-backdrop {\n    background-color: rgb(0 0 0 / 0.8);',
+    'the shared modal backdrop must use the approved less-transparent black layer'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'single shared black screen backdrop at 80-percent opacity',
+    'the shared UI standard must preserve the site-wide modal backdrop treatment'
+  );
   requireText(
     globals,
     '.app-blocklist-confirmation-card',
@@ -476,8 +625,13 @@ const validateCurrentBatchContract = (files) => {
   }
   requireText(
     globals,
-    '.button-sm {\n    @apply h-8',
-    'small buttons must be 32px high'
+    '--action-control-height: 1.875rem;',
+    'all shared action-button aliases must resolve through the 30-pixel action token'
+  );
+  requireText(
+    globals,
+    '.app-button.button-md,\n  .app-button.button-standard,\n  .app-button.button-sm,\n  .button-md,\n  .button-standard,\n  .button-sm {\n    @apply px-2.5 text-xs;\n    box-sizing: border-box;\n    height: var(--action-control-height);\n    min-height: var(--action-control-height);\n    max-height: var(--action-control-height);\n    padding-top: 0;\n    padding-bottom: 0;',
+    'standard, medium, and small action buttons must enforce the 30-pixel border-box geometry in the final cascade'
   );
   requireText(
     globals,
@@ -493,6 +647,284 @@ const validateCurrentBatchContract = (files) => {
     globals,
     '.app-button-association {\n    @apply border-cyan',
     'Associations must use aqua styling'
+  );
+  requireText(
+    'src/components/Association/AssociationBadge.tsx',
+    "'app-button app-button-association h-6 w-6 rounded-full p-0",
+    'the poster Associations action must reuse the shared association button style'
+  );
+  requireOrder(
+    'src/components/Association/AssociationBadge.tsx',
+    [
+      'buttonType="association"',
+      'buttonSize="sm"',
+      'data-testid="association-badge"',
+    ],
+    'the Movie and Series Associations action must use the same shared 30-pixel size as neighboring actions'
+  );
+  for (const [token, description] of [
+    ['cancelButtonType="danger"', 'Associations must use a red Cancel action'],
+    [
+      'okButtonType="success"',
+      'Associations must use a green Browse More action',
+    ],
+    [
+      'okText={intl.formatMessage(messages.browseMore)}',
+      'Associations must expose the Browse More action',
+    ],
+    [
+      'request-modal-site-surface',
+      'Associations must use the site background inside the dialog card',
+    ],
+    [
+      'sm:!max-w-4xl',
+      'Associations must use the readable-width Collection-style card',
+    ],
+  ]) {
+    requireText(
+      'src/components/Association/AssociationBadge.tsx',
+      token,
+      description
+    );
+  }
+  rejectText(
+    'src/components/Association/AssociationBadge.tsx',
+    'XMarkIcon',
+    'the Associations dialog must not retain a top-right close X'
+  );
+  requireText(
+    'src/components/Association/AssociationDetailCard.tsx',
+    'refreshed-card-surface relative overflow-hidden rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20',
+    'association results must reuse the complete artwork-backed Issue card surface'
+  );
+  for (const token of [
+    'const backdrop = nodeBackdrop(edge.node)',
+    'className="refreshed-artwork-scrim"',
+    'className="refreshed-artwork-gradient"',
+    'sm:grid-cols-[80px_minmax(0,1fr)]',
+    'sm:h-[120px] sm:w-20',
+  ]) {
+    requireText(
+      'src/components/Association/AssociationDetailCard.tsx',
+      token,
+      'association detail cards must retain the shared artwork, poster, and scrim block'
+    );
+  }
+  requireText(
+    'src/components/Association/helpers.ts',
+    'export const nodeBackdrop',
+    'association results must resolve per-title background artwork through one shared helper'
+  );
+  for (const token of [
+    "const primaryQualityLabel = isAlbum ? 'MP3' : 'HD'",
+    "const secondaryQualityLabel = isAlbum ? 'FLAC' : '4K'",
+    'className="col-span-2 h-4"',
+    'className="col-span-2 m-0 line-clamp-2 min-w-0 whitespace-normal"',
+  ]) {
+    requireText(
+      'src/components/Association/AssociationDetailCard.tsx',
+      token,
+      'association detail cards must reserve HD/4K or MP3/FLAC rows, a spacer, and wrapping relationship text'
+    );
+  }
+  rejectText(
+    'src/components/Association/AssociationDetailCard.tsx',
+    '>Status:</dt>',
+    'association detail cards must not repeat a separate Status heading or value'
+  );
+  requireText(
+    'src/components/Association/AssociationDetailCard.tsx',
+    'onSelect?: () => void;',
+    'the shared association detail card must expose one navigation-close callback'
+  );
+  requireCount(
+    'src/components/Association/AssociationDetailCard.tsx',
+    'onClick={onSelect}',
+    2,
+    'both the association poster and title links must invoke the shared navigation-close callback'
+  );
+  requireCount(
+    'src/components/Association/AssociationPopover.tsx',
+    'onSelect={onSelect}',
+    2,
+    'every Associations popup result group must pass through the navigation-close callback'
+  );
+  requireText(
+    'src/components/Association/AssociationBadge.tsx',
+    'onSelect={() => setIsOpen(false)}',
+    'selecting an Associations popup result must close the popup as navigation begins'
+  );
+  requireText(
+    'src/components/CollectionDetails/CollectionAssociationsButton.tsx',
+    'onClick={() => setShow(false)}',
+    'collection association links must close their popup as navigation begins'
+  );
+  requireText(
+    'src/components/Association/AssociationWall.tsx',
+    '<AssociationDetailCard',
+    'the full Associations explorer must reuse the relationship detail card'
+  );
+  requireText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'data-testid="poster-quality-status-badge"',
+    'poster quality states must use the shared rounded status badge'
+  );
+  requireOrder(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    [
+      "pendingApproval: '{quality}: Pending approval'",
+      "approvedProcessing: '{quality}: Approved and processing'",
+      '<Tooltip content={tooltipLabel}>',
+    ],
+    'pending bell and processing timer badges must explain their meaning in tooltips'
+  );
+  requireText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px]',
+    'poster quality states must match the rounded media-type badge silhouette'
+  );
+  requireText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'bg-indigo-700/35',
+    'processing timer badges must preserve the translucent poster surface'
+  );
+  requireText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'bg-yellow-700/35',
+    'pending bell badges must preserve the translucent poster surface'
+  );
+  requireText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'bg-green-700/35',
+    'available quality badges must use the same resting transparency as buttons'
+  );
+  rejectText(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    'bg-green-700/70',
+    'poster availability badges must not restore the former opaque surface'
+  );
+  for (const [fileName, token, description] of [
+    [
+      'src/components/Common/MediaTypeBadge/index.tsx',
+      'bg-blue-700/35',
+      'media-type badges must use the shared button resting transparency',
+    ],
+    [
+      'src/components/Common/BookFormatBadge/index.tsx',
+      'bg-amber-700/35',
+      'book-format badges must use the shared button resting transparency',
+    ],
+    [
+      'src/components/Common/Badge/index.tsx',
+      'bg-indigo-500/35',
+      'shared badges must use the shared button resting transparency',
+    ],
+  ]) {
+    requireText(fileName, token, description);
+  }
+  requireOrder(
+    'src/components/Common/StatusBadgeMini/index.tsx',
+    [
+      'data-testid="poster-quality-status-badge"',
+      '<span>{quality}</span>',
+      '<AvailabilityIcon',
+    ],
+    'available poster qualities must place the outlined availability icon after the green quality label'
+  );
+  requireOrder(
+    'src/components/TitleCard/index.tsx',
+    [
+      'grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto]',
+      '{primaryStatusBadge && (',
+      '<AssociationBadge',
+      '{secondaryStatusBadge && (',
+    ],
+    'poster overlays must keep primary status on row one, Associations on row two left, and secondary status on row two right'
+  );
+  requireOrder(
+    'src/components/TitleCard/index.tsx',
+    [
+      'const canShowBlocklistAction =',
+      '{primaryStatusBadge && (',
+      '{!primaryStatusBadge && canShowBlocklistAction && (',
+      '<AssociationBadge',
+    ],
+    'the no-request blocklist action must occupy the empty top-right poster status slot'
+  );
+  requireText(
+    'server/lib/musicQualityAvailability.ts',
+    'export const getMusicQualityStatuses',
+    'music posters must preserve separate MP3 and FLAC request states'
+  );
+  requireText(
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'initialServerId !== undefined',
+    'zero-valued Lidarr service IDs must remain valid explicit music destinations'
+  );
+  requireText(
+    'src/components/RequestModal/PlaylistImportModal.tsx',
+    'dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-2xl"',
+    'playlist import must use a centered readable-width site-background card surface'
+  );
+  for (const [token, description] of [
+    [
+      'cancelButtonType="danger"',
+      'playlist import must use a red Cancel action',
+    ],
+    [
+      'okButtonType="success"',
+      'playlist import must use a green Preview Matches action',
+    ],
+    [
+      'buttonType="association"',
+      'Connect Spotify must use the Associations button style',
+    ],
+  ]) {
+    requireText(
+      'src/components/RequestModal/PlaylistImportModal.tsx',
+      token,
+      description
+    );
+  }
+  requireText(
+    'src/components/RequestModal/PlaylistImportModal.tsx',
+    'className="request-form-control mt-2 block h-10 w-full',
+    'playlist URL input must use the shared request control styling'
+  );
+  requireText(
+    'src/components/Discover/index.tsx',
+    '<div className="discover-home">',
+    'Discover must scope its larger poster-card treatment to the home page'
+  );
+  requireText(
+    'src/components/Association/index.tsx',
+    '<div className="discover-home">',
+    'the Associations list explorer must reuse Discover poster and shelf formatting'
+  );
+  requireText(
+    globals,
+    '.discover-home .title-card-shell',
+    'Discover poster cards must retain their wider responsive sizing'
+  );
+  requireText(
+    globals,
+    '.discover-home .slider-track:not(.slider-track-compact)',
+    'Discover poster shelves must retain enough height for the complete card border'
+  );
+  requireText(
+    'server/routes/request.test.ts',
+    'allows simultaneous active music requests for different Lidarr destinations',
+    'MP3 and FLAC must retain independent active-request regression coverage'
+  );
+  requireOrder(
+    'src/components/TitleCard/index.tsx',
+    ['setIsUpdating(false);', 'setShowRequestModal(false);'],
+    'request completion must clear poster-local loading before unmounting the modal'
+  );
+  requireText(
+    'src/components/TitleCard/index.tsx',
+    'pointer-events-none absolute inset-0 z-40',
+    'poster mutation feedback must never intercept detail navigation'
   );
   requireText(
     globals,
@@ -511,8 +943,33 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     globals,
-    '.media-rating-row {\n    @apply flex min-h-8 flex-wrap items-center justify-between gap-x-3',
+    'drop-shadow(0 0 3px rgb(0 0 0 / 0.95))',
+    'rating icons and wordmarks must retain the visible black readability shadow'
+  );
+  requireText(
+    globals,
+    '0 0 6px rgb(0 0 0 / 0.9);',
+    'rating values must retain the visible black readability shadow'
+  );
+  requireText(
+    globals,
+    '.media-rating-row {\n    @apply flex min-h-[30px] flex-nowrap items-center justify-between pt-[5px];',
     'playback actions and ratings must use the compact full-width shared row'
+  );
+  requireText(
+    globals,
+    '.media-rating-link {\n    @apply inline-flex h-[30px] flex-none items-center gap-[5px]',
+    'rating image and value pairs must use only the shared five-pixel internal gap'
+  );
+  rejectText(
+    globals,
+    '.media-playback-control-group',
+    'playback controls must not be nested in a group that defeats full-row justification'
+  );
+  requireText(
+    globals,
+    'flex-nowrap items-center justify-between pt-[5px];',
+    'the ratings row must not add bottom spacing before the primary actions'
   );
   requireText(
     globals,
@@ -526,13 +983,30 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     globals,
-    '.media-primary-action-row',
-    'detail primary actions must use one shared full-width row'
+    '.media-primary-action-row {\n    @apply mt-[5px]',
+    'ratings and primary actions must retain exactly one standard five-pixel gap'
   );
   requireText(
     globals,
-    '.media-availability-cell',
+    '.media-availability-cell {\n    @apply flex w-full items-center justify-center justify-self-stretch;',
     'availability headings and status icons must share one centered cell style'
+  );
+  requireText(
+    globals,
+    '.media-scroll-grid-header {\n    padding-right: 0.875rem;',
+    'scrolling media table headers must reserve the shared thin scrollbar width'
+  );
+  requireCount(
+    'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx',
+    'media-scroll-grid-header',
+    2,
+    'both series selector headers must reserve the same right-side space as their rows'
+  );
+  requireCount(
+    'src/components/MediaDetails/PlaybackTrackList.tsx',
+    'media-scroll-grid-header',
+    1,
+    'playback selector headers must reserve the same right-side space as their rows'
   );
   for (const fileName of [
     'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx',
@@ -594,7 +1068,7 @@ const validateCurrentBatchContract = (files) => {
     ],
     [
       'src/components/BookDetails/BookDetailsLayout.tsx',
-      'className="media-rating-row justify-start"',
+      'className="media-rating-row"',
     ],
     [
       'src/components/CollectionDetails/index.tsx',
@@ -607,10 +1081,84 @@ const validateCurrentBatchContract = (files) => {
       'playback and ratings must appear above the primary action row'
     );
   }
+  const issueListItem = 'src/components/IssueList/IssueItem/index.tsx';
+  requireCount(
+    issueListItem,
+    'media-detail-column-divider',
+    2,
+    'both Issue card detail separators must use the shared owning-column border class'
+  );
+  requireText(
+    issueListItem,
+    'card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)]',
+    'Issue cards must not reserve a standalone divider track between detail groups'
+  );
+  rejectText(
+    issueListItem,
+    '_1px_0.75rem_minmax(0,1fr)]',
+    'Issue cards must not restore the legacy one-pixel divider track'
+  );
+  rejectText(
+    issueListItem,
+    'card:block hidden bg-gray-600',
+    'Issue cards must not insert a separate gray divider element'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'both separators are ordinary `media-detail-column-divider` borders on the second and third groups',
+    'the style standard must explicitly govern both Issue card dividers'
+  );
+  const blocklist = 'src/components/Blocklist/index.tsx';
+  requireCount(
+    blocklist,
+    'media-detail-column-divider',
+    2,
+    'both Blocklist card detail separators must use the shared owning-column border class'
+  );
+  rejectText(
+    blocklist,
+    '_1px_0.75rem_minmax(0,1fr)]',
+    'Blocklist cards must not restore the legacy one-pixel divider track'
+  );
+  rejectText(
+    blocklist,
+    'card:block hidden bg-gray-600',
+    'Blocklist cards must not insert a separate gray divider element'
+  );
+  requireText(
+    'src/components/IssueDetails/IssueAffectedEpisodes.tsx',
+    'className="request-divider-dark grid grid-cols-[7rem_7rem_minmax(0,1fr)] gap-x-3 border-b',
+    'Affected Episodes headings must use the shared two-pixel dark table divider'
+  );
+  requireText(
+    issueListItem,
+    'className={`compact-detail-status-badge ${statusClass}`}',
+    'Issue status badges must use the shared compact detail-status geometry'
+  );
+  requireText(
+    'src/components/BlocklistedTagsBadge/index.tsx',
+    'compact-detail-status-badge compact-detail-status-badge-danger',
+    'Blocklist source badges must share the compact Issue-status geometry'
+  );
+  for (const token of [
+    '.compact-detail-status-badge {',
+    '.compact-detail-status-badge-danger {',
+    '.compact-detail-status-badge-success {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'compact Issue and Blocklist badge geometry and colors must resolve through shared global classes'
+    );
+  }
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'Blocklist cards use the identical three-group divider construction as Issue cards',
+    'the style standard must explicitly govern Blocklist and Affected Episodes dividers'
+  );
   for (const fileName of [
     'src/components/MovieDetails/MovieDetailsLayout.tsx',
     'src/components/TvDetails/SeriesDetailsLayout.tsx',
-    'src/components/MusicDetails/MusicDetailsLayout.tsx',
     'src/components/BookDetails/BookDetailsLayout.tsx',
   ]) {
     requireText(
@@ -648,8 +1196,18 @@ const validateCurrentBatchContract = (files) => {
   }
   requireText(
     globals,
-    '.selection-circle {\n    @apply flex h-4 w-4 flex-none items-center justify-center rounded-full border border-gray-600 bg-gray-800 text-transparent',
-    'selection circles must use the fixed global inactive geometry and palette'
+    '.selection-circle {\n    @apply flex h-4 w-4 flex-none items-center justify-center rounded-full border text-transparent',
+    'selection circles must use the fixed global inactive geometry'
+  );
+  requireText(
+    globals,
+    '--theme-control-surface: 49 46 129;\n    --theme-control-surface-hover: 55 48 163;\n    --theme-control-border: 99 102 241;\n    --theme-control-text: 199 210 254;',
+    'shared controls must retain the approved dark-indigo palette'
+  );
+  requireText(
+    globals,
+    'background-color: rgb(var(--theme-control-surface) / 0.92);',
+    'inactive selection circles must use the shared control surface'
   );
   requireText(
     globals,
@@ -668,7 +1226,7 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     globals,
-    '.playback-button-label {\n    @apply inline-flex min-w-0 items-center gap-2 leading-none;',
+    '.playback-button-label {\n    @apply inline-flex min-w-0 items-center gap-[5px] leading-none;',
     'playback labels must share centered text and explicit logo spacing'
   );
   requireText(
@@ -698,6 +1256,26 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     globals,
+    '.app-filter-button {\n    @apply inline-flex items-center justify-center gap-1.5',
+    'filter buttons must consume the shared compact geometry'
+  );
+  requireText(
+    globals,
+    '.app-filter-button {\n    @apply inline-flex items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium whitespace-nowrap transition focus:ring-2 focus:ring-indigo-400 focus:outline-none;\n    height: var(--compact-control-height);',
+    'filter buttons must resolve through the shared 20-pixel height'
+  );
+  requireText(
+    globals,
+    '.discover-filter-control {\n    @apply relative inline-flex max-w-full min-w-0 rounded-md border',
+    'filter fields and dropdowns must use the shared compact row'
+  );
+  requireText(
+    globals,
+    'height: var(--compact-control-height);',
+    'filter fields must resolve through the shared compact height property'
+  );
+  requireText(
+    globals,
     '.app-filter-section-gap {',
     'filter categories must use the shared larger vertical gap'
   );
@@ -705,6 +1283,16 @@ const validateCurrentBatchContract = (files) => {
     globals,
     '.app-filter-section-heading {',
     'discovery filter headings must use the shared larger vertical gap'
+  );
+  requireText(
+    globals,
+    '.discover-filter-secondary-row {\n    @apply mt-[5px] flex flex-wrap gap-2;',
+    'wrapped discovery filter rows must use the shared five-pixel row spacing'
+  );
+  requireText(
+    globals,
+    '.discover-compact-select\n    .react-select__indicator-separator {\n    @apply hidden;',
+    'compact searchable dropdowns must not restore the oversized legacy indicator divider'
   );
   for (const fileName of [
     'src/components/Search/index.tsx',
@@ -719,8 +1307,6 @@ const validateCurrentBatchContract = (files) => {
     );
   }
   for (const fileName of [
-    'src/components/Discover/DiscoverMovies/index.tsx',
-    'src/components/Discover/DiscoverTv/index.tsx',
     'src/components/Discover/DiscoverMusic/index.tsx',
     'src/components/Discover/DiscoverBooks/index.tsx',
   ]) {
@@ -732,7 +1318,6 @@ const validateCurrentBatchContract = (files) => {
   }
   for (const fileName of [
     'src/components/Common/BookFormatSelector/index.tsx',
-    'src/components/Common/CardTextVisibilityToggle/index.tsx',
     'src/components/Discover/FilterPanel/index.tsx',
     'src/components/Blocklist/index.tsx',
     'src/components/IssueList/index.tsx',
@@ -760,6 +1345,46 @@ const validateCurrentBatchContract = (files) => {
     );
   }
   requireText(
+    'src/components/Common/CardTextVisibilityToggle/index.tsx',
+    'getFilterToggleButtonClass(isAlwaysVisible)',
+    'Discover title visibility must use the shared filter button treatment'
+  );
+  requireText(
+    'src/components/MediaSlider/index.tsx',
+    'buttonType="trailer"',
+    'Discover refresh must use the shared orange button treatment'
+  );
+  requireText(
+    'src/components/Slider/index.tsx',
+    'buttonType="success"',
+    'Discover previous and next controls must use the shared green button treatment'
+  );
+  requireText(
+    globals,
+    '.discover-filter-control .discover-compact-select .react-select__multi-value',
+    'Discover-linked filter selections must use the shared dark dropdown surface'
+  );
+  requireText(
+    globals,
+    'background-color: rgb(var(--theme-control-surface-hover) / 0.58) !important;',
+    'Discover-linked filter selection pills must override the legacy white react-select background'
+  );
+  requireText(
+    globals,
+    '.react-select-container .react-select__option--is-selected::before',
+    'site-wide searchable dropdowns must show the selected check mark'
+  );
+  requireText(
+    'src/components/Selector/index.tsx',
+    'hideSelectedOptions={!isMulti}',
+    'multi-select filters must keep selected choices visible in the open menu'
+  );
+  requireText(
+    globals,
+    '.discover-compact-select\n    .react-select__option--is-selected',
+    'Discover searchable dropdowns must use the Runtime-style selected option treatment'
+  );
+  requireText(
     globals,
     'linear-gradient(\n        40deg,',
     'page gradient must use 40 degrees'
@@ -776,8 +1401,96 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     globals,
-    '.refreshed-inset-surface {\n    background-color: rgb(var(--theme-control-surface) / 0.32);\n    color: rgb(var(--theme-control-text) / 0.86)',
-    'refreshed inset cards must use the translucent blue control surface and content-tone standard'
+    '.refreshed-inset-surface {\n    background-color: rgb(var(--theme-control-surface) / 0.42);\n    color: rgb(var(--theme-control-text) / 0.86)',
+    'refreshed inset cards must use the darker translucent control surface without changing outer cards'
+  );
+  requireText(
+    globals,
+    '.request-form-control,\n  .request-listbox-control {\n    color: rgb(var(--theme-control-text));\n    border-color: rgb(var(--theme-control-border) / 0.75);\n    background-color: rgb(var(--theme-control-surface) / 0.58);',
+    'request controls must use the shared dropdown treatment'
+  );
+  requireText(
+    globals,
+    '.request-divider-dark {\n    border-color: rgb(var(--theme-control-border) / 0.72);',
+    'request table and details dividers must use the shared theme border color'
+  );
+  rejectText(
+    globals,
+    'border-color: rgb(var(--color-gray-900) / 0.7);',
+    'shared dividers must not restore the near-black legacy border color'
+  );
+  requireText(
+    globals,
+    '.request-divider-dark.border-t {\n    border-top-width: 2px !important;',
+    'request horizontal dividers must remain two pixels wide'
+  );
+  requireText(
+    globals,
+    '.media-detail-column-divider {\n    @apply mt-2 border-t-2 pt-2;',
+    'detail columns must own their responsive divider border'
+  );
+  requireText(
+    globals,
+    '.media-detail-column-divider',
+    'detail columns must resolve through the shared divider class'
+  );
+  rejectText(
+    globals,
+    '.request-divider-dark::before',
+    'detail dividers must not use pseudo-elements'
+  );
+  requireText(
+    globals,
+    '.request-divider-dark',
+    'table dividers must resolve through the shared divider class'
+  );
+  for (const fileName of [
+    'src/components/MovieDetails/MovieDetailsLayout.tsx',
+    'src/components/TvDetails/SeriesDetailsLayout.tsx',
+    'src/components/MusicDetails/MusicDetailsLayout.tsx',
+    'src/components/BookDetails/BookDetailsLayout.tsx',
+    'src/components/IssueDetails/IssueMediaSummary.tsx',
+    'src/components/RequestModal/MovieRequestModal.tsx',
+    'src/components/RequestModal/TvRequestModal.tsx',
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'src/components/RequestModal/BookRequestModal.tsx',
+    'src/components/Association/AssociationDetailCard.tsx',
+    'src/components/CollectionDetails/index.tsx',
+    'src/components/Blocklist/index.tsx',
+    'src/components/IssueList/IssueItem/index.tsx',
+    'src/components/RequestStatus/index.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'media-detail-column-divider',
+      'every detail divider must reference the shared owning-column border class'
+    );
+    rejectText(
+      fileName,
+      'request-divider-fill-dark',
+      'detail layouts must not insert standalone divider elements'
+    );
+    rejectText(
+      fileName,
+      'request-divider-dark card:relative',
+      'detail layouts must not draw divider pseudo-elements'
+    );
+  }
+  for (const fileName of [
+    'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx',
+    'src/components/MediaDetails/AlbumTrackList.tsx',
+    'src/components/MediaDetails/PlaybackTrackList.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'request-divider-dark grid',
+      'track and episode table header rules must use the two-pixel dark divider standard'
+    );
+  }
+  requireText(
+    globals,
+    '.request-modal-site-surface {',
+    'full-size request surfaces must expose the shared site-gradient treatment'
   );
   for (const fileName of [
     'src/components/RequestStatus/index.tsx',
@@ -909,15 +1622,15 @@ const validateCurrentBatchContract = (files) => {
     'direct and dropdown playback links must retain centered logo spacing'
   );
 
-  requireOrder(
+  rejectText(
     requestButton,
-    ["id: 'decline-request'", "buttonType: 'danger'"],
-    'single-request decline must use the semantic red button role'
+    "id: 'decline-request'",
+    'media details must keep request decline actions on the Requests page'
   );
-  requireOrder(
+  rejectText(
     requestButton,
-    ["id: 'decline-4k-request'", "buttonType: 'danger'"],
-    '4K decline must use the semantic red button role'
+    "id: 'decline-4k-request'",
+    'media details must keep 4K request decline actions on the Requests page'
   );
   requireText(
     requestButton,
@@ -1043,8 +1756,426 @@ const validateCurrentBatchContract = (files) => {
   const disclosure = 'src/components/MediaDetails/DetailDisclosureButton.tsx';
   requireText(
     disclosure,
+    'className="detail-disclosure-control"',
+    'detail disclosures must use the shared segmented control surface'
+  );
+  requireText(
+    disclosure,
+    'const PushPinIcon =',
+    'detail disclosure pins must use the conventional pushpin icon'
+  );
+  requireText(
+    disclosure,
+    "fill={filled ? 'currentColor' : 'none'}",
+    'the unpinned pushpin interior must remain transparent'
+  );
+  rejectText(
+    disclosure,
+    'MapPinIcon',
+    'detail disclosure pins must not regress to map-location icons'
+  );
+  requireText(
+    globals,
+    '.detail-disclosure-control {\n    @apply inline-flex items-stretch overflow-hidden rounded-md border text-[11px] font-medium transition;',
+    'Cast, Crew, and Subject Tags must use the shared dropdown control'
+  );
+  requireText(
+    globals,
+    '.detail-disclosure-control {\n    @apply inline-flex items-stretch overflow-hidden rounded-md border text-[11px] font-medium transition;\n    height: var(--compact-control-height);\n    color: rgb(var(--theme-control-text));\n    border-color: rgb(var(--theme-control-border) / 0.75);\n    background-color: rgb(var(--theme-control-surface) / 0.58);',
+    'Cast, Crew, and Subject Tags must match the shared dropdown surface'
+  );
+  requireText(
+    globals,
+    '--compact-control-height: 1.25rem;',
+    'all micro-controls must resolve their 20-pixel height through one shared rule'
+  );
+  requireText(
+    globals,
+    '.compact-control {\n    height: var(--compact-control-height);',
+    'compact controls must consume the single shared height property'
+  );
+  requireText(
+    'src/components/Common/Badge/index.tsx',
+    "'compact-control inline-flex items-center px-2 text-xs leading-none",
+    'badges must consume the shared 20-pixel compact-control height'
+  );
+  requireText(
+    disclosure,
     'className="detail-disclosure-button"',
     'detail disclosure controls must consume one shared style'
+  );
+  requireText(
+    disclosure,
+    'aria-pressed={pinned}',
+    'detail disclosure pins must expose their selected state'
+  );
+  requireOrder(
+    disclosure,
+    [
+      'className={`detail-disclosure-pin',
+      'aria-pressed={pinned}',
+      '{label}',
+      '<ChevronDownIcon',
+    ],
+    'the selectable pin must precede the disclosure label and unfold icon'
+  );
+
+  requireText(
+    'src/hooks/useDetailDisclosurePins.ts',
+    '/settings/detail-disclosures/${mediaType}',
+    'detail disclosure pins must use the authenticated category-scoped per-user settings endpoint'
+  );
+  requireText(
+    'src/hooks/useDetailDisclosurePins.ts',
+    'optimisticData: mutation.next',
+    'detail disclosure pins must update optimistically'
+  );
+  requireCount(
+    'server/routes/user/usersettings.ts',
+    "'/detail-disclosures'",
+    2,
+    'detail disclosure pin settings must expose one read and one write route'
+  );
+  for (const fieldName of [
+    'detailDisclosureCastPinned',
+    'detailDisclosureCrewPinned',
+    'detailDisclosureSubjectTagsPinned',
+  ]) {
+    requireText(
+      'server/entity/UserSettings.ts',
+      fieldName,
+      `user settings must persist ${fieldName}`
+    );
+    requireText(
+      'server/migration/sqlite/1785000000000-AddDetailDisclosurePins.ts',
+      fieldName,
+      `SQLite migration must add ${fieldName}`
+    );
+    requireText(
+      'server/migration/postgres/1785000000000-AddDetailDisclosurePins.ts',
+      fieldName,
+      `PostgreSQL migration must add ${fieldName}`
+    );
+  }
+  requireText(
+    'server/entity/UserSettings.ts',
+    'detailDisclosureArtistsPinned',
+    'user settings must persist the Artists disclosure pin'
+  );
+  requireText(
+    'server/migration/sqlite/1785100000000-AddDetailDisclosureArtistsPin.ts',
+    'detailDisclosureArtistsPinned',
+    'SQLite migration must add the Artists disclosure pin'
+  );
+  requireText(
+    'server/migration/postgres/1785100000000-AddDetailDisclosureArtistsPin.ts',
+    'detailDisclosureArtistsPinned',
+    'PostgreSQL migration must add the Artists disclosure pin'
+  );
+  requireText(
+    'seerr-api.yml',
+    '/user/{userId}/settings/detail-disclosures:',
+    'the public API contract must document persistent detail disclosure pins'
+  );
+  requireText(
+    'seerr-api.yml',
+    '/user/{userId}/settings/detail-disclosures/{mediaType}:',
+    'the public API contract must document category-scoped persistent detail disclosure pins'
+  );
+  for (const fileName of [
+    'server/entity/UserSettings.ts',
+    'server/migration/sqlite/1785200000000-AddScopedDetailDisclosurePins.ts',
+    'server/migration/postgres/1785200000000-AddScopedDetailDisclosurePins.ts',
+  ]) {
+    requireText(
+      fileName,
+      'detailDisclosurePins',
+      'detail disclosure pin storage must be scoped by media category'
+    );
+  }
+  for (const [fileName, mediaType] of [
+    ['src/components/MovieDetails/MovieDetailsLayout.tsx', 'movie'],
+    ['src/components/TvDetails/SeriesDetailsLayout.tsx', 'tv'],
+    ['src/components/MusicDetails/MusicDetailsLayout.tsx', 'music'],
+    ['src/components/BookDetails/BookDetailsLayout.tsx', 'book'],
+    [
+      'src/components/CollectionDetails/CollectionMetadataDisclosures.tsx',
+      'movie',
+    ],
+  ]) {
+    requireText(
+      fileName,
+      `useDetailDisclosurePins('${mediaType}')`,
+      'each detail page must consume only its own persistent pin category'
+    );
+  }
+
+  for (const fileName of [
+    'src/components/MovieDetails/MovieDetailsLayout.tsx',
+    'src/components/TvDetails/SeriesDetailsLayout.tsx',
+    'src/components/CollectionDetails/CollectionMetadataDisclosures.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'className="mt-[5px] flex flex-wrap items-center gap-2"',
+      'the disclosure row must keep the same five-pixel gap above and below'
+    );
+    requireText(
+      fileName,
+      "onPinClick={() => void togglePinned('cast')}",
+      'Cast must expose its persistent pin'
+    );
+    requireText(
+      fileName,
+      "onPinClick={() => void togglePinned('crew')}",
+      'Crew must expose its persistent pin'
+    );
+    requireText(
+      fileName,
+      "onPinClick={() => void togglePinned('subjectTags')}",
+      'Subject Tags must expose its persistent pin'
+    );
+  }
+  requireText(
+    'src/components/MusicDetails/MusicDetailsLayout.tsx',
+    "onPinClick={() => void togglePinned('artists')}",
+    'View Artists must expose its persistent pin'
+  );
+  for (const [fileName, collapseTokens] of [
+    [
+      'src/components/MovieDetails/MovieDetailsLayout.tsx',
+      [
+        'setShowCast(pins.cast)',
+        'setShowCrew(pins.crew)',
+        'setShowTags(pins.subjectTags)',
+      ],
+    ],
+    [
+      'src/components/TvDetails/SeriesDetailsLayout.tsx',
+      [
+        'setShowCast(pins.cast)',
+        'setShowCrew(pins.crew)',
+        'setShowTags(pins.subjectTags)',
+      ],
+    ],
+    [
+      'src/components/MusicDetails/MusicDetailsLayout.tsx',
+      ['setShowArtists(pins.artists)', 'setShowTags(pins.subjectTags)'],
+    ],
+    [
+      'src/components/BookDetails/BookDetailsLayout.tsx',
+      ['setShowGenres(pins.subjectTags)'],
+    ],
+  ]) {
+    for (const collapseToken of collapseTokens) {
+      requireText(
+        fileName,
+        collapseToken,
+        'pin state changes must open and close the matching disclosure'
+      );
+    }
+  }
+  requireText(
+    'src/components/CollectionDetails/CollectionMetadataDisclosures.tsx',
+    'else next.delete(section)',
+    'collection pin state changes must close the matching disclosure when unpinned'
+  );
+  requireText(
+    'src/components/MusicDetails/MusicDetailsLayout.tsx',
+    "onPinClick={() => void togglePinned('subjectTags')}",
+    'the Subject Tags pin must carry into Music details'
+  );
+  requireText(
+    'src/components/BookDetails/BookDetailsLayout.tsx',
+    "onPinClick={() => void togglePinned('subjectTags')}",
+    'the persisted subject pin must carry into Book genres'
+  );
+
+  const mediaDetailArtwork =
+    'src/components/MediaDetails/MediaDetailArtwork.tsx';
+  requireText(
+    mediaDetailArtwork,
+    "'--media-detail-artwork-url': `url(${JSON.stringify(resolvedSrc)})`",
+    'the Firefox artwork fallback must reuse the resolved cached image URL'
+  );
+  requireText(
+    mediaDetailArtwork,
+    'className="media-detail-artwork-image object-cover object-top"',
+    'the standard artwork image must preserve the expanding cover behavior'
+  );
+  requireText(
+    globals,
+    '@supports (-moz-appearance: none)',
+    'the dynamic artwork workaround must remain Firefox-specific'
+  );
+  requireText(
+    globals,
+    'background-image: var(--media-detail-artwork-url);',
+    'Firefox must render expanding detail artwork through a stable background layer'
+  );
+  requireText(
+    globals,
+    '.media-detail-artwork-image {\n      opacity: 0;',
+    'Firefox must hide the replaced-image paint path that accumulates zoom'
+  );
+
+  const advancedRequester =
+    'src/components/RequestModal/AdvancedRequester/index.tsx';
+  requireText(
+    advancedRequester,
+    'open={panelOnly ? expanded : true}',
+    'non-panel Advanced Options must remain visible'
+  );
+  requireText(
+    advancedRequester,
+    '(serverData?.rootFolders.length ?? 0) > 5',
+    'root-folder scrolling must begin only after five rows'
+  );
+  requireText(
+    advancedRequester,
+    "'scrollable-card max-h-[8.5rem] overflow-y-auto'",
+    'long root-folder tables must scroll their data rows'
+  );
+  requireText(
+    advancedRequester,
+    'className="request-divider-dark col-span-2 mb-1 grid grid-cols-subgrid border-b px-1 pb-2"',
+    'root-folder table rules must use the dark Destination Server color'
+  );
+  requireText(
+    advancedRequester,
+    'className="request-form-control compact-control relative inline-flex',
+    'Requested By must use the dark Destination Server control treatment'
+  );
+  requireText(
+    advancedRequester,
+    'const selectableUserData = userData?.results;',
+    'request managers must be able to select every Seerr user'
+  );
+  requireText(
+    advancedRequester,
+    'const RequestListboxControl =',
+    'Destination Server, Quality Profile, and Root Folder must share the request listbox treatment'
+  );
+  requireCount(
+    advancedRequester,
+    '<RequestListboxControl',
+    3,
+    'Destination Server, Quality Profile, and Root Folder must all use the shared request listbox'
+  );
+  requireText(
+    advancedRequester,
+    'id="folder"\n                    label={intl.formatMessage(messages.rootfolder)}\n                    value={selectedFolder}',
+    'Root Folder must use the shared request listbox with its selected path'
+  );
+  rejectText(
+    advancedRequester,
+    '<select\n                      id="folder"',
+    'Root Folder must not fall back to a native select menu'
+  );
+  requireText(
+    advancedRequester,
+    'className="request-listbox-button"',
+    'request listbox value buttons must resolve through their shared global style'
+  );
+  requireText(
+    advancedRequester,
+    'className="request-listbox-check"',
+    'request listbox menus must mark their selected option with a check icon'
+  );
+  for (const className of [
+    '.request-listbox-control {',
+    '.request-listbox-label {',
+    '.request-listbox-button {',
+    '.request-listbox-menu {',
+    '.request-listbox-option {',
+    '.request-listbox-option-active {',
+    '.request-listbox-check {',
+  ]) {
+    requireText(
+      globals,
+      className,
+      'request dropdown color, geometry, and selection styling must live in shared global classes'
+    );
+  }
+  requireText(
+    'server/entity/MediaRequest.ts',
+    'const isManagedRequestForAnotherUser =',
+    'request managers must be able to submit a configured tier on behalf of any selected user'
+  );
+  for (const fileName of [
+    'src/components/RequestModal/MovieRequestModal.tsx',
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'src/components/RequestModal/BookRequestModal.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'useState(true)',
+      'fresh request forms must open Advanced Options by default'
+    );
+    requireText(
+      fileName,
+      'className="request-form-control compact-control inline-flex',
+      'Advanced Options buttons must match the Destination Server control treatment'
+    );
+  }
+  for (const fileName of [
+    'src/components/RequestModal/MovieRequestModal.tsx',
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'src/components/RequestModal/BookRequestModal.tsx',
+    'src/components/RequestModal/CollectionRequestModal.tsx',
+    'src/components/RequestModal/BulkRequestModal.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'request-modal-site-surface sm:max-w-5xl',
+      'full-size request cards must use the site background gradient'
+    );
+  }
+  for (const token of [
+    'dialogClass="artwork-form-main-card refreshed-card-surface refreshed-detail-text"',
+    'backdropFull',
+    'className="refreshed-inset-surface rounded-lg border border-gray-700 p-3"',
+  ]) {
+    requireText(
+      'src/components/RequestModal/TvRequestModal.tsx',
+      token,
+      'Request Series must reuse the Report Issue main-card artwork, border, and inset-card layout'
+    );
+  }
+  rejectText(
+    'src/components/RequestModal/TvRequestModal.tsx',
+    '<RequestMediaCard',
+    'Request Series must not restore a nested artwork card inside the main modal card'
+  );
+  requireText(
+    globals,
+    '.artwork-form-main-card {',
+    'Report Issue and Request Series must share one main-card layout class'
+  );
+  requireText(
+    'src/components/IssueModal/CreateIssueModal/index.tsx',
+    'dialogClass="artwork-form-main-card refreshed-card-surface refreshed-detail-text"',
+    'Report Issue and Request Series must consume the same main-card layout class'
+  );
+  for (const token of [
+    'max-height: none !important;',
+    'overflow: visible !important;',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'artwork forms must leave vertical scrolling on the full modal viewport rather than the main card'
+    );
+  }
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'same shared blue control surface and border as the Destination Server dropdown',
+    'the style standard must document the shared blue request-control treatment'
+  );
+  requireText(
+    'docs/maintainers/current-batch-acceptance-ledger.md',
+    '## Request-card contrast and Advanced Options',
+    'the acceptance ledger must retain the request-card contrast work'
   );
 
   for (const fileName of [
@@ -1073,8 +2204,8 @@ const validateCurrentBatchContract = (files) => {
     );
     requireText(
       fileName,
-      'className="refreshed-artwork-scrim"',
-      'artwork must use the shared scrim'
+      '<MediaDetailArtwork',
+      'artwork-backed detail cards must use the stable shared artwork layer'
     );
     requireText(
       fileName,
@@ -1091,7 +2222,6 @@ const validateCurrentBatchContract = (files) => {
   for (const fileName of [
     'src/components/MovieDetails/MovieDetailsLayout.tsx',
     'src/components/TvDetails/SeriesDetailsLayout.tsx',
-    'src/components/MusicDetails/MusicDetailsLayout.tsx',
     'src/components/BookDetails/BookDetailsLayout.tsx',
   ]) {
     requireText(
@@ -1111,12 +2241,12 @@ const validateCurrentBatchContract = (files) => {
     );
     requireText(
       fileName,
-      'card:grid-cols-[max-content_0.75rem_6rem_0.75rem_1px_0.75rem_minmax(0,1fr)]',
+      'card:grid-cols-[max-content_0.75rem_6rem_0.75rem_minmax(0,1fr)]',
       'main detail cards must keep the first two detail groups in one shared table grid'
     );
     requireText(
       fileName,
-      'card:col-span-5 card:col-start-3',
+      'card:col-span-3 card:col-start-3',
       'main detail card Genres value must begin in the first value column and span through the second detail group'
     );
     requireText(
@@ -1136,7 +2266,59 @@ const validateCurrentBatchContract = (files) => {
     );
   }
 
+  const mediaQualitySelect =
+    'src/components/MediaDetails/MediaQualitySelect.tsx';
+  requireText(
+    mediaQualitySelect,
+    '<AdjustmentsHorizontalIcon',
+    'detail quality selection must expose a recognizable selection icon'
+  );
+  requireText(
+    mediaQualitySelect,
+    'app-button app-button-detail-request button-standard media-quality-select-control',
+    'detail quality selection must use the shared green Quality-button treatment'
+  );
+  requireText(
+    globals,
+    '.media-quality-select-control {\n    @apply items-center gap-1.5 px-2 text-[11px];',
+    'detail quality controls must vertically center their text and icons'
+  );
+  requireText(
+    mediaQualitySelect,
+    'className="media-quality-select-menu"',
+    'detail quality options must reference the shared dropdown-menu style'
+  );
+  requireText(
+    mediaQualitySelect,
+    '<CheckIcon',
+    'detail quality options must visibly mark the current selection'
+  );
+
   const musicLayout = 'src/components/MusicDetails/MusicDetailsLayout.tsx';
+  for (const [token, description] of [
+    [
+      'data-testid="media-details-poster"',
+      'Music details must retain the standard contained poster',
+    ],
+    [
+      'sm:grid-cols-[80px_minmax(0,1fr)]',
+      'Music details must retain the responsive poster and detail geometry',
+    ],
+    [
+      'data-testid="media-details-genres"',
+      'Music details must retain the shared Genres row',
+    ],
+    [
+      'card:grid-cols-3',
+      'Music details must divide the post-poster detail space into equal thirds',
+    ],
+    [
+      'media-primary-action-row',
+      'Music detail actions must retain the shared full-width row',
+    ],
+  ]) {
+    requireText(musicLayout, token, description);
+  }
   rejectText(
     musicLayout,
     'totalListeners',
@@ -1148,10 +2330,15 @@ const validateCurrentBatchContract = (files) => {
     'musicbrainz.org/search?query=',
     'Origin must remain a navigable MusicBrainz link'
   );
-  requireOrder(
+  rejectText(
     musicLayout,
-    ['qualityLabels.map', '<Badge', 'messages.available'],
-    'MP3/FLAC badges must be immediately left of Available'
+    'qualityLabels.map',
+    'Music details must not repeat MP3 and FLAC badges beneath the title'
+  );
+  rejectText(
+    musicLayout,
+    "import Badge from '@app/components/Common/Badge';",
+    'Music details must not render the removed overall availability badge beneath the title'
   );
   requireOrder(
     musicLayout,
@@ -1170,6 +2357,36 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     musicLayout,
+    'availableRecordingIds={data.trackAvailability?.[selectedQuality]}',
+    'music track rows must follow the selected Lidarr quality availability'
+  );
+  requireText(
+    musicLayout,
+    'card:col-span-2 mt-0.5 grid min-w-0',
+    'Music Genres must span both compact metadata columns'
+  );
+  requireText(
+    'src/components/MediaDetails/AlbumTrackList.tsx',
+    'availableRecordings.has(',
+    'music track availability icons must match recording IDs from the selected Lidarr instance'
+  );
+  requireText(
+    'server/routes/music.ts',
+    'getMusicTrackAvailability(',
+    'Music details must resolve recording-file availability from configured Lidarr qualities'
+  );
+  requireText(
+    'server/lib/musicTrackAvailability.ts',
+    '.filter((track) => track.hasFile)',
+    'Lidarr recording availability must include only tracks with files'
+  );
+  requireText(
+    'seerr-api.yml',
+    'trackAvailability:',
+    'the album details API contract must expose quality-specific track availability'
+  );
+  requireText(
+    musicLayout,
     'catalog={playbackCatalog}',
     'music track selection must use the media-server availability catalog'
   );
@@ -1177,6 +2394,36 @@ const validateCurrentBatchContract = (files) => {
     musicLayout,
     'onSelectionChange={setSelectedPlaybackItemIds}',
     'music track selection must control the playback playlist'
+  );
+  requireText(
+    musicLayout,
+    '<MediaQualitySelect',
+    'Music details must expose the MP3 and FLAC quality selector'
+  );
+  requireOrder(
+    musicLayout,
+    [
+      'data-testid="music-playback-rating-row"',
+      '<MediaQualitySelect',
+      'label={intl.formatMessage(messages.quality)}',
+      '{playbackActions?.(',
+    ],
+    'Music quality selection must match the Movie row immediately before playback controls'
+  );
+  rejectText(
+    musicLayout,
+    'className="card:mt-auto mt-2 self-end"',
+    'Music quality selection must not return to the upper availability column'
+  );
+  requireText(
+    musicLayout,
+    "? 'flac'\n      : 'mp3'",
+    'Music details must default to MP3 unless FLAC is the only available quality'
+  );
+  requireText(
+    musicLayout,
+    "selectedQuality === 'flac'",
+    'Music playback must pass the exact selected quality to server and device actions'
   );
   requireText(
     musicLayout,
@@ -1214,6 +2461,59 @@ const validateCurrentBatchContract = (files) => {
     seriesLayout,
     'onSelectionChange={setSelectedPlaybackItemIds}',
     'series selections must control the playback playlist'
+  );
+  const movieLayout = 'src/components/MovieDetails/MovieDetailsLayout.tsx';
+  for (const detailLayout of [movieLayout, seriesLayout]) {
+    requireText(
+      detailLayout,
+      '<MediaQualitySelect',
+      'Movie and Series details must expose the HD and 4K quality selector'
+    );
+    requireText(
+      detailLayout,
+      "? '4k'\n      : 'hd'",
+      'Movie and Series details must default to HD unless 4K is the only available quality'
+    );
+    requireText(
+      detailLayout,
+      "selectedQuality === '4k'",
+      'Movie and Series playback must use the exact selected quality'
+    );
+  }
+  requireOrder(
+    seriesLayout,
+    [
+      'className="media-rating-row"',
+      '<MediaQualitySelect',
+      'label={intl.formatMessage(messages.quality)}',
+      '{playbackActions?.(',
+    ],
+    'Series quality selection must match the Movie row immediately before playback controls'
+  );
+  rejectText(
+    seriesLayout,
+    'className="card:mt-auto mt-2 self-end"',
+    'Series quality selection must not return to the upper availability column'
+  );
+  requireOrder(
+    movieLayout,
+    [
+      'className="media-rating-row"',
+      '<MediaQualitySelect',
+      'label={intl.formatMessage(messages.quality)}',
+      "playbackActions?.(selectedQuality === '4k')",
+    ],
+    'Movie quality selection must be a directly justified row item immediately before playback controls'
+  );
+  rejectText(
+    movieLayout,
+    'className="card:mt-auto mt-2 self-end"',
+    'Movie quality selection must not return to the upper availability column'
+  );
+  rejectText(
+    movieLayout,
+    'media-playback-control-group',
+    'Movie playback controls must not restore the nested non-justified group'
   );
   const seriesBrowser =
     'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx';
@@ -1266,13 +2566,38 @@ const validateCurrentBatchContract = (files) => {
   const albumTrackList = 'src/components/MediaDetails/AlbumTrackList.tsx';
   requireText(
     albumTrackList,
+    'onClick={toggleAllTracks}',
+    'the Music track selector must expose one all-tracks selection control'
+  );
+  requireText(
+    albumTrackList,
+    'columnIndex === 0',
+    'only the left Music track-card heading may render the all-tracks selector'
+  );
+  rejectText(
+    albumTrackList,
     'columnItemIds.forEach((itemId) =>',
-    'each Music track table must expose its own select-all control'
+    'Music track cards must not retain independent per-column select-all behavior'
   );
   requireText(
     albumTrackList,
     "import SelectionCircle from '@app/components/Common/SelectionCircle';",
     'Music track controls must consume the shared SelectionCircle component'
+  );
+  requireText(
+    albumTrackList,
+    'catalog?.groups.flatMap((group) => group.items) ?? []',
+    'Music track selection must consider every playback catalog group'
+  );
+  requireText(
+    albumTrackList,
+    'const selectionId = playableItem?.id || track.recordingMbid.trim();',
+    'available Music tracks must remain selectable when a playback catalog ID is absent'
+  );
+  requireText(
+    albumTrackList,
+    'disabled={!selectableId}',
+    'Music track circles must use the resolved availability selection ID'
   );
 
   const selectionCircle = 'src/components/Common/SelectionCircle/index.tsx';
@@ -1353,6 +2678,33 @@ const validateCurrentBatchContract = (files) => {
   for (const [componentFile, componentSource] of Object.entries(files)) {
     if (!componentFile.startsWith('src/components/')) continue;
 
+    if (componentSource.includes('h-[22px]')) {
+      errors.push(
+        `${componentFile}: compact controls must consume the shared 20-pixel compact-control rule instead of a page-local 22-pixel height`
+      );
+    }
+
+    if (
+      componentFile.startsWith('src/components/Settings/') &&
+      !componentFile.includes('.test.') &&
+      componentSource.includes('type="checkbox"')
+    ) {
+      if (!componentSource.includes('@app/components/Settings/SettingsField')) {
+        errors.push(
+          `${componentFile}: Settings checkbox fields must consume the shared SettingsField SelectionCircle adapter`
+        );
+      }
+      if (
+        /import\s*\{[^}]*\bField\b[^}]*\}\s*from\s*['"]formik['"]/.test(
+          componentSource
+        )
+      ) {
+        errors.push(
+          `${componentFile}: Settings checkbox fields must not import the native Formik Field directly`
+        );
+      }
+    }
+
     if (
       componentSource.includes('playback-selection-button') ||
       componentSource.includes('fill-indigo-500/30')
@@ -1399,6 +2751,85 @@ const validateCurrentBatchContract = (files) => {
     'book overview links must pass through the shared safe URL transform'
   );
   requireText(
+    bookLayout,
+    'card:row-span-3 card:row-start-1',
+    'Book Details must keep its top metadata groups to the shared three-row height'
+  );
+  requireText(
+    bookLayout,
+    'card:row-start-4',
+    'Book Details Genres must occupy the shared fourth summary row'
+  );
+  rejectText(
+    bookLayout,
+    'card:row-start-5',
+    'Book Details must not restore the oversized fifth summary row'
+  );
+  requireText(
+    bookLayout,
+    'playbackCatalog && availablePlaybackItemIds.length > 0 &&',
+    'Book Details must hide the empty playable-track message while retaining populated selectors'
+  );
+  for (const fileName of [
+    'src/components/MovieDetails/MovieDetailsLayout.tsx',
+    'src/components/TvDetails/SeriesDetailsLayout.tsx',
+    'src/components/MusicDetails/MusicDetailsLayout.tsx',
+    'src/components/BookDetails/BookDetailsLayout.tsx',
+    'src/components/CollectionDetails/index.tsx',
+    'src/components/RequestModal/RequestMediaCard.tsx',
+    'src/components/IssueDetails/index.tsx',
+    'src/components/RequestStatus/index.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'media-detail-card',
+      'detail cards must inherit the shared visible text-link treatment'
+    );
+  }
+  requireText(
+    'src/styles/globals.css',
+    '.media-detail-card a:not(.app-button)',
+    'linked detail-card text must be visibly underlined without decorating button links'
+  );
+  for (const scrollbarToken of [
+    'scrollbar-width: thin;',
+    'scrollbar-gutter: stable;',
+    '.scrollable-card::-webkit-scrollbar',
+  ]) {
+    requireText(
+      'src/styles/globals.css',
+      scrollbarToken,
+      'scrollable cards must retain the shared thin stable-gutter scrollbar'
+    );
+  }
+  requireOrder(
+    'src/components/CollectionDetails/index.tsx',
+    [
+      "id: 'tmdb'",
+      "id: 'rt-critics'",
+      "id: 'rt-audience'",
+      "id: 'imdb'",
+      '<CollectionPartRatings',
+    ],
+    'Collection item ratings must preserve TMDB, RT critic, RT audience, and IMDb order'
+  );
+  requireText(
+    'src/components/CollectionDetails/index.tsx',
+    'href={`/${part.mediaType}/${part.id}`}',
+    'Collection item posters and titles must link to their media detail page'
+  );
+  requireText(
+    'src/components/CollectionDetails/index.tsx',
+    'scrollable-card mt-2 -mr-3',
+    'the Collection item scrollbar must meet the card right edge'
+  );
+  requireCount(
+    'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx',
+    'scrollable-card -mr-2',
+    2,
+    'Series season and episode scroll regions must share edge-aligned scrollbar geometry'
+  );
+  requireText(
     'src/utils/bookMarkdown.test.ts',
     'removes stray emphasis text after an https Markdown link',
     'the observed malformed provider link must have regression coverage'
@@ -1406,7 +2837,6 @@ const validateCurrentBatchContract = (files) => {
 
   const requestModals = [
     'src/components/RequestModal/MovieRequestModal.tsx',
-    'src/components/RequestModal/TvRequestModal.tsx',
     'src/components/RequestModal/MusicRequestModal.tsx',
     'src/components/RequestModal/BookRequestModal.tsx',
   ];
@@ -1452,6 +2882,46 @@ const validateCurrentBatchContract = (files) => {
       'request modals must retain a stable standard submit action target'
     );
   }
+  for (const token of [
+    '<RequestFooterStatus',
+    'selectedDestinationAvailable',
+    'selectedDestinationRequested',
+    'selectedDestinationCovered',
+    'disabled={',
+    'data-testid="modal-cancel-button"',
+  ]) {
+    requireText(
+      'src/components/RequestModal/TvRequestModal.tsx',
+      token,
+      'Request Series must retain its request availability and action behavior after adopting the shared main-card shell'
+    );
+  }
+  for (const fileName of [
+    'src/components/RequestModal/MovieRequestModal.tsx',
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'src/components/RequestModal/BookRequestModal.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'cancelButtonType="danger"',
+      'request-edit Close actions must use the shared red danger treatment'
+    );
+  }
+  requireText(
+    'src/components/RequestModal/TvRequestModal.tsx',
+    "cancelButtonType={editRequest ? 'danger' : 'default'}",
+    'the Series request-edit Close action must use the shared red danger treatment'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'Do not replace Root Folder with a native select or page-local dropdown styling.',
+    'the style standard must require Root Folder to reuse the shared request listbox'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'every continuation line remains anchored to the right edge',
+    'the style standard must preserve right alignment when request actions wrap'
+  );
   const advanced = 'src/components/RequestModal/AdvancedRequester/index.tsx';
   requireText(
     advanced,
@@ -1521,7 +2991,7 @@ const validateCurrentBatchContract = (files) => {
 
   const collectionDetails = 'src/components/CollectionDetails/index.tsx';
   for (const token of [
-    'className="refreshed-artwork-scrim"',
+    '<MediaDetailArtwork',
     'getTmdbPosterImageVariants(data.posterPath)',
     '<CollectionAssociationsButton',
     '<FormatRequestControl options={requestOptions}',
@@ -1652,7 +3122,6 @@ const validateCurrentBatchContract = (files) => {
     'src/components/RequestList/index.tsx',
     'src/components/RequestStatus/index.tsx',
     'src/components/Settings/SettingsLogs/index.tsx',
-    'src/components/UserList/index.tsx',
   ];
   for (const fileName of paginationPages) {
     requireText(
@@ -1678,11 +3147,598 @@ const validateCurrentBatchContract = (files) => {
     'pagination must place Results Per Page left, page count center, and Previous then Next right'
   );
 
+  const userList = 'src/components/UserList/index.tsx';
+  for (const token of [
+    'className="refreshed-card-surface',
+    'messages.filters',
+    'messages.keywordSearch',
+    'value={typeFilter}',
+    'value={roleFilter}',
+    'messages.sortByHeading',
+    'const sortOptions:',
+    "{ key: 'created'",
+    "{ key: 'displayname'",
+    "{ key: 'requests'",
+    "{ key: 'usertype'",
+    "{ key: 'role'",
+    'className="user-list-table-scroll scrollable-card overflow-auto"',
+    'className="app-data-table user-list-data-table"',
+    'visibleUsers.map((user)',
+    'buttonSize="standard"',
+  ]) {
+    requireText(
+      userList,
+      token,
+      'the Users page must use the standardized card, filters, sorts, scrollable table, and actions'
+    );
+  }
+  requireCount(
+    userList,
+    '<SelectionCircle',
+    2,
+    'the Users table must use shared selection circles for select-all and row selection'
+  );
+  requireText(
+    userList,
+    '/api/v1/user?take=100&skip=0',
+    'the Users table must load one scrollable user set instead of paging the page'
+  );
+  for (const token of [
+    'Common/PaginationFooter',
+    '<PaginationFooter',
+    '<Table.',
+    'id="selectAll"',
+    'id={`user-list-select-',
+    'className="w-full"',
+  ]) {
+    rejectText(
+      userList,
+      token,
+      'the Users page must not restore pagination, legacy table controls, native row checkboxes, or full-width actions'
+    );
+  }
+  for (const token of [
+    '.user-list-table-scroll {',
+    'max-height: 32rem;',
+    '.app-data-table.user-list-data-table {',
+    'min-width: 44rem;',
+    '.user-list-name-column {',
+    '.user-list-actions-column {',
+    '.app-data-table {',
+    '.app-data-table-header-row,',
+    'border-bottom: 2px solid rgb(var(--theme-control-border) / 0.72);',
+    '.app-data-table-heading {',
+    '.app-data-table-row,',
+    '.app-data-table-cell {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'Users table geometry, typography, and divider styling must resolve through shared global classes'
+    );
+  }
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'The Users page places its controls and user list inside one shared translucent outer card',
+    'the style standard must explicitly govern the refreshed Users page'
+  );
+
+  const settingsLayout = 'src/components/Settings/SettingsLayout.tsx';
+  for (const token of [
+    '<Header>{intl.formatMessage(globalMessages.settings)}</Header>',
+    '<SettingsTabs tabType="filter" settingsRoutes={settingsRoutes} />',
+    'className="discover-filter-control settings-page-search"',
+    '<article className="settings-main-card">',
+    'className="settings-page-actions"',
+    'buttonType="danger"',
+    'buttonType="success"',
+    'disabled={!hasUnsavedChanges}',
+    'intl.formatMessage(messages.save)',
+    'router.beforePopState(() => {',
+    "window.history.pushState(null, '', currentSettingsPathRef.current);",
+    'cancelText={intl.formatMessage(messages.discard)}',
+    'okText={intl.formatMessage(messages.save)}',
+    "void router.push('/discover');",
+  ]) {
+    requireText(
+      settingsLayout,
+      token,
+      'every Settings route must use the shared shell, navigation, actions, and unsaved-change workflow'
+    );
+  }
+  rejectText(
+    settingsLayout,
+    '<div className="mt-10 text-white">{children}</div>',
+    'Settings content must not restore the uncontained legacy layout'
+  );
+  const settingsTabs = 'src/components/Common/SettingsTabs/index.tsx';
+  for (const token of [
+    "tabType: 'default' | 'button' | 'filter'",
+    "linkClasses = 'app-filter-button settings-page-filter-link'",
+    "activeLinkColor = 'app-filter-button-active'",
+    "inactiveLinkColor = 'app-filter-button-idle'",
+  ]) {
+    requireText(
+      settingsTabs,
+      token,
+      'Settings route navigation must reuse the shared filter-button component styling'
+    );
+  }
+  requireCount(
+    'src/components/Settings/SettingsMain/index.tsx',
+    '<section className="settings-group-card">',
+    2,
+    'General Settings and Playlist Integrations must be separate standard subcards'
+  );
+  requireOrder(
+    'src/components/Settings/SettingsMain/index.tsx',
+    [
+      'messages.generalsettings',
+      'messages.playlistIntegrations',
+      'className="actions"',
+    ],
+    'General Settings and Playlist Integrations subcards must precede the shared form submission path'
+  );
+  for (const token of [
+    '.settings-page-navigation-row {',
+    '.settings-page-filter-link {',
+    '.settings-main-card {',
+    '@apply mt-5 rounded-xl border border-gray-700 p-3 shadow-lg shadow-gray-950/20;',
+    '.settings-group-card,',
+    '.settings-page-content > .mb-6 {',
+    'margin-bottom: 0 !important;',
+    '.settings-page-content > .mb-6 + .section {',
+    'margin-top: 0 !important;',
+    '.settings-page-actions {',
+    '.app-button-success:disabled {',
+    '.settings-card-actions {',
+    '.settings-service-card-actions {',
+    '.settings-page-content > .mb-6 + .settings-service-section {',
+    '.settings-main-card .app-button {',
+    '.settings-badge-row {',
+    '.settings-page-has-actions .actions {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'Settings layout, groups, actions, and change state must resolve through shared global classes'
+    );
+  }
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'Every application Settings route uses one shared page shell',
+    'the style standard must explicitly govern the shared Settings refresh'
+  );
+  for (const token of [
+    'The gap from Search Settings to the main card is 20 pixels',
+    'Legacy heading/body pairs must suppress the old 24- and 40-pixel margins',
+    'Setting names top-align with their adjacent button, badge, selector, text field, or dropdown.',
+    'nested options within one setting use the shared five-pixel gap',
+  ]) {
+    requireText(
+      'docs/maintainers/ui-style-standard.md',
+      token,
+      'the style standard must preserve Settings card continuity, alignment, and spacing'
+    );
+  }
+  for (const token of [
+    '@apply min-w-max flex-none;',
+    '@apply w-full min-w-0;',
+    '@apply px-2 py-0 text-xs leading-4;',
+    'height: var(--compact-control-height);',
+    '@apply text-sm leading-5 font-semibold text-white;',
+    '@apply mt-1 w-full max-w-none text-sm leading-5 font-normal;',
+    '.settings-form-row-description {',
+    '@apply col-span-full m-0 mt-[5px] w-full text-sm leading-5 font-normal;',
+    '.settings-page-content .settings-compatible-listbox-button {',
+    'max-height: var(--compact-control-height);',
+    'background-color: rgb(var(--theme-control-surface) / 0.58) !important;',
+    '.settings-page-content .react-select__multi-value {',
+    '@apply inline-flex flex-nowrap items-center gap-[5px] whitespace-nowrap;',
+    '.settings-permission-options .permission-option-row,',
+    '.settings-permission-options .permission-option-child {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'Settings navigation, fields, and selectors must resolve through the shared documented dimensions'
+    );
+  }
+  for (const settingsSource of Object.keys(files).filter(
+    (fileName) =>
+      fileName.startsWith('src/components/Settings/') &&
+      fileName.endsWith('.tsx')
+  )) {
+    rejectText(
+      settingsSource,
+      'className="label-tip"',
+      'Settings descriptions must span the full shared row instead of nesting inside the label column'
+    );
+  }
+  requireText(
+    'src/components/Settings/SettingsUsers/index.tsx',
+    'className="settings-permission-options max-w-lg"',
+    'Default Permissions must use the shared compact nested-option spacing'
+  );
+  for (const token of [
+    '<section className="settings-group-card">',
+    '<h3 className="settings-group-heading">',
+    '<Form className="settings-group-content">',
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsUsers/index.tsx',
+      token,
+      'Users Settings must keep its heading and fields in one complete shared group card'
+    );
+  }
+  for (const token of [
+    'permission-option-row relative',
+    'permission-option-child pl-10',
+  ]) {
+    requireText(
+      'src/components/PermissionOption/index.tsx',
+      token,
+      'permission options must expose shared semantic rows for Settings spacing'
+    );
+  }
+  rejectText(
+    'src/components/PermissionOption/index.tsx',
+    'permission-option-child mt-4',
+    'nested permission rows must not restore blank-row spacing'
+  );
+  requireText(
+    globals,
+    "input[type='checkbox'] {\n    @apply h-4 w-4 rounded-full text-emerald-500",
+    'native selection circles must share the standard global geometry'
+  );
+  requireText(
+    globals,
+    'background-color: rgb(var(--theme-control-surface) / 0.92);',
+    'native selection circles must share the approved inactive color'
+  );
+  const settingsField = 'src/components/Settings/SettingsField.tsx';
+  for (const token of [
+    "import SelectionCircle from '@app/components/Common/SelectionCircle';",
+    "props.type === 'checkbox'",
+    '<SelectionCircle',
+    'selected={Boolean(field.value)}',
+    'void helpers.setValue(checked);',
+  ]) {
+    requireText(
+      settingsField,
+      token,
+      'Settings boolean fields must use the shared SelectionCircle while preserving Formik state'
+    );
+  }
+  requireText(
+    settingsField,
+    'notifySettingsUserChange();',
+    'Settings selection circles must notify the shared dirty-state controller after a user change'
+  );
+  for (const token of [
+    'SETTINGS_USER_CHANGE_EVENT',
+    'event.nativeEvent.isTrusted',
+    'useSettingsPageAction',
+    'pageAction && (',
+  ]) {
+    requireText(
+      settingsLayout,
+      token,
+      'Settings dirty state must accept explicit user changes without treating programmatic initialization as an edit'
+    );
+  }
+  requireText(
+    settingsTabs,
+    'flex w-full min-w-0 flex-wrap justify-between gap-[5px]',
+    'Settings route buttons must remain content-width, fully justified, and wrapping'
+  );
+  requireCount(
+    'src/components/Settings/SettingsNetwork/index.tsx',
+    'className="settings-badge-row"',
+    4,
+    'multi-badge Network settings must keep every badge together in one row'
+  );
+  requireText(
+    'src/components/Settings/SettingsNetwork/index.tsx',
+    '<p className="settings-form-row-description">\n                        {intl.formatMessage(messages.allowHttpAuthTip)}',
+    'the HTTP authentication description must span the full Settings row before wrapping'
+  );
+  requireText(
+    globals,
+    '.settings-http-warning {\n    @apply border-red-500/90 bg-red-950/35;',
+    'the HTTP warning card must use the same red surface as Cancel actions'
+  );
+  for (const settingsCardFile of [
+    'src/components/Settings/SettingsServices.tsx',
+    'src/components/Settings/OverrideRule/OverrideRuleTiles.tsx',
+  ]) {
+    requireText(
+      settingsCardFile,
+      'className="settings-card-actions',
+      'Settings card actions must use the shared content-width action row'
+    );
+    rejectText(
+      settingsCardFile,
+      'inline-flex w-0 flex-1',
+      'Settings cards must not restore full-width legacy action buttons'
+    );
+  }
+  const commonTable = 'src/components/Common/Table/index.tsx';
+  for (const token of [
+    'className="app-data-table-body"',
+    'className="app-data-table-container"',
+    'className="app-data-table-scroll scrollable-card"',
+    'className="app-data-table-frame"',
+    "'app-data-table-heading'",
+    "'app-data-table-cell'",
+    "className={`app-data-table ${className ?? ''}`}",
+  ]) {
+    requireText(
+      commonTable,
+      token,
+      'shared tables must resolve their typography, rows, and dividers through the standard data-table classes'
+    );
+  }
+  for (const token of [
+    'className="app-list-row"',
+    'className="app-list-label"',
+    'className="app-list-value',
+    'className="app-list-items section"',
+  ]) {
+    requireText(
+      'src/components/Common/List/index.tsx',
+      token,
+      'shared lists must resolve compact Settings rows through standard list classes'
+    );
+  }
+  for (const token of [
+    "bgColor: 'border border-orange-400 backdrop-blur bg-orange-500/40'",
+    '<div className="flex items-center">',
+  ]) {
+    requireText(
+      'src/components/Common/Alert/index.tsx',
+      token,
+      'warning cards must use the shared bright-orange treatment with vertically centered content'
+    );
+  }
+  for (const token of [
+    '<section className="settings-group-card">',
+    'className="settings-library-actions mt-[5px]"',
+    'className="settings-library-grid"',
+    'setAllLibrariesEnabled(true)',
+    'setAllLibrariesEnabled(false)',
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsPlex.tsx',
+      token,
+      'Plex Libraries must use one standard group card with shared actions and bulk selection'
+    );
+  }
+  requireText(
+    'src/components/Settings/LibraryItem.tsx',
+    '<SelectionCircle',
+    'Plex library selection must use the shared selection-circle control'
+  );
+  rejectText(
+    'src/components/Settings/LibraryItem.tsx',
+    'role="checkbox"',
+    'Plex library selection must not restore the legacy switch imitation'
+  );
+  requireCount(
+    'src/components/Settings/SettingsMetadata.tsx',
+    'className="refreshed-inset-surface mt-[5px] rounded-lg border border-gray-700 p-3"',
+    2,
+    'Metadata Provider Status and Selection must be two valid standard inset cards'
+  );
+  requireText(
+    'src/components/Settings/SettingsServices.tsx',
+    'useSettingsPageAction(newOverrideRuleAction);',
+    'New Override Rule must use the shared Settings page action row'
+  );
+  rejectText(
+    'src/components/Settings/SettingsServices.tsx',
+    'min-h-[8rem] rounded-lg border-2 border-dashed border-gray-400 shadow sm:min-h-[11rem]',
+    'Services must not restore the dashed New Override Rule placeholder card'
+  );
+  for (const token of [
+    '.settings-library-card {',
+    '.settings-page-content .app-list-row {',
+    '.app-data-table-body > tr {',
+    '.settings-table-action-row {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'Settings tables, lists, and Plex library rows must resolve through shared global classes'
+    );
+  }
+  for (const token of [
+    '.settings-service-card {',
+    '.settings-service-grid {',
+    '.settings-service-title {',
+    '.settings-service-details {',
+    '.settings-log-toolbar {',
+    '.settings-log-control-icon svg {',
+    '.settings-log-primary-cell {',
+    '.app-data-table.settings-jobs-table {',
+    '.settings-jobs-actions-column {',
+    '.user-list-requests-column {',
+    'background-color: transparent;',
+    '.settings-http-warning {',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'Settings services, warnings, logs, jobs, and table geometry must remain shared and standardized'
+    );
+  }
+  requireCount(
+    'src/components/Settings/SettingsServices.tsx',
+    'className="settings-service-grid"',
+    5,
+    'every service and override-rule grid must use the shared five-pixel layout'
+  );
+  for (const token of [
+    'className="settings-service-card refreshed-inset-surface"',
+    'className="settings-service-logo-link"',
+    'className="settings-service-badges"',
+    'className="settings-service-details"',
+    'className="settings-card-actions settings-service-card-actions"',
+    'buttonType="warning"',
+    'className="settings-service-delete-action"',
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsServices.tsx',
+      token,
+      'service cards must preserve the shared logo, title, detail-column, and semantic-action layout'
+    );
+  }
+  requireCount(
+    'src/components/Settings/SettingsServices.tsx',
+    'className="section settings-service-section"',
+    5,
+    'every Services subcard must preserve the shared body-text spacing'
+  );
+  for (const token of [
+    'className="settings-service-card refreshed-inset-surface text-left"',
+    'className="settings-rule-card-content"',
+    'className="settings-rule-subheading"',
+  ]) {
+    requireText(
+      'src/components/Settings/OverrideRule/OverrideRuleTiles.tsx',
+      token,
+      'Override Conditions must match the shared service inset-card layout'
+    );
+  }
+  for (const token of [
+    'className="settings-log-toolbar"',
+    'className="settings-log-search-control"',
+    'className="settings-log-filter-control"',
+    'className="settings-log-primary-cell text-gray-300"',
+    '<Table className="settings-logs-table">',
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsLogs/index.tsx',
+      token,
+      'Logs must use compact shared controls, standard table headings, and top-left primary cells'
+    );
+  }
+  for (const token of [
+    '<Table className="settings-jobs-table">',
+    'className="settings-jobs-actions-column"',
+    'buttonSize="standard"',
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsJobsCache/index.tsx',
+      token,
+      'Jobs must use the compact standard table and action geometry'
+    );
+  }
+  requireText(
+    'src/components/Settings/SettingsNetwork/index.tsx',
+    'className="settings-http-warning"',
+    'the HTTP-login acknowledgement must use its explicit yellow warning treatment'
+  );
+  for (const token of [
+    '<span className="settings-plain-value truncate">',
+    '<span className="settings-plain-value">{data.appDataPath}</span>',
+    "{data.tz || 'Not available'}",
+  ]) {
+    requireText(
+      'src/components/Settings/SettingsAbout/index.tsx',
+      token,
+      'About metadata must render as ordinary detail text rather than code tags'
+    );
+  }
+  for (const forbidden of [
+    '<code>{data.appDataPath}</code>',
+    '<code>{data.tz}</code>',
+  ]) {
+    rejectText(
+      'src/components/Settings/SettingsAbout/index.tsx',
+      forbidden,
+      'About metadata must not restore code-style tags'
+    );
+  }
+
   const issueDetails = 'src/components/IssueDetails/index.tsx';
   requireOrder(
     issueDetails,
-    ['onClick={leaveIssue}', 'messages.exit', 'messages.closeissue'],
-    'Exit and Close Issue must retain their swapped placement'
+    [
+      '{intl.formatMessage(messages.addcomment)}',
+      'onClick={leaveIssue}',
+      '? messages.closeissue',
+    ],
+    'Issue actions must place Add Comment first, followed by Cancel immediately before Close or Reopen Issue'
+  );
+  requireText(
+    issueDetails,
+    '{intl.formatMessage(globalMessages.cancel)}',
+    'Issue Details must label its exit action Cancel'
+  );
+  rejectText(
+    issueDetails,
+    'messages.exit',
+    'Issue Details must not restore the old Exit label'
+  );
+  rejectText(
+    issueDetails,
+    'h-[22px]',
+    'Issue Details actions must not use the smaller disclosure-button size'
+  );
+  requireCount(
+    issueDetails,
+    'buttonSize="sm"',
+    5,
+    'every Issue Details action must use the shared 30-pixel action size'
+  );
+  for (const [token, description] of [
+    ['useDeepLinks', 'Issue Details must not restore media-server playback'],
+    ['selectedMediaUrl', 'Issue Details must not resolve a playback target'],
+    ['messages.playonserver', 'Issue Details must not label a playback action'],
+    ['<PlayIcon', 'Issue Details must not render a playback control'],
+  ]) {
+    rejectText(issueDetails, token, description);
+  }
+  for (const [token, description] of [
+    ['buttonType="warning"', 'Add Comment must use the shared warning action'],
+    ['buttonType="danger"', 'Cancel must use the shared danger action'],
+    [
+      'buttonType="success"',
+      'Close or Reopen Issue must use the shared success action',
+    ],
+  ]) {
+    requireText(issueDetails, token, description);
+  }
+  requireText(
+    'src/components/RequestStatus/index.tsx',
+    'border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px]',
+    'Request Status History must use the compact translucent green action treatment'
+  );
+  requireText(
+    'src/components/RequestStatus/index.tsx',
+    'className="request-status-action-row"',
+    'request cards must resolve wrapping action alignment through the shared global style'
+  );
+  for (const filterPage of [
+    'src/components/RequestStatus/index.tsx',
+    'src/components/Blocklist/index.tsx',
+  ]) {
+    requireText(
+      filterPage,
+      '<CompactSelect',
+      'Request Status and Blocklist dropdowns must reuse the compact Issues control'
+    );
+    rejectText(
+      filterPage,
+      'discover-filter-control h-8',
+      'Request Status and Blocklist filters must not override the shared compact height'
+    );
+  }
+  requireText(
+    globals,
+    '.request-status-action-row {\n    @apply relative z-10 flex flex-wrap items-center justify-end gap-2 pt-[5px];',
+    'every wrapped request action line must stay right-justified'
   );
   requireText(
     issueDetails,
@@ -1696,7 +3752,7 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     issueDetails,
-    '<article className="refreshed-card-surface relative overflow-hidden',
+    '<article className="media-detail-card refreshed-card-surface relative overflow-hidden',
     'Issue Details must contain every region in one artwork-backed outer card'
   );
   requireText(
@@ -1745,6 +3801,50 @@ const validateCurrentBatchContract = (files) => {
     ],
     'Issues must separate Task Filters, Media Filters, and regular Filters'
   );
+  for (const token of [
+    'CompactSelect,',
+    "mediaFilter === 'movie'",
+    "mediaFilter === 'tv'",
+    "mediaFilter === 'music'",
+    'messages.releaseDate',
+    'messages.firstPublished',
+    'messages.genres',
+    'messages.studio',
+    'messages.network',
+    'messages.albumType',
+    "params.set('releaseYear'",
+    "params.set('genre'",
+  ]) {
+    requireText(
+      issueList,
+      token,
+      'Issues must reveal and submit the filters belonging to the selected media type'
+    );
+  }
+  rejectText(
+    issueList,
+    'discover-filter-control h-8',
+    'Issues controls must not override the shared 20-pixel compact geometry'
+  );
+  const issueRoute = 'server/routes/issue.ts';
+  for (const token of [
+    'req.query.releaseYear',
+    'req.query.genre',
+    'req.query.studio',
+    'req.query.network',
+    'req.query.albumType',
+    'searchMetadata.releaseDate',
+    'searchMetadata.genres',
+    'searchMetadata.studio',
+    'searchMetadata.network',
+    'searchMetadata.albumType',
+  ]) {
+    requireText(
+      issueRoute,
+      token,
+      'the Issues API must apply every visible media-specific filter before counts and pagination'
+    );
+  }
   for (const fileName of [
     'src/components/RequestStatus/index.tsx',
     'src/components/Blocklist/index.tsx',
@@ -1801,10 +3901,25 @@ const validateCurrentBatchContract = (files) => {
     'artwork={backdrop}',
     'caller-provided issue artwork must be passed into the summary card'
   );
-  rejectText(
+  requireText(
     createIssue,
-    'loading={!!detailUrl && !data && !error}\n            backdrop=',
-    'Report an Issue must not restore artwork on the outer modal'
+    'backdrop={resolvedBackdrop}',
+    'Report an Issue must place the media artwork on its outer card'
+  );
+  requireText(
+    createIssue,
+    'backdropFull',
+    'Report an Issue artwork must cover the full outer card'
+  );
+  requireText(
+    createIssue,
+    'dialogClass="artwork-form-main-card refreshed-card-surface refreshed-detail-text"',
+    'Report an Issue must use the Collection-style main card with visible outer spacing'
+  );
+  requireText(
+    createIssue,
+    'embedded',
+    'Report an Issue media summary must render as an inset subcard'
   );
   rejectText(
     createIssue,
@@ -1826,6 +3941,311 @@ const validateCurrentBatchContract = (files) => {
     'flex flex-wrap items-center justify-end gap-2',
     'issue form actions must remain right-aligned'
   );
+  for (const token of [
+    'data-testid="modal-cancel-button"\n                buttonType="danger"\n                buttonSize="standard"',
+    'data-testid="modal-ok-button"\n                buttonType="success"\n                buttonSize="standard"',
+  ]) {
+    requireText(
+      createIssue,
+      token,
+      'Report an Issue confirmation actions must use the standard 30-pixel shared button'
+    );
+  }
+  requireCount(
+    createIssue,
+    'className="inline-flex items-center gap-1.5 [&_svg]:!m-0"',
+    2,
+    'Report an Issue actions must preserve the standard icon-to-label gap'
+  );
+  rejectText(
+    createIssue,
+    'h-[22px]',
+    'Report an Issue actions must not use the undersized disclosure-button height'
+  );
+  requireText(
+    'src/components/Common/Modal/index.tsx',
+    "actionButtonSize = 'sm'",
+    'modal confirmation actions must default to the standard 30-pixel size site-wide'
+  );
+
+  for (const editRequestFile of [
+    'src/components/RequestModal/MovieRequestModal.tsx',
+    'src/components/RequestModal/MusicRequestModal.tsx',
+    'src/components/RequestModal/BookRequestModal.tsx',
+  ]) {
+    requireText(
+      editRequestFile,
+      'backdropFull',
+      'edit-request cards must use full-card artwork'
+    );
+    requireText(
+      editRequestFile,
+      'refreshed-card-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-5xl',
+      'edit-request cards must use the refreshed centered main-card layout'
+    );
+    requireText(
+      editRequestFile,
+      'refreshed-inset-surface',
+      'edit-request content must retain darker inset subcards'
+    );
+  }
+  requireText(
+    'src/components/RequestModal/TvRequestModal.tsx',
+    'artwork-form-main-card refreshed-card-surface refreshed-detail-text',
+    'the Series edit-request card must retain the shared Report Issue main-card layout'
+  );
+  for (const token of [
+    'title={intl.formatMessage(messages.deleteTitle)}',
+    'title={intl.formatMessage(messages.removeTitle,',
+  ]) {
+    requireOrder(
+      'src/components/RequestStatus/index.tsx',
+      [
+        token,
+        'dialogClass="request-modal-site-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-lg"',
+        '<p className="refreshed-inset-surface rounded-lg border border-gray-700 p-3">',
+      ],
+      'request deletion confirmations must use the standard site-background card and inset message layout'
+    );
+  }
+
+  for (const [fileName, prop, description] of [
+    [
+      'src/components/Discover/DiscoverStudio/index.tsx',
+      '<DiscoverMovies studio={studio} />',
+      'Studio results must reuse the complete Movie filter page',
+    ],
+    [
+      'src/components/Discover/DiscoverNetwork/index.tsx',
+      '<DiscoverTv network={network} />',
+      'Network results must reuse the complete Series filter page',
+    ],
+  ]) {
+    requireText(fileName, prop, description);
+  }
+  for (const [fileName, titleToken] of [
+    [
+      'src/components/Discover/DiscoverMovies/index.tsx',
+      "studioMovies: '{studio} Movies'",
+    ],
+    [
+      'src/components/Discover/DiscoverTv/index.tsx',
+      "networkSeries: '{network} Series'",
+    ],
+  ]) {
+    requireText(
+      fileName,
+      titleToken,
+      'Discover-linked company result pages must retain a named top-left title'
+    );
+    requireText(
+      fileName,
+      'https://image.tmdb.org/t/p/original',
+      'Discover-linked company result pages must show the original provider logo above the filters'
+    );
+  }
+  for (const fileName of [
+    'src/components/Discover/StudioSlider/index.tsx',
+    'src/components/Discover/NetworkSlider/index.tsx',
+  ]) {
+    requireText(
+      fileName,
+      'https://image.tmdb.org/t/p/original',
+      'Discover company buttons must use original-resolution provider logos'
+    );
+    rejectText(
+      fileName,
+      'filter(duotone',
+      'Discover company buttons must preserve the provider logo colors'
+    );
+  }
+
+  for (const [manageFile, standardButtonCount] of [
+    ['src/components/ManageSlideOver/index.tsx', 9],
+    ['src/components/ExternalMediaManageSlideOver/index.tsx', 5],
+  ]) {
+    requireText(
+      manageFile,
+      '<Modal',
+      'media management must use the centered refreshed modal instead of the legacy slide-over'
+    );
+    rejectText(
+      manageFile,
+      '<SlideOver',
+      'media management must not restore the narrow right-hand slide-over'
+    );
+    requireText(
+      manageFile,
+      'backdropFull',
+      'media management artwork must cover its complete outer card'
+    );
+    requireText(
+      manageFile,
+      'dialogClass="refreshed-card-surface refreshed-detail-text !w-[calc(100%-2rem)] rounded-xl border border-gray-700 shadow-lg shadow-gray-950/20 sm:!max-w-5xl"',
+      'media management must use the Report an Issue main-card layout'
+    );
+    requireText(
+      manageFile,
+      'cancelButtonType="danger"',
+      'media management must use the standard red Cancel action'
+    );
+    requireText(
+      manageFile,
+      'manage-media-card-sections space-y-[5px]',
+      'media management sections must use inset cards with the shared compact gap'
+    );
+    requireText(
+      manageFile,
+      '<IssueMediaSummary',
+      'media management must retain one fallback summary when no open issue is viewable'
+    );
+    requireText(
+      manageFile,
+      'embedded',
+      'media management must use the exact embedded Issue Details summary treatment'
+    );
+    requireText(
+      manageFile,
+      '<IssueItem',
+      'media management must reuse the full Issue list card for open issues'
+    );
+    rejectText(
+      manageFile,
+      '<IssueBlock',
+      'media management must not retain the redundant simplified Open Issues card'
+    );
+    requireOrder(
+      manageFile,
+      [
+        'canViewIssues && openIssues.length > 0',
+        '<IssueItem',
+        '<IssueMediaSummary',
+      ],
+      'media management must replace the generic summary with full Issue cards when open issues are viewable'
+    );
+    requireText(
+      manageFile,
+      'className="manage-media-section-title"',
+      'media management headings must use the shared standard text size'
+    );
+    rejectText(
+      manageFile,
+      'className="w-full"',
+      'media management actions must never use a full-width button override'
+    );
+    rejectText(
+      manageFile,
+      'className={`w-full',
+      'media management actions must never use a dynamic full-width button override'
+    );
+    rejectText(
+      manageFile,
+      'buttonSize="sm"',
+      'media management actions must not use the ambiguously named small size'
+    );
+    requireText(
+      manageFile,
+      'actionButtonSize="standard"',
+      'the management Cancel action must use the explicit 30-pixel standard size'
+    );
+    requireCount(
+      manageFile,
+      'buttonSize="standard"',
+      standardButtonCount,
+      'every media management content action must use the explicit 30-pixel standard size'
+    );
+    requireText(
+      manageFile,
+      'actionsClass="!mt-[5px] !justify-start"',
+      'the management Cancel action must sit at bottom right with the standard five-pixel gap'
+    );
+    rejectText(
+      manageFile,
+      'intl.formatMessage(messages.manageModalMedia)',
+      'media management must not retain a standalone Media card heading'
+    );
+    rejectText(
+      manageFile,
+      'intl.formatMessage(messages.manageModalMedia4k)',
+      'media management must not retain a standalone 4K Media card heading'
+    );
+    requireCount(
+      manageFile,
+      'intl.formatMessage(messages.manageModalAdvanced)',
+      1,
+      'media management must combine service and advanced controls under one Advanced card'
+    );
+  }
+  for (const token of ["label: 'HD'", "label: '4K'"]) {
+    requireText(
+      'src/components/ManageSlideOver/index.tsx',
+      token,
+      'Movie and Series management summaries must show both availability qualities'
+    );
+  }
+  for (const token of ["label: 'MP3'", "label: 'FLAC'"]) {
+    requireText(
+      'src/components/ExternalMediaManageSlideOver/index.tsx',
+      token,
+      'Music management summaries must show both availability qualities'
+    );
+  }
+  requireText(
+    globals,
+    '.manage-media-card-sections > div',
+    'media management sections must share one site-wide inset-card treatment'
+  );
+  requireText(
+    globals,
+    '.manage-media-section-title',
+    'media management headings must share one site-wide compact treatment'
+  );
+  requireText(
+    'src/components/Common/Button/index.tsx',
+    "standard: 'button-standard'",
+    'the shared Button component must expose an unambiguous standard-size token'
+  );
+  requireText(
+    'src/components/Common/Button/index.tsx',
+    "default: 'button-standard'",
+    'the shared Button default must resolve to the 30-pixel site standard'
+  );
+  requireText(
+    globals,
+    '--action-control-height: 1.875rem;',
+    'the shared standard-size token must resolve to exactly 30-pixel height'
+  );
+  for (const token of [
+    'expect(bounds.height).to.eq(30)',
+    "expect(styles.fontSize).to.eq('12px')",
+    "expect($button).to.have.class('button-standard')",
+  ]) {
+    requireText(
+      'cypress/e2e/library-discover-parity.cy.ts',
+      token,
+      'rendered Manage regression coverage must measure the canonical action geometry'
+    );
+  }
+  for (const [token, description] of [
+    [
+      '.app-button-primary {\n    @apply border-indigo-500/90 bg-indigo-950/35 text-indigo-200',
+      'standard primary actions must use the translucent dark-indigo treatment',
+    ],
+    [
+      '.app-button-danger {\n    @apply border-red-500/90 bg-red-950/35 text-red-300',
+      'standard red actions must use the translucent dark-red treatment',
+    ],
+    [
+      '.app-button-warning {\n    @apply border-yellow-500/90 bg-yellow-950/35 text-yellow-200',
+      'standard warning actions must use the translucent dark-yellow treatment',
+    ],
+    [
+      '.app-button-success {\n    @apply border-green-500/90 bg-green-950/35 text-green-300',
+      'standard green actions must use the translucent dark-green treatment',
+    ],
+  ]) {
+    requireText(globals, token, description);
+  }
 
   const profile = 'src/components/UserProfile/ProfileHeader/index.tsx';
   requireText(
@@ -1967,13 +4387,18 @@ const validateCurrentBatchContract = (files) => {
     ],
     [
       'server/lib/playbackMediaRoot.ts',
-      'media.ratingKeyFlac ??',
-      'Plex playback must prefer FLAC before MP3 and the legacy identifier',
+      'const selectedVariant = is4k ? media.ratingKeyFlac : media.ratingKeyMp3;',
+      'Plex music playback must resolve the exact selected MP3 or FLAC identifier',
     ],
     [
       'server/lib/playbackMediaRoot.ts',
-      'media.jellyfinMediaIdFlac ??',
-      'Jellyfin and Emby playback must prefer FLAC before MP3 and the legacy identifier',
+      '? media.jellyfinMediaIdFlac\n        : media.jellyfinMediaIdMp3;',
+      'Jellyfin and Emby music playback must resolve the exact selected MP3 or FLAC identifier',
+    ],
+    [
+      'server/lib/playbackSelection.test.ts',
+      'translates a music selection into only the selected quality catalog',
+      'playlist selection must have regression coverage against mixed music qualities',
     ],
     [
       'server/lib/audioPlaybackFormat.test.ts',
@@ -2131,15 +4556,16 @@ const validateCurrentBatchContract = (files) => {
   requireOrder(
     filterPanel,
     [
+      'className="discover-filter-primary-row"',
       'getFilterResetButtonClass(!hasActiveFilters)',
       '<CardTextVisibilityToggle',
       '<AvailabilityQualityControl',
       'className="order-3"',
-      'className="order-4 basis-full"',
+      "variant === 'search' ? 'contents' : 'discover-filter-secondary-row'",
       '<form',
       'order-5',
     ],
-    'movie and series must preserve Clear Filters, Title View, Quality Available, then the Keyword Search row break'
+    'movie and series must preserve the shared compact gap between their primary and wrapping filter rows'
   );
   requireOrder(
     'src/components/Discover/AvailabilityQualityControl/index.tsx',
@@ -2173,6 +4599,41 @@ const validateCurrentBatchContract = (files) => {
     'server/routes/discover.ts',
     'availableQualities',
     'Music discovery must expose separately persisted Lidarr qualities'
+  );
+  requireText(
+    'server/routes/discover.ts',
+    'getLiveRadarrMovieAvailability',
+    'Movie quality filters must consult current synchronized Radarr libraries'
+  );
+  requireText(
+    'server/routes/discover.ts',
+    'if (movie.hasFile && !destination.has(movie.tmdbId))',
+    'Movie quality filters must exclude monitored Radarr entries without files'
+  );
+  requireText(
+    'server/routes/discover.ts',
+    'const pageTmdbIds = pageItems.map(({ movie }) => movie.tmdbId);',
+    'Live Movie filtering must hydrate persisted relationships only after pagination'
+  );
+  requireText(
+    'server/routes/discover.ts',
+    'cover?serviceId=${server.id}&externalServiceId=${movie.id}&is4k=${server.is4k}',
+    'Live Radarr Movie cards must use the authenticated service-specific cover proxy'
+  );
+  requireText(
+    'server/routes/discover.test.ts',
+    'uses current Radarr file state and metadata for quality availability',
+    'Live Radarr Movie availability must retain focused route coverage'
+  );
+  requireText(
+    'server/routes/movie.test.ts',
+    'serves a live Radarr discovery cover without persisted service links',
+    'Live Radarr Movie posters must retain focused cover-proxy coverage'
+  );
+  requireText(
+    'server/routes/movie.ts',
+    'candidate.id === explicitServiceId && Boolean(candidate.is4k) === is4k',
+    'Live Radarr Movie covers must validate the requested configured service and quality'
   );
   requireText(
     'server/routes/discover.test.ts',
@@ -2228,25 +4689,47 @@ const validateCurrentBatchContract = (files) => {
   requireOrder(
     'src/components/Discover/DiscoverMusic/index.tsx',
     [
+      'className="discover-filter-primary-row"',
       'getFilterResetButtonClass(!hasActiveFilters)',
       '<CardTextVisibilityToggle',
       '<AvailabilityQualityControl',
       'className="order-3"',
-      'className="order-4 basis-full"',
+      'className="discover-filter-secondary-row"',
       '<form',
       'order-5',
     ],
-    'Music must preserve Clear Filters, Title View, Quality Available, then the Keyword Search row break'
+    'Music must preserve the shared compact gap between its primary and wrapping filter rows'
   );
   requireOrder(
     'src/components/Discover/FilterPanel/index.tsx',
     ['<form', "type === 'tv'", 'messages.status', 'messages.releaseDate'],
     'Series Status must sit immediately after Keyword Search'
   );
+  const discoverFilterPanel = 'src/components/Discover/FilterPanel/index.tsx';
   requireText(
-    'src/components/Selector/index.tsx',
-    'defaultOptions={availableGenreOptions}',
-    'the shared Movie and Series genre selector must preload its options'
+    discoverFilterPanel,
+    'const { data: availableGenres } = useSWR<TmdbGenre[]>(',
+    'Movie and Series Genres must load the complete type-specific option list'
+  );
+  requireText(
+    discoverFilterPanel,
+    'label={intl.formatMessage(messages.genres)}\n          value={selectedGenre}\n          options={genreOptions}',
+    'Movie and Series Genres must use the same shared single-value dropdown as neighboring filters'
+  );
+  rejectText(
+    discoverFilterPanel,
+    '<GenreSelector',
+    'Movie and Series Genres must not restore the multi-select control'
+  );
+  rejectText(
+    discoverFilterPanel,
+    "updateFilter('genre', value?.map((v) => v.value).join(','))",
+    'Movie and Series Genres must not concatenate multiple selections'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'Genres is a single-value filter on Movie, Series, Music, and Book discovery.',
+    'the style standard must preserve single-value Genres filtering site-wide'
   );
   requireText(
     'src/components/Selector/genreOptions.test.ts',
@@ -2393,13 +4876,148 @@ const validateCurrentBatchContract = (files) => {
     );
   }
   for (const fileName of [
-    'src/components/Discover/DiscoverMovies/index.tsx',
-    'src/components/Discover/DiscoverTv/index.tsx',
+    'src/components/Discover/MediaDiscoveryControls.tsx',
   ]) {
     requireText(
       fileName,
       'getFilterToggleButtonClass(active)',
       'movie and series sort controls must use the shared Discover button style'
+    );
+  }
+  for (const fileName of [
+    'src/components/Discover/DiscoverMovies/index.tsx',
+    'src/components/Discover/DiscoverTv/index.tsx',
+  ]) {
+    requireText(
+      fileName,
+      '<MediaDiscoveryControls',
+      'movie and series discovery must consume the shared filter and sort controls'
+    );
+  }
+  rejectText(
+    'src/components/Discover/index.tsx',
+    '<DiscoverMediaTabs',
+    'the grouped Discover landing page must not duplicate Trending media filters'
+  );
+  requireOrder(
+    'src/components/Discover/DiscoverMediaTabs.tsx',
+    [
+      "type: 'movie'",
+      "type: 'tv'",
+      "type: 'music'",
+      "type: 'book'",
+      "type: 'audiobook'",
+    ],
+    'Discover media filters must retain the Movies, Series, Music, Books, Audiobooks order'
+  );
+  requireText(
+    'src/components/Discover/Trending.tsx',
+    'basePath="/discover/trending"',
+    'Trending must retain its own five-choice shared media filter row'
+  );
+  for (const token of [
+    '<DiscoverMovies',
+    '<DiscoverTv',
+    '<DiscoverMusic',
+    '<DiscoverBooks',
+    "format={mediaType === 'audiobook' ? 'audiobook' : 'ebook'}",
+  ]) {
+    requireText(
+      'src/components/Discover/Trending.tsx',
+      token,
+      'Trending media choices must render the corresponding complete discovery controls'
+    );
+  }
+  rejectText(
+    'src/components/Discover/Trending.tsx',
+    '<select',
+    'Trending must not restore its legacy oversized native dropdowns'
+  );
+  for (const fileName of [
+    'src/components/Discover/DiscoverMovies/index.tsx',
+    'src/components/Discover/DiscoverTv/index.tsx',
+    'src/components/Discover/DiscoverMusic/index.tsx',
+    'src/components/Discover/DiscoverBooks/index.tsx',
+  ]) {
+    requireText(
+      fileName,
+      '{mediaFilters}',
+      'every Trending media destination must place the shared media filters above its own Filters controls'
+    );
+  }
+  requireText(
+    'src/components/Common/CardTextVisibilityToggle/index.tsx',
+    'getFilterToggleButtonClass(isAlwaysVisible)',
+    'the title visibility filter must consume the shared compact filter button'
+  );
+  rejectText(
+    'src/components/Common/CardTextVisibilityToggle/index.tsx',
+    'buttonSize="sm"',
+    'the title visibility filter must not restore the taller shared action button'
+  );
+  for (const token of [
+    '.app-button svg,',
+    'button:not(.app-filter-button):not(.app-control-shadow-exempt) svg,',
+    '.detail-disclosure-control svg,',
+    'text-shadow:',
+    'drop-shadow(0 0 3px rgb(0 0 0 / 0.95))',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'non-filter buttons must retain the shared ratings-style black readability shadow'
+    );
+  }
+  for (const token of ['text-shadow: none;', 'filter: none;']) {
+    requireText(
+      globals,
+      token,
+      'filter and sort buttons must remain exempt from the shared action-button shadow'
+    );
+  }
+  requireText(
+    'src/components/RequestList/index.tsx',
+    'className="app-control-shadow-exempt z-40 mr-2 rounded-l-none px-3"',
+    'the legacy Request List sort-direction button must remain shadow-free'
+  );
+  for (const [fileName, mediaType] of [
+    ['src/components/MovieDetails/MovieRecommendations.tsx', 'movie'],
+    ['src/components/MovieDetails/MovieSimilar.tsx', 'movie'],
+    ['src/components/TvDetails/TvRecommendations.tsx', 'tv'],
+    ['src/components/TvDetails/TvSimilar.tsx', 'tv'],
+  ]) {
+    requireText(
+      fileName,
+      `<MediaDiscoveryControls type="${mediaType}"`,
+      'linked Recommendations and Similar pages must reuse their media discovery controls'
+    );
+    requireText(
+      fileName,
+      'filterAndSortRelatedMedia(titles, preparedFilters)',
+      'linked Recommendations and Similar pages must apply their visible filters and sorts'
+    );
+  }
+  for (const token of [
+    '.media-inset-heading {',
+    '@apply text-sm leading-5 font-semibold text-white;',
+    '.media-inset-table-heading {',
+    '@apply text-xs leading-4 font-semibold text-white;',
+  ]) {
+    requireText(
+      globals,
+      token,
+      'media inset and table headings must use their shared white typography'
+    );
+  }
+  for (const fileName of [
+    'src/components/MovieDetails/index.tsx',
+    'src/components/TvDetails/index.tsx',
+    'src/components/Association/AssociationBadge.tsx',
+  ]) {
+    rejectText(
+      fileName,
+      'className="ml-1.5"',
+      'detail action labels must not duplicate the shared button icon gap'
     );
   }
   requireText(
@@ -2427,8 +5045,115 @@ const validateCurrentBatchContract = (files) => {
   );
   requireText(
     slider,
-    "compact ? 'min-h-[5.5rem]'",
+    "'slider-track-compact min-h-[5.5rem]'",
     'compact sliders must not reserve poster height'
+  );
+  requireText(
+    'src/components/Discover/RecentRequestsSlider/index.tsx',
+    'filter=recent&take=10&sort=added&skip=0',
+    'Discover Recent Requests must use the non-deleted recent filter'
+  );
+  requireOrder(
+    'src/components/Discover/RecentRequestsSlider/index.tsx',
+    [
+      '<Slider',
+      'compact',
+      '<RequestCard',
+      'compact',
+      'showApprovalActions={false}',
+    ],
+    'Discover Recent Requests must use compact cards without approval actions'
+  );
+  requireText(
+    'src/components/RequestCard/index.tsx',
+    '<RequestCardPlaceholder compact={compact} />',
+    'Request-card loading must retain its caller compact geometry'
+  );
+  requireText(
+    'src/components/RequestCard/index.tsx',
+    "compact ? 'min-h-0' : 'min-h-[17rem]'",
+    'loaded compact Request cards must contract to their content'
+  );
+  requireText(
+    'src/components/RequestCard/index.tsx',
+    'showApprovalActions &&',
+    'Request cards must retain a caller-controlled approval-action boundary'
+  );
+  requireText(
+    'src/components/RequestCard/index.tsx',
+    "isMusic(title) ? 'aspect-square' : 'aspect-[2/3]'",
+    'Request poster frames must match square Music and portrait media artwork'
+  );
+  rejectText(
+    'src/components/RequestButton/index.tsx',
+    "id: 'approve-request'",
+    'media details must not expose a separate approval action'
+  );
+  rejectText(
+    'src/components/RequestButton/index.tsx',
+    "id: 'decline-request'",
+    'media details must not expose a separate decline action'
+  );
+  requireText(
+    'src/components/MediaDetails/SeriesSeasonEpisodeBrowser.tsx',
+    "partial ? 'text-emerald-600' : 'text-green-400'",
+    'partial season availability must use the dark emerald marker'
+  );
+  requireText(
+    globals,
+    'drop-shadow(0 0 3px rgb(0 0 0 / 0.95))',
+    'rating source artwork must retain the visible black shadow'
+  );
+  requireCount(
+    'src/components/Association/AssociationPopover.tsx',
+    'className="grid grid-cols-1 gap-2"',
+    2,
+    'the Associations dialog must keep every result in one full-width row'
+  );
+  rejectText(
+    'src/components/Association/AssociationPopover.tsx',
+    'sm:grid-cols-2',
+    'the Associations dialog must not switch result cards into two columns'
+  );
+  requireText(
+    'src/components/Association/AssociationWall.tsx',
+    'className="grid grid-cols-1 gap-3"',
+    'the full Associations explorer must keep every result in one full-width row'
+  );
+  rejectText(
+    'src/components/Association/AssociationWall.tsx',
+    'lg:grid-cols-2',
+    'the full Associations explorer must not switch result cards into two columns'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'occupies one full-width row; never place two result cards beside each other',
+    'the shared UI standard must preserve the one-card-per-row Associations layout'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'Do not show a redundant Status heading or value.',
+    'the shared UI standard must prohibit redundant Association status rows'
+  );
+  requireText(
+    'docs/maintainers/ui-style-standard.md',
+    'closes the popup as navigation begins',
+    'the shared UI standard must require Associations popups to close during result navigation'
+  );
+  requireText(
+    'src/components/Discover/StudioSlider/index.tsx',
+    "image: '/images/company-logos/dc-studios.png'",
+    'the supplied color DC Studios logo must be used by Discover'
+  );
+  requireText(
+    'server/routes/request.ts',
+    "case 'recent':",
+    'the request route must provide the non-deleted Discover shelf filter'
+  );
+  requireText(
+    'server/routes/request.test.ts',
+    'accepts the recent requests slider query',
+    'the non-deleted recent request filter must retain route coverage'
   );
 
   const evidence = [
@@ -2511,6 +5236,46 @@ const validateCurrentBatchContract = (files) => {
       'server/routes/userAvatar.openapi.test.ts',
       'avatar',
       'must test the local avatar route contract',
+    ],
+    [
+      'server/routes/user.test.ts',
+      'persists independent detail disclosure pins per user',
+      'must test database-backed detail disclosure pin persistence',
+    ],
+    [
+      'src/hooks/detailDisclosurePinsMutation.test.ts',
+      'does not roll back a newer detail disclosure pin mutation',
+      'must test stale optimistic pin rollback protection',
+    ],
+    [
+      'server/migration/sqlite/1785000000000-AddDetailDisclosurePins.test.ts',
+      'default to unpinned and migrate reversibly',
+      'must test the SQLite detail disclosure pin migration',
+    ],
+    [
+      'server/migration/postgres/1785000000000-AddDetailDisclosurePins.test.ts',
+      'migrate reversibly',
+      'must test the PostgreSQL detail disclosure pin migration contract',
+    ],
+    [
+      'server/lib/musicTrackAvailability.test.ts',
+      'keeps selected MP3 and FLAC track availability independent',
+      'must test quality-specific Lidarr track availability',
+    ],
+    [
+      'server/api/servarr/lidarr.test.ts',
+      'returns only valid track availability fields',
+      'must test bounded Lidarr track response normalization',
+    ],
+    [
+      'server/migration/sqlite/1785100000000-AddDetailDisclosureArtistsPin.test.ts',
+      'adds and removes the persistent Artists disclosure pin',
+      'must test the SQLite Artists pin migration',
+    ],
+    [
+      'server/migration/postgres/1785100000000-AddDetailDisclosureArtistsPin.test.ts',
+      'adds and removes the persistent Artists disclosure pin',
+      'must test the PostgreSQL Artists pin migration contract',
     ],
   ];
   for (const [fileName, text, reason] of evidence) {

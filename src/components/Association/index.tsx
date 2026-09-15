@@ -95,7 +95,7 @@ const AssociationExplorer = () => {
   const effectiveView = isGraphAvailable ? view : 'wall';
 
   return (
-    <>
+    <div className="discover-home">
       <PageTitle
         title={intl.formatMessage(messages.title, {
           title: graph.root.title,
@@ -132,7 +132,7 @@ const AssociationExplorer = () => {
       ) : (
         <AssociationGraph graph={graph} />
       )}
-    </>
+    </div>
   );
 };
 

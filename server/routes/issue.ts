@@ -70,6 +70,13 @@ const issueTypeByFilter = {
   other: IssueType.OTHER,
 } as const;
 
+const parseIssueMetadataFilter = (value: unknown, fieldName: string) =>
+  parseBoundedString(value ?? '', {
+    fieldName,
+    maxLength: 128,
+    required: false,
+  });
+
 const parseIssueStatusAction = (status: unknown): IssueStatus | undefined => {
   switch (status) {
     case 'resolved':
@@ -304,6 +311,45 @@ issueRoutes.get<
     if ('error' in parsedIssueType) {
       return next({ status: 400, message: parsedIssueType.error });
     }
+    const parsedReleaseYear = parseIssueMetadataFilter(
+      req.query.releaseYear,
+      'Release year'
+    );
+    if ('error' in parsedReleaseYear) {
+      return next({ status: 400, message: parsedReleaseYear.error });
+    }
+    if (
+      parsedReleaseYear.value &&
+      parsedReleaseYear.value !== 'before-1970' &&
+      !/^\d{4}$/.test(parsedReleaseYear.value)
+    ) {
+      return next({
+        status: 400,
+        message: 'Release year must be a four-digit year or before-1970.',
+      });
+    }
+    const parsedGenre = parseIssueMetadataFilter(req.query.genre, 'Genre');
+    if ('error' in parsedGenre) {
+      return next({ status: 400, message: parsedGenre.error });
+    }
+    const parsedStudio = parseIssueMetadataFilter(req.query.studio, 'Studio');
+    if ('error' in parsedStudio) {
+      return next({ status: 400, message: parsedStudio.error });
+    }
+    const parsedNetwork = parseIssueMetadataFilter(
+      req.query.network,
+      'Network'
+    );
+    if ('error' in parsedNetwork) {
+      return next({ status: 400, message: parsedNetwork.error });
+    }
+    const parsedAlbumType = parseIssueMetadataFilter(
+      req.query.albumType,
+      'Album type'
+    );
+    if ('error' in parsedAlbumType) {
+      return next({ status: 400, message: parsedAlbumType.error });
+    }
     const parsedSearch = parseBoundedString(req.query.search ?? '', {
       fieldName: 'Search',
       maxLength: 512,
@@ -376,6 +422,52 @@ issueRoutes.get<
       query = query.andWhere('issue.issueType = :selectedIssueType', {
         selectedIssueType: issueTypeByFilter[parsedIssueType.value],
       });
+    }
+
+    if (parsedMediaType.value && parsedMediaType.value !== 'all') {
+      if (parsedReleaseYear.value === 'before-1970') {
+        query = query.andWhere(
+          "COALESCE(searchMetadata.releaseDate, '') <> '' AND searchMetadata.releaseDate < :issueReleaseCutoff",
+          { issueReleaseCutoff: '1970' }
+        );
+      } else if (parsedReleaseYear.value) {
+        query = query.andWhere(
+          "COALESCE(searchMetadata.releaseDate, '') LIKE :issueReleaseYear ESCAPE '\\'",
+          { issueReleaseYear: `${parsedReleaseYear.value}%` }
+        );
+      }
+      if (parsedGenre.value) {
+        query = query.andWhere(
+          "LOWER(COALESCE(searchMetadata.genres, '')) LIKE :issueGenre ESCAPE '\\'",
+          {
+            issueGenre: `%${escapeSqlLikePattern(parsedGenre.value.toLocaleLowerCase())}%`,
+          }
+        );
+      }
+      if (parsedMediaType.value === MediaType.MOVIE && parsedStudio.value) {
+        query = query.andWhere(
+          "LOWER(COALESCE(searchMetadata.studio, '')) LIKE :issueStudio ESCAPE '\\'",
+          {
+            issueStudio: `%${escapeSqlLikePattern(parsedStudio.value.toLocaleLowerCase())}%`,
+          }
+        );
+      }
+      if (parsedMediaType.value === MediaType.TV && parsedNetwork.value) {
+        query = query.andWhere(
+          "LOWER(COALESCE(searchMetadata.network, '')) LIKE :issueNetwork ESCAPE '\\'",
+          {
+            issueNetwork: `%${escapeSqlLikePattern(parsedNetwork.value.toLocaleLowerCase())}%`,
+          }
+        );
+      }
+      if (parsedMediaType.value === MediaType.MUSIC && parsedAlbumType.value) {
+        query = query.andWhere(
+          "LOWER(COALESCE(searchMetadata.albumType, '')) LIKE :issueAlbumType ESCAPE '\\'",
+          {
+            issueAlbumType: `%${escapeSqlLikePattern(parsedAlbumType.value.toLocaleLowerCase())}%`,
+          }
+        );
+      }
     }
 
     const now = Date.now();

@@ -1,18 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Shared CommonJS validator used by the repository scripts and Node tests. */
 const ts = require('typescript');
 
-const REFRESHED_STYLE_MARKERS = [
-  'refreshed-card-surface',
-  'refreshed-inset-surface',
-  'refreshed-detail-text',
-  'refreshed-artwork-scrim',
-  'availability-quality-control',
-  'media-primary-action-row',
-  'selection-circle',
-  'title-card-overlay-',
-];
-
-const ALWAYS_SCOPED_PREFIXES = ['src/components/TitleCard/'];
 const CONTAINER_TAGS = new Set([
   'article',
   'aside',
@@ -23,9 +11,7 @@ const CONTAINER_TAGS = new Set([
   'section',
 ]);
 
-const isScopedFile = (fileName, source) =>
-  ALWAYS_SCOPED_PREFIXES.some((prefix) => fileName.startsWith(prefix)) ||
-  REFRESHED_STYLE_MARKERS.some((marker) => source.includes(marker));
+const isScopedFile = (fileName) => fileName.startsWith('src/components/');
 
 const getAttribute = (opening, name) =>
   opening.attributes.properties.find(
@@ -60,32 +46,54 @@ const hasVisualInlineProperty = (styleText) =>
     styleText
   );
 
-const validateGlobalStylesheet = (fileName, source) => {
-  const errors = [];
-  const disclosureRule = source.match(
-    /\.detail-disclosure-button\s*\{([\s\S]*?)\}/
+const isApprovedDynamicThemeSwatch = (opening, styleText) =>
+  Boolean(getAttribute(opening, 'data-theme-swatch')) &&
+  /^\{?\s*backgroundColor:\s*swatch\s*\}?$/.test(styleText);
+
+const hasPseudoElementDivider = (classText) =>
+  /(?:before|after):(?:w-px|border-[lr](?:-[^\s'"`}]+)?)(?=$|[\s'"`}])/.test(
+    classText
   );
 
-  if (!disclosureRule) {
-    return [`${fileName}:1: shared detail disclosure button rule is required`];
-  }
+const normalizedAttributeValue = (attribute, sourceFile) =>
+  getAttributeText(attribute, sourceFile).replace(/^['"]|['"]$/g, '');
 
-  const line = source.slice(0, disclosureRule.index).split('\n').length;
-  const declaration = disclosureRule[1];
-  if (/\bbg-(?:black|gray-(?:800|900|950))\b/.test(declaration)) {
-    errors.push(
-      `${fileName}:${line}: detail disclosure buttons may not use a near-black surface`
-    );
-  }
-  if (
-    !declaration.includes('var(--theme-control-surface)') ||
-    !declaration.includes('var(--theme-control-border)') ||
-    !declaration.includes('var(--theme-control-text)')
-  ) {
-    errors.push(
-      `${fileName}:${line}: detail disclosure buttons must use the shared blue control palette`
-    );
-  }
+const sharedStyleReferencePattern =
+  /(?:^|[\s'"`])((?:app|auth|association|detail|discover|format|manage|media|refreshed|request|scrollable|selection|title-card)-[a-z0-9-]+)/g;
+
+const stylesheetDefines = (stylesheet, className) => {
+  const escaped = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\.${escaped}(?=[\\s,{:.>])`).test(stylesheet);
+};
+
+const validateGlobalStylesheet = (fileName, source) => {
+  const errors = [];
+  const requiredSharedSelectors = [
+    '.app-button',
+    '.app-button-primary',
+    '.app-button-warning',
+    '.app-button-danger',
+    '.app-button-success',
+    '.button-standard',
+    '.detail-disclosure-control',
+    '.media-quality-select-control',
+    '.media-detail-column-divider',
+    '.media-rating-row',
+    '.media-primary-action-row',
+    '.scrollable-card',
+    '.refreshed-card-surface',
+    '.refreshed-inset-surface',
+    '.refreshed-artwork-scrim',
+    '.request-card-artwork-gradient',
+  ];
+
+  requiredSharedSelectors.forEach((selector) => {
+    if (!source.includes(`${selector} {`) && !source.includes(`${selector},`)) {
+      errors.push(
+        `${fileName}:1: required shared style reference is missing (${selector})`
+      );
+    }
+  });
 
   return errors;
 };
@@ -93,13 +101,14 @@ const validateGlobalStylesheet = (fileName, source) => {
 const validateRefreshedUiStyleBoundaries = (files) => {
   const errors = [];
   let scopedFileCount = 0;
+  const globalStyles = files['src/styles/globals.css'] ?? '';
 
   for (const [fileName, source] of Object.entries(files)) {
     if (fileName === 'src/styles/globals.css') {
       errors.push(...validateGlobalStylesheet(fileName, source));
       continue;
     }
-    if (!isScopedFile(fileName, source)) continue;
+    if (!isScopedFile(fileName)) continue;
     scopedFileCount += 1;
 
     const sourceFile = ts.createSourceFile(
@@ -135,6 +144,21 @@ const validateRefreshedUiStyleBoundaries = (files) => {
           classText.includes('refreshed-inset-surface');
         nextInsideSharedSurface = insideSharedSurface || ownsSharedSurface;
 
+        if (globalStyles) {
+          const sharedReferences = Array.from(
+            classText.matchAll(sharedStyleReferencePattern),
+            (match) => match[1]
+          );
+          sharedReferences.forEach((className) => {
+            if (!stylesheetDefines(globalStyles, className)) {
+              report(
+                opening,
+                `shared style reference has no global CSS definition (${className})`
+              );
+            }
+          });
+        }
+
         if (tagName === 'style') {
           report(
             opening,
@@ -145,12 +169,38 @@ const validateRefreshedUiStyleBoundaries = (files) => {
         const styleAttribute = getAttribute(opening, 'style');
         if (
           styleAttribute &&
-          hasVisualInlineProperty(getAttributeText(styleAttribute, sourceFile))
+          hasVisualInlineProperty(
+            getAttributeText(styleAttribute, sourceFile)
+          ) &&
+          !isApprovedDynamicThemeSwatch(
+            opening,
+            getAttributeText(styleAttribute, sourceFile)
+          )
         ) {
           report(
             styleAttribute,
             'visual inline styles must be moved to the shared global stylesheet'
           );
+        }
+
+        if (hasPseudoElementDivider(classText)) {
+          report(
+            opening,
+            'column dividers must use the shared ordinary border class, never a pseudo-element'
+          );
+        }
+
+        for (const sizeAttributeName of ['buttonSize', 'actionButtonSize']) {
+          const sizeAttribute = getAttribute(opening, sizeAttributeName);
+          if (
+            sizeAttribute &&
+            normalizedAttributeValue(sizeAttribute, sourceFile) === 'default'
+          ) {
+            report(
+              sizeAttribute,
+              `${sizeAttributeName}="default" is the larger legacy size; use the explicit shared standard token`
+            );
+          }
         }
 
         if (nextInsideSharedSurface && hasDirectMutedGrayText(classText)) {

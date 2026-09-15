@@ -74,4 +74,45 @@ describe('Lidarr response normalization', () => {
       },
     ]);
   });
+
+  it('returns only valid track availability fields', async () => {
+    const api = new LidarrAPI({
+      url: 'http://localhost:8686/api/v1',
+      apiKey: 'key',
+    });
+    mock.method(
+      LidarrAPI.prototype as unknown as MockableLidarr,
+      'get',
+      async () => [
+        null,
+        { id: 'bad' },
+        {
+          id: 7,
+          albumId: 4,
+          title: 'Track',
+          trackNumber: '1',
+          absoluteTrackNumber: 1,
+          mediumNumber: 1,
+          hasFile: true,
+          trackFileId: 9,
+          foreignRecordingId: 'ABC-123',
+          apiKey: 'must-not-leak',
+        },
+      ]
+    );
+
+    assert.deepStrictEqual(await api.getTracks({ albumId: 4 }), [
+      {
+        id: 7,
+        albumId: 4,
+        title: 'Track',
+        trackNumber: '1',
+        absoluteTrackNumber: 1,
+        mediumNumber: 1,
+        hasFile: true,
+        trackFileId: 9,
+        foreignRecordingId: 'abc-123',
+      },
+    ]);
+  });
 });

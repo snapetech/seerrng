@@ -15,7 +15,7 @@ const messages = defineMessages('components.BlocklistedTagsBadge', {
 const KEYWORD_LOOKUP_CONCURRENCY = 8;
 
 export const compactBlocklistSourceBadgeClass =
-  'box-border !h-4 !max-h-4 min-h-0 max-w-full items-center gap-0.5 self-center border border-red-500 !px-1 !py-0 text-[8px] !font-semibold !leading-[14px] !text-red-300';
+  'compact-detail-status-badge compact-detail-status-badge-danger max-w-full gap-0.5';
 
 interface BlocklistedTagsBadgeProps {
   data: BlocklistItem;

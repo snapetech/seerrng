@@ -2,13 +2,14 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
+import Field from '@app/components/Settings/SettingsField';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { REDACTED_SECRET } from '@app/utils/secret';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
@@ -277,9 +278,6 @@ const NotificationsEmail = () => {
             <div className="form-row">
               <label htmlFor="usePublicLogo" className="checkbox-label">
                 {intl.formatMessage(messages.usePublicLogo)}
-                <span className="label-tip">
-                  {intl.formatMessage(messages.usePublicLogoTip)}
-                </span>
               </label>
               <div className="form-input-area">
                 <Field
@@ -288,6 +286,9 @@ const NotificationsEmail = () => {
                   name="usePublicLogo"
                 />
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.usePublicLogoTip)}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="userEmailRequired" className="checkbox-label">
@@ -392,9 +393,6 @@ const NotificationsEmail = () => {
               <label htmlFor="encryption" className="text-label">
                 {intl.formatMessage(messages.encryption)}
                 <span className="label-required">*</span>
-                <span className="label-tip">
-                  {intl.formatMessage(messages.encryptionTip)}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -414,6 +412,9 @@ const NotificationsEmail = () => {
                   </Field>
                 </div>
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.encryptionTip)}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="allowSelfSigned" className="checkbox-label">
@@ -462,11 +463,6 @@ const NotificationsEmail = () => {
                   {intl.formatMessage(messages.pgpPrivateKey)}
                 </span>
                 <SettingsBadge badgeType="advanced" />
-                <span className="label-tip">
-                  {intl.formatMessage(messages.pgpPrivateKeyTip, {
-                    OpenPgpLink: OpenPgpLink,
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -490,6 +486,11 @@ const NotificationsEmail = () => {
                     <div className="error">{errors.pgpPrivateKey}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.pgpPrivateKeyTip, {
+                  OpenPgpLink: OpenPgpLink,
+                })}
+              </span>
             </div>
             <div className="form-row">
               <label htmlFor="pgpPassword" className="text-label">
@@ -497,11 +498,6 @@ const NotificationsEmail = () => {
                   {intl.formatMessage(messages.pgpPassword)}
                 </span>
                 <SettingsBadge badgeType="advanced" />
-                <span className="label-tip">
-                  {intl.formatMessage(messages.pgpPasswordTip, {
-                    OpenPgpLink: OpenPgpLink,
-                  })}
-                </span>
               </label>
               <div className="form-input-area">
                 <div className="form-input-field">
@@ -522,6 +518,11 @@ const NotificationsEmail = () => {
                     <div className="error">{errors.pgpPassword}</div>
                   )}
               </div>
+              <span className="settings-form-row-description">
+                {intl.formatMessage(messages.pgpPasswordTip, {
+                  OpenPgpLink: OpenPgpLink,
+                })}
+              </span>
             </div>
             <div className="actions">
               <div className="flex justify-end">

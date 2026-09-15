@@ -146,7 +146,7 @@ const Slider = ({
     <div className="relative" data-testid="media-slider">
       <div className="absolute right-0 -mt-10 flex gap-1 text-gray-400">
         <Button
-          buttonType="default"
+          buttonType="success"
           buttonSize="sm"
           className="h-8 w-8 p-0 disabled:text-gray-600"
           onClick={() => slide(Direction.LEFT)}
@@ -158,7 +158,7 @@ const Slider = ({
           <ChevronLeftIcon className="h-4 w-4" />
         </Button>
         <Button
-          buttonType="default"
+          buttonType="success"
           buttonSize="sm"
           className="h-8 w-8 p-0 disabled:text-gray-600"
           onClick={() => slide(Direction.RIGHT)}
@@ -171,8 +171,10 @@ const Slider = ({
         </Button>
       </div>
       <div
-        className={`hide-scrollbar relative -my-2 -mr-4 -ml-4 overflow-x-scroll overflow-y-auto overscroll-x-contain px-2 py-2 whitespace-nowrap ${
-          compact ? 'min-h-[5.5rem]' : 'min-h-[13.5rem] md:min-h-[17rem]'
+        className={`slider-track hide-scrollbar relative -my-2 -mr-4 -ml-4 overflow-x-scroll overflow-y-auto overscroll-x-contain px-2 py-2 whitespace-nowrap ${
+          compact
+            ? 'slider-track-compact min-h-[5.5rem]'
+            : 'min-h-[13.5rem] md:min-h-[17rem]'
         }`}
         ref={containerRef}
         onScroll={onScroll}

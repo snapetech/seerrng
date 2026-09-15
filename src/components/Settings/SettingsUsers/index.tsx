@@ -5,6 +5,7 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import PermissionEdit from '@app/components/PermissionEdit';
 import QuotaSelector from '@app/components/QuotaSelector';
+import { default as SettingsField } from '@app/components/Settings/SettingsField';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -13,7 +14,7 @@ import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import { MediaServerType } from '@server/constants/server';
 import type { MainSettings } from '@server/lib/settings';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Form, Formik } from 'formik';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 import * as yup from 'yup';
@@ -100,13 +101,13 @@ const SettingsUsers = () => {
           intl.formatMessage(globalMessages.settings),
         ]}
       />
-      <div className="mb-6">
-        <h3 className="heading">{intl.formatMessage(messages.userSettings)}</h3>
+      <section className="settings-group-card">
+        <h3 className="settings-group-heading">
+          {intl.formatMessage(messages.userSettings)}
+        </h3>
         <p className="description">
           {intl.formatMessage(messages.userSettingsDescription)}
         </p>
-      </div>
-      <div className="section">
         <Formik
           initialValues={{
             localLogin: data?.localLogin,
@@ -168,7 +169,7 @@ const SettingsUsers = () => {
         >
           {({ isSubmitting, isValid, values, errors, setFieldValue }) => {
             return (
-              <Form className="section">
+              <Form className="settings-group-content">
                 <div
                   role="group"
                   aria-labelledby="group-label"
@@ -177,9 +178,7 @@ const SettingsUsers = () => {
                   <div className="form-row">
                     <span id="group-label" className="group-label">
                       {intl.formatMessage(messages.loginMethods)}
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.loginMethodsTip)}
-                      </span>
+
                       {'localLogin | mediaServerLogin' in errors && (
                         <span className="error">
                           {errors['localLogin | mediaServerLogin'] as string}
@@ -233,6 +232,9 @@ const SettingsUsers = () => {
                         </div>
                       )}
                     </div>
+                    <span className="settings-form-row-description">
+                      {intl.formatMessage(messages.loginMethodsTip)}
+                    </span>
                   </div>
                 </div>
 
@@ -242,15 +244,9 @@ const SettingsUsers = () => {
                       messages.newPlexLogin,
                       mediaServerFormatValues
                     )}
-                    <span className="label-tip">
-                      {intl.formatMessage(
-                        messages.newPlexLoginTip,
-                        mediaServerFormatValues
-                      )}
-                    </span>
                   </label>
                   <div className="form-input-area">
-                    <Field
+                    <SettingsField
                       type="checkbox"
                       id="newPlexLogin"
                       name="newPlexLogin"
@@ -259,6 +255,12 @@ const SettingsUsers = () => {
                       }}
                     />
                   </div>
+                  <span className="settings-form-row-description">
+                    {intl.formatMessage(
+                      messages.newPlexLoginTip,
+                      mediaServerFormatValues
+                    )}
+                  </span>
                 </div>
                 <div className="form-row">
                   <label htmlFor="applicationTitle" className="text-label">
@@ -328,12 +330,9 @@ const SettingsUsers = () => {
                   <div className="form-row">
                     <span id="group-label" className="group-label">
                       {intl.formatMessage(messages.defaultPermissions)}
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.defaultPermissionsTip)}
-                      </span>
                     </span>
                     <div className="form-input-area">
-                      <div className="max-w-lg">
+                      <div className="settings-permission-options max-w-lg">
                         <PermissionEdit
                           currentPermission={values.defaultPermissions}
                           onUpdate={(newPermissions) =>
@@ -342,6 +341,9 @@ const SettingsUsers = () => {
                         />
                       </div>
                     </div>
+                    <span className="settings-form-row-description">
+                      {intl.formatMessage(messages.defaultPermissionsTip)}
+                    </span>
                   </div>
                 </div>
                 <div className="actions">
@@ -366,7 +368,7 @@ const SettingsUsers = () => {
             );
           }}
         </Formik>
-      </div>
+      </section>
     </>
   );
 };

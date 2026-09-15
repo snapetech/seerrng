@@ -11,6 +11,7 @@ import MusicBrainz from '@server/api/musicbrainz';
 import type { MbAlbumResult } from '@server/api/musicbrainz/interfaces';
 import type { OpenLibrarySearchDoc } from '@server/api/openlibrary';
 import OpenLibraryAPI from '@server/api/openlibrary';
+import RadarrAPI, { type RadarrMovie } from '@server/api/servarr/radarr';
 import type { SortOptions } from '@server/api/themoviedb';
 import TheMovieDb, { SortOptionsIterable } from '@server/api/themoviedb';
 import type {
@@ -36,10 +37,16 @@ import {
   normalizeMusicBrainzId,
   normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
+import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { extractImageCacheUrls } from '@server/lib/imageCacheUrls';
 import { enqueueImageCacheWarm } from '@server/lib/imageCacheWarmer';
 import { hydrateMediaSummaryRelations } from '@server/lib/mediaSummaryHydration';
-import { getAvailableMusicQualities } from '@server/lib/musicQualityAvailability';
+import {
+  getAvailableMusicQualities,
+  getMusicQualityStatuses,
+} from '@server/lib/musicQualityAvailability';
+import { runWithServarrServiceSnapshot } from '@server/lib/serviceAdmission';
+import type { RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import {
   clampNumber,
@@ -430,15 +437,21 @@ const mapDiscoverAlbumResult = (
   relatedMediaMap: Map<string, MediaEntity>
 ) => {
   const media = getRelatedMusicMedia(relatedMediaMap, album.id);
+  const services = getSettings().lidarr;
   const availableQualities = getAvailableMusicQualities(
     media,
     media?.requests ?? [],
-    getSettings().lidarr
+    services
   );
 
   return {
     ...mapAlbumResult(album, media),
     availableQualities,
+    qualityStatuses: getMusicQualityStatuses(
+      media,
+      media?.requests ?? [],
+      services
+    ),
   };
 };
 
@@ -495,6 +508,8 @@ const getLocalAvailableMusic = async ({
   );
   const settings = getSettings();
   const requestedQuality = availability.toLocaleUpperCase();
+  const sortAscending = sortByValue.endsWith('.asc');
+  const sortByBase = sortByValue.replace(/\.(?:asc|desc)$/, '');
 
   const matches = media
     .map((item) => {
@@ -550,21 +565,22 @@ const getLocalAvailableMusic = async ({
         (!releaseDateLte || releaseDate <= releaseDateLte)
     )
     .sort((left, right) => {
-      if (sortByValue.startsWith('release_date')) {
+      if (sortByBase === 'release_date') {
         const comparison = left.releaseDate.localeCompare(right.releaseDate);
-        return sortByValue === 'release_date.asc' ? comparison : -comparison;
+        return sortAscending ? comparison : -comparison;
       }
 
       const leftAdded =
         left.item.mediaAddedAt?.getTime() ?? left.item.updatedAt.getTime();
       const rightAdded =
         right.item.mediaAddedAt?.getTime() ?? right.item.updatedAt.getTime();
-      return (
+      const comparison =
         rightAdded - leftAdded ||
         (left.searchMetadata?.title ?? '').localeCompare(
           right.searchMetadata?.title ?? ''
-        )
-      );
+        );
+
+      return sortAscending ? -comparison : comparison;
     });
 
   const offset = (page - 1) * itemsPerPage;
@@ -609,6 +625,11 @@ const getLocalAvailableMusic = async ({
           item
         ),
         availableQualities,
+        qualityStatuses: getMusicQualityStatuses(
+          item,
+          item.requests ?? [],
+          settings.lidarr
+        ),
       })
     ),
   };
@@ -809,16 +830,22 @@ const rotateItems = <T>(items: T[], offset: number): T[] => [
 
 const musicSortOptions = new Set([
   'ranked',
+  'ranked.asc',
   'popular.week',
+  'popular.week.asc',
   'popular.month',
+  'popular.month.asc',
   'popular.year',
+  'popular.year.asc',
   'listen_count.desc',
+  'listen_count.asc',
   'release_date.desc',
   'release_date.asc',
 ]);
 
 const bookSortOptions = new Set([
   'ranked',
+  'ranked.asc',
   'newest',
   'oldest',
   'random',
@@ -826,6 +853,7 @@ const bookSortOptions = new Set([
   'rating.desc',
   'rating.asc',
   'editions',
+  'editions.asc',
 ]);
 
 const tmdbSortOptions = new Set<string>(SortOptionsIterable);
@@ -965,6 +993,219 @@ const parseLocalRuntime = (runtime?: string | null): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+type LiveRadarrMovie = {
+  movie: RadarrMovie;
+  server: RadarrSettings;
+};
+
+type LiveRadarrMovieAvailability = {
+  hd: Map<number, LiveRadarrMovie>;
+  isHdAuthoritative: boolean;
+  is4k: Map<number, LiveRadarrMovie>;
+  is4kAuthoritative: boolean;
+};
+
+const getLiveRadarrMovieAvailability =
+  async (): Promise<LiveRadarrMovieAvailability> => {
+    const servers = getExternalRuntimeConfig().radarr.filter(
+      (server) => server.syncEnabled
+    );
+    const hdServers = servers.filter((server) => !server.is4k);
+    const servers4k = servers.filter((server) => server.is4k);
+    const result: LiveRadarrMovieAvailability = {
+      hd: new Map(),
+      isHdAuthoritative: hdServers.length > 0,
+      is4k: new Map(),
+      is4kAuthoritative: servers4k.length > 0,
+    };
+
+    await Promise.all(
+      servers.map(async (server) => {
+        const movies = await runWithServarrServiceSnapshot(
+          'radarr',
+          server,
+          async (current) =>
+            new RadarrAPI({
+              apiKey: current.apiKey,
+              url: RadarrAPI.buildUrl(current, '/api/v3'),
+            }).getMovies()
+        );
+        const destination = server.is4k ? result.is4k : result.hd;
+
+        for (const movie of movies) {
+          if (movie.hasFile && !destination.has(movie.tmdbId)) {
+            destination.set(movie.tmdbId, { movie, server });
+          }
+        }
+      })
+    );
+
+    return result;
+  };
+
+const clearStaleAvailableStatus = (
+  status: MediaStatus | undefined
+): MediaStatus =>
+  status === MediaStatus.AVAILABLE || status === MediaStatus.PARTIALLY_AVAILABLE
+    ? MediaStatus.UNKNOWN
+    : (status ?? MediaStatus.UNKNOWN);
+
+const getLiveAvailableMovieDiscoverResponse = async ({
+  quality,
+  page,
+  query,
+  user,
+}: {
+  quality: 'hd' | '4k';
+  page: number;
+  query: FilterOptions;
+  user?: User;
+}) => {
+  const availability = await getLiveRadarrMovieAvailability();
+  const isRequestedQualityAuthoritative =
+    quality === '4k'
+      ? availability.is4kAuthoritative
+      : availability.isHdAuthoritative;
+
+  if (!isRequestedQualityAuthoritative) {
+    return undefined;
+  }
+
+  const requestedMovies =
+    quality === '4k' ? availability.is4k : availability.hd;
+  const requestedGenreIds = splitNumericFilter(query.genre);
+
+  const movies = [...requestedMovies.values()]
+    .map(({ movie, server }) => {
+      const genreIds = getLocalVideoGenreIds(
+        MediaType.MOVIE,
+        movie.genres ?? []
+      );
+      const releaseDate = movie.year ? String(movie.year) : '';
+      const runtime = movie.runtime;
+
+      return {
+        movie,
+        server,
+        genreIds,
+        releaseDate,
+        runtime,
+      };
+    })
+    .filter(
+      ({ movie, genreIds, releaseDate, runtime }) =>
+        (!query.search ||
+          matchesAllSearchTerms(
+            [movie.title, movie.originalTitle, movie.overview],
+            query.search
+          )) &&
+        (!requestedGenreIds.length ||
+          requestedGenreIds.every((genreId) => genreIds.includes(genreId))) &&
+        (!query.primaryReleaseDateGte ||
+          releaseDate >= query.primaryReleaseDateGte) &&
+        (!query.primaryReleaseDateLte ||
+          releaseDate <= query.primaryReleaseDateLte) &&
+        (!query.withRuntimeGte ||
+          (runtime ?? 0) >= Number(query.withRuntimeGte)) &&
+        (!query.withRuntimeLte ||
+          (runtime ?? Number.POSITIVE_INFINITY) <= Number(query.withRuntimeLte))
+    )
+    .sort((left, right) => {
+      const sortOption = getValidatedTmdbSort(query.sortBy);
+      const ascending = sortOption.endsWith('.asc');
+      const direction = ascending ? 1 : -1;
+
+      if (
+        sortOption.startsWith('release_date') ||
+        sortOption.startsWith('primary_release_date')
+      ) {
+        return left.releaseDate.localeCompare(right.releaseDate) * direction;
+      }
+      if (sortOption.startsWith('original_title')) {
+        return (
+          (left.movie.originalTitle || left.movie.title).localeCompare(
+            right.movie.originalTitle || right.movie.title
+          ) * direction
+        );
+      }
+      if (sortOption.startsWith('vote_average')) {
+        return (
+          ((left.movie.ratings?.value ?? 0) -
+            (right.movie.ratings?.value ?? 0)) *
+          direction
+        );
+      }
+
+      return left.movie.title.localeCompare(right.movie.title);
+    });
+
+  const itemsPerPage = 20;
+  const pageStart = (page - 1) * itemsPerPage;
+  const pageItems = movies.slice(pageStart, pageStart + itemsPerPage);
+  const pageTmdbIds = pageItems.map(({ movie }) => movie.tmdbId);
+  const persistedMedia = pageTmdbIds.length
+    ? await getRepository(Media).find({
+        where: { mediaType: MediaType.MOVIE, tmdbId: In(pageTmdbIds) },
+      })
+    : [];
+  await hydrateMediaSummaryRelations(persistedMedia, user);
+  const mediaByTmdbId = new Map(
+    persistedMedia.map((media) => [media.tmdbId, media])
+  );
+
+  return {
+    page,
+    totalPages: Math.max(1, Math.ceil(movies.length / itemsPerPage)),
+    totalResults: movies.length,
+    results: pageItems.map(({ movie, server, genreIds, releaseDate }) => {
+      const persisted = mediaByTmdbId.get(movie.tmdbId);
+      const hdMovie = availability.hd.get(movie.tmdbId);
+      const movie4k = availability.is4k.get(movie.tmdbId);
+      const media = new Media({
+        ...persisted,
+        mediaType: MediaType.MOVIE,
+        tmdbId: movie.tmdbId,
+        status: availability.isHdAuthoritative
+          ? hdMovie
+            ? MediaStatus.AVAILABLE
+            : clearStaleAvailableStatus(persisted?.status)
+          : (persisted?.status ?? MediaStatus.UNKNOWN),
+        status4k: availability.is4kAuthoritative
+          ? movie4k
+            ? MediaStatus.AVAILABLE
+            : clearStaleAvailableStatus(persisted?.status4k)
+          : (persisted?.status4k ?? MediaStatus.UNKNOWN),
+        serviceId: hdMovie?.server.id ?? persisted?.serviceId,
+        externalServiceId: hdMovie?.movie.id ?? persisted?.externalServiceId,
+        serviceId4k: movie4k?.server.id ?? persisted?.serviceId4k,
+        externalServiceId4k:
+          movie4k?.movie.id ?? persisted?.externalServiceId4k,
+      });
+
+      return mapMovieResult(
+        {
+          id: movie.tmdbId,
+          media_type: 'movie',
+          title: movie.title,
+          original_title: movie.originalTitle || movie.title,
+          release_date: releaseDate,
+          adult: false,
+          video: false,
+          popularity: 0,
+          poster_path: `/api/v1/movie/${movie.tmdbId}/cover?serviceId=${server.id}&externalServiceId=${movie.id}&is4k=${server.is4k}`,
+          backdrop_path: undefined,
+          vote_count: movie.ratings?.votes ?? 0,
+          vote_average: movie.ratings?.value ?? 0,
+          genre_ids: genreIds,
+          overview: movie.overview ?? '',
+          original_language: '',
+        },
+        media
+      );
+    }),
+  };
+};
+
 const getLocalAvailableVideoDiscoverResponse = async ({
   mediaType,
   quality,
@@ -978,6 +1219,29 @@ const getLocalAvailableVideoDiscoverResponse = async ({
   query: FilterOptions;
   user?: User;
 }) => {
+  if (mediaType === MediaType.MOVIE) {
+    try {
+      const liveResponse = await getLiveAvailableMovieDiscoverResponse({
+        quality,
+        page,
+        query,
+        user,
+      });
+      if (liveResponse) {
+        return liveResponse;
+      }
+    } catch (e) {
+      logger.warn(
+        'Unable to retrieve live Radarr availability; using indexed movie availability',
+        {
+          label: 'API',
+          quality,
+          errorMessage: e.message,
+        }
+      );
+    }
+  }
+
   const statusField = quality === '4k' ? 'status4k' : 'status';
   const mediaItems = await getRepository(Media)
     .createQueryBuilder('media')
@@ -2267,7 +2531,8 @@ discoverRoutes.get('/music', async (req, res) => {
   const days = parsePositiveInt(req.query.days, 14, 365);
   const hasCustomDays = typeof req.query.days === 'string';
   const sortByValue = getValidatedSort(req.query.sortBy, musicSortOptions);
-  const sortAscending = sortByValue === 'release_date.asc';
+  const sortAscending = sortByValue.endsWith('.asc');
+  const sortByBase = sortByValue.replace(/\.(?:asc|desc)$/, '');
   const parsedGenre = parseOptionalDiscoverString(
     req.query.genre,
     'Genre',
@@ -2407,7 +2672,17 @@ discoverRoutes.get('/music', async (req, res) => {
       });
       const albums = dedupeMusicAlbums(
         filteredAlbums.slice(providerWindow.sliceStart, providerWindow.sliceEnd)
-      );
+      ).sort((a, b) => {
+        if (sortByBase === 'release_date') {
+          const comparison = (a['first-release-date'] ?? '').localeCompare(
+            b['first-release-date'] ?? ''
+          );
+          return sortAscending ? comparison : -comparison;
+        }
+
+        const comparison = scoreMusicAlbum(b) - scoreMusicAlbum(a);
+        return sortAscending ? -comparison : comparison;
+      });
       const relatedMediaMap = await getRelatedMusicMediaMap(
         albums.map((album) => album.id),
         req.user
@@ -2437,12 +2712,13 @@ discoverRoutes.get('/music', async (req, res) => {
           offset: providerWindow.offset,
         });
       const sortedAlbums = dedupeMusicAlbums(releaseGroups).sort((a, b) => {
-        if (sortByValue === 'ranked') {
+        if (sortByBase === 'ranked') {
           return scoreMusicAlbum(b) - scoreMusicAlbum(a);
         }
 
-        if (sortByValue === 'listen_count.desc') {
-          return (b.score ?? 0) - (a.score ?? 0);
+        if (sortByBase === 'listen_count' || sortByBase.startsWith('popular')) {
+          const comparison = (b.score ?? 0) - (a.score ?? 0);
+          return sortAscending ? -comparison : comparison;
         }
 
         const left = a['first-release-date'] ?? '';
@@ -2452,20 +2728,24 @@ discoverRoutes.get('/music', async (req, res) => {
           : right.localeCompare(left);
       });
       const albums =
-        sortByValue === 'ranked'
-          ? diversifyMusicAlbumsByArtist(
-              shuffleRankedWindow(
-                rankByQualityScore(
-                  sortedAlbums,
-                  scoreMusicAlbum,
-                  0.08,
-                  4,
+        sortByBase === 'ranked'
+          ? (() => {
+              const rankedAlbums = diversifyMusicAlbumsByArtist(
+                shuffleRankedWindow(
+                  rankByQualityScore(
+                    sortedAlbums,
+                    scoreMusicAlbum,
+                    0.08,
+                    4,
+                    shuffleSeed
+                  ),
                   shuffleSeed
                 ),
-                shuffleSeed
-              ),
-              providerWindow.sliceEnd
-            ).slice(providerWindow.sliceStart, providerWindow.sliceEnd)
+                providerWindow.sliceEnd
+              ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
+
+              return sortAscending ? rankedAlbums.reverse() : rankedAlbums;
+            })()
           : sortedAlbums.slice(
               providerWindow.sliceStart,
               providerWindow.sliceEnd
@@ -2488,24 +2768,30 @@ discoverRoutes.get('/music', async (req, res) => {
     const providerWindow = getProviderWindow(page, itemsPerPage);
     const hasReleaseDateFilter = Boolean(releaseDateGte || releaseDateLte);
 
-    if (!genreFilter.length && sortByValue.startsWith('popular')) {
+    if (
+      !genreFilter.length &&
+      (sortByBase.startsWith('popular') || sortByBase === 'listen_count')
+    ) {
       const range =
-        sortByValue === 'popular.week'
-          ? 'week'
-          : sortByValue === 'popular.year'
-            ? 'year'
-            : 'month';
+        sortByBase === 'listen_count'
+          ? 'all_time'
+          : sortByBase === 'popular.week'
+            ? 'week'
+            : sortByBase === 'popular.year'
+              ? 'year'
+              : 'month';
       const topAlbums = await listenBrainz.getTopAlbums({
         range,
         offset: providerWindow.offset,
         count: providerWindow.limit,
       });
-      const albums = diversifyMusicAlbumsByArtist(
+      const chartAlbums = diversifyMusicAlbumsByArtist(
         dedupeMusicAlbums(
           topAlbums.payload.release_groups.map(mapTopAlbumRelease)
         ),
         providerWindow.sliceEnd
       ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
+      const albums = sortAscending ? chartAlbums.reverse() : chartAlbums;
       const relatedMediaMap = await getRelatedMusicMediaMap(
         albums.map((album) => album.id),
         req.user
@@ -2525,7 +2811,7 @@ discoverRoutes.get('/music', async (req, res) => {
     }
 
     if (
-      sortByValue === 'ranked' &&
+      sortByBase === 'ranked' &&
       !releaseTypeFilter.length &&
       !hasReleaseDateFilter &&
       !hasCustomDays
@@ -2622,7 +2908,7 @@ discoverRoutes.get('/music', async (req, res) => {
             );
           });
 
-        const fallbackAlbums = diversifyMusicAlbumsByArtist(
+        const rankedFallbackAlbums = diversifyMusicAlbumsByArtist(
           shuffleRankedWindow(
             rankByQualityScore(
               [...fallbackAlbumsById.values()].sort(
@@ -2637,6 +2923,9 @@ discoverRoutes.get('/music', async (req, res) => {
           ),
           providerWindow.sliceEnd
         ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
+        const fallbackAlbums = sortAscending
+          ? rankedFallbackAlbums.reverse()
+          : rankedFallbackAlbums;
 
         if (!fallbackAlbums.length) {
           return res.status(200).json(emptyDiscoverResponse(page));
@@ -2701,7 +2990,7 @@ discoverRoutes.get('/music', async (req, res) => {
         );
       });
 
-      const albums = diversifyMusicAlbumsByArtist(
+      const rankedAlbums = diversifyMusicAlbumsByArtist(
         shuffleRankedWindow(
           rankByQualityScore(
             [...albumsById.values()].sort(
@@ -2716,6 +3005,7 @@ discoverRoutes.get('/music', async (req, res) => {
         ),
         providerWindow.sliceEnd
       ).slice(providerWindow.sliceStart, providerWindow.sliceEnd);
+      const albums = sortAscending ? rankedAlbums.reverse() : rankedAlbums;
       const relatedMediaMap = await getRelatedMusicMediaMap(
         albums.map((album) => album.id),
         req.user
@@ -2736,6 +3026,7 @@ discoverRoutes.get('/music', async (req, res) => {
       freshReleases = await listenBrainz.getFreshReleases({
         days,
         sort: 'release_date',
+        order: sortByBase === 'release_date' && !sortAscending ? 'desc' : 'asc',
         offset: providerWindow.offset,
         count: providerWindow.limit,
       });
@@ -2753,6 +3044,7 @@ discoverRoutes.get('/music', async (req, res) => {
       freshReleases = await listenBrainz.getFreshReleases({
         days: 7,
         sort: 'release_date',
+        order: sortByBase === 'release_date' && !sortAscending ? 'desc' : 'asc',
         offset: providerWindow.offset,
         count: providerWindow.limit,
       });
@@ -2768,12 +3060,14 @@ discoverRoutes.get('/music', async (req, res) => {
             )
         )
     ).sort((a, b) => {
-      if (sortByValue === 'ranked') {
-        return scoreMusicRelease(b) - scoreMusicRelease(a);
+      if (sortByBase === 'ranked') {
+        const comparison = scoreMusicRelease(b) - scoreMusicRelease(a);
+        return sortAscending ? -comparison : comparison;
       }
 
-      if (sortByValue === 'listen_count.desc') {
-        return (b.listen_count ?? 0) - (a.listen_count ?? 0);
+      if (sortByBase === 'listen_count' || sortByBase.startsWith('popular')) {
+        const comparison = (b.listen_count ?? 0) - (a.listen_count ?? 0);
+        return sortAscending ? -comparison : comparison;
       }
 
       const left = a.release_date ?? '';
@@ -2783,31 +3077,35 @@ discoverRoutes.get('/music', async (req, res) => {
         : right.localeCompare(left);
     });
     const releases =
-      sortByValue === 'ranked'
-        ? diversifyMusicAlbumsByArtist(
-            shuffleRankedWindow(
-              rankByQualityScore(
-                sortedReleases.map(mapFreshReleaseAlbum),
-                scoreMusicAlbum,
-                0.08,
-                4,
+      sortByBase === 'ranked'
+        ? (() => {
+            const rankedReleases = diversifyMusicAlbumsByArtist(
+              shuffleRankedWindow(
+                rankByQualityScore(
+                  sortedReleases.map(mapFreshReleaseAlbum),
+                  scoreMusicAlbum,
+                  0.08,
+                  4,
+                  shuffleSeed
+                ),
                 shuffleSeed
               ),
-              shuffleSeed
-            ),
-            providerWindow.sliceEnd
-          )
-            .slice(providerWindow.sliceStart, providerWindow.sliceEnd)
-            .map((album) => {
-              const release = sortedReleases.find(
-                (sortedRelease) =>
-                  getMusicBrainzIdKey(sortedRelease.release_group_mbid) ===
-                  getMusicBrainzIdKey(album.id)
-              );
+              providerWindow.sliceEnd
+            )
+              .slice(providerWindow.sliceStart, providerWindow.sliceEnd)
+              .map((album) => {
+                const release = sortedReleases.find(
+                  (sortedRelease) =>
+                    getMusicBrainzIdKey(sortedRelease.release_group_mbid) ===
+                    getMusicBrainzIdKey(album.id)
+                );
 
-              return release;
-            })
-            .filter((release): release is LbRelease => !!release)
+                return release;
+              })
+              .filter((release): release is LbRelease => !!release);
+
+            return sortAscending ? rankedReleases.reverse() : rankedReleases;
+          })()
         : sortedReleases.slice(
             providerWindow.sliceStart,
             providerWindow.sliceEnd
@@ -2822,7 +3120,7 @@ discoverRoutes.get('/music', async (req, res) => {
         {
           ...mapFreshReleaseAlbum(release),
           score:
-            sortByValue === 'ranked'
+            sortByBase === 'ranked'
               ? scoreMusicRelease(release)
               : (release.listen_count ?? 0),
         },
@@ -2966,6 +3264,8 @@ discoverRoutes.get('/books', async (req, res) => {
   const shuffleSeed = parsedShuffleSeed.value;
   const hasSearchQuery = !!searchQuery;
   const sortByValue = requestedSortBy ?? (hasSearchQuery ? 'newest' : 'ranked');
+  const sortAscending = sortByValue.endsWith('.asc');
+  const sortByBase = sortByValue.replace(/\.(?:asc|desc)$/, '');
   const bookDiscoveryContext = {
     format:
       parsedFormat.value === 'audiobook'
@@ -3015,7 +3315,7 @@ discoverRoutes.get('/books', async (req, res) => {
 
   try {
     const openLibrarySort =
-      sortByValue === 'ranked' && !hasSearchQuery && !hasSubjectFilter
+      sortByBase === 'ranked' && !hasSearchQuery && !hasSubjectFilter
         ? 'random'
         : sortByValue === 'newest'
           ? 'new'
@@ -3023,11 +3323,9 @@ discoverRoutes.get('/books', async (req, res) => {
             ? 'old'
             : sortByValue === 'random'
               ? 'random'
-              : sortByValue === 'rating' ||
-                  sortByValue === 'rating.desc' ||
-                  sortByValue === 'rating.asc'
+              : sortByBase === 'rating'
                 ? 'rating'
-                : sortByValue === 'editions'
+                : sortByBase === 'editions'
                   ? 'editions'
                   : undefined;
     const books = await settlePromisesWithin(
@@ -3085,8 +3383,8 @@ discoverRoutes.get('/books', async (req, res) => {
 
       return true;
     });
-    const sortedDocs =
-      sortByValue === 'ranked' && !hasSearchQuery
+    const rankedDocs =
+      sortByBase === 'ranked' && !hasSearchQuery
         ? shuffleRankedWindow(
             rankByQualityScore(
               [...dedupedDocs].sort(
@@ -3099,13 +3397,22 @@ discoverRoutes.get('/books', async (req, res) => {
             ),
             shuffleSeed
           )
-        : sortByValue === 'rating.asc'
-          ? [...dedupedDocs].sort(
-              (a, b) =>
-                (a.ratings_average ?? Number.POSITIVE_INFINITY) -
-                (b.ratings_average ?? Number.POSITIVE_INFINITY)
-            )
-          : dedupedDocs;
+        : undefined;
+    const sortedDocs = rankedDocs
+      ? sortAscending
+        ? [...rankedDocs].reverse()
+        : rankedDocs
+      : sortByValue === 'rating.asc'
+        ? [...dedupedDocs].sort(
+            (a, b) =>
+              (a.ratings_average ?? Number.POSITIVE_INFINITY) -
+              (b.ratings_average ?? Number.POSITIVE_INFINITY)
+          )
+        : sortByBase === 'editions' && sortAscending
+          ? [...dedupedDocs].reverse()
+          : sortByBase === 'random'
+            ? shuffleRankedWindow(dedupedDocs, shuffleSeed, dedupedDocs.length)
+            : dedupedDocs;
     const pagedDocs = providerWindow
       ? sortedDocs.slice(providerWindow.sliceStart, providerWindow.sliceEnd)
       : sortedDocs;
