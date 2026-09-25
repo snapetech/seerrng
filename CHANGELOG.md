@@ -102,6 +102,43 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.28.0](https://github.com/snapetech/seerrng/compare/v3.27.1..v3.28.0) - 2026-09-25
+
+### User-facing changes
+
+#### Added
+
+- **Media Management:** Administrators can set per-user comic request limits and manage tracked magazines from their detail pages. Removing a magazine from LazyLibrarian clears its SeerrNG tracking while leaving files on disk; the comics and magazines guides now describe the current controls.
+- **Comics:** Users with advanced request permissions can now choose which Mylar or Kapowarr server handles a comic request when more than one is configured, instead of always using the admin-set default.
+- **Search:** Global Search now has dedicated Comics and Magazines categories. Comics come from ComicVine, and magazines come from the tracked catalogs in configured LazyLibrarian services.
+- **Yunohost:** YunoHost operators can install SeerrNG on amd64 and arm64 from the new package branch, with persistent data, a localhost-only service, and YunoHost-managed reverse proxy, HTTPS, backups, and restores.
+
+#### Fixed
+
+- **Interface:** Light appearance now keeps page surfaces, controls, and text in the same color scheme, and request artwork no longer fades under a white overlay.
+
+### 🚀 Features
+- *(comics)* Add advanced server picker for comic requests - ([cf025c4](https://github.com/snapetech/seerrng/commit/cf025c467965a8ef5beaf707c76ae5ccbdfd54e7))
+- *(comics)* Add manage/issue-reporting parity and blocklist support - ([d8a43b3](https://github.com/snapetech/seerrng/commit/d8a43b3e3d7f9ab6326519bd03709ade6ea85a14))
+- *(magazines)* Add management and finish comic quotas - ([4654c69](https://github.com/snapetech/seerrng/commit/4654c69f8fb97fbb4e05b2e0a06c5e17bd9677a2))
+- *(search)* Merge comics and magazines search - ([461dac5](https://github.com/snapetech/seerrng/commit/461dac599bdfa437b4794a894ede3bb2337d9b64))
+- *(search)* Add comics and magazines categories - ([d105a96](https://github.com/snapetech/seerrng/commit/d105a96b6e8cd8140e5cd3ed0f1e47579f319ea2))
+- *(yunohost)* Add YunoHost package support - ([828859c](https://github.com/snapetech/seerrng/commit/828859ccf26c527b44bb1dbbc651fc3d96a62678))
+
+### 🐛 Bug Fixes
+- *(ui)* Align light appearance and artwork overlays - ([e18cf44](https://github.com/snapetech/seerrng/commit/e18cf442d645eb7cd40afd793b0fac82700aa474))
+- *(yunohost)* Preserve backup cleanup handler - ([d2615fa](https://github.com/snapetech/seerrng/commit/d2615fa5bb9374edd39c63f07bb9c18b7905d354))
+- *(yunohost)* Snapshot SQLite data during backups - ([788cac7](https://github.com/snapetech/seerrng/commit/788cac7dbfb36740b7c368966875a3c1d99a9a21))
+- *(yunohost)* Prepare private SQLite directory - ([8b36382](https://github.com/snapetech/seerrng/commit/8b363828fd9fd646f468d02a4711f08b3ebe5b73))
+
+### 📖 Documentation
+- *(comics)* Remove stale server picker limitation - ([49102ba](https://github.com/snapetech/seerrng/commit/49102ba1c3db961e82a43bcdf4a2e922899e9fdc))
+
+### ⚙️ Miscellaneous Tasks
+- *(yunohost)* Target v3.27.1 release assets - ([d4d2ad3](https://github.com/snapetech/seerrng/commit/d4d2ad3eee0d50f1a140dd36d849d4b5174cd016))
+
 ## [3.27.1](https://github.com/snapetech/seerrng/compare/v3.27.0..v3.27.1) - 2026-09-25
 
 ### User-facing changes
