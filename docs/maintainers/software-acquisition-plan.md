@@ -1,10 +1,10 @@
 # Software acquisition plan: ROMs and games
 
-**Status:** Research and implementation proposal
+**Status:** Implementation in progress
 
 **Researched:** 2026-09-25
 
-**Confidence:** High that ROMarr, Questarr, and Gamarr are actively developed as of this date. Moderate that any one of them meets SeerrNG's full request lifecycle without a small API adaptation.
+**Confidence:** High that ROMarr and Questarr are actively developed as of this date. Moderate that the current ROMarr API meets the full request lifecycle without compatibility work. High that Questarr needs an extension for durable external request/job status. Gamarr remains a conditional fallback pending a defined platform gap.
 
 ## Scope
 
@@ -20,7 +20,7 @@ General desktop applications for Windows, Linux, and macOS are deferred to a fut
 
 ## Recommendation
 
-Do not build a new general-purpose game downloader. Use ROMarr as the initial backend for supported ROM systems; it is actively maintained and its current API covers the main request-to-import path. Use Questarr as the preferred game acquisition baseline, but extend its integration API before depending on it for SeerrNG's per-request progress and reconciliation. Keep Gamarr as a forkable fallback for platform gaps; its source is active and MIT-licensed, but its request API is not yet a dependable external contract as-is.
+Do not build a new general-purpose game downloader. Use ROMarr as the initial backend for supported ROM systems; it is actively maintained and its current API covers the main request-to-import path. Maintain [QuestarrNG](https://github.com/snapetech/QuestarrNG) as the separate Games acquisition service and add the request/job contract SeerrNG needs. The upstream API does not expose durable external request identity or request-specific job status. Keep Gamarr as a forkable fallback for a demonstrated platform gap; its source is active and MIT-licensed, but its request API is not a dependable external contract as-is.
 
 Treat Retro, Modern Emulation, and Games as SeerrNG catalog/request experiences that route to providers by the selected platform and acquisition capabilities. They do not need a different backend just because they have different labels in the UI.
 
@@ -31,7 +31,7 @@ This assessment uses release and commit information available on 2026-09-25. Sta
 | Backend | Maintenance and maturity evidence | Integration assessment |
 | --- | --- | --- |
 | [ROMarr](https://github.com/BlizzHacker/romarr) | MIT. v0.9.0 was released 2026-09-19, with 79 commits since v0.8.0; the latest commit was on the release date. The v0.9.0 notes describe a persisted queue, failed-download recovery, and a state-file security fix. The repository has an OpenAPI description and tests for the served API. It is still pre-1.0 and had a small public contributor base at review time. | **Integrate as-is for the first ROM pilot, pinned to v0.9.0.** It is active and has the API and queue behavior needed to prove the flow. Keep the SeerrNG adapter separate so a breaking upstream change cannot take down request tracking. Recheck its release health before implementation. [v0.9.0 notes](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0) · [activity](https://github.com/BlizzHacker/romarr/commits/main) · [API](https://github.com/BlizzHacker/romarr#api) |
-| [Questarr](https://github.com/Doezer/Questarr) | GPL-3.0. Latest release v1.4.2 was published 2026-08-11; the main branch was updated 2026-09-24. It has a versioned integration API, API documentation, integration tests, and higher visible GitHub star/fork counts than the other candidates at review time. Those counts are only a weak adoption signal. v1.4.2 was a dependency security hotfix. | **Use as the preferred Games baseline, with a small upstream contribution or maintained fork before full SeerrNG integration.** The v1 integration contract can request a title and sync a library, but the reviewed contract accepts only a title/status for requests and does not return per-request download progress or a job ID. It also does not express SeerrNG's selected OS/architecture variant. [v1.4.2 notes](https://github.com/Doezer/Questarr/releases/tag/v1.4.2) · [recent activity](https://github.com/Doezer/Questarr/commits/main) · [API docs](https://github.com/Doezer/Questarr/blob/main/docs/API.md) · [integration routes](https://github.com/Doezer/Questarr/blob/main/server/routes/integration.ts) · [license](https://github.com/Doezer/Questarr/blob/main/COPYING) |
+| [Questarr](https://github.com/Doezer/Questarr) / [QuestarrNG](https://github.com/snapetech/QuestarrNG) | GPL-3.0-only. Latest tagged release v1.4.2 was published 2026-08-11. Upstream main was pushed 2026-09-24 and contains package version 1.5.0; QuestarrNG currently tracks upstream main commit `6f31f2999d6b6e029eca557551039526f89615d0`. The project has a versioned integration API, API documentation, and integration tests. | **Maintain QuestarrNG as a separate service and extend the integration API before using it for SeerrNG requests.** Existing v1 accepts title-only requests and does not persist caller request IDs or return request-specific acquisition status/job IDs. The selected platform/OS/architecture must also be recorded and applied before SeerrNG can claim a variant-specific acquisition. The fork remains separate under GPL-3.0-only. [v1.4.2 notes](https://github.com/Doezer/Questarr/releases/tag/v1.4.2) · [recent upstream activity](https://github.com/Doezer/Questarr/commits/main) · [API docs](https://github.com/Doezer/Questarr/blob/main/docs/API.md) · [integration routes](https://github.com/Doezer/Questarr/blob/main/server/routes/integration.ts) · [fork](https://github.com/snapetech/QuestarrNG) |
 | [Gamarr](https://github.com/JeremiahM37/gamarr) | MIT. Latest release v1.3.0 was published 2026-08-05; commits continued through 2026-09-25. The project documents an OpenAPI 3.1 API and reports 43 automated end-to-end tests. | **Do not use its request workflow as-is for production. Keep it as the MIT-licensed fork fallback.** The code has request create/list/search/download routes, but those routes are absent from the published OpenAPI document. A request row does not persist the download job ID, and request completion is watched by an in-process goroutine. A fork would need a versioned external contract, idempotency, persisted request-to-job correlation, restart recovery, and dependable status/import reconciliation. [v1.3.0 notes](https://github.com/JeremiahM37/gamarr/releases/tag/v1.3.0) · [recent activity](https://github.com/JeremiahM37/gamarr/commits/main) · [request handlers](https://github.com/JeremiahM37/gamarr/blob/main/internal/api/requests.go) · [OpenAPI document](https://github.com/JeremiahM37/gamarr/blob/main/internal/api/openapi.json) · [request model](https://github.com/JeremiahM37/gamarr/blob/main/internal/models/request.go) |
 
 ### What each backend would handle
@@ -40,7 +40,7 @@ This assessment uses release and commit information available on 2026-09-25. Sta
 | --- | --- | --- |
 | Retro Emulation | ROMarr for platforms it supports. It can search through Prowlarr/indexers, dispatch to download clients, validate imports, and target RomM, Gaseous, Retrom, Gameyfin, or a platform-organized folder. | Keep library services as destinations, not acquisition managers. |
 | Modern Emulation | ROMarr wherever the exact system and file format are supported. Its documented matrix spans 58 systems, including newer consoles; validate the exact matrix at implementation time. | Use Gamarr only for a demonstrated coverage gap, and then only through the planned fork/adaptation work. Do not route based on an undefined “modern” label. |
-| Native PC games | Questarr, after the versioned integration API is extended to carry SeerrNG request identity and target variant and to expose job state. It already has discovery, Prowlarr/Torznab and Newznab, downloader, and post-processing support. | Gamarr is a fallback if Questarr cannot cover required titles or variants and the Gamarr fork passes the recovery and API gates. |
+| Native PC games | QuestarrNG, after its versioned integration API carries SeerrNG request identity and the target variant and exposes durable job state. It retains Questarr's discovery, Prowlarr/Torznab and Newznab, downloader, and post-processing support. | Gamarr is a fallback if QuestarrNG cannot cover a required platform or source and a GamarrNG fork passes the recovery and API gates. |
 | Store-account games | Store-specific connector only when that store is explicitly included in the product matrix. itch.io's butlerd is an official, documented per-store JSON-RPC service with queued tasks, progress, and cancellation. | This does not provide a general game-store API. Steam catalog IDs do not grant download entitlement; Valve's Steamworks API requires a running Steam client and a license for the app. Treat store download as a separate, account-authorized provider. [butlerd](https://itch.io/docs/butler/launcher-integration.html) · [Steamworks API overview](https://partner.steamgames.com/doc/sdk/api) |
 
 ## Required provider adaptation
@@ -51,7 +51,7 @@ ROMarr documents request submission, release search, queue, history, health, and
 
 The spike must confirm duplicate submission handling, stable correlation from SeerrNG request to ROMarr request and download, authentication, cancellation, failed-download retry, import results, and state recovery after both systems restart. Do not use its `latest` container tag as a production pin. [ROMarr API and v0.9.0 release](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0)
 
-### Questarr: upstream a small, versioned machine contract or keep a thin fork
+### QuestarrNG: add a durable, versioned machine contract
 
 Questarr's API v1 integration endpoints are deliberately limited to ping, library read/sync, and `POST /api/integration/games/request`. The request is title-based and hands off to Questarr's own auto-search pipeline. Its API key is intended for machine integrations, and the API version is explicitly tracked.
 
@@ -64,7 +64,7 @@ For SeerrNG's full request experience, extend that contract with:
 - Cancel/retry operations tied to the same request.
 - A clear signal that import/library registration is complete, rather than only that a request was accepted.
 
-First offer the narrowly scoped changes upstream. If they are not accepted, maintain a small fork based on a tagged Questarr release and track upstream changes. Keep Questarr as a separate service; do not copy its GPL-3.0 code into SeerrNG. Before distributing a fork, follow the license terms for that fork. [Questarr integration API](https://github.com/Doezer/Questarr/blob/main/docs/API.md#integration-api-external-clients) · [release history](https://github.com/Doezer/Questarr/releases)
+The fork was created from active upstream main at `6f31f2999d6b6e029eca557551039526f89615d0` (package version 1.5.0; latest tagged release v1.4.2). Keep the QuestarrNG application separate from SeerrNG and comply with its GPL-3.0-only terms. Do not copy its code into SeerrNG. The fork README and API docs must identify the upstream, explain the SeerrNG request/job contract, and link to the main SeerrNG repository. [Questarr integration API](https://github.com/Doezer/Questarr/blob/main/docs/API.md#integration-api-external-clients) · [upstream release history](https://github.com/Doezer/Questarr/releases) · [QuestarrNG](https://github.com/snapetech/QuestarrNG)
 
 ### Gamarr: fork only if it fills a proven platform gap
 
@@ -105,7 +105,7 @@ flowchart LR
     C[Catalog providers] --> S[SeerrNG catalog and variant]
     S --> R[Request and approval]
     R --> O[Durable dispatch outbox]
-    O --> A[ROMarr, Questarr or QuestarrNG, GamarrNG fallback]
+    O --> A[ROMarr or QuestarrNG, GamarrNG fallback]
     A --> D[Download job and files]
     D --> L[Import and verify]
     L --> I[Library adapter]
@@ -128,21 +128,29 @@ Use pinned v0.9.0 for a disposable integration spike. Test one Retro system and 
 
 **Exit gate:** repeated dispatch cannot create duplicate provider work; the local request remains correlated to its provider job across restarts; SeerrNG can show search/download/import outcomes; and “available” follows library confirmation.
 
-### 2. Extend Questarr for Games
+### 2. Extend QuestarrNG for Games — in progress
 
-Use a pinned Questarr release as the baseline. Submit the external API changes upstream first; maintain a thin fork if the contract cannot meet the request identity, selected variant, progress, and reconciliation requirements. Test one PC game for each OS that the product intends to expose and confirm which download sources actually provide a matching build.
+QuestarrNG is created from actively maintained upstream main. Add an idempotent external request contract with durable correlation to Questarr's game and download records, selected target metadata, request status readback, and supported cancel/retry operations. Keep the fork's README and API documentation current with the NG branding and SeerrNG purpose.
 
 **Exit gate:** SeerrNG can request a specific game variant, reconcile the provider job after restart, and report truthful progress and availability without adopting Questarr's UI or request database as SeerrNG's source of truth.
 
 ### 3. Evaluate Gamarr only for uncovered systems
 
-Compare the agreed console/platform matrix with ROMarr and Questarr. If Gamarr uniquely covers a required system or source, create a time-boxed fork spike implementing the six API/recovery requirements above. If no external project can supply that category reliably, build only the missing acquisition worker/provider for that target.
+Compare the supported console/platform matrix with ROMarr and QuestarrNG. If Gamarr uniquely covers a required system or source, create a time-boxed GamarrNG fork implementing the six API/recovery requirements above. If no external project can supply that category reliably, build only the missing acquisition worker/provider for that target.
 
 **Exit gate:** adopt the fork only if it has a documented/versioned API, authenticated and idempotent requests, durable restart recovery, and successful import reconciliation.
 
 ### 4. Implement and expand the SeerrNG domain
 
 After the first backend passes, implement one vertical slice using a dedicated software request/job model and the provider boundary above. Add further systems and providers through the same contract. Pin backend versions and schedule routine compatibility/security reviews; do not follow floating `latest` tags.
+
+### Current implementation record
+
+- Work is on the `feature/software-acquisition` branch, based on the current SeerrNG `origin/main`.
+- The plan update has been carried onto that branch before implementation.
+- `snapetech/QuestarrNG` has been created as a separate fork of `Doezer/Questarr` for durable SeerrNG request/job correlation and variant-aware acquisition metadata.
+- ROMarr remains an upstream integration target; no ROMarr fork is planned unless a required capability cannot be adapted at the SeerrNG provider boundary.
+- General desktop applications remain a future wishlist item.
 
 ## Acceptance criteria
 
