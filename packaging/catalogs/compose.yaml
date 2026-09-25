@@ -1,0 +1,16 @@
+services:
+  seerrng:
+    image: docker.io/snapetech/seerrng:v3.27.1
+    container_name: seerrng
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: info
+      PORT: "5055"
+    ports:
+      - "5055:5055/tcp"
+      - "5056:5056/tcp"
+    volumes:
+      - seerrng-config:/app/config
+
+volumes:
+  seerrng-config:
