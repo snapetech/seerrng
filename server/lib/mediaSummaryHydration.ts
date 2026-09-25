@@ -1,5 +1,6 @@
 import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import Issue from '@server/entity/Issue';
 import type Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
@@ -9,7 +10,7 @@ import { restrictMediaRelationsForUser } from '@server/lib/mediaResponse';
 export const hydrateMediaSummaryRelations = async (
   mediaItems: Media[],
   user?: User,
-  options: { includeRequestSeasons?: boolean } = {}
+  options: { includeRequestSeasons?: boolean; includeIssues?: boolean } = {}
 ): Promise<Media[]> => {
   const mediaIds = [
     ...new Set(
@@ -43,7 +44,7 @@ export const hydrateMediaSummaryRelations = async (
     );
   }
 
-  const [activeRequests, userWatchlists] = await Promise.all([
+  const [activeRequests, userWatchlists, issues] = await Promise.all([
     activeRequestQuery.getMany(),
     user
       ? getRepository(Watchlist)
@@ -51,6 +52,18 @@ export const hydrateMediaSummaryRelations = async (
           .innerJoinAndSelect('watchlist.media', 'watchlistMedia')
           .where('watchlistMedia.id IN (:...mediaIds)', { mediaIds })
           .andWhere('watchlist.requestedBy = :userId', { userId: user.id })
+          .getMany()
+      : [],
+    options.includeIssues
+      ? getRepository(Issue)
+          .createQueryBuilder('issue')
+          .leftJoinAndSelect('issue.media', 'issueMedia')
+          .leftJoinAndSelect('issue.createdBy', 'issueCreatedBy')
+          .leftJoinAndSelect('issue.modifiedBy', 'issueModifiedBy')
+          .leftJoinAndSelect('issue.comments', 'issueComments')
+          .where('issueMedia.id IN (:...mediaIds)', { mediaIds })
+          .orderBy('issue.createdAt', 'DESC')
+          .addOrderBy('issue.id', 'DESC')
           .getMany()
       : [],
   ]);
@@ -70,10 +83,21 @@ export const hydrateMediaSummaryRelations = async (
     watchlists.push(watchlist);
     watchlistsByMediaId.set(mediaId, watchlists);
   }
+  const issuesByMediaId = new Map<number, Issue[]>();
+  for (const issue of issues) {
+    const mediaId = issue.media.id;
+    issue.media = undefined as unknown as Media;
+    const mediaIssues = issuesByMediaId.get(mediaId) ?? [];
+    mediaIssues.push(issue);
+    issuesByMediaId.set(mediaId, mediaIssues);
+  }
 
   for (const media of mediaItems) {
     media.requests = requestsByMediaId.get(media.id) ?? [];
     media.watchlists = watchlistsByMediaId.get(media.id) ?? [];
+    if (options.includeIssues) {
+      media.issues = issuesByMediaId.get(media.id) ?? [];
+    }
     restrictMediaRelationsForUser(media, user);
   }
 

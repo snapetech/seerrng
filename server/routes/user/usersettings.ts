@@ -467,6 +467,8 @@ const parseGeneralSettingsBody = (
     'bookQuotaDays',
     'comicQuotaLimit',
     'comicQuotaDays',
+    'magazineQuotaLimit',
+    'magazineQuotaDays',
   ] as const) {
     const rawValue = bodyObject[fieldName];
     if (!hasOwn(bodyObject, fieldName)) {
@@ -493,6 +495,7 @@ const parseGeneralSettingsBody = (
     'watchlistSyncMusic',
     'watchlistSyncBooks',
     'watchlistSyncComics',
+    'watchlistSyncMagazines',
   ] as const) {
     if (!hasOwn(bodyObject, fieldName)) {
       continue;
@@ -823,6 +826,8 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
             bookQuotaDays: user.bookQuotaDays,
             comicQuotaLimit: user.comicQuotaLimit,
             comicQuotaDays: user.comicQuotaDays,
+            magazineQuotaLimit: user.magazineQuotaLimit,
+            magazineQuotaDays: user.magazineQuotaDays,
             globalMovieQuotaDays: defaultQuotas.movie.quotaDays,
             globalMovieQuotaLimit: defaultQuotas.movie.quotaLimit,
             globalTvQuotaDays: defaultQuotas.tv.quotaDays,
@@ -833,11 +838,14 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
             globalBookQuotaLimit: defaultQuotas.book.quotaLimit,
             globalComicQuotaDays: defaultQuotas.comic.quotaDays,
             globalComicQuotaLimit: defaultQuotas.comic.quotaLimit,
+            globalMagazineQuotaDays: defaultQuotas.magazine.quotaDays,
+            globalMagazineQuotaLimit: defaultQuotas.magazine.quotaLimit,
             watchlistSyncMovies: user.settings?.watchlistSyncMovies,
             watchlistSyncTv: user.settings?.watchlistSyncTv,
             watchlistSyncMusic: user.settings?.watchlistSyncMusic,
             watchlistSyncBooks: user.settings?.watchlistSyncBooks,
             watchlistSyncComics: user.settings?.watchlistSyncComics,
+            watchlistSyncMagazines: user.settings?.watchlistSyncMagazines,
             cardTextVisibility: serializeCardTextVisibility(user.settings),
           });
         }
@@ -937,6 +945,8 @@ userSettingsRoutes.post<
               'bookQuotaLimit',
               'comicQuotaDays',
               'comicQuotaLimit',
+              'magazineQuotaDays',
+              'magazineQuotaLimit',
             ] as const) {
               if (hasOwn(body, fieldName)) {
                 Object.assign(user, { [fieldName]: body[fieldName] ?? null });
@@ -960,6 +970,7 @@ userSettingsRoutes.post<
             'watchlistSyncMusic',
             'watchlistSyncBooks',
             'watchlistSyncComics',
+            'watchlistSyncMagazines',
           ] as const) {
             if (hasOwn(body, fieldName)) {
               Object.assign(user.settings, {
@@ -1000,6 +1011,7 @@ userSettingsRoutes.post<
             watchlistSyncMusic: savedUser.settings?.watchlistSyncMusic,
             watchlistSyncBooks: savedUser.settings?.watchlistSyncBooks,
             watchlistSyncComics: savedUser.settings?.watchlistSyncComics,
+            watchlistSyncMagazines: savedUser.settings?.watchlistSyncMagazines,
             cardTextVisibility: serializeCardTextVisibility(savedUser.settings),
             email: savedUser.email,
           });

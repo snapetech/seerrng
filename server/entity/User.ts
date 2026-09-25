@@ -233,6 +233,12 @@ export class User {
   @Column({ nullable: true })
   public comicQuotaDays?: number;
 
+  @Column({ nullable: true })
+  public magazineQuotaLimit?: number;
+
+  @Column({ nullable: true })
+  public magazineQuotaDays?: number;
+
   @OneToOne(() => UserSettings, (settings) => settings.user, {
     cascade: true,
     eager: true,
@@ -667,9 +673,10 @@ export class User {
       : 0;
 
     const magazineQuotaLimit = !canBypass
-      ? defaultQuotas.magazine.quotaLimit
+      ? (this.magazineQuotaLimit ?? defaultQuotas.magazine.quotaLimit)
       : 0;
-    const magazineQuotaDays = defaultQuotas.magazine.quotaDays;
+    const magazineQuotaDays =
+      this.magazineQuotaDays ?? defaultQuotas.magazine.quotaDays;
     const magazineDate = new Date();
     if (magazineQuotaDays) {
       magazineDate.setDate(magazineDate.getDate() - magazineQuotaDays);

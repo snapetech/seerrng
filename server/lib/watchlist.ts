@@ -7,9 +7,11 @@ import type {
   WatchlistResponse,
 } from '@server/interfaces/api/discoverInterfaces';
 import {
+  isValidExternalMediaId,
   normalizeMusicBrainzId,
   normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
+import { normalizeMagazineTitle } from '@server/lib/magazineIdentity';
 import type { SelectQueryBuilder } from 'typeorm';
 
 const mapLocalWatchlistItem = (item: Watchlist): WatchlistItem => ({
@@ -19,9 +21,14 @@ const mapLocalWatchlistItem = (item: Watchlist): WatchlistItem => ({
   tmdbId: item.tmdbId,
   mbId: item.mbId ? normalizeMusicBrainzId(item.mbId) : item.mbId,
   externalId: item.externalId
-    ? normalizeOpenLibraryWorkId(item.externalId)
+    ? item.mediaType === MediaType.COMIC
+      ? item.externalId.trim()
+      : item.mediaType === MediaType.MAGAZINE
+        ? normalizeMagazineTitle(item.externalId)
+        : normalizeOpenLibraryWorkId(item.externalId)
     : item.externalId,
-  mediaType: item.mediaType as 'movie' | 'tv' | 'music' | 'book',
+  mediaType: item.mediaType as
+    'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine',
   title: item.title,
 });
 
@@ -30,19 +37,25 @@ const isRenderableWatchlistItem = (item: Watchlist): boolean =>
     Number.isSafeInteger(item.tmdbId) &&
     Number(item.tmdbId) > 0) ||
   (item.mediaType === MediaType.MUSIC && !!item.mbId) ||
-  (item.mediaType === MediaType.BOOK && !!item.externalId);
+  (item.mediaType === MediaType.BOOK && !!item.externalId) ||
+  (item.mediaType === MediaType.COMIC &&
+    !!item.externalId &&
+    isValidExternalMediaId(item.externalId, MediaType.COMIC)) ||
+  (item.mediaType === MediaType.MAGAZINE &&
+    !!item.externalId &&
+    isValidExternalMediaId(item.externalId, MediaType.MAGAZINE));
 
 const applyRenderableWatchlistFilter = (query: SelectQueryBuilder<Watchlist>) =>
   query.andWhere(
     `(
       (watchlist.mediaType IN (:...screenMediaTypes) AND watchlist.tmdbId > 0)
       OR (watchlist.mediaType = :musicMediaType AND watchlist.mbId IS NOT NULL AND watchlist.mbId != '')
-      OR (watchlist.mediaType = :bookMediaType AND watchlist.externalId IS NOT NULL AND watchlist.externalId != '')
+      OR (watchlist.mediaType IN (:...externalMediaTypes) AND watchlist.externalId IS NOT NULL AND watchlist.externalId != '')
     )`,
     {
       screenMediaTypes: [MediaType.MOVIE, MediaType.TV],
       musicMediaType: MediaType.MUSIC,
-      bookMediaType: MediaType.BOOK,
+      externalMediaTypes: [MediaType.BOOK, MediaType.COMIC, MediaType.MAGAZINE],
     }
   );
 
@@ -62,6 +75,16 @@ const getWatchlistDedupeKey = (item: WatchlistItem) => {
     return `${item.mediaType}:openlibrary:${normalizeOpenLibraryWorkId(
       item.externalId
     ).toLocaleLowerCase()}`;
+  }
+
+  if (item.mediaType === MediaType.COMIC && item.externalId) {
+    return `${item.mediaType}:comicvine:${item.externalId.trim()}`;
+  }
+
+  if (item.mediaType === MediaType.MAGAZINE && item.externalId) {
+    return `${item.mediaType}:lazylibrarian:${normalizeMagazineTitle(
+      item.externalId
+    )}`;
   }
 
   return `${item.mediaType}:rating:${item.ratingKey}`;

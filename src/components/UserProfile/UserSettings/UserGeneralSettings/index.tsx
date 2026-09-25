@@ -63,6 +63,7 @@ const messages = defineMessages(
     musicrequestlimit: 'Music Request Limit',
     bookrequestlimit: 'Book Request Limit',
     comicrequestlimit: 'Comic Request Limit',
+    magazinerequestlimit: 'Magazine Request Limit',
     enableOverride: 'Override Global Limit',
     applanguage: 'Display Language',
     languageDefault: 'Default ({language})',
@@ -92,6 +93,9 @@ const messages = defineMessages(
     comicwatchlistsync: 'Auto-Request Comics',
     comicwatchlistsynctip:
       'Automatically request comics added to your SeerrNG comic watchlist.',
+    magazinewatchlistsync: 'Auto-Request Magazines',
+    magazinewatchlistsynctip:
+      'Automatically request magazines added to your SeerrNG magazine watchlist.',
     cardTextVisibility: 'Card Titles',
     cardTextVisibilityTip:
       'Choose when each media type shows title text on poster cards.',
@@ -113,6 +117,7 @@ const UserGeneralSettings = () => {
   const [musicQuotaEnabled, setMusicQuotaEnabled] = useState(false);
   const [bookQuotaEnabled, setBookQuotaEnabled] = useState(false);
   const [comicQuotaEnabled, setComicQuotaEnabled] = useState(false);
+  const [magazineQuotaEnabled, setMagazineQuotaEnabled] = useState(false);
   const router = useRouter();
   const userId = getPositiveQueryParamNumber(router.query.userId);
   const {
@@ -188,6 +193,10 @@ const UserGeneralSettings = () => {
     );
     setComicQuotaEnabled(
       data?.comicQuotaLimit != undefined && data?.comicQuotaDays != undefined
+    );
+    setMagazineQuotaEnabled(
+      data?.magazineQuotaLimit != undefined &&
+        data?.magazineQuotaDays != undefined
     );
   }, [data]);
 
@@ -268,11 +277,14 @@ const UserGeneralSettings = () => {
           bookQuotaDays: data?.bookQuotaDays,
           comicQuotaLimit: data?.comicQuotaLimit,
           comicQuotaDays: data?.comicQuotaDays,
+          magazineQuotaLimit: data?.magazineQuotaLimit,
+          magazineQuotaDays: data?.magazineQuotaDays,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
           watchlistSyncMusic: data?.watchlistSyncMusic,
           watchlistSyncBooks: data?.watchlistSyncBooks,
           watchlistSyncComics: data?.watchlistSyncComics,
+          watchlistSyncMagazines: data?.watchlistSyncMagazines,
           cardTextVisibilityMovie: data?.cardTextVisibility?.movie ?? 'hover',
           cardTextVisibilityTv: data?.cardTextVisibility?.tv ?? 'hover',
           cardTextVisibilityAlbum: data?.cardTextVisibility?.album ?? 'always',
@@ -333,11 +345,18 @@ const UserGeneralSettings = () => {
                 ? values.comicQuotaLimit
                 : null,
               comicQuotaDays: comicQuotaEnabled ? values.comicQuotaDays : null,
+              magazineQuotaLimit: magazineQuotaEnabled
+                ? values.magazineQuotaLimit
+                : null,
+              magazineQuotaDays: magazineQuotaEnabled
+                ? values.magazineQuotaDays
+                : null,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
               watchlistSyncMusic: values.watchlistSyncMusic,
               watchlistSyncBooks: values.watchlistSyncBooks,
               watchlistSyncComics: values.watchlistSyncComics,
+              watchlistSyncMagazines: values.watchlistSyncMagazines,
               cardTextVisibility: {
                 movie: values.cardTextVisibilityMovie,
                 tv: values.cardTextVisibilityTv,
@@ -849,6 +868,48 @@ const UserGeneralSettings = () => {
                         </div>
                       </div>
                     </div>
+                    <div className="form-row">
+                      <div className="text-label">
+                        <span>
+                          {intl.formatMessage(messages.magazinerequestlimit)}
+                        </span>
+                      </div>
+                      <div className="form-input-area">
+                        <div className="flex flex-col">
+                          <div className="mb-4 flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={magazineQuotaEnabled}
+                              onChange={() =>
+                                setMagazineQuotaEnabled((enabled) => !enabled)
+                              }
+                            />
+                            <span className="ml-2 text-gray-300">
+                              {intl.formatMessage(messages.enableOverride)}
+                            </span>
+                          </div>
+                          <QuotaSelector
+                            isDisabled={!magazineQuotaEnabled}
+                            dayFieldName="magazineQuotaDays"
+                            limitFieldName="magazineQuotaLimit"
+                            mediaType="magazine"
+                            onChange={setFieldValue}
+                            defaultDays={values.magazineQuotaDays}
+                            defaultLimit={values.magazineQuotaLimit}
+                            dayOverride={
+                              !magazineQuotaEnabled
+                                ? data?.globalMagazineQuotaDays
+                                : undefined
+                            }
+                            limitOverride={
+                              !magazineQuotaEnabled
+                                ? data?.globalMagazineQuotaLimit
+                                : undefined
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               {hasPermission(
@@ -1031,6 +1092,37 @@ const UserGeneralSettings = () => {
                         setFieldValue(
                           'watchlistSyncComics',
                           !values.watchlistSyncComics
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {hasPermission(
+                [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_MAGAZINE],
+                { type: 'or' }
+              ) && (
+                <div className="form-row">
+                  <label
+                    htmlFor="watchlistSyncMagazines"
+                    className="checkbox-label"
+                  >
+                    <span>
+                      {intl.formatMessage(messages.magazinewatchlistsync)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.magazinewatchlistsynctip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="watchlistSyncMagazines"
+                      name="watchlistSyncMagazines"
+                      onChange={() => {
+                        setFieldValue(
+                          'watchlistSyncMagazines',
+                          !values.watchlistSyncMagazines
                         );
                       }}
                     />

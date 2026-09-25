@@ -56,6 +56,8 @@ export interface UserSettingsGeneralResponse {
   bookQuotaDays?: number;
   comicQuotaLimit?: number;
   comicQuotaDays?: number;
+  magazineQuotaLimit?: number;
+  magazineQuotaDays?: number;
   globalMovieQuotaDays?: number;
   globalMovieQuotaLimit?: number;
   globalTvQuotaLimit?: number;
@@ -66,11 +68,14 @@ export interface UserSettingsGeneralResponse {
   globalBookQuotaLimit?: number;
   globalComicQuotaDays?: number;
   globalComicQuotaLimit?: number;
+  globalMagazineQuotaDays?: number;
+  globalMagazineQuotaLimit?: number;
   watchlistSyncMovies?: boolean;
   watchlistSyncTv?: boolean;
   watchlistSyncMusic?: boolean;
   watchlistSyncBooks?: boolean;
   watchlistSyncComics?: boolean;
+  watchlistSyncMagazines?: boolean;
   cardTextVisibility?: UserSettingsCardTextResponse;
 }
 

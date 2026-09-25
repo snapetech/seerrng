@@ -493,6 +493,73 @@ describe('POST /blocklist', () => {
     assert.strictEqual(duplicateBook.status, 412);
   });
 
+  it('creates, finds, and removes magazine blocklist entries by normalized title', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const created = await agent.post('/blocklist').send({
+      mediaType: MediaType.MAGAZINE,
+      externalId: ' The   New Yorker ',
+      externalProvider: MediaIdentifierProvider.LAZYLIBRARIAN,
+      title: 'The New Yorker',
+    });
+    const duplicate = await agent.post('/blocklist').send({
+      mediaType: MediaType.MAGAZINE,
+      externalId: 'THE NEW YORKER',
+      externalProvider: MediaIdentifierProvider.LAZYLIBRARIAN,
+      title: 'The New Yorker',
+    });
+
+    assert.strictEqual(created.status, 201);
+    assert.strictEqual(duplicate.status, 412);
+
+    const [list, detail] = await Promise.all([
+      agent.get('/blocklist').query({ mediaType: MediaType.MAGAZINE }),
+      agent
+        .get(`/blocklist/${encodeURIComponent('THE NEW YORKER')}`)
+        .query({ mediaType: MediaType.MAGAZINE }),
+    ]);
+
+    assert.strictEqual(list.status, 200);
+    assert.strictEqual(list.body.results.length, 1);
+    assert.strictEqual(list.body.results[0].title, 'The New Yorker');
+    assert.strictEqual(detail.status, 200);
+    assert.strictEqual(detail.body.externalId, 'the new yorker');
+    const saved = await getRepository(Blocklist).findOneOrFail({
+      where: {
+        mediaType: MediaType.MAGAZINE,
+        externalId: 'the new yorker',
+      },
+      relations: { media: { identifiers: true } },
+    });
+    assert.strictEqual(saved.media.status, MediaStatus.BLOCKLISTED);
+    assert.deepStrictEqual(
+      saved.media.identifiers.map(({ provider, value, canonical }) => ({
+        provider,
+        value,
+        canonical,
+      })),
+      [
+        {
+          provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+          value: 'the new yorker',
+          canonical: true,
+        },
+      ]
+    );
+
+    const removed = await agent
+      .delete(`/blocklist/${encodeURIComponent('The New Yorker')}`)
+      .query({ mediaType: MediaType.MAGAZINE });
+
+    assert.strictEqual(removed.status, 204);
+    assert.strictEqual(
+      await getRepository(Blocklist).countBy({
+        mediaType: MediaType.MAGAZINE,
+        externalId: 'the new yorker',
+      }),
+      0
+    );
+  });
+
   it('admits only one concurrent screen blocklist entry', async () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const responses = await Promise.all([

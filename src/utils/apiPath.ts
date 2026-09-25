@@ -23,5 +23,14 @@ export const normalizeExternalTitleId = (
     return normalizeOpenLibraryWorkId(id);
   }
 
+  if (mediaType === 'magazine') {
+    return id
+      .toString()
+      .normalize('NFKC')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
   return id;
 };

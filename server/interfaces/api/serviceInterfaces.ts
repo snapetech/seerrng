@@ -42,3 +42,9 @@ export interface ComicServiceOption {
   isDefault: boolean;
   backendType: 'mylar' | 'kapowarr';
 }
+
+export interface MagazineServiceOption {
+  id: number;
+  name: string;
+  isDefault: boolean;
+}

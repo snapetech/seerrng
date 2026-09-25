@@ -83,7 +83,7 @@ const blocklistGet = z.object({
   filter: z.enum(['all', 'manual', 'blocklistedTags']).optional(),
   timeFrame: z.enum(['all', '7d', '14d', '30d', '6m']).default('all'),
   mediaType: z
-    .enum(['all', 'movie', 'tv', 'music', 'book', 'comic'])
+    .enum(['all', 'movie', 'tv', 'music', 'book', 'comic', 'magazine'])
     .default('all'),
   sort: z.enum(['date', 'title', 'mediaType']).default('date'),
   sortDirection: z.enum(['asc', 'desc']).default('desc'),
@@ -129,7 +129,8 @@ const isSupportedBlocklistType = (mediaType: unknown): mediaType is MediaType =>
   mediaType === MediaType.TV ||
   mediaType === MediaType.MUSIC ||
   mediaType === MediaType.BOOK ||
-  mediaType === MediaType.COMIC;
+  mediaType === MediaType.COMIC ||
+  mediaType === MediaType.MAGAZINE;
 
 const getBlocklistAdmissionKey = (item: {
   mediaType: MediaType;
@@ -146,7 +147,10 @@ const getBlocklistAdmissionKey = (item: {
     }:${item.externalId ?? ''}`;
   }
   if (item.mediaType === MediaType.COMIC) {
-    return `request-canonical:comic:${item.externalId ?? ''}`;
+    return `request-canonical:comic:${MediaIdentifierProvider.COMICVINE}:${item.externalId ?? ''}`;
+  }
+  if (item.mediaType === MediaType.MAGAZINE) {
+    return `request-canonical:magazine:${MediaIdentifierProvider.LAZYLIBRARIAN}:${item.externalId ?? ''}`;
   }
   return `request-media:${item.mediaType}:${item.tmdbId}`;
 };
@@ -427,6 +431,20 @@ blocklistRoutes.post(
             values.externalProvider !== MediaIdentifierProvider.COMICVINE))
       ) {
         return next({ status: 400, message: 'Invalid comic identity.' });
+      }
+      if (
+        values.mediaType === MediaType.MAGAZINE &&
+        (!values.externalId ||
+          !isValidExternalMediaId(
+            values.externalId,
+            values.mediaType,
+            values.externalProvider
+          ) ||
+          values.tmdbId !== undefined ||
+          (values.externalProvider !== undefined &&
+            values.externalProvider !== MediaIdentifierProvider.LAZYLIBRARIAN))
+      ) {
+        return next({ status: 400, message: 'Invalid magazine identity.' });
       }
 
       await runAuthorizedUserSecurityMutation(

@@ -187,7 +187,18 @@ export class Blocklist implements BlocklistItem {
           blocklistRequest.tmdbId !== undefined ||
           (blocklistRequest.externalProvider !== undefined &&
             blocklistRequest.externalProvider !==
-              MediaIdentifierProvider.COMICVINE)))
+              MediaIdentifierProvider.COMICVINE))) ||
+      (blocklistRequest.mediaType === 'magazine' &&
+        (!blocklistRequest.externalId ||
+          !isValidExternalMediaId(
+            blocklistRequest.externalId,
+            blocklistRequest.mediaType,
+            blocklistRequest.externalProvider
+          ) ||
+          blocklistRequest.tmdbId !== undefined ||
+          (blocklistRequest.externalProvider !== undefined &&
+            blocklistRequest.externalProvider !==
+              MediaIdentifierProvider.LAZYLIBRARIAN)))
     ) {
       throw new Error('Blocklist media identity is invalid.');
     }
@@ -215,6 +226,14 @@ export class Blocklist implements BlocklistItem {
       blocklistRequest = {
         ...blocklistRequest,
         externalProvider: MediaIdentifierProvider.COMICVINE,
+      };
+    } else if (
+      blocklistRequest.mediaType === 'magazine' &&
+      blocklistRequest.externalProvider === undefined
+    ) {
+      blocklistRequest = {
+        ...blocklistRequest,
+        externalProvider: MediaIdentifierProvider.LAZYLIBRARIAN,
       };
     }
 
@@ -276,6 +295,21 @@ export class Blocklist implements BlocklistItem {
         identifier?.media.mediaType === blocklistRequest.mediaType
           ? identifier.media
           : null;
+    } else if (
+      blocklistRequest.mediaType === 'magazine' &&
+      blocklistRequest.externalId
+    ) {
+      const identifier = await em.getRepository(MediaIdentifier).findOne({
+        where: {
+          provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+          value: blocklistRequest.externalId,
+        },
+        relations: { media: true },
+      });
+      media =
+        identifier?.media.mediaType === blocklistRequest.mediaType
+          ? identifier.media
+          : null;
     } else {
       media = await mediaRepository.findOne({
         where: {
@@ -325,7 +359,16 @@ export class Blocklist implements BlocklistItem {
                     canonical: true,
                   }),
                 ]
-              : undefined,
+              : blocklistRequest.mediaType === 'magazine' &&
+                  blocklistRequest.externalId
+                ? [
+                    new MediaIdentifier({
+                      provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+                      value: blocklistRequest.externalId,
+                      canonical: true,
+                    }),
+                  ]
+                : undefined,
       });
 
       await mediaRepository.save(media);

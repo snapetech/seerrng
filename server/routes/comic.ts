@@ -56,7 +56,11 @@ comicRoutes.get('/:id', async (req, res, next) => {
       relationLoadStrategy: 'query',
     });
     const media = identifier?.media
-      ? (await hydrateMediaSummaryRelations([identifier.media], req.user))[0]
+      ? (
+          await hydrateMediaSummaryRelations([identifier.media], req.user, {
+            includeIssues: true,
+          })
+        )[0]
       : undefined;
 
     const comicDetails = mapComicVineVolumeDetails(

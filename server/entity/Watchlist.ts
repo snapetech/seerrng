@@ -26,6 +26,10 @@ import {
   normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
+import {
+  cleanMagazineTitle,
+  normalizeMagazineTitle,
+} from '@server/lib/magazineIdentity';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
@@ -139,7 +143,9 @@ export class Watchlist {
       externalId: watchlistRequest.externalId
         ? watchlistRequest.mediaType === MediaType.COMIC
           ? watchlistRequest.externalId.trim()
-          : normalizeOpenLibraryWorkId(watchlistRequest.externalId)
+          : watchlistRequest.mediaType === MediaType.MAGAZINE
+            ? normalizeMagazineTitle(watchlistRequest.externalId)
+            : normalizeOpenLibraryWorkId(watchlistRequest.externalId)
         : undefined,
     };
 
@@ -165,6 +171,15 @@ export class Watchlist {
         !isValidExternalMediaId(watchlistRequest.externalId, MediaType.COMIC))
     ) {
       throw new Error('ComicVine ID is invalid for comic watchlists.');
+    }
+
+    if (
+      watchlistRequest.mediaType === MediaType.MAGAZINE &&
+      (!watchlistRequest.externalId ||
+        watchlistRequest.externalId.length > 256 ||
+        !normalizeMagazineTitle(watchlistRequest.externalId))
+    ) {
+      throw new Error('Magazine title is invalid for magazine watchlists.');
     }
 
     if (!options.securityGranted) {
@@ -212,6 +227,12 @@ export class Watchlist {
           activeUser,
           options.expectedCredentialVersion
         );
+      } else if (watchlistRequest.mediaType === MediaType.MAGAZINE) {
+        await this.requestMagazineFromWatchlist(
+          watchlist.title,
+          activeUser,
+          options.expectedCredentialVersion
+        );
       }
 
       return watchlist;
@@ -222,7 +243,8 @@ export class Watchlist {
         watchlistRequest.mediaType === MediaType.MUSIC
           ? watchlistRequest.mbId
           : watchlistRequest.mediaType === MediaType.BOOK ||
-              watchlistRequest.mediaType === MediaType.COMIC
+              watchlistRequest.mediaType === MediaType.COMIC ||
+              watchlistRequest.mediaType === MediaType.MAGAZINE
             ? watchlistRequest.externalId
             : watchlistRequest.tmdbId;
       const identityKey =
@@ -232,7 +254,9 @@ export class Watchlist {
             ? `request-canonical:book:${MediaIdentifierProvider.OPENLIBRARY}:${identity}`
             : watchlistRequest.mediaType === MediaType.COMIC
               ? `request-canonical:comic:${MediaIdentifierProvider.COMICVINE}:${identity}`
-              : `request-media:${watchlistRequest.mediaType}:${identity}`;
+              : watchlistRequest.mediaType === MediaType.MAGAZINE
+                ? `request-canonical:magazine:${MediaIdentifierProvider.LAZYLIBRARIAN}:${identity}`
+                : `request-media:${watchlistRequest.mediaType}:${identity}`;
 
       const watchlist = await runWithRequestAdmission([identityKey], () =>
         this.createWatchlist(
@@ -458,6 +482,81 @@ export class Watchlist {
       });
     }
 
+    if (watchlistRequest.mediaType === MediaType.MAGAZINE) {
+      if (!watchlistRequest.externalId) {
+        throw new Error('Magazine title is required for magazine watchlists.');
+      }
+
+      const existing = await watchlistRepository.findOne({
+        where: {
+          externalId: watchlistRequest.externalId,
+          mediaType: MediaType.MAGAZINE,
+          requestedBy: { id: user.id },
+        },
+      });
+
+      if (existing) {
+        logger.warn('Duplicate request for watchlist blocked', {
+          externalId: watchlistRequest.externalId,
+          mediaType: watchlistRequest.mediaType,
+          label: 'Watchlist',
+        });
+
+        throw new DuplicateWatchlistRequestError();
+      }
+
+      const title = cleanMagazineTitle(
+        watchlistRequest.title ?? watchlistRequest.externalId
+      );
+      return dataSource.transaction(async (manager) => {
+        const transactionalMediaRepository = manager.getRepository(Media);
+        const identifierRepository = manager.getRepository(MediaIdentifier);
+        const transactionalWatchlistRepository = manager.getRepository(this);
+        const identifier = await identifierRepository.findOne({
+          where: {
+            provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+            value: watchlistRequest.externalId,
+          },
+          relations: { media: true },
+        });
+        let media =
+          identifier?.media.mediaType === MediaType.MAGAZINE
+            ? identifier.media
+            : undefined;
+
+        if (!media) {
+          media = await transactionalMediaRepository.save(
+            new Media({
+              tmdbId: 0,
+              mediaType: MediaType.MAGAZINE,
+              externalServiceSlug: title,
+            })
+          );
+          await identifierRepository.save(
+            new MediaIdentifier({
+              media,
+              provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+              value: watchlistRequest.externalId,
+              canonical: true,
+            })
+          );
+        } else if (!media.externalServiceSlug) {
+          media.externalServiceSlug = title;
+          await transactionalMediaRepository.save(media);
+        }
+
+        const watchlist = new this({
+          ...watchlistRequest,
+          title,
+          requestedBy: user,
+          media,
+        });
+
+        await transactionalWatchlistRepository.save(watchlist);
+        return watchlist;
+      });
+    }
+
     if (!watchlistRequest.tmdbId) {
       throw new Error('TMDB ID is required for movie and series watchlists.');
     }
@@ -556,7 +655,9 @@ export class Watchlist {
     const watchlist = await watchlistRepository.findOneBy({
       ...(mediaType === MediaType.MUSIC
         ? { mbId: id as string }
-        : mediaType === MediaType.BOOK || mediaType === MediaType.COMIC
+        : mediaType === MediaType.BOOK ||
+            mediaType === MediaType.COMIC ||
+            mediaType === MediaType.MAGAZINE
           ? { externalId: id as string }
           : { tmdbId: Number(id) }),
       mediaType,
@@ -750,6 +851,60 @@ export class Watchlist {
             label: 'Watchlist',
             userId: user.id,
             comicVineId,
+            errorMessage: e.message,
+          });
+      }
+    }
+  }
+
+  private static async requestMagazineFromWatchlist(
+    title: string,
+    user: User,
+    expectedCredentialVersion?: number
+  ): Promise<void> {
+    if (
+      !user.settings?.watchlistSyncMagazines ||
+      !user.hasPermission(
+        [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_MAGAZINE],
+        { type: 'or' }
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await MediaRequest.request(
+        {
+          mediaId: title,
+          mediaType: MediaType.MAGAZINE,
+        },
+        user,
+        { expectedCredentialVersion, isAutoRequest: true }
+      );
+    } catch (e) {
+      if (!(e instanceof Error)) {
+        return;
+      }
+
+      switch (e.constructor) {
+        case RequestPermissionError:
+        case DuplicateMediaRequestError:
+        case QuotaRestrictedError:
+        case NoSeasonsAvailableError:
+          logger.debug('Failed to create magazine request from watchlist', {
+            label: 'Watchlist',
+            userId: user.id,
+            magazineTitle: title,
+            errorMessage: e.message,
+          });
+          break;
+        case BlocklistedMediaError:
+          break;
+        default:
+          logger.error('Failed to create magazine request from watchlist', {
+            label: 'Watchlist',
+            userId: user.id,
+            magazineTitle: title,
             errorMessage: e.message,
           });
       }

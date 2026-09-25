@@ -1,5 +1,10 @@
 import ExternalAPI from '@server/api/externalapi';
 import type { LazyLibrarianSettings } from '@server/lib/settings';
+import {
+  MAX_SAFE_REMOTE_IMAGE_BYTES,
+  normalizeSafeRasterImage,
+  type SafeRemoteImage,
+} from '@server/utils/safeRemoteImage';
 import { buildServiceUrl } from '@server/utils/serviceUrl';
 
 export interface LazyLibrarianMagazine {
@@ -123,10 +128,12 @@ class LazyLibrarianAPI extends ExternalAPI {
     });
   }
 
+  private readonly serviceUrl: string;
   private readonly apiKey: string;
 
   constructor({ url, apiKey }: { url: string; apiKey: string }) {
     super(url, {}, { allowPrivateAddresses: true });
+    this.serviceUrl = url;
     this.apiKey = apiKey;
   }
 
@@ -208,6 +215,29 @@ class LazyLibrarianAPI extends ExternalAPI {
 
   public async scanMagazine(title?: string): Promise<void> {
     await this.runCommand<unknown>('forceMagazineScan', title ? { title } : {});
+  }
+
+  public async getMagazineCover(coverId: string): Promise<SafeRemoteImage> {
+    if (!/^(?:[a-f\d]{32}|[a-f\d]{40})$/i.test(coverId)) {
+      throw new Error('Magazine cover ID is invalid.');
+    }
+
+    const coverUrl = new URL(this.serviceUrl);
+    coverUrl.pathname = `${coverUrl.pathname.replace(/\/+$/, '')}/cache/magazine/${coverId.toLowerCase()}.jpg`;
+    coverUrl.search = '';
+    coverUrl.hash = '';
+
+    const response = await this.axios.get<ArrayBuffer>(coverUrl.href, {
+      responseType: 'arraybuffer',
+      maxContentLength: MAX_SAFE_REMOTE_IMAGE_BYTES,
+      maxBodyLength: MAX_SAFE_REMOTE_IMAGE_BYTES,
+      headers: { Accept: 'image/*' },
+    });
+
+    return normalizeSafeRasterImage(
+      response.data,
+      response.headers['content-type']
+    );
   }
 }
 

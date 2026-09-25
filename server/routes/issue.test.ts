@@ -256,6 +256,34 @@ describe('Issue route validation', () => {
     });
   });
 
+  it('filters magazine issues by media type', async () => {
+    const magazineIssue = await createIssue(
+      'admin@seerr.dev',
+      115,
+      IssueType.OTHER,
+      IssueStatus.OPEN,
+      MediaType.MAGAZINE
+    );
+    await createIssue(
+      'admin@seerr.dev',
+      115,
+      IssueType.OTHER,
+      IssueStatus.OPEN,
+      MediaType.MOVIE
+    );
+    const agent = await login();
+
+    const response = await agent
+      .get('/issue')
+      .query({ mediaType: MediaType.MAGAZINE });
+
+    assert.strictEqual(response.status, 200);
+    assert.deepStrictEqual(
+      response.body.results.map(({ id }: { id: number }) => id),
+      [magazineIssue.id]
+    );
+  });
+
   it('filters movie issues through the media-specific metadata controls', async () => {
     const matchingIssue = await createIssue(
       'admin@seerr.dev',

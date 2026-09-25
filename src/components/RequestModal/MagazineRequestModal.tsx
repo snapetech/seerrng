@@ -1,3 +1,4 @@
+import Alert from '@app/components/Common/Alert';
 import Modal from '@app/components/Common/Modal';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestFooterStatus from '@app/components/RequestModal/RequestFooterStatus';
@@ -11,8 +12,9 @@ import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
+import type { MagazineServiceOption } from '@server/interfaces/api/serviceInterfaces';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
-import { hasAutoApprovePermission } from '@server/lib/permissions';
+import { Permission, hasAutoApprovePermission } from '@server/lib/permissions';
 import type { MagazineDetails } from '@server/models/Magazine';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
@@ -29,6 +31,8 @@ const messages = defineMessages('components.RequestModal.Magazine', {
   pendingApproval: 'Your request is pending approval.',
   requestFrom: "{username}'s request is pending approval.",
   requestError: 'Something went wrong while submitting the request.',
+  backendRequestFailed:
+    'The request was submitted, but LazyLibrarian rejected it while processing.',
   editError: 'Something went wrong while canceling the request.',
   latestIssue: 'Latest issue',
   status: 'Status',
@@ -36,6 +40,10 @@ const messages = defineMessages('components.RequestModal.Magazine', {
   readyToRequest: 'Ready to Request',
   approval: 'Approval',
   notAvailable: 'Not Available',
+  service: 'Service',
+  defaultService: 'Default ({name})',
+  noMagazineServer:
+    'No LazyLibrarian service is configured. Magazine requests are unavailable.',
 });
 
 interface MagazineRequestModalProps {
@@ -44,6 +52,7 @@ interface MagazineRequestModalProps {
   onComplete?: (newStatus: MediaStatus) => void;
   onUpdating?: (isUpdating: boolean) => void;
   editRequest?: NonFunctionProperties<MediaRequest>;
+  initialServerId?: number;
 }
 
 const MagazineRequestModal = ({
@@ -52,16 +61,23 @@ const MagazineRequestModal = ({
   onComplete,
   onUpdating,
   editRequest,
+  initialServerId,
 }: MagazineRequestModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { user } = useUser();
+  const { user, hasPermission } = useUser();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedServerId, setSelectedServerId] = useState<number | undefined>(
+    initialServerId
+  );
   const { data } = useSWR<MagazineDetails>(
     `/api/v1/magazine/${encodeApiPathSegment(magazineTitle)}`
   );
   const { data: quota } = useSWR<QuotaResponse>(
     user ? `/api/v1/user/${user.id}/quota` : null
+  );
+  const { data: magazineServices } = useSWR<MagazineServiceOption[]>(
+    '/api/v1/service/magazine'
   );
   useEffect(() => onUpdating?.(isUpdating), [isUpdating, onUpdating]);
 
@@ -79,6 +95,18 @@ const MagazineRequestModal = ({
       )
     );
   const requestCovered = isAvailable || isRequested;
+  const serviceUnavailable =
+    !!magazineServices && magazineServices.length === 0;
+  const canUseAdvancedOptions = hasPermission(
+    [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
+    { type: 'or' }
+  );
+  const selectedService = magazineServices?.find(
+    (service) => service.id === selectedServerId
+  );
+  const fallbackService = magazineServices?.find(
+    (service) => service.isDefault
+  );
   const hasAutoApprove = hasAutoApprovePermission(
     user?.permissions ?? 0,
     'magazine'
@@ -91,10 +119,20 @@ const MagazineRequestModal = ({
       const response = await axios.post<MediaRequest>('/api/v1/request', {
         mediaId: magazineTitle,
         mediaType: 'magazine',
+        ...(selectedServerId !== undefined
+          ? { serverId: selectedServerId }
+          : {}),
       });
       mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
       mutate('/api/v1/request/count');
       if (response.data) {
+        if (response.data.status === MediaRequestStatus.FAILED) {
+          addToast(intl.formatMessage(messages.backendRequestFailed), {
+            appearance: 'error',
+            autoDismiss: true,
+          });
+          return;
+        }
         onComplete?.(
           response.data.status === MediaRequestStatus.APPROVED
             ? MediaStatus.PROCESSING
@@ -123,7 +161,14 @@ const MagazineRequestModal = ({
     } finally {
       setIsUpdating(false);
     }
-  }, [addToast, intl, magazineTitle, onComplete, requestCovered]);
+  }, [
+    addToast,
+    intl,
+    magazineTitle,
+    onComplete,
+    requestCovered,
+    selectedServerId,
+  ]);
 
   const cancelRequest = async () => {
     if (!editRequest) return;
@@ -193,6 +238,14 @@ const MagazineRequestModal = ({
       {(quota?.magazine?.limit ?? 0) > 0 && (
         <QuotaDisplay mediaType="magazine" quota={quota?.magazine} />
       )}
+      {serviceUnavailable && (
+        <div className="mb-3">
+          <Alert
+            title={intl.formatMessage(messages.noMagazineServer)}
+            type="warning"
+          />
+        </div>
+      )}
       <RequestMediaCard artworkType="book">
         <div className="flex min-w-0 flex-col gap-3">
           <h3 className="text-lg leading-5 font-semibold text-white">
@@ -218,6 +271,14 @@ const MagazineRequestModal = ({
               )}
             </dd>
             <dt className="font-medium text-gray-100">
+              {intl.formatMessage(messages.service)}:
+            </dt>
+            <dd className="m-0 truncate">
+              {selectedService?.name ??
+                fallbackService?.name ??
+                intl.formatMessage(messages.notAvailable)}
+            </dd>
+            <dt className="font-medium text-gray-100">
               {intl.formatMessage(messages.approval)}:
             </dt>
             <dd className="m-0">
@@ -228,7 +289,36 @@ const MagazineRequestModal = ({
               />
             </dd>
           </dl>
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {canUseAdvancedOptions &&
+              magazineServices &&
+              magazineServices.length > 1 && (
+                <select
+                  className="request-form-control compact-control mr-auto rounded-md border px-2 text-[11px] font-medium"
+                  value={selectedServerId ?? ''}
+                  onChange={(event) =>
+                    setSelectedServerId(
+                      event.target.value === ''
+                        ? undefined
+                        : Number(event.target.value)
+                    )
+                  }
+                  aria-label={intl.formatMessage(messages.service)}
+                >
+                  <option value="">
+                    {fallbackService
+                      ? intl.formatMessage(messages.defaultService, {
+                          name: fallbackService.name,
+                        })
+                      : intl.formatMessage(messages.notAvailable)}
+                  </option>
+                  {magazineServices.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             <button
               type="button"
               onClick={onCancel}
@@ -241,7 +331,10 @@ const MagazineRequestModal = ({
               type="button"
               onClick={() => void sendRequest()}
               disabled={
-                isUpdating || requestCovered || quota?.magazine?.restricted
+                isUpdating ||
+                requestCovered ||
+                quota?.magazine?.restricted ||
+                serviceUnavailable
               }
               className="compact-control inline-flex items-center gap-1 disabled:opacity-40"
             >

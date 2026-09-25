@@ -206,6 +206,8 @@ Query parameters for `/discover/books`:
 |----------|------|-------------|
 | `GET /service/lidarr` | Required | List Lidarr servers |
 | `GET /service/lidarr/{id}` | Required | Lidarr server details |
+| `GET /service/comic` | Required | List Mylar3 and Kapowarr destinations |
+| `GET /service/magazine` | Required | List LazyLibrarian destinations |
 | `GET /service/readarr` | Required | List Bookshelf servers |
 | `GET /service/readarr/{id}` | Required | Bookshelf server details |
 

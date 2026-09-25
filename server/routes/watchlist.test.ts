@@ -7,7 +7,9 @@ import OpenLibraryAPI from '@server/api/openlibrary';
 import { MediaType } from '@server/constants/media';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
-import MediaIdentifier from '@server/entity/MediaIdentifier';
+import MediaIdentifier, {
+  MediaIdentifierProvider,
+} from '@server/entity/MediaIdentifier';
 import {
   MediaRequest,
   runWithRequestAdmission,
@@ -499,6 +501,61 @@ describe('POST /watchlist', () => {
     assert.strictEqual(mediaRequestMock.mock.callCount(), 0);
   });
 
+  it('adds magazine watchlist items and auto-requests them when enabled', async () => {
+    const userRepository = getRepository(User);
+    const admin = await userRepository.findOneOrFail({
+      where: { email: 'admin@seerr.dev' },
+    });
+    admin.settings = new UserSettings({ watchlistSyncMagazines: true });
+    await userRepository.save(admin);
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const response = await agent.post('/watchlist').send({
+      mediaType: MediaType.MAGAZINE,
+      externalId: '  The   New Yorker ',
+      title: 'The New Yorker',
+    });
+
+    assert.strictEqual(response.status, 201);
+    assert.strictEqual(response.body.externalId, 'the new yorker');
+    assert.strictEqual(response.body.title, 'The New Yorker');
+    assert.deepStrictEqual(mediaRequestMock.mock.calls[0].arguments[0], {
+      mediaId: 'The New Yorker',
+      mediaType: MediaType.MAGAZINE,
+    });
+    assert.strictEqual(
+      mediaRequestMock.mock.calls[0].arguments[2]?.isAutoRequest,
+      true
+    );
+
+    const identifier = await getRepository(MediaIdentifier).findOneOrFail({
+      where: {
+        provider: MediaIdentifierProvider.LAZYLIBRARIAN,
+        value: 'the new yorker',
+      },
+      relations: { media: true },
+    });
+    assert.strictEqual(identifier.canonical, true);
+    assert.strictEqual(identifier.media.mediaType, MediaType.MAGAZINE);
+  });
+
+  it('deduplicates magazine watchlist items by normalized title per user', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const first = await agent.post('/watchlist').send({
+      mediaType: MediaType.MAGAZINE,
+      externalId: 'The New Yorker',
+      title: 'The New Yorker',
+    });
+    const duplicate = await agent.post('/watchlist').send({
+      mediaType: MediaType.MAGAZINE,
+      externalId: '  THE   NEW YORKER ',
+      title: 'The New Yorker',
+    });
+
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(duplicate.status, 409);
+  });
+
   it('blocks duplicate comic watchlist items by ComicVine ID for the same user', async () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const body = {
@@ -778,6 +835,38 @@ describe('DELETE /watchlist/:mediaId', () => {
         where: {
           mediaType: MediaType.COMIC,
           externalId: '4321',
+          requestedBy: { id: admin.id },
+        },
+      }),
+      false
+    );
+  });
+
+  it('deletes magazine watchlist items by normalized title', async () => {
+    const admin = await getRepository(User).findOneOrFail({
+      where: { email: 'admin@seerr.dev' },
+    });
+    const watchlistRepository = getRepository(Watchlist);
+    await watchlistRepository.save(
+      new Watchlist({
+        mediaType: MediaType.MAGAZINE,
+        externalId: 'the new yorker',
+        title: 'The New Yorker',
+        requestedBy: admin,
+      })
+    );
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const response = await agent.delete(
+      `/watchlist/${encodeURIComponent('The   New Yorker')}?mediaType=magazine`
+    );
+
+    assert.strictEqual(response.status, 204);
+    assert.strictEqual(
+      await watchlistRepository.exists({
+        where: {
+          mediaType: MediaType.MAGAZINE,
+          externalId: 'the new yorker',
           requestedBy: { id: admin.id },
         },
       }),

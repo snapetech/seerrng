@@ -56,6 +56,7 @@ const issueMediaTypeFilters = [
   MediaType.MUSIC,
   MediaType.BOOK,
   MediaType.COMIC,
+  MediaType.MAGAZINE,
 ] as const;
 const issueTypeFilters = [
   'all',
@@ -425,7 +426,12 @@ issueRoutes.get<
       });
     }
 
-    if (parsedMediaType.value && parsedMediaType.value !== 'all') {
+    if (
+      parsedMediaType.value &&
+      parsedMediaType.value !== 'all' &&
+      parsedMediaType.value !== MediaType.COMIC &&
+      parsedMediaType.value !== MediaType.MAGAZINE
+    ) {
       if (parsedReleaseYear.value === 'before-1970') {
         query = query.andWhere(
           "COALESCE(searchMetadata.releaseDate, '') <> '' AND searchMetadata.releaseDate < :issueReleaseCutoff",

@@ -59,6 +59,14 @@ const PlexWatchlistSlider = () => {
               title={item.title}
               isAddedToWatchlist={true}
             />
+          ) : (item.mediaType === 'comic' || item.mediaType === 'magazine') &&
+            item.externalId ? (
+            <LibraryTitleCard
+              id={item.externalId}
+              type={item.mediaType}
+              title={item.title}
+              isAddedToWatchlist={true}
+            />
           ) : item.tmdbId ? (
             <TmdbTitleCard
               id={item.tmdbId}
@@ -82,7 +90,8 @@ const PlexWatchlistSlider = () => {
       !user?.settings?.watchlistSyncTv &&
       !user?.settings?.watchlistSyncMusic &&
       !user?.settings?.watchlistSyncBooks &&
-      !user?.settings?.watchlistSyncComics) ||
+      !user?.settings?.watchlistSyncComics &&
+      !user?.settings?.watchlistSyncMagazines) ||
     watchlistError
   ) {
     return null;

@@ -142,7 +142,7 @@ const normalizeSearchText = (value?: string) =>
 
 type MagazineCatalogSearchResults = {
   totalResults: number;
-  results: LazyLibrarianMagazine[];
+  results: (LazyLibrarianMagazine & { serviceId: number })[];
 };
 
 const searchLazyLibrarianCatalogs = async (
@@ -152,11 +152,13 @@ const searchLazyLibrarianCatalogs = async (
 ): Promise<MagazineCatalogSearchResults> => {
   const settled = await Promise.allSettled(
     services.map((service) =>
-      runWithServarrServiceSnapshot('lazylibrarian', service, (current) =>
-        new LazyLibrarianAPI({
-          url: LazyLibrarianAPI.buildUrl(current),
-          apiKey: current.apiKey,
-        }).getMagazines()
+      runWithServarrServiceSnapshot('lazylibrarian', service, async (current) =>
+        (
+          await new LazyLibrarianAPI({
+            url: LazyLibrarianAPI.buildUrl(current),
+            apiKey: current.apiKey,
+          }).getMagazines()
+        ).map((magazine) => ({ ...magazine, serviceId: current.id }))
       )
     )
   );
@@ -177,7 +179,10 @@ const searchLazyLibrarianCatalogs = async (
     });
   }
 
-  const magazinesByTitle = new Map<string, LazyLibrarianMagazine>();
+  const magazinesByTitle = new Map<
+    string,
+    LazyLibrarianMagazine & { serviceId: number }
+  >();
   for (const magazine of successful.flat()) {
     const key = normalizeMagazineTitle(magazine.title);
     if (key && !magazinesByTitle.has(key)) {
@@ -990,7 +995,8 @@ searchRoutes.get('/', async (req, res, next) => {
         mapLazyLibrarianMagazine(
           magazine,
           [],
-          magazineMediaMap.get(normalizeMagazineTitle(magazine.title))
+          magazineMediaMap.get(normalizeMagazineTitle(magazine.title)),
+          magazine.serviceId
         )
       );
 

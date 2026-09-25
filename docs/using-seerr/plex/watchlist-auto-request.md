@@ -1,95 +1,58 @@
 ---
 title: Watchlist Auto Request
-description: Learn how to use the Plex Watchlist Auto Request feature
+description: Automatically request Plex and SeerrNG watchlist items
 sidebar_position: 1
 ---
 
 # Watchlist Auto Request
 
-The Plex Watchlist Auto Request feature allows Seerr to automatically create requests for media items you add to your Plex Watchlist. Simply add content to your Plex Watchlist, and Seerr will automatically request it for you.
+SeerrNG can automatically request movies and series from a user's Plex
+Watchlist. Users can also keep local SeerrNG watchlists for music, books,
+comics, and magazines, and opt in to automatic requests for those formats.
 
-:::info
-This feature is only available for Plex users. Local users cannot use the Watchlist Auto Request feature.
-:::
+Both administrator permissions and the matching toggle in the user's profile
+are required. Auto requests still follow request permissions, quotas,
+availability, and blocklist state.
 
-## Prerequisites
+## Plex Watchlist: Movies and Series
 
-- You must have logged into Seerr at least once with your Plex account
-- Your administrator must have granted you the necessary permissions
-- Your Plex account must have access to the Plex server configured in Seerr
+This path is available to users who sign in through Plex and have access to the
+Plex server configured in SeerrNG.
 
-## Permission System
+An administrator grants **Auto-Request** and the applicable **Auto-Request
+Movies** and/or **Auto-Request Series** permission. In their profile under
+**General**, the user enables the matching **Auto-Request Movies** or
+**Auto-Request Series** toggle. SeerrNG periodically checks the Plex Watchlist
+and submits requests for eligible items that are not already available.
 
-The Watchlist Auto Request feature uses a two-tier permission system:
+## SeerrNG Watchlist: Music, Books, Comics, and Magazines
 
-### Administrator Permissions (Required)
-Your administrator must grant you these permissions in your user profile:
-- **Auto-Request** (master permission)
-- **Auto-Request Movies** (for movie auto-requests)
-- **Auto-Request Series** (for TV series auto-requests)
+Local SeerrNG watchlists are available for music albums, books, comics, and
+magazines. Add an item from its detail page or poster card. To submit a request
+automatically, the user needs **Auto-Request** plus the permission for that
+format, then enables its toggle in their profile under **General**:
 
-### User Activation (Required)
-You must enable the feature in your own profile settings:
-- **Auto-Request Movies** toggle
-- **Auto-Request Series** toggle
+- **Auto-Request Music**
+- **Auto-Request Books**
+- **Auto-Request Comics**
+- **Auto-Request Magazines**
 
-:::warning Two-Step Process
-Both administrator permissions AND user activation are required. Having permissions doesn't automatically enable the feature - you must also activate it in your profile.
-:::
-
-## How to Enable
-
-### Step 1: Check Your Permissions
-Contact your administrator to verify you have been granted:
-- `Auto-Request` permission
-- `Auto-Request Movies` and/or `Auto-Request Series` permissions
-
-### Step 2: Activate the Feature
-1. Go to your user profile settings
-2. Navigate to the "General" section
-3. Find the "Auto-Request" options
-4. Enable the toggles for:
-   - **Auto-Request Movies** - to automatically request movies from your watchlist
-   - **Auto-Request Series** - to automatically request TV series from your watchlist
-
-### Step 3: Start Using
-- Add movies and TV shows to your Plex Watchlist
-- Seerr will automatically create requests for new items
-- You'll receive notifications when items are auto-requested
-
-## How It Works
-
-Once properly configured, Seerr will:
-
-1. Periodically checks your Plex Watchlist for new items
-2. Verify if the content already exists in your media libraries
-3. Automatically submits requests for new items that aren't already available
-4. Only requests content types you have permissions for
-5. Notifiy you when auto-requests are created
-
-:::info Content Limitations
-Auto-request only works for standard quality content. 4K content must be requested manually if you have 4K permissions.
-:::
+SeerrNG submits an eligible request when the item is added to the local
+watchlist. For books, the request uses the default configured ebook destination
+when available, then the audiobook destination, and otherwise follows the
+standard book request default.
 
 ## For Administrators
 
-### Granting Permissions
-1. Navigate to **Users** > **[Select User]** > **Permissions**
-2. Enable the required permissions:
-   - **Auto-Request** (master toggle)
-   - **Auto-Request Movies** (for movie auto-requests)
-   - **Auto-Request Series** (for TV series auto-requests)
-3. Optionally enable **Auto-Approve** permissions for automatic approval
+Open **Users > [Select User] > Permissions** and grant **Auto-Request** and the
+specific format permissions the user should have. The user's profile toggle is
+still required. You can set defaults for new accounts under **Settings >
+Users > Default Permissions**.
 
-### Default Permissions
-- Go to **Settings** > **Users** > **Default Permissions**
-- Configure auto-request permissions for new users
-- This sets the default permissions but users still need to activate the feature individually
+## Limits
 
-## Limitations
-
-- Local users cannot use this feature
-- 4K content requires manual requests
-- Users must have logged into Seerr with their Plex account
-- Respects user request limits and quotas
-- Won't request content already in your libraries
+- Automatic requests obey the user's request quota, required request
+  permissions, existing availability, and blocklist entries.
+- 4K movie and series requests are not created by the Plex Watchlist flow.
+- Users can remove local music, book, comic, and magazine entries from their
+  SeerrNG watchlist at any time.

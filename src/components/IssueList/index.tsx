@@ -59,6 +59,7 @@ const messages = defineMessages('components.IssueList', {
   music: 'Music',
   books: 'Books',
   comics: 'Comics',
+  magazines: 'Magazines',
   issueType: 'Issue Type',
   releaseDate: 'Release Date',
   releaseYear: 'Release Year',
@@ -82,7 +83,8 @@ type Filter = 'all' | 'open' | 'resolved';
 type Sort = 'added' | 'modified' | 'status';
 type Direction = 'asc' | 'desc';
 type TimeFrame = '7d' | '14d' | '30d' | '6m' | 'all';
-type MediaFilter = 'all' | 'movie' | 'tv' | 'music' | 'book' | 'comic';
+type MediaFilter =
+  'all' | 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
 type IssueTypeFilter = 'all' | 'audio' | 'video' | 'subtitle' | 'other';
 
 const IssueList = () => {
@@ -301,6 +303,7 @@ const IssueList = () => {
               ['music', messages.music],
               ['book', messages.books],
               ['comic', messages.comics],
+              ['magazine', messages.magazines],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -357,34 +360,36 @@ const IssueList = () => {
               className="min-w-0 flex-1 border-0 bg-transparent px-2 py-0 text-xs font-medium text-gray-200 placeholder:text-gray-500 focus:ring-0"
             />
           </label>
-          {mediaFilter !== 'all' && mediaFilter !== 'comic' && (
-            <>
-              <CompactSelect
-                label={intl.formatMessage(
-                  mediaFilter === 'music'
-                    ? messages.releaseYear
-                    : mediaFilter === 'book'
-                      ? messages.firstPublished
-                      : messages.releaseDate
-                )}
-                value={releaseYearFilter}
-                options={yearOptions}
-                onChange={(value) => {
-                  setReleaseYearFilter(value);
-                  resetPage();
-                }}
-              />
-              <CompactSelect
-                label={intl.formatMessage(messages.genres)}
-                value={genreFilter}
-                options={genreOptions}
-                onChange={(value) => {
-                  setGenreFilter(value);
-                  resetPage();
-                }}
-              />
-            </>
-          )}
+          {mediaFilter !== 'all' &&
+            mediaFilter !== 'comic' &&
+            mediaFilter !== 'magazine' && (
+              <>
+                <CompactSelect
+                  label={intl.formatMessage(
+                    mediaFilter === 'music'
+                      ? messages.releaseYear
+                      : mediaFilter === 'book'
+                        ? messages.firstPublished
+                        : messages.releaseDate
+                  )}
+                  value={releaseYearFilter}
+                  options={yearOptions}
+                  onChange={(value) => {
+                    setReleaseYearFilter(value);
+                    resetPage();
+                  }}
+                />
+                <CompactSelect
+                  label={intl.formatMessage(messages.genres)}
+                  value={genreFilter}
+                  options={genreOptions}
+                  onChange={(value) => {
+                    setGenreFilter(value);
+                    resetPage();
+                  }}
+                />
+              </>
+            )}
           {mediaFilter === 'movie' && (
             <CompactSelect
               label={intl.formatMessage(messages.studio)}

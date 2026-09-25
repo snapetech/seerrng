@@ -12,7 +12,7 @@ const messages = defineMessages('components.IssueModal', {
 interface IssueOption {
   name: MessageDescriptor;
   issueType: IssueType;
-  mediaType?: 'movie' | 'tv' | 'music' | 'book' | 'comic';
+  mediaType?: 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
 }
 
 export const issueOptions: IssueOption[] = [
@@ -43,7 +43,11 @@ export const getIssueOptionsForMediaType = (
     );
   }
 
-  if (mediaType === 'book' || mediaType === 'comic') {
+  if (
+    mediaType === 'book' ||
+    mediaType === 'comic' ||
+    mediaType === 'magazine'
+  ) {
     return issueOptions.filter(
       (option) => option.issueType === IssueType.OTHER
     );

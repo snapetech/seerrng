@@ -9,6 +9,8 @@ import {
   isBookInProgress,
 } from '@app/utils/libraryMedia';
 import type { BookDetails } from '@server/models/Book';
+import type { ComicDetails } from '@server/models/Comic';
+import type { MagazineDetails } from '@server/models/Magazine';
 import type { MusicDetails } from '@server/models/Music';
 import { useMemo } from 'react';
 import { useInView } from 'react-intersection-observer';
@@ -16,7 +18,7 @@ import useSWR from 'swr';
 
 export interface LibraryTitleCardProps {
   id: string;
-  type: 'album' | 'book';
+  type: 'album' | 'book' | 'comic' | 'magazine';
   title?: string;
   canExpand?: boolean;
   isAddedToWatchlist?: boolean;
@@ -41,17 +43,20 @@ const LibraryTitleCard = ({
     () =>
       type === 'album'
         ? `/api/v1/music/${encodeApiPathSegment(normalizedId)}`
-        : `/api/v1/book/${encodeApiPathSegment(normalizedId)}`,
+        : type === 'book'
+          ? `/api/v1/book/${encodeApiPathSegment(normalizedId)}`
+          : type === 'comic'
+            ? `/api/v1/comic/${encodeApiPathSegment(normalizedId)}`
+            : `/api/v1/magazine/${encodeApiPathSegment(normalizedId)}`,
     [normalizedId, type]
   );
-  const { data: title, error } = useSWR<MusicDetails | BookDetails>(
-    inView ? url : null,
-    {
-      dedupingInterval: 30000,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    }
-  );
+  const { data: title, error } = useSWR<
+    MusicDetails | BookDetails | ComicDetails | MagazineDetails
+  >(inView ? url : null, {
+    dedupingInterval: 30000,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
 
   if (!title && !error && fallbackTitle) {
     return (
@@ -121,21 +126,64 @@ const LibraryTitleCard = ({
     );
   }
 
-  const book = title as BookDetails;
+  if (type === 'book') {
+    const book = title as BookDetails;
+
+    return (
+      <TitleCard
+        key={book.id}
+        id={book.id}
+        image={book.posterPath}
+        isAddedToWatchlist={book.mediaInfo?.watchlists?.length ?? true}
+        status={book.mediaInfo?.status}
+        title={book.title}
+        artist={book.author}
+        year={book.firstPublishYear?.toString()}
+        mediaType="book"
+        inProgress={isBookInProgress(book)}
+        canRequestAdditionalFormat={canRequestMissingBookFormat(book)}
+        canExpand={canExpand}
+        mutateParent={mutateParent}
+      />
+    );
+  }
+
+  if (type === 'comic') {
+    const comic = title as ComicDetails;
+
+    return (
+      <TitleCard
+        key={comic.id}
+        id={comic.id}
+        image={comic.posterPath}
+        isAddedToWatchlist={comic.onUserWatchlist ?? isAddedToWatchlist}
+        status={comic.mediaInfo?.status}
+        title={comic.title}
+        artist={comic.publisher}
+        year={comic.startYear}
+        mediaType="comic"
+        canExpand={canExpand}
+        mutateParent={mutateParent}
+      />
+    );
+  }
+
+  const magazine = title as MagazineDetails;
 
   return (
     <TitleCard
-      key={book.id}
-      id={book.id}
-      image={book.posterPath}
-      isAddedToWatchlist={book.mediaInfo?.watchlists?.length ?? true}
-      status={book.mediaInfo?.status}
-      title={book.title}
-      artist={book.author}
-      year={book.firstPublishYear?.toString()}
-      mediaType="book"
-      inProgress={isBookInProgress(book)}
-      canRequestAdditionalFormat={canRequestMissingBookFormat(book)}
+      key={magazine.id}
+      id={magazine.id}
+      image={magazine.posterPath}
+      isAddedToWatchlist={magazine.onUserWatchlist ?? isAddedToWatchlist}
+      status={magazine.mediaInfo?.status}
+      title={magazine.title}
+      artist={
+        magazine.latestIssue
+          ? `Latest issue ${magazine.latestIssue}`
+          : undefined
+      }
+      mediaType="magazine"
       canExpand={canExpand}
       mutateParent={mutateParent}
     />

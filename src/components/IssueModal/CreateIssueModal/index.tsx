@@ -10,6 +10,7 @@ import SeriesEpisodeSelector from '@app/components/IssueModal/CreateIssueModal/S
 import { getIssueOptionsForMediaType } from '@app/components/IssueModal/constants';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
+import { encodeApiPathSegment } from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
 import { PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/solid';
@@ -19,6 +20,7 @@ import type Issue from '@server/entity/Issue';
 import type { SeasonEpisodeSelection } from '@server/interfaces/api/seasonInterfaces';
 import type { BookDetails } from '@server/models/Book';
 import type { ComicDetails } from '@server/models/Comic';
+import type { MagazineDetails } from '@server/models/Magazine';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MusicDetails } from '@server/models/Music';
 import type { TvDetails } from '@server/models/Tv';
@@ -51,7 +53,12 @@ const messages = defineMessages('components.IssueModal.CreateIssueModal', {
 });
 
 type IssueMediaDetails =
-  MovieDetails | TvDetails | MusicDetails | BookDetails | ComicDetails;
+  | MovieDetails
+  | TvDetails
+  | MusicDetails
+  | BookDetails
+  | ComicDetails
+  | MagazineDetails;
 
 const isMusic = (media: IssueMediaDetails): media is MusicDetails => {
   return (media as MusicDetails).mediaType === 'album';
@@ -65,8 +72,12 @@ const isComic = (media: IssueMediaDetails): media is ComicDetails => {
   return (media as ComicDetails).mediaType === 'comic';
 };
 
+const isMagazine = (media: IssueMediaDetails): media is MagazineDetails => {
+  return (media as MagazineDetails).mediaType === 'magazine';
+};
+
 const isMovie = (movie: IssueMediaDetails): movie is MovieDetails => {
-  if (isMusic(movie) || isBook(movie) || isComic(movie)) {
+  if (isMusic(movie) || isBook(movie) || isComic(movie) || isMagazine(movie)) {
     return false;
   }
 
@@ -74,7 +85,7 @@ const isMovie = (movie: IssueMediaDetails): movie is MovieDetails => {
 };
 
 interface CreateIssueModalProps {
-  mediaType: 'movie' | 'tv' | 'music' | 'book' | 'comic';
+  mediaType: 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
   tmdbId?: number;
   mediaId?: number;
   title?: string;
@@ -97,7 +108,9 @@ const CreateIssueModal = ({
       ? tmdbId
         ? `/api/v1/${mediaType}/${tmdbId}`
         : null
-      : null;
+      : mediaType === 'magazine' && title
+        ? `/api/v1/magazine/${encodeApiPathSegment(title)}`
+        : null;
   const { data, error } = useSWR<IssueMediaDetails>(detailUrl);
 
   if (!tmdbId && !mediaId) {
@@ -110,7 +123,7 @@ const CreateIssueModal = ({
     (data
       ? isMusic(data)
         ? (data.artistBackdrop ?? data.artistThumb ?? data.posterPath)
-        : isBook(data) || isComic(data)
+        : isBook(data) || isComic(data) || isMagazine(data)
           ? data.posterPath
           : data.backdropPath
             ? `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.backdropPath}`
@@ -121,7 +134,11 @@ const CreateIssueModal = ({
   const resolvedTitle =
     title ??
     (data
-      ? isMovie(data) || isMusic(data) || isBook(data) || isComic(data)
+      ? isMovie(data) ||
+        isMusic(data) ||
+        isBook(data) ||
+        isComic(data) ||
+        isMagazine(data)
         ? data.title
         : data.name
       : undefined);
@@ -291,14 +308,18 @@ const CreateIssueModal = ({
                 embedded
                 rightDetails={[
                   { label: 'Status', value: 'Ready to Report' },
-                  {
-                    label: 'Quality',
-                    value: hasAvailableVideoQuality
-                      ? values.is4k
-                        ? intl.formatMessage(messages.ultraHd)
-                        : intl.formatMessage(messages.hd)
-                      : intl.formatMessage(messages.noAvailableQuality),
-                  },
+                  ...(mediaType === 'movie' || mediaType === 'tv'
+                    ? [
+                        {
+                          label: 'Quality',
+                          value: hasAvailableVideoQuality
+                            ? values.is4k
+                              ? intl.formatMessage(messages.ultraHd)
+                              : intl.formatMessage(messages.hd)
+                            : intl.formatMessage(messages.noAvailableQuality),
+                        },
+                      ]
+                    : []),
                 ]}
                 footer={
                   <>
@@ -334,7 +355,8 @@ const CreateIssueModal = ({
               !isMovie(data) &&
               !isMusic(data) &&
               !isBook(data) &&
-              !isComic(data) && (
+              !isComic(data) &&
+              !isMagazine(data) && (
                 <>
                   <SeriesEpisodeSelector
                     tvId={data.id}

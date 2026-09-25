@@ -192,6 +192,9 @@ export class UserSettings {
   @Column({ nullable: true })
   public watchlistSyncComics?: boolean;
 
+  @Column({ nullable: true })
+  public watchlistSyncMagazines?: boolean;
+
   @Column({ type: 'varchar', nullable: true })
   public cardTextVisibilityMovie?: CardTextVisibility;
 
@@ -258,6 +261,7 @@ export class UserSettings {
       watchlistSyncMusic: this.watchlistSyncMusic,
       watchlistSyncBooks: this.watchlistSyncBooks,
       watchlistSyncComics: this.watchlistSyncComics,
+      watchlistSyncMagazines: this.watchlistSyncMagazines,
       cardTextVisibilityMovie: this.cardTextVisibilityMovie,
       cardTextVisibilityTv: this.cardTextVisibilityTv,
       cardTextVisibilityAlbum: this.cardTextVisibilityAlbum,

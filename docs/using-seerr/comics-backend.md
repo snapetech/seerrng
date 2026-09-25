@@ -110,14 +110,24 @@ Point Kapowarr's FlareSolverr setting at the `flaresolverr` container, then:
 
 ## Known limitations
 
-This is a first-pass integration; the following are deliberate scope cuts,
-not bugs:
+This is a first-pass integration; the following is a deliberate scope cut, not
+a bug:
 
 - No per-request root-folder or profile picker. Users with advanced request
   permission can choose a comic server when multiple instances are configured;
   other requests use a configured default.
-- Comics do not currently support watchlists.
-- Comic issue reports support the **Other** category only.
+- Comic issue reports support the **Other** category only. Users with **Create
+  Issues** can report problems for an available tracked comic; users with
+  **View Issues** or **Manage Issues** can see open reports on comic details.
+
+Users with **Manage Blocklist** can blocklist a comic from its detail page or
+Discover card. Comic entries appear in the **Comics** filter on the Blocklist
+page, where they can be removed.
+
+Non-Plex users can add a comic to their SeerrNG watchlist from its detail page
+or card. Users with **Auto-Request** and **Auto-Request Comics** can turn on
+**Auto-Request Comics** in their profile to submit a comic request when they
+add it to that watchlist.
 
 Users with **Manage Requests** permission can open **Manage Comic** from a
 tracked comic's details page. Administrators can open the comic in its backend,

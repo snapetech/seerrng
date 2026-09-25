@@ -3587,17 +3587,21 @@ discoverRoutes.get('/magazines', async (req, res) => {
   try {
     const magazinesByTitle = new Map<
       string,
-      Awaited<ReturnType<LazyLibrarianAPI['getMagazines']>>[number]
+      Awaited<ReturnType<LazyLibrarianAPI['getMagazines']>>[number] & {
+        serviceId: number;
+      }
     >();
     for (const service of settings.lazylibrarian) {
       const magazines = await runWithServarrServiceSnapshot(
         'lazylibrarian',
         service,
         async (current) =>
-          new LazyLibrarianAPI({
-            url: LazyLibrarianAPI.buildUrl(current),
-            apiKey: current.apiKey,
-          }).getMagazines()
+          (
+            await new LazyLibrarianAPI({
+              url: LazyLibrarianAPI.buildUrl(current),
+              apiKey: current.apiKey,
+            }).getMagazines()
+          ).map((magazine) => ({ ...magazine, serviceId: current.id }))
       );
       for (const magazine of magazines) {
         const key = normalizeMagazineTitle(magazine.title);
@@ -3646,7 +3650,8 @@ discoverRoutes.get('/magazines', async (req, res) => {
         [],
         mediaByTitle.get(key)
           ? hydratedById.get(mediaByTitle.get(key)!.id)
-          : undefined
+          : undefined,
+        magazine.serviceId
       )
     );
 

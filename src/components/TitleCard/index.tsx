@@ -196,7 +196,9 @@ const TitleCard = ({
               mediaType: 'music',
               title,
             }
-          : mediaType === 'book' || mediaType === 'comic'
+          : mediaType === 'book' ||
+              mediaType === 'comic' ||
+              mediaType === 'magazine'
             ? {
                 externalId: actionId,
                 mediaType,
@@ -278,11 +280,17 @@ const TitleCard = ({
           await axios.post(
             `/api/v1/blocklist/collection/${encodeApiPathSegment(id)}`
           );
-        } else if (isAlbum || isBook) {
+        } else if (isAlbum || isBook || isComic || isMagazine) {
           await axios.post('/api/v1/blocklist', {
             externalId: actionId,
-            externalProvider: isAlbum ? 'musicbrainz' : 'openlibrary',
-            mediaType: isAlbum ? 'music' : 'book',
+            externalProvider: isAlbum
+              ? 'musicbrainz'
+              : isBook
+                ? 'openlibrary'
+                : isComic
+                  ? 'comicvine'
+                  : 'lazylibrarian',
+            mediaType: isAlbum ? 'music' : mediaType,
             title,
             user: user?.id,
           });
@@ -433,7 +441,7 @@ const TitleCard = ({
   const canUseRequestActions =
     canUseVideoActions || isAlbum || isBook || isComic || isMagazine;
   const canUseWatchlistActions =
-    canUseVideoActions || isAlbum || isBook || isComic;
+    canUseVideoActions || isAlbum || isBook || isComic || isMagazine;
   const detailHref =
     mediaType === 'movie'
       ? `/movie/${id}`
@@ -496,7 +504,7 @@ const TitleCard = ({
     hasPermission([Permission.MANAGE_BLOCKLIST], {
       type: 'or',
     }) &&
-    (canUseVideoActions || isAlbum || isBook);
+    (canUseVideoActions || isAlbum || isBook || isComic || isMagazine);
   const canRequest4k =
     ((mediaType === 'movie' && settings.currentSettings.movie4kEnabled) ||
       (mediaType === 'tv' && settings.currentSettings.series4kEnabled)) &&

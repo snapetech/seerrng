@@ -114,6 +114,16 @@ const ListView = ({
               canExpand
               mutateParent={mutateParent}
             />
+          ) : (title.mediaType === 'comic' || title.mediaType === 'magazine') &&
+            title.externalId ? (
+            <LibraryTitleCard
+              id={title.externalId}
+              type={title.mediaType}
+              title={title.title}
+              isAddedToWatchlist={true}
+              canExpand
+              mutateParent={mutateParent}
+            />
           ) : title.tmdbId ? (
             <TmdbTitleCard
               id={title.tmdbId}
@@ -277,6 +287,7 @@ const ListView = ({
               <TitleCard
                 key={title.id}
                 id={title.id}
+                isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
                 image={title.posterPath}
                 status={title.mediaInfo?.status}
                 title={title.title}
@@ -292,6 +303,8 @@ const ListView = ({
               <TitleCard
                 key={title.id}
                 id={title.id}
+                isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
+                image={title.posterPath}
                 status={title.mediaInfo?.status}
                 title={title.title}
                 artist={

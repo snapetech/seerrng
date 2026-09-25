@@ -26,17 +26,35 @@ export interface MagazineIssueReference {
 
 export interface MagazineDetails extends MagazineResult {
   issues: MagazineIssueReference[];
+  onUserWatchlist?: boolean;
 }
+
+const getMagazinePosterPath = (
+  magazine: LazyLibrarianMagazine,
+  serviceId?: number
+): string | undefined => {
+  const coverId = magazine.latestCover?.match(
+    /^cache\/magazine\/([a-f\d]{32}|[a-f\d]{40})\.jpg$/i
+  )?.[1];
+
+  if (!serviceId || !Number.isSafeInteger(serviceId) || !coverId) {
+    return undefined;
+  }
+
+  return `/api/v1/magazine/cover/${serviceId}/${coverId.toLowerCase()}`;
+};
 
 export const mapLazyLibrarianMagazine = (
   magazine: LazyLibrarianMagazine,
   issues: LazyLibrarianIssue[] = [],
-  media?: Media
+  media?: Media,
+  serviceId?: number
 ): MagazineResult => ({
   id: magazine.title,
   provider: 'lazylibrarian',
   mediaType: 'magazine',
   title: magazine.title,
+  posterPath: getMagazinePosterPath(magazine, serviceId),
   status: magazine.status,
   latestIssue: magazine.issueDate,
   issueCount: issues.length,
@@ -46,9 +64,12 @@ export const mapLazyLibrarianMagazine = (
 export const mapLazyLibrarianMagazineDetails = (
   magazine: LazyLibrarianMagazine,
   issues: LazyLibrarianIssue[],
-  media?: Media
+  media?: Media,
+  onUserWatchlist?: boolean,
+  serviceId?: number
 ): MagazineDetails => ({
-  ...mapLazyLibrarianMagazine(magazine, issues, media),
+  ...mapLazyLibrarianMagazine(magazine, issues, media, serviceId),
+  onUserWatchlist,
   issues: issues.map((issue) => ({
     id:
       issue.issueId ??

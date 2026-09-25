@@ -60,6 +60,23 @@ components:
           example: 1
         title:
           type: string
+        externalId:
+          type: string
+          description: Canonical external title ID, or normalized magazine title.
+        externalProvider:
+          type: string
+          enum:
+            [
+              musicbrainz,
+              openlibrary,
+              openlibrary_edition,
+              isbn,
+              comicvine,
+              lazylibrarian,
+            ]
+        mediaType:
+          type: string
+          enum: [movie, tv, music, book, comic, magazine]
         media:
           $ref: '#/components/schemas/MediaInfo'
         userId:
@@ -75,6 +92,15 @@ components:
         tmdbId:
           type: number
           example: 1
+        mbId:
+          type: string
+          description: MusicBrainz release group ID.
+        externalId:
+          type: string
+          description: Open Library work ID, ComicVine volume ID, or magazine title.
+        mediaType:
+          type: string
+          enum: [movie, tv, music, book, comic, magazine]
         ratingKey:
           type: string
         type:
@@ -258,6 +284,16 @@ components:
           nullable: true
           description: 'Enable watchlist sync for books'
           example: true
+        watchlistSyncComics:
+          type: boolean
+          nullable: true
+          description: 'Enable watchlist sync for comics'
+          example: false
+        watchlistSyncMagazines:
+          type: boolean
+          nullable: true
+          description: 'Enable watchlist sync for magazines'
+          example: false
         cardTextVisibility:
           $ref: '#/components/schemas/CardTextVisibilitySettings'
         detailDisclosureCastPinned:
@@ -1348,6 +1384,8 @@ components:
         title:
           type: string
           example: Batman
+        onUserWatchlist:
+          type: boolean
         aliases:
           type: array
           items:
@@ -1388,6 +1426,21 @@ components:
         backendType:
           type: string
           enum: [mylar, kapowarr]
+    MagazineServiceOption:
+      type: object
+      required:
+        - id
+        - name
+        - isDefault
+      properties:
+        id:
+          type: number
+          example: 1
+        name:
+          type: string
+          example: LazyLibrarian
+        isDefault:
+          type: boolean
     MagazineIssueReference:
       type: object
       required:
@@ -1418,6 +1471,9 @@ components:
           enum: [magazine]
         title:
           type: string
+        posterPath:
+          type: string
+          description: SeerrNG magazine cover URL when LazyLibrarian has a cached cover.
         status:
           type: string
         latestIssue:
@@ -1433,6 +1489,8 @@ components:
           required:
             - issues
           properties:
+            onUserWatchlist:
+              type: boolean
             issues:
               type: array
               items:
@@ -6718,7 +6776,7 @@ paths:
           name: mediaType
           schema:
             type: string
-            enum: [all, movie, tv, music, book]
+            enum: [all, movie, tv, music, book, comic, magazine]
             default: all
         - in: query
           name: sort
@@ -6812,6 +6870,8 @@ paths:
               - tv
               - music
               - book
+              - comic
+              - magazine
       responses:
         '200':
           description: Blocklist details in JSON
@@ -6837,6 +6897,8 @@ paths:
               - tv
               - music
               - book
+              - comic
+              - magazine
       responses:
         '204':
           description: Succesfully removed media item
@@ -6949,6 +7011,8 @@ paths:
               - tv
               - music
               - book
+              - comic
+              - magazine
       responses:
         '200':
           description: Blocklist details in JSON
@@ -7041,7 +7105,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Watchlist'
-  /watchlist/{tmdbId}:
+  /watchlist/{mediaId}:
     delete:
       summary: Delete watchlist item
       description: Removes a watchlist item.
@@ -7049,8 +7113,8 @@ paths:
         - watchlist
       parameters:
         - in: path
-          name: tmdbId
-          description: tmdbId ID
+          name: mediaId
+          description: TMDB ID, external media ID, or magazine title
           required: true
           example: '1'
           schema:
@@ -7063,6 +7127,10 @@ paths:
             enum:
               - movie
               - tv
+              - music
+              - book
+              - comic
+              - magazine
       responses:
         '204':
           description: Succesfully removed watchlist item
@@ -9283,6 +9351,35 @@ paths:
           description: Comic not found
         '503':
           description: ComicVine is not configured on this server
+  /magazine/cover/{serviceId}/{coverId}:
+    get:
+      summary: Get a magazine cover
+      description: Returns a cached LazyLibrarian magazine cover through SeerrNG.
+      tags:
+        - search
+      parameters:
+        - in: path
+          name: serviceId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: path
+          name: coverId
+          required: true
+          schema:
+            type: string
+            pattern: '^(?:[a-fA-F0-9]{32}|[a-fA-F0-9]{40})$'
+      responses:
+        '200':
+          description: Magazine cover image returned
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Magazine cover not found
   /magazine/{title}:
     get:
       summary: Get magazine details
@@ -9494,6 +9591,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ComicServiceOption'
+  /service/magazine:
+    get:
+      summary: Get LazyLibrarian magazine service summaries
+      tags:
+        - service
+      responses:
+        '200':
+          description: Magazine services returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MagazineServiceOption'
   /service/readarr:
     get:
       summary: Get Bookshelf service summaries
@@ -11743,7 +11854,7 @@ paths:
           name: mediaType
           schema:
             type: string
-            enum: [all, movie, tv, music, book, comic]
+            enum: [all, movie, tv, music, book, comic, magazine]
             default: all
         - in: query
           name: issueType

@@ -1,6 +1,7 @@
 import { MediaType } from '@server/constants/media';
 import { MediaIdentifierProvider } from '@server/entity/MediaIdentifier';
 import { normalizeValidIsbn } from '@server/lib/isbn';
+import { normalizeMagazineTitle } from '@server/lib/magazineIdentity';
 
 export const normalizeMusicBrainzId = (id: string): string =>
   id.trim().toLowerCase();
@@ -87,7 +88,9 @@ export const normalizeExternalMediaId = (
     ? normalizeMusicBrainzId(id)
     : mediaType === MediaType.BOOK
       ? normalizeExternalBookId(id, provider)
-      : id.trim();
+      : mediaType === MediaType.MAGAZINE
+        ? normalizeMagazineTitle(id)
+        : id.trim();
 
 export const isValidExternalMediaId = (
   id: string,
@@ -107,6 +110,16 @@ export const isValidExternalMediaId = (
       (provider === undefined ||
         provider === MediaIdentifierProvider.COMICVINE) &&
       /^\d+$/.test(id.trim())
+    );
+  }
+
+  if (mediaType === MediaType.MAGAZINE) {
+    const normalizedId = normalizeMagazineTitle(id);
+    return (
+      (provider === undefined ||
+        provider === MediaIdentifierProvider.LAZYLIBRARIAN) &&
+      normalizedId.length > 0 &&
+      normalizedId.length <= 256
     );
   }
 

@@ -8,6 +8,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import type {
   ComicServiceOption,
+  MagazineServiceOption,
   ServiceCommonServer,
   ServiceCommonServerWithDetails,
 } from '@server/interfaces/api/serviceInterfaces';
@@ -384,6 +385,23 @@ serviceRoutes.get('/comic', async (req, res, next) => {
       ];
 
       return res.status(200).json(comicServices);
+    });
+  } catch (error) {
+    return reportServiceSummaryReadError(error, next);
+  }
+});
+
+serviceRoutes.get('/magazine', async (req, res, next) => {
+  try {
+    return await runServiceSummaryRead(req, () => {
+      const magazineServices: MagazineServiceOption[] =
+        getExternalRuntimeConfig().lazylibrarian.map((service) => ({
+          id: service.id,
+          name: service.name,
+          isDefault: service.isDefault,
+        }));
+
+      return res.status(200).json(magazineServices);
     });
   } catch (error) {
     return reportServiceSummaryReadError(error, next);

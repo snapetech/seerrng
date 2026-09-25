@@ -129,7 +129,8 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
       mediaType !== MediaType.TV &&
       mediaType !== MediaType.MUSIC &&
       mediaType !== MediaType.BOOK &&
-      mediaType !== MediaType.COMIC
+      mediaType !== MediaType.COMIC &&
+      mediaType !== MediaType.MAGAZINE
     ) {
       return next({
         status: 400,
@@ -140,7 +141,8 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     const parsedMediaId =
       mediaType === MediaType.MUSIC ||
       mediaType === MediaType.BOOK ||
-      mediaType === MediaType.COMIC
+      mediaType === MediaType.COMIC ||
+      mediaType === MediaType.MAGAZINE
         ? parseWatchlistExternalId(req.params.mediaId)
         : parseWatchlistNumericId(req.params.mediaId);
 
@@ -151,7 +153,9 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     const mediaId =
       mediaType === MediaType.MUSIC
         ? normalizeMusicBrainzId(parsedMediaId as string)
-        : mediaType === MediaType.BOOK || mediaType === MediaType.COMIC
+        : mediaType === MediaType.BOOK ||
+            mediaType === MediaType.COMIC ||
+            mediaType === MediaType.MAGAZINE
           ? normalizeExternalMediaId(parsedMediaId as string, mediaType)
           : parsedMediaId;
     if (
@@ -169,6 +173,12 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     if (
       mediaType === MediaType.COMIC &&
       !isValidExternalMediaId(mediaId as string, MediaType.COMIC)
+    ) {
+      return next({ status: 400, message: 'Invalid mediaId parameter.' });
+    }
+    if (
+      mediaType === MediaType.MAGAZINE &&
+      !isValidExternalMediaId(mediaId as string, MediaType.MAGAZINE)
     ) {
       return next({ status: 400, message: 'Invalid mediaId parameter.' });
     }

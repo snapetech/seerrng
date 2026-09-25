@@ -4,6 +4,7 @@ import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
+import ExternalBlocklistModal from '@app/components/ExternalBlocklistModal';
 import IssueBlock from '@app/components/IssueBlock';
 import AvailabilityValue, {
   getMediaAvailabilityTone,
@@ -20,6 +21,7 @@ import {
   ArrowTopRightOnSquareIcon,
   CogIcon,
   ExclamationTriangleIcon,
+  EyeSlashIcon,
   InformationCircleIcon,
   MinusCircleIcon,
   StarIcon,
@@ -80,6 +82,8 @@ const ComicDetails = () => {
   const [editRequest, setEditRequest] =
     useState<NonFunctionProperties<MediaRequest>>();
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showBlocklistModal, setShowBlocklistModal] = useState(false);
+  const [isBlocklisting, setIsBlocklisting] = useState(false);
   const [showManager, setShowManager] = useState(router.query.manage === '1');
   const [isWatchlistUpdating, setIsWatchlistUpdating] = useState(false);
   const [toggleWatchlist, setToggleWatchlist] = useState(true);
@@ -142,6 +146,9 @@ const ComicDetails = () => {
   const canWatchlist =
     data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
     user?.userType !== UserType.PLEX;
+  const canUseBlocklist = hasPermission(Permission.MANAGE_BLOCKLIST);
+  const isBlocklistAvailable =
+    data.mediaInfo?.status !== MediaStatus.BLOCKLISTED;
   const canUseReportIssue = hasPermission(
     [Permission.MANAGE_ISSUES, Permission.CREATE_ISSUES],
     { type: 'or' }
@@ -222,6 +229,39 @@ const ComicDetails = () => {
     }
   };
 
+  const blocklistComic = async (): Promise<void> => {
+    setIsBlocklisting(true);
+
+    try {
+      await axios.post('/api/v1/blocklist', {
+        externalId: data.id,
+        externalProvider: 'comicvine',
+        mediaType: MediaType.COMIC,
+        title: data.title,
+      });
+      addToast(
+        <span>
+          {intl.formatMessage(globalMessages.blocklistSuccess, {
+            title: data.title,
+            strong: (message: React.ReactNode) => (
+              <strong key="strong">{message}</strong>
+            ),
+          })}
+        </span>,
+        { appearance: 'success', autoDismiss: true }
+      );
+      void revalidate();
+    } catch {
+      addToast(intl.formatMessage(globalMessages.blocklistError), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      setIsBlocklisting(false);
+      setShowBlocklistModal(false);
+    }
+  };
+
   return (
     <>
       <PageTitle title={data.title} />
@@ -248,6 +288,17 @@ const ComicDetails = () => {
           title={data.title}
           backdrop={data.posterPath}
           onCancel={() => setShowIssueModal(false)}
+        />
+      )}
+      {showBlocklistModal && (
+        <ExternalBlocklistModal
+          show
+          type="comic"
+          title={data.title}
+          backdrop={data.posterPath}
+          onCancel={() => setShowBlocklistModal(false)}
+          onComplete={() => void blocklistComic()}
+          isUpdating={isBlocklisting}
         />
       )}
       {showRequestModal && (
@@ -330,6 +381,30 @@ const ComicDetails = () => {
             </div>
 
             <div className="media-primary-action-row">
+              {canUseBlocklist && (
+                <Tooltip
+                  content={intl.formatMessage(
+                    isBlocklistAvailable
+                      ? globalMessages.addToBlocklist
+                      : globalMessages.alreadyBlocklisted
+                  )}
+                >
+                  <Button
+                    buttonType="blocklist"
+                    buttonSize="sm"
+                    onClick={() => setShowBlocklistModal(true)}
+                    disabled={!isBlocklistAvailable}
+                    disabledReason={intl.formatMessage(
+                      globalMessages.alreadyBlocklisted
+                    )}
+                    aria-label={intl.formatMessage(
+                      globalMessages.addToBlocklist
+                    )}
+                  >
+                    <EyeSlashIcon />
+                  </Button>
+                </Tooltip>
+              )}
               {canWatchlist && (
                 <Tooltip
                   content={intl.formatMessage(
