@@ -7,9 +7,9 @@ sidebar_position: 3
 # YunoHost
 
 :::warning
-The YunoHost package is maintained in the SeerrNG repository, but it is not yet
-listed in YunoHost's official app catalog. Catalog inclusion is reviewed and
-managed by the YunoHost community.
+The package's catalog entry is awaiting review by YunoHost maintainers. Until it
+is listed in the official catalog, install it from the dedicated package
+repository below.
 :::
 
 ## Requirements
@@ -25,12 +25,13 @@ directory, and configures YunoHost's Nginx reverse proxy and HTTPS certificate.
 YunoHost's LDAP login and single sign-on are not used. Sign-in and user access
 are managed by SeerrNG and the media server you connect during setup.
 
-## Install the package branch
+## Install the package
 
-The package is available for manual installation from the `yunohost` branch:
+The package is available for manual installation from the
+[`seerrng_ynh` repository](https://github.com/snapetech/seerrng_ynh):
 
 ```bash
-sudo yunohost app install https://github.com/snapetech/seerrng/tree/yunohost --debug
+sudo yunohost app install https://github.com/snapetech/seerrng_ynh --debug
 ```
 
 Choose the dedicated domain and `/` as the installation path. After installation,
@@ -40,28 +41,18 @@ open the app URL and complete SeerrNG's first-run setup.
 
 Use YunoHost's normal app upgrade and backup/restore tools. The package pins
 each upstream release archive by SHA-256 and supports YunoHost's app backup and
-restore lifecycle. The Node.js 22 runtime is managed by YunoHost.
+restore lifecycle. Its source metadata tracks stable SeerrNG releases, and
+YunoHost's updater periodically proposes archive URL and checksum changes for
+administrators to apply with the normal app upgrade flow. The Node.js 22 runtime
+is managed by YunoHost.
 
 Application logs are available from YunoHost's service page and in
 `/home/yunohost.app/seerrng/logs/seerr.log` (the data directory uses a different
 instance name for additional installations). To inspect service output over
 SSH, run `sudo journalctl -u seerrng`.
 
-## Request official catalog inclusion
+## Catalog status
 
-To make the package available in the YunoHost app catalog, follow YunoHost's
-[catalog submission guide](https://doc.yunohost.org/dev/packaging/publish/).
-Fork `YunoHost/apps` and add this entry to `apps.toml`:
-
-```toml
-[seerrng]
-url = "https://github.com/snapetech/seerrng"
-branch = "yunohost"
-category = "multimedia"
-state = "inprogress"
-```
-
-Copy [`public/android-chrome-512x512.png`](https://github.com/snapetech/seerrng/blob/main/public/android-chrome-512x512.png)
-to `logos/seerrng.png`, then open a pull request. Do not set `level`; YunoHost's
-CI determines it. The YunoHost maintainers may ask for changes or for the
-package to move to a dedicated `YunoHost-Apps` repository.
+The package has been submitted to YunoHost's official app catalog and is
+awaiting maintainer review. The [catalog submission guide](https://doc.yunohost.org/dev/packaging/publish/)
+describes how catalog inclusion and maintenance work.
