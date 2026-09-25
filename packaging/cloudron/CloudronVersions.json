@@ -1,0 +1,30 @@
+{
+  "stable": true,
+  "versions": {
+    "3.27.1": {
+      "creationDate": "Fri, 25 Sep 2026 20:57:09 GMT",
+      "manifest": {
+        "id": "tech.snapetech.seerrng",
+        "title": "SeerrNG",
+        "author": "Snapetech",
+        "description": "Self-hosted media requests and discovery for Plex, Jellyfin, and Emby across movies, TV, music, ebooks, and audiobooks.",
+        "tagline": "Media requests and discovery across movies, TV, music, and books",
+        "version": "3.27.1",
+        "upstreamVersion": "v3.27.1",
+        "healthCheckPath": "/api/v1/settings/public",
+        "httpPort": 5055,
+        "addons": {"localstorage": {}},
+        "persistentDirs": ["/app/config"],
+        "manifestVersion": 2,
+        "website": "https://github.com/snapetech/seerrng",
+        "documentationUrl": "https://snapetech.github.io/seerrng/",
+        "packageUrl": "https://github.com/snapetech/seerrng",
+        "iconUrl": "https://raw.githubusercontent.com/snapetech/seerrng/main/public/android-chrome-512x512.png",
+        "tags": ["media", "requests", "plex", "jellyfin", "emby"],
+        "dockerImage": "docker.io/snapetech/seerrng:v3.27.1"
+      },
+      "publishState": "published",
+      "ts": "Fri, 25 Sep 2026 20:57:09 GMT"
+    }
+  }
+}

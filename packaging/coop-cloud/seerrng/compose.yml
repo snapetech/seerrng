@@ -1,0 +1,28 @@
+services:
+  app:
+    image: docker.io/snapetech/seerrng:v3.27.1
+    environment:
+      LOG_LEVEL: info
+      PORT: "5055"
+    volumes:
+      - seerrng_config:/app/config
+    networks:
+      - proxy
+    deploy:
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=proxy"
+        - "traefik.http.services.${STACK_NAME}.loadbalancer.server.port=5055"
+        - "traefik.http.routers.${STACK_NAME}.rule=Host(`${DOMAIN}`${EXTRA_DOMAINS})"
+        - "traefik.http.routers.${STACK_NAME}.entrypoints=web-secure"
+        - "traefik.http.routers.${STACK_NAME}.tls.certresolver=${LETS_ENCRYPT_ENV}"
+        - "coop-cloud.${STACK_NAME}.version=v3.27.1"
+
+volumes:
+  seerrng_config:
+
+networks:
+  proxy:
+    external: true
