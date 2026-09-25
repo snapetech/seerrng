@@ -1,3 +1,4 @@
+import Spinner from '@app/assets/spinner.svg';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
@@ -8,6 +9,7 @@ import AvailabilityValue, {
   getMediaAvailabilityTone,
 } from '@app/components/MediaDetails/AvailabilityValue';
 import MediaDetailArtwork from '@app/components/MediaDetails/MediaDetailArtwork';
+import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
@@ -19,6 +21,8 @@ import {
   CogIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
+  MinusCircleIcon,
+  StarIcon,
 } from '@heroicons/react/24/solid';
 import { IssueStatus } from '@server/constants/issue';
 import {
@@ -26,9 +30,11 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { UserType } from '@server/constants/user';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { ComicDetails as ComicDetailsType } from '@server/models/Comic';
+import axios from 'axios';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
@@ -57,17 +63,26 @@ const messages = defineMessages('components.ComicDetails', {
   manage: 'Manage Comic',
   reportissue: 'Report an Issue',
   openissues: 'Open Issues',
+  watchlistSuccess: '<strong>{title}</strong> added to watchlist successfully!',
+  watchlistDeleted:
+    '<strong>{title}</strong> Removed from watchlist successfully!',
+  watchlistError: 'Something went wrong. Please try again.',
+  removefromwatchlist: 'Remove From Watchlist',
+  addtowatchlist: 'Add To Watchlist',
 });
 
 const ComicDetails = () => {
   const router = useRouter();
   const intl = useIntl();
+  const { addToast } = useToasts();
   const { user, hasPermission } = useUser();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [editRequest, setEditRequest] =
     useState<NonFunctionProperties<MediaRequest>>();
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [showManager, setShowManager] = useState(router.query.manage === '1');
+  const [isWatchlistUpdating, setIsWatchlistUpdating] = useState(false);
+  const [toggleWatchlist, setToggleWatchlist] = useState(true);
   const comicId =
     typeof router.query.comicId === 'string' ? router.query.comicId : '';
 
@@ -82,6 +97,10 @@ const ComicDetails = () => {
   useEffect(() => {
     setShowManager(router.query.manage === '1');
   }, [router.query.manage]);
+
+  useEffect(() => {
+    setToggleWatchlist(!data?.onUserWatchlist);
+  }, [data?.onUserWatchlist]);
 
   if (!data && !error) {
     return <LoadingSpinner />;
@@ -120,6 +139,9 @@ const ComicDetails = () => {
   const isManageAvailable = Boolean(
     data.mediaInfo && data.mediaInfo.status !== MediaStatus.UNKNOWN
   );
+  const canWatchlist =
+    data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
+    user?.userType !== UserType.PLEX;
   const canUseReportIssue = hasPermission(
     [Permission.MANAGE_ISSUES, Permission.CREATE_ISSUES],
     { type: 'or' }
@@ -132,6 +154,73 @@ const ComicDetails = () => {
     data.mediaInfo?.issues?.filter(
       (issue) => issue.status === IssueStatus.OPEN
     ) ?? [];
+
+  const addToWatchlist = async (): Promise<void> => {
+    setIsWatchlistUpdating(true);
+
+    try {
+      const response = await axios.post('/api/v1/watchlist', {
+        externalId: data.id,
+        mediaType: MediaType.COMIC,
+        title: data.title,
+      });
+
+      if (response.data) {
+        addToast(
+          <span>
+            {intl.formatMessage(messages.watchlistSuccess, {
+              title: data.title,
+              strong: (msg: React.ReactNode) => (
+                <strong key="strong">{msg}</strong>
+              ),
+            })}
+          </span>,
+          { appearance: 'success', autoDismiss: true }
+        );
+      }
+
+      setToggleWatchlist(false);
+    } catch {
+      addToast(intl.formatMessage(messages.watchlistError), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      setIsWatchlistUpdating(false);
+      revalidate();
+    }
+  };
+
+  const removeFromWatchlist = async (): Promise<void> => {
+    setIsWatchlistUpdating(true);
+
+    try {
+      await axios.delete(
+        `/api/v1/watchlist/${encodeApiPathSegment(data.id)}?mediaType=comic`
+      );
+
+      addToast(
+        <span>
+          {intl.formatMessage(messages.watchlistDeleted, {
+            title: data.title,
+            strong: (msg: React.ReactNode) => (
+              <strong key="strong">{msg}</strong>
+            ),
+          })}
+        </span>,
+        { appearance: 'info', autoDismiss: true }
+      );
+      setToggleWatchlist(true);
+    } catch {
+      addToast(intl.formatMessage(messages.watchlistError), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      setIsWatchlistUpdating(false);
+      revalidate();
+    }
+  };
 
   return (
     <>
@@ -241,6 +330,36 @@ const ComicDetails = () => {
             </div>
 
             <div className="media-primary-action-row">
+              {canWatchlist && (
+                <Tooltip
+                  content={intl.formatMessage(
+                    toggleWatchlist
+                      ? messages.addtowatchlist
+                      : messages.removefromwatchlist
+                  )}
+                >
+                  <Button
+                    buttonType={toggleWatchlist ? 'ghost' : 'default'}
+                    buttonSize="sm"
+                    onClick={
+                      toggleWatchlist ? addToWatchlist : removeFromWatchlist
+                    }
+                    aria-label={intl.formatMessage(
+                      toggleWatchlist
+                        ? messages.addtowatchlist
+                        : messages.removefromwatchlist
+                    )}
+                  >
+                    {isWatchlistUpdating ? (
+                      <Spinner />
+                    ) : toggleWatchlist ? (
+                      <StarIcon className="text-amber-300" />
+                    ) : (
+                      <MinusCircleIcon />
+                    )}
+                  </Button>
+                </Tooltip>
+              )}
               {canUseManage && (
                 <Tooltip
                   content={intl.formatMessage(

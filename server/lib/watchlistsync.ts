@@ -104,13 +104,15 @@ class WatchlistSync {
             Permission.AUTO_REQUEST_TV,
             Permission.AUTO_REQUEST_MUSIC,
             Permission.AUTO_REQUEST_BOOK,
+            Permission.AUTO_REQUEST_COMIC,
           ],
           { type: 'or' }
         ) ||
         (!activeUser.settings?.watchlistSyncMovies &&
           !activeUser.settings?.watchlistSyncTv &&
           !activeUser.settings?.watchlistSyncMusic &&
-          !activeUser.settings?.watchlistSyncBooks)
+          !activeUser.settings?.watchlistSyncBooks &&
+          !activeUser.settings?.watchlistSyncComics)
       ) {
         return undefined;
       }

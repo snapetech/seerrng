@@ -13,10 +13,11 @@ import { QueryFailedError } from 'typeorm';
 import { MediaType } from '@server/constants/media';
 import { watchlistCreate } from '@server/interfaces/api/watchlistCreate';
 import {
+  isValidExternalMediaId,
   isValidMusicBrainzResourceId,
   isValidOpenLibraryResourceId,
+  normalizeExternalMediaId,
   normalizeMusicBrainzId,
-  normalizeOpenLibraryWorkId,
 } from '@server/lib/externalIds';
 import { UserMutationActorUnauthorizedError } from '@server/lib/userSecurityMutation';
 
@@ -61,7 +62,10 @@ watchlistRoutes.post<never, Watchlist, Watchlist>(
           ? normalizeMusicBrainzId(parsedBody.data.mbId)
           : undefined,
         externalId: parsedBody.data.externalId
-          ? normalizeOpenLibraryWorkId(parsedBody.data.externalId)
+          ? normalizeExternalMediaId(
+              parsedBody.data.externalId,
+              parsedBody.data.mediaType
+            )
           : undefined,
       };
       logPayload = {
@@ -124,7 +128,8 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
       mediaType !== MediaType.MOVIE &&
       mediaType !== MediaType.TV &&
       mediaType !== MediaType.MUSIC &&
-      mediaType !== MediaType.BOOK
+      mediaType !== MediaType.BOOK &&
+      mediaType !== MediaType.COMIC
     ) {
       return next({
         status: 400,
@@ -133,7 +138,9 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     }
 
     const parsedMediaId =
-      mediaType === MediaType.MUSIC || mediaType === MediaType.BOOK
+      mediaType === MediaType.MUSIC ||
+      mediaType === MediaType.BOOK ||
+      mediaType === MediaType.COMIC
         ? parseWatchlistExternalId(req.params.mediaId)
         : parseWatchlistNumericId(req.params.mediaId);
 
@@ -144,8 +151,8 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     const mediaId =
       mediaType === MediaType.MUSIC
         ? normalizeMusicBrainzId(parsedMediaId as string)
-        : mediaType === MediaType.BOOK
-          ? normalizeOpenLibraryWorkId(parsedMediaId as string)
+        : mediaType === MediaType.BOOK || mediaType === MediaType.COMIC
+          ? normalizeExternalMediaId(parsedMediaId as string, mediaType)
           : parsedMediaId;
     if (
       mediaType === MediaType.MUSIC &&
@@ -156,6 +163,12 @@ watchlistRoutes.delete('/:mediaId', async (req, res, next) => {
     if (
       mediaType === MediaType.BOOK &&
       !isValidOpenLibraryResourceId(mediaId as string)
+    ) {
+      return next({ status: 400, message: 'Invalid mediaId parameter.' });
+    }
+    if (
+      mediaType === MediaType.COMIC &&
+      !isValidExternalMediaId(mediaId as string, MediaType.COMIC)
     ) {
       return next({ status: 400, message: 'Invalid mediaId parameter.' });
     }

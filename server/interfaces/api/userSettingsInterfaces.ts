@@ -70,6 +70,7 @@ export interface UserSettingsGeneralResponse {
   watchlistSyncTv?: boolean;
   watchlistSyncMusic?: boolean;
   watchlistSyncBooks?: boolean;
+  watchlistSyncComics?: boolean;
   cardTextVisibility?: UserSettingsCardTextResponse;
 }
 

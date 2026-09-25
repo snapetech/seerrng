@@ -46,6 +46,7 @@ export interface UserSettings {
   watchlistSyncTv?: boolean;
   watchlistSyncMusic?: boolean;
   watchlistSyncBooks?: boolean;
+  watchlistSyncComics?: boolean;
   cardTextVisibilityMovie?: CardTextVisibility;
   cardTextVisibilityTv?: CardTextVisibility;
   cardTextVisibilityAlbum?: CardTextVisibility;

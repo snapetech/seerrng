@@ -89,6 +89,9 @@ const messages = defineMessages(
     bookwatchlistsync: 'Auto-Request Books',
     bookwatchlistsynctip:
       'Automatically request books added to SeerrNG book watchlists when a supported book watchlist source is available.',
+    comicwatchlistsync: 'Auto-Request Comics',
+    comicwatchlistsynctip:
+      'Automatically request comics added to your SeerrNG comic watchlist.',
     cardTextVisibility: 'Card Titles',
     cardTextVisibilityTip:
       'Choose when each media type shows title text on poster cards.',
@@ -269,6 +272,7 @@ const UserGeneralSettings = () => {
           watchlistSyncTv: data?.watchlistSyncTv,
           watchlistSyncMusic: data?.watchlistSyncMusic,
           watchlistSyncBooks: data?.watchlistSyncBooks,
+          watchlistSyncComics: data?.watchlistSyncComics,
           cardTextVisibilityMovie: data?.cardTextVisibility?.movie ?? 'hover',
           cardTextVisibilityTv: data?.cardTextVisibility?.tv ?? 'hover',
           cardTextVisibilityAlbum: data?.cardTextVisibility?.album ?? 'always',
@@ -333,6 +337,7 @@ const UserGeneralSettings = () => {
               watchlistSyncTv: values.watchlistSyncTv,
               watchlistSyncMusic: values.watchlistSyncMusic,
               watchlistSyncBooks: values.watchlistSyncBooks,
+              watchlistSyncComics: values.watchlistSyncComics,
               cardTextVisibility: {
                 movie: values.cardTextVisibilityMovie,
                 tv: values.cardTextVisibilityTv,
@@ -995,6 +1000,37 @@ const UserGeneralSettings = () => {
                         setFieldValue(
                           'watchlistSyncBooks',
                           !values.watchlistSyncBooks
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {hasPermission(
+                [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_COMIC],
+                { type: 'or' }
+              ) && (
+                <div className="form-row">
+                  <label
+                    htmlFor="watchlistSyncComics"
+                    className="checkbox-label"
+                  >
+                    <span>
+                      {intl.formatMessage(messages.comicwatchlistsync)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.comicwatchlistsynctip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="watchlistSyncComics"
+                      name="watchlistSyncComics"
+                      onChange={() => {
+                        setFieldValue(
+                          'watchlistSyncComics',
+                          !values.watchlistSyncComics
                         );
                       }}
                     />

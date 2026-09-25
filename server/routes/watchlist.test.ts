@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { before, beforeEach, describe, it, mock } from 'node:test';
 
+import ComicVineAPI from '@server/api/comicvine';
 import ListenBrainzAPI from '@server/api/listenbrainz';
 import OpenLibraryAPI from '@server/api/openlibrary';
 import { MediaType } from '@server/constants/media';
@@ -56,6 +57,17 @@ const getWorkMock = mock.method(
   })
 );
 
+const getVolumeMock = mock.method(
+  ComicVineAPI.prototype,
+  'getVolume',
+  async () =>
+    ({
+      id: 4567,
+      name: 'Watchlist Comic',
+      resource_type: 'volume',
+    }) as Awaited<ReturnType<ComicVineAPI['getVolume']>>
+);
+
 const mediaRequestMock = mock.method(
   MediaRequest,
   'request',
@@ -99,9 +111,11 @@ before(async () => {
 beforeEach(() => {
   getAlbumMock.mock.resetCalls();
   getWorkMock.mock.resetCalls();
+  getVolumeMock.mock.resetCalls();
   mediaRequestMock.mock.resetCalls();
   mediaRequestMock.mock.mockImplementation(async () => new MediaRequest());
   getSettings().readarr = [];
+  getSettings().main.comicVineApiKey = 'watchlist-test-comicvine-key';
 });
 
 setupTestDb();
@@ -442,6 +456,65 @@ describe('POST /watchlist', () => {
     });
   });
 
+  it('auto-requests comic watchlist items when comic watchlist sync is enabled', async () => {
+    const userRepository = getRepository(User);
+    const admin = await userRepository.findOneOrFail({
+      where: { email: 'admin@seerr.dev' },
+    });
+    admin.settings = new UserSettings({
+      watchlistSyncComics: true,
+    });
+    await userRepository.save(admin);
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.post('/watchlist').send({
+      mediaType: MediaType.COMIC,
+      externalId: '4567',
+      title: 'Watchlist Comic',
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.externalId, '4567');
+    assert.strictEqual(getVolumeMock.mock.callCount(), 1);
+    assert.strictEqual(mediaRequestMock.mock.callCount(), 1);
+    assert.deepStrictEqual(mediaRequestMock.mock.calls[0].arguments[0], {
+      mediaId: '4567',
+      mediaType: MediaType.COMIC,
+    });
+    assert.strictEqual(
+      mediaRequestMock.mock.calls[0].arguments[2]?.isAutoRequest,
+      true
+    );
+  });
+
+  it('does not auto-request comic watchlist items when comic watchlist sync is disabled', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.post('/watchlist').send({
+      mediaType: MediaType.COMIC,
+      externalId: '4568',
+      title: 'Watchlist Comic Disabled',
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(mediaRequestMock.mock.callCount(), 0);
+  });
+
+  it('blocks duplicate comic watchlist items by ComicVine ID for the same user', async () => {
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const body = {
+      mediaType: MediaType.COMIC,
+      externalId: '9001',
+      title: 'Duplicate Comic',
+    };
+
+    const firstRes = await agent.post('/watchlist').send(body);
+    const duplicateRes = await agent.post('/watchlist').send(body);
+
+    assert.strictEqual(firstRes.status, 201);
+    assert.strictEqual(firstRes.body.externalId, '9001');
+    assert.strictEqual(duplicateRes.status, 409);
+  });
+
   it('blocks duplicate book watchlist items by Open Library ID for the same user', async () => {
     const agent = await loginAs('admin@seerr.dev', 'test1234');
     const body = {
@@ -674,6 +747,37 @@ describe('DELETE /watchlist/:mediaId', () => {
         where: {
           mediaType: MediaType.BOOK,
           externalId: 'OLdeleteW',
+          requestedBy: { id: admin.id },
+        },
+      }),
+      false
+    );
+  });
+
+  it('deletes comic watchlist items by ComicVine ID', async () => {
+    const userRepository = getRepository(User);
+    const admin = await userRepository.findOneOrFail({
+      where: { email: 'admin@seerr.dev' },
+    });
+    const watchlistRepository = getRepository(Watchlist);
+    await watchlistRepository.save(
+      new Watchlist({
+        mediaType: MediaType.COMIC,
+        externalId: '4321',
+        title: 'Delete Comic',
+        requestedBy: admin,
+      })
+    );
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.delete('/watchlist/4321?mediaType=comic');
+
+    assert.strictEqual(res.status, 204);
+    assert.strictEqual(
+      await watchlistRepository.exists({
+        where: {
+          mediaType: MediaType.COMIC,
+          externalId: '4321',
           requestedBy: { id: admin.id },
         },
       }),

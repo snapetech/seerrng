@@ -29,6 +29,7 @@ export interface ComicIssueReference {
 export interface ComicDetails extends ComicResult {
   description?: string;
   issues?: ComicIssueReference[];
+  onUserWatchlist?: boolean;
 }
 
 const pickPosterPath = (
@@ -64,9 +65,11 @@ export const mapComicVineVolumeResult = (
 
 export const mapComicVineVolumeDetails = (
   volume: ComicVineVolumeDetails,
-  media?: Media
+  media?: Media,
+  onUserWatchlist?: boolean
 ): ComicDetails => ({
   ...mapComicVineVolumeResult(volume, media),
   description: volume.description,
   issues: volume.issues?.map(mapIssueSummary),
+  onUserWatchlist,
 });

@@ -492,6 +492,7 @@ const parseGeneralSettingsBody = (
     'watchlistSyncTv',
     'watchlistSyncMusic',
     'watchlistSyncBooks',
+    'watchlistSyncComics',
   ] as const) {
     if (!hasOwn(bodyObject, fieldName)) {
       continue;
@@ -836,6 +837,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
             watchlistSyncTv: user.settings?.watchlistSyncTv,
             watchlistSyncMusic: user.settings?.watchlistSyncMusic,
             watchlistSyncBooks: user.settings?.watchlistSyncBooks,
+            watchlistSyncComics: user.settings?.watchlistSyncComics,
             cardTextVisibility: serializeCardTextVisibility(user.settings),
           });
         }
@@ -957,6 +959,7 @@ userSettingsRoutes.post<
             'watchlistSyncTv',
             'watchlistSyncMusic',
             'watchlistSyncBooks',
+            'watchlistSyncComics',
           ] as const) {
             if (hasOwn(body, fieldName)) {
               Object.assign(user.settings, {
@@ -996,6 +999,7 @@ userSettingsRoutes.post<
             watchlistSyncTv: savedUser.settings?.watchlistSyncTv,
             watchlistSyncMusic: savedUser.settings?.watchlistSyncMusic,
             watchlistSyncBooks: savedUser.settings?.watchlistSyncBooks,
+            watchlistSyncComics: savedUser.settings?.watchlistSyncComics,
             cardTextVisibility: serializeCardTextVisibility(savedUser.settings),
             email: savedUser.email,
           });

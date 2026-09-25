@@ -81,7 +81,8 @@ const PlexWatchlistSlider = () => {
       !user?.settings?.watchlistSyncMovies &&
       !user?.settings?.watchlistSyncTv &&
       !user?.settings?.watchlistSyncMusic &&
-      !user?.settings?.watchlistSyncBooks) ||
+      !user?.settings?.watchlistSyncBooks &&
+      !user?.settings?.watchlistSyncComics) ||
     watchlistError
   ) {
     return null;

@@ -196,7 +196,7 @@ const TitleCard = ({
               mediaType: 'music',
               title,
             }
-          : mediaType === 'book'
+          : mediaType === 'book' || mediaType === 'comic'
             ? {
                 externalId: actionId,
                 mediaType,
@@ -432,7 +432,8 @@ const TitleCard = ({
   const canUseVideoActions = videoMediaType && Number.isFinite(numericId);
   const canUseRequestActions =
     canUseVideoActions || isAlbum || isBook || isComic || isMagazine;
-  const canUseWatchlistActions = canUseVideoActions || isAlbum || isBook;
+  const canUseWatchlistActions =
+    canUseVideoActions || isAlbum || isBook || isComic;
   const detailHref =
     mediaType === 'movie'
       ? `/movie/${id}`
