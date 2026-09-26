@@ -1,6 +1,7 @@
 import ReadarrAPI, {
   type ReadarrBookLookupResult,
 } from '@server/api/servarr/readarr';
+import type Media from '@server/entity/Media';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import type { ReadarrSettings } from '@server/lib/settings';
 import type {
@@ -10,6 +11,7 @@ import type {
   BookIsbnCandidate,
   BookResult,
   BookSeriesDetails,
+  BookSeriesReference,
 } from '@server/models/Book';
 
 export const BOOKSHELF_BOOK_ID_PREFIX = 'bookshelf:';
@@ -130,8 +132,12 @@ export const makeBookshelfAuthorId = (
 ) =>
   `${BOOKSHELF_AUTHOR_ID_PREFIX}${serviceId}:${encodeForeignId(JSON.stringify({ foreignAuthorId, authorName }))}`;
 
-export const makeBookshelfSeriesId = (serviceId: number, title: string) =>
-  `${BOOKSHELF_SERIES_ID_PREFIX}${serviceId}:${encodeForeignId(title)}`;
+export const makeBookshelfSeriesId = (
+  serviceId: number,
+  title: string,
+  authorId?: number
+) =>
+  `${BOOKSHELF_SERIES_ID_PREFIX}${serviceId}:${encodeForeignId(title)}${authorId ? `:${authorId}` : ''}`;
 
 export const parseBookshelfAuthorId = (
   value: string
@@ -168,16 +174,22 @@ export const parseBookshelfAuthorId = (
 
 export const parseBookshelfSeriesId = (
   value: string
-): { serviceId: number; title: string } | undefined => {
+): { serviceId: number; title: string; authorId?: number } | undefined => {
   const match = value.match(
-    /^bookshelf-series:(\d{1,10}):([A-Za-z0-9_-]{1,2048})$/
+    /^bookshelf-series:(\d{1,10}):([A-Za-z0-9_-]{1,2048})(?::(\d{1,10}))?$/
   );
   if (!match) return undefined;
   const serviceId = Number(match[1]);
   if (!Number.isSafeInteger(serviceId) || serviceId <= 0) return undefined;
   try {
     const title = Buffer.from(match[2], 'base64url').toString('utf8').trim();
-    return title && title.length <= 512 ? { serviceId, title } : undefined;
+    const authorId = match[3] ? Number(match[3]) : undefined;
+    return title &&
+      title.length <= 512 &&
+      (authorId === undefined ||
+        (Number.isSafeInteger(authorId) && authorId > 0))
+      ? { serviceId, title, authorId }
+      : undefined;
   } catch {
     return undefined;
   }
@@ -201,6 +213,76 @@ const normalizeSeriesTitle = (value: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+type LinkedBookMedia = Pick<
+  Media,
+  | 'serviceId'
+  | 'externalServiceId'
+  | 'audiobookServiceId'
+  | 'audiobookExternalServiceId'
+>;
+
+export const getBookshelfLibraryBookSeries = async (
+  servers: ReadarrSettings[],
+  media?: LinkedBookMedia
+): Promise<BookSeriesReference[]> => {
+  if (!media) return [];
+
+  const candidates = [
+    {
+      serviceId: media.serviceId,
+      bookId: media.externalServiceId,
+    },
+    {
+      serviceId: media.audiobookServiceId,
+      bookId: media.audiobookExternalServiceId,
+    },
+  ].filter(
+    (candidate): candidate is { serviceId: number; bookId: number } =>
+      typeof candidate.serviceId === 'number' &&
+      Number.isSafeInteger(candidate.serviceId) &&
+      candidate.serviceId > 0 &&
+      typeof candidate.bookId === 'number' &&
+      Number.isSafeInteger(candidate.bookId) &&
+      candidate.bookId > 0
+  );
+
+  const results = await Promise.all(
+    candidates.map(async ({ serviceId, bookId }) => {
+      const server = servers.find((candidate) => candidate.id === serviceId);
+      if (!server) return [];
+
+      try {
+        const book = await getApi(server).getBook(bookId, 300);
+        if (book.id !== bookId) return [];
+
+        const mapped = mapBookshelfBook(book, serviceId);
+        const authorId =
+          typeof book.authorId === 'number' &&
+          Number.isSafeInteger(book.authorId) &&
+          book.authorId > 0
+            ? book.authorId
+            : undefined;
+        return (mapped.series ?? []).map((series) => ({
+          ...series,
+          id: authorId
+            ? makeBookshelfSeriesId(serviceId, series.title, authorId)
+            : series.id,
+        }));
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  const unique = new Map<string, BookSeriesReference>();
+  for (const series of results.flat()) {
+    const source = series.id.match(/^bookshelf-series:\d+:/)?.[0] ?? series.id;
+    const key = `${source}:${normalizeSeriesTitle(series.title)}:${series.position ?? ''}`;
+    if (!unique.has(key)) unique.set(key, series);
+  }
+  return [...unique.values()];
+};
 
 const getIsbnCandidates = (
   result: ReadarrBookLookupResult
@@ -331,25 +413,44 @@ export const getBookshelfSeriesDetails = async (
   if (!parsed || !server) return undefined;
 
   try {
-    const matches = await getApi(server).lookupBook(parsed.title);
     const expectedTitle = normalizeSeriesTitle(parsed.title);
-    const books = matches
-      .filter((book) =>
-        parseSeriesTitle(book.seriesTitle).some(
-          (series) => normalizeSeriesTitle(series.title) === expectedTitle
-        )
+    const api = getApi(server);
+    const [libraryBooks, catalogBooks] = await Promise.all([
+      parsed.authorId
+        ? api.getBooksByAuthor(parsed.authorId).catch(() => [])
+        : Promise.resolve([]),
+      api.lookupBook(parsed.title).catch(() => []),
+    ]);
+    const nativeMatches = libraryBooks.filter((book) =>
+      parseSeriesTitle(book.seriesTitle).some(
+        (series) => normalizeSeriesTitle(series.title) === expectedTitle
       )
-      .map((book) => {
-        const mappedBook = mapBookshelfBook(book, server.id);
-        return {
-          ...mappedBook,
-          series: mappedBook.series?.map((series) =>
-            normalizeSeriesTitle(series.title) === expectedTitle
-              ? { ...series, id, title: parsed.title }
+    );
+    const catalogMatches = catalogBooks.filter((book) =>
+      parseSeriesTitle(book.seriesTitle).some(
+        (series) => normalizeSeriesTitle(series.title) === expectedTitle
+      )
+    );
+    const books = [...nativeMatches, ...catalogMatches].map((book) => {
+      const mappedBook = mapBookshelfBook(book, server.id);
+      return {
+        ...mappedBook,
+        series: mappedBook.series?.map((series) =>
+          normalizeSeriesTitle(series.title) === expectedTitle
+            ? { ...series, id, title: parsed.title }
+            : parsed.authorId
+              ? {
+                  ...series,
+                  id: makeBookshelfSeriesId(
+                    server.id,
+                    series.title,
+                    parsed.authorId
+                  ),
+                }
               : series
-          ),
-        };
-      });
+        ),
+      };
+    });
     const dedupedBooks = [
       ...new Map(books.map((book) => [book.id, book])).values(),
     ];

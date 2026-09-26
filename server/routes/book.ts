@@ -17,11 +17,13 @@ import { upsertMediaSearchMetadata } from '@server/lib/mediaSearchMetadata';
 import { getSettings, type ReadarrSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import {
+  type BookSeriesReference,
   mapOpenLibrarySearchDoc,
   mapOpenLibraryWork,
 } from '@server/models/Book';
 import {
   getBookshelfBookDetails,
+  getBookshelfLibraryBookSeries,
   parseBookshelfBookId,
   searchBookshelfCatalogs,
 } from '@server/utils/bookshelfCatalog';
@@ -71,6 +73,23 @@ const parseOpenLibraryWorkId = (value: unknown) => {
   return isValidOpenLibraryResourceId(normalized)
     ? { value: normalized }
     : { error: 'Book ID is invalid.' };
+};
+
+const mergeBookSeriesReferences = (
+  ...seriesLists: (BookSeriesReference[] | undefined)[]
+): BookSeriesReference[] => {
+  const unique = new Map<string, BookSeriesReference>();
+  for (const series of seriesLists.flatMap((entries) => entries ?? [])) {
+    const source = series.id.match(/^bookshelf-series:\d+:/)?.[0] ?? series.id;
+    const key = `${series.title
+      .toLocaleLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()}:${source}:${series.position ?? ''}`;
+    if (!unique.has(key)) unique.set(key, series);
+  }
+  return [...unique.values()];
 };
 
 const getBookCoverService = (
@@ -237,6 +256,11 @@ bookRoutes.get('/:id', async (req, res, next) => {
     try {
       const mediaMap = await findBookMediaForBookResults([details], req.user);
       const media = mediaMap.get(details.id);
+      const librarySeries = await getBookshelfLibraryBookSeries(
+        getSettings().readarr,
+        media
+      );
+      const series = mergeBookSeriesReferences(librarySeries, details.series);
       await upsertMediaSearchMetadata(undefined, {
         title: details.title,
         author: details.author,
@@ -246,7 +270,12 @@ bookRoutes.get('/:id', async (req, res, next) => {
       });
       return res
         .status(200)
-        .json(filterEntityResponse({ ...details, mediaInfo: media }, req.user));
+        .json(
+          filterEntityResponse(
+            { ...details, series, mediaInfo: media },
+            req.user
+          )
+        );
     } catch (e) {
       return next(e);
     }
@@ -297,6 +326,31 @@ bookRoutes.get('/:id', async (req, res, next) => {
       editionCount: editions.size,
     };
 
+    const settings = getSettings();
+    const [librarySeries, bookshelfSeriesResults] = await Promise.all([
+      getBookshelfLibraryBookSeries(settings.readarr, media),
+      bookDetails.isbn13
+        ? searchBookshelfCatalogs(
+            settings.readarr,
+            `isbn:${bookDetails.isbn13}`
+          )
+        : Promise.resolve([]),
+    ]);
+    const matchingSeries = bookshelfSeriesResults
+      .filter((result) =>
+        result.isbnCandidates?.some(
+          (candidate) => candidate.isbn === bookDetails.isbn13
+        )
+      )
+      .flatMap((result) => result.series ?? []);
+    const series = mergeBookSeriesReferences(librarySeries, matchingSeries);
+    const bookDetailsWithSeries = series.length
+      ? {
+          ...bookDetails,
+          series,
+        }
+      : bookDetails;
+
     await upsertMediaSearchMetadata(media?.id, {
       title: bookDetails.title,
       releaseDate: bookDetails.firstPublishYear?.toString(),
@@ -313,7 +367,9 @@ bookRoutes.get('/:id', async (req, res, next) => {
         .join(' '),
     });
 
-    return res.status(200).json(filterEntityResponse(bookDetails, req.user));
+    return res
+      .status(200)
+      .json(filterEntityResponse(bookDetailsWithSeries, req.user));
   } catch (e) {
     logger.error('Failed to retrieve book details', {
       label: 'Book',
