@@ -8,6 +8,10 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
+import type {
+  PcArchitecture,
+  PcOperatingSystem,
+} from '@server/api/software/types';
 import axios from 'axios';
 import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -29,6 +33,13 @@ const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
   game: 'PC game',
   operatingSystem: 'Operating system: {value}',
   architecture: 'Architecture: {value}',
+  windows: 'Windows',
+  linux: 'Linux',
+  macos: 'macOS',
+  x64: 'x64',
+  arm64: 'ARM64',
+  x86: 'x86',
+  universal: 'Universal',
   submitted: 'Requested {date}',
   approve: 'Approve',
   decline: 'Decline',
@@ -68,7 +79,10 @@ interface SoftwareRequestRow {
     name: string | null;
     catalogId: number | null;
   } | null;
-  variant?: { operatingSystem: string; architecture: string } | null;
+  variant?: {
+    operatingSystem: PcOperatingSystem;
+    architecture: PcArchitecture;
+  } | null;
   createdAt: string;
 }
 
@@ -235,6 +249,26 @@ const SoftwareRequests = ({
           : messages.retro
     );
 
+  const operatingSystemLabel = (value: PcOperatingSystem) =>
+    intl.formatMessage(
+      value === 'windows'
+        ? messages.windows
+        : value === 'macos'
+          ? messages.macos
+          : messages.linux
+    );
+
+  const architectureLabel = (value: PcArchitecture) =>
+    intl.formatMessage(
+      value === 'arm64'
+        ? messages.arm64
+        : value === 'x86'
+          ? messages.x86
+          : value === 'universal'
+            ? messages.universal
+            : messages.x64
+    );
+
   const canRetryRequest = (request: SoftwareRequestRow) =>
     canManage || (canRequest && request.requestedBy?.id === user?.id);
 
@@ -284,12 +318,16 @@ const SoftwareRequests = ({
                         <>
                           <span>
                             {intl.formatMessage(messages.operatingSystem, {
-                              value: request.variant.operatingSystem,
+                              value: operatingSystemLabel(
+                                request.variant.operatingSystem
+                              ),
                             })}
                           </span>
                           <span>
                             {intl.formatMessage(messages.architecture, {
-                              value: request.variant.architecture,
+                              value: architectureLabel(
+                                request.variant.architecture
+                              ),
                             })}
                           </span>
                         </>
