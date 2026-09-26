@@ -490,10 +490,10 @@ upstream recovery.
 
 For compatibility mode, provide `HARDCOVER_AUTH` with the `Bearer ` prefix;
 the token is used by rreading-glasses. Native mode passes it to BookshelfNG.
-Get a token from
-https://hardcover.app/settings → Hardcover API. Hosted mode does not require a
-local token for metadata, although Bookshelf's own Hardcover list-import
-settings still need an API key when that feature is used.
+Create a token in [Hardcover account API settings](https://hardcover.app/account/api).
+Hosted mode does not require a local token for metadata, although Bookshelf's
+own Hardcover list-import settings still need an API key when that feature is
+used.
 
 For Goodreads/softcover mode, provide a Goodreads cookie via `COOKIE` if your
 upstream requires one.
