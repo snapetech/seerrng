@@ -202,20 +202,16 @@ softwareAcquisitionRoutes.post(
         const api = new ROMarrNGAPI(parsed.value);
         const handshake = await api.getHandshake();
         if (handshake.apiVersion !== 1 || handshake.service !== 'ROMarrNG') {
-          return res
-            .status(502)
-            .json({
-              error: 'ROMarrNG returned an unsupported integration contract.',
-            });
+          return res.status(502).json({
+            error: 'ROMarrNG returned an unsupported integration contract.',
+          });
         }
         const platforms = await api.getPlatforms();
-        return res
-          .status(200)
-          .json({
-            success: true,
-            service: handshake.service,
-            platformCount: platforms.length,
-          });
+        return res.status(200).json({
+          success: true,
+          service: handshake.service,
+          platformCount: platforms.length,
+        });
       }
 
       const api = new QuestarrNGAPI(parsed.value);
@@ -225,21 +221,17 @@ softwareAcquisitionRoutes.post(
         handshake.requestContractVersion !== 1 ||
         handshake.service !== 'QuestarrNG'
       ) {
-        return res
-          .status(502)
-          .json({
-            error: 'QuestarrNG returned an unsupported integration contract.',
-          });
+        return res.status(502).json({
+          error: 'QuestarrNG returned an unsupported integration contract.',
+        });
       }
       return res
         .status(200)
         .json({ success: true, service: handshake.service });
     } catch {
-      return res
-        .status(502)
-        .json({
-          error: `${provider === 'romarr' ? 'ROMarrNG' : 'QuestarrNG'} connection failed.`,
-        });
+      return res.status(502).json({
+        error: `${provider === 'romarr' ? 'ROMarrNG' : 'QuestarrNG'} connection failed.`,
+      });
     }
   })
 );
