@@ -55,6 +55,10 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
 - Music discovery and metadata through MusicBrainz, ListenBrainz, Cover Art Archive, TheAudioDB, and archive-backed artwork sources.
 - Book discovery and identity matching through Open Library, ISBN-10/ISBN-13 normalization, foreign book IDs, and edition IDs.
 - Separate ebook and audiobook service routing so both formats can be requested, approved, scanned, retried, and removed independently.
+- One BookshelfNG instance can manage both formats on the same book record.
+  When both formats are enabled, their separate SeerrNG service entries can
+  point to the same BookshelfNG URL and API key; separate app instances are
+  not required.
 - Catalog browsing and requests for Retro and Modern emulation systems and PC games for Windows, Linux, and macOS, with QuestarrNG and ROMarrNG handling acquisition.
 - Administrator-controlled availability switches for each supported category, including separate ebook, audiobook, Retro, Modern, and PC Games controls.
 - Bookshelf backend diagnostics that classify Hardcover, softcover/Goodreads, and unknown metadata providers.
@@ -256,7 +260,8 @@ Hardcover metadata modes are:
 Compatibility mode is the installer default because it keeps BookshelfNG
 decoupled from Hardcover's GraphQL API and centralizes authentication, caching,
 request coalescing, and upstream throttling. One proxy and PostgreSQL cache can
-serve both BookshelfNG instances. Existing installs that already use the local
+serve one or more BookshelfNG instances; one instance is enough for ebooks and
+audiobooks. Existing installs that already use the local
 proxy are preserved as compatibility mode on installer reruns.
 
 Native mode remains useful when the shortest direct request path is more
@@ -305,8 +310,8 @@ In compatibility mode, a metadata request follows this path:
 4. A cache miss, expired entry, or free-text search needs an upstream request;
    successful responses are written back to the shared cache.
 
-This gives both Bookshelf instances a shared cache, coalesces concurrent work,
-and centralizes rate limiting. A short Hardcover outage can therefore leave
+This gives connected Bookshelf instances a shared cache, coalesces concurrent
+work, and centralizes rate limiting. A short Hardcover outage can therefore leave
 already-cached direct lookups usable, and a proxy restart does not discard the
 cache when the PostgreSQL volume is healthy. It does not make the system an
 unlimited offline mirror: searches, recommendations, new metadata, and expired
@@ -314,8 +319,8 @@ entries still depend on Hardcover, and the current proxy does not promise
 stale-if-error responses.
 
 The proxy and PostgreSQL database are shared local dependencies. If either is
-down, both Bookshelf instances lose this metadata path. There is no automatic
-runtime failover to Goodreads or OpenLibrary. Keep the proxy data volume while
+down, connected Bookshelf instances lose this metadata path. There is no
+automatic runtime failover to Goodreads or OpenLibrary. Keep the proxy data volume while
 troubleshooting; use `--validate-api`, an actual lookup, and proxy logs after
 recovery. Native mode has a smaller local failure surface but only per-process
 caching, so a fresh search or uncached refresh still needs Hardcover.
@@ -332,8 +337,16 @@ edition IDs are not portable to Hardcover. Use the migration flow below.
 
 ### Bookshelf Installer
 
-The deployment helper creates a two-instance Bookshelf stack for ebook and
-audiobook requests:
+Fresh deployments run one combined BookshelfNG process and one database for
+ebooks and audiobooks. SeerrNG still needs two service entries because it
+routes **Book** and **Audiobook** requests separately; point both entries to
+the same BookshelfNG URL and API key. The installer remembers this choice.
+
+Existing audiobook databases keep the split two-process layout on reruns. The
+installer does not merge databases. Select `--single-instance` only after
+migrating any separate audiobook database; the helper refuses to ignore one.
+Use `--split-instances` when separate BookshelfNG settings or databases are
+desired:
 
 ```bash
 deploy/install-bookshelf-backend.sh
@@ -345,13 +358,18 @@ Useful modes:
 deploy/install-bookshelf-backend.sh --dry-run
 deploy/install-bookshelf-backend.sh --validate-only
 deploy/install-bookshelf-backend.sh --validate-api
+deploy/install-bookshelf-backend.sh --split-instances
 deploy/install-bookshelf-backend.sh --migrate-to-hardcover
 deploy/install-bookshelf-backend.sh --restore-backup
 ```
 
+Use `--single-instance` to explicitly choose the combined deployment. Fresh
+installs already choose it by default.
+
 Set `BOOKSHELF_BACKEND=auto|hardcover|softcover` to choose the backend policy.
-`auto` creates Hardcover instances for fresh installs and invokes the migration
-flow when an existing Readarr/softcover config is detected.
+`auto` creates a Hardcover-backed BookshelfNG deployment for fresh installs
+and invokes the migration flow when an existing Readarr/softcover config is
+detected without a saved backend choice.
 
 ### Hardcover Migration
 
@@ -382,9 +400,11 @@ The migration is layered:
 These catalogs support **normal BookshelfNG search and metadata lookups**, as
 well as migration recovery. SeerrNG merges BookshelfNG results with its
 Open Library results and carries each Bookshelf result's source identity
-through details and book requests. The managed two-instance deployment enables
-Library of Congress for the audiobook service by default; Google Books and
-Europeana are added when their API keys are configured. Apify remains
+through details and book requests. The optional split deployment enables
+Library of Congress on the audiobook instance by default to coordinate request
+pacing across processes. A single BookshelfNG instance uses one catalog
+selection for both formats. Google Books and Europeana are added when their API
+keys are configured. Apify remains
 operator-enabled. A provider result does not need a numeric Goodreads ID. See
 the [metadata source support matrix](./docs/using-seerr/bookshelf-metadata-sources.md)
 for setup, coverage, limits, and identity details.
@@ -601,7 +621,7 @@ For music and book changes, test against real services when possible:
 
 - Add a Lidarr server, set it as default, request an album, approve it, scan it, retry failure cases, and remove it.
 - Add a Bookshelf/Readarr-compatible ebook server, request a book by search result and specific edition/ISBN, approve it, scan it, retry it, and remove it.
-- Add a separate audiobook Bookshelf service and test audiobook-only plus both-format requests.
+- Add an audiobook Bookshelf service entry pointing to the same instance as the ebook entry, then test audiobook-only and both-format requests.
 - Run `deploy/bookshelf-migration-lab.sh apply` against a copied source Bookshelf/Readarr config before changing migration code.
 - Validate migration cutover with `node deploy/bookshelf-hardcover-migration.mjs --cutover-check <migration-dir>`.
 - Confirm request cards, request detail pages, notifications, and backend links point to the correct SeerrNG and service pages.

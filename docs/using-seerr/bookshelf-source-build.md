@@ -244,27 +244,25 @@ same host, use that address in the service settings. If it runs on another
 host, bind and firewall the listener intentionally instead of assuming that
 `127.0.0.1` is reachable remotely.
 
-## Run separate ebook and audiobook instances
+## One instance for ebooks and audiobooks
 
-Bookshelf supports one type of a given book per instance. If you need both
-ebooks and audiobooks, run two instances with separate data directories and
-ports:
+One BookshelfNG process and database can manage ebook and audiobook files on
+the same book record. The source-build service on port `8787` is enough for
+both formats; configure its author root folder, download clients, and profiles
+in BookshelfNG.
 
-```text
-/var/lib/bookshelfng-ebooks       -> port 8787
-/var/lib/bookshelfng-audiobooks   -> port 8788
-```
+SeerrNG uses separate routing entries for ebook and audiobook requests. Add
+two **Bookshelf** service entries with the same host, port, and API key, then
+set **Book Format** to **Book** on one and **Audiobook** on the other. Mark one
+entry as the default for each format. Both entries can point to
+`http://127.0.0.1:8787` when SeerrNG and BookshelfNG share a host.
 
-Each instance needs its own `config.xml`, database, logs, and service unit.
-Start the second instance once to create its configuration, stop it, change
-its `<Port>` value from `8787` to `8788`, and then start it again. Never point
-both instances at the same data directory.
-
-In SeerrNG, add the same host twice under **Settings > Services** and set
-**Book Format** to **Ebook** for port `8787` and **Audiobook** for port `8788`.
-Mark one service of each format as the default when both-format requests are
-needed. See the [Bookshelf backend guide](./bookshelf-backend.md) for the
-format-specific root-folder and profile settings.
+Each author can optionally set separate ebook and audiobook folders in
+BookshelfNG. Those overrides apply to future imports, upgrades, and renames;
+existing files are not moved automatically. Quality and metadata profiles remain
+shared. Separate app instances remain an option when isolated databases or
+different settings for the same author are required; they are not needed to
+support both formats.
 
 ## Connect it to SeerrNG
 
