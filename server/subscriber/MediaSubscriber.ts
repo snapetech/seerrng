@@ -138,7 +138,8 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
               event[request.is4k ? 'status4k' : 'status'] ===
                 MediaStatus.DELETED) &&
             (event.mediaType === MediaType.MOVIE ||
-              event.mediaType === MediaType.MUSIC)
+              event.mediaType === MediaType.MUSIC ||
+              event.mediaType === MediaType.COMIC)
           ) {
             shouldComplete = true;
           } else if (event.mediaType === MediaType.BOOK) {
