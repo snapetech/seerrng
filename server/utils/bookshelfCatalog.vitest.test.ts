@@ -1,5 +1,8 @@
-import type { ReadarrBookLookupResult } from '@server/api/servarr/readarr';
-import { describe, expect, it } from 'vitest';
+import ReadarrAPI, {
+  type ReadarrBookLookupResult,
+} from '@server/api/servarr/readarr';
+import type { ReadarrSettings } from '@server/lib/settings';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getBookshelfBookDetails,
   getBookshelfMetadataSource,
@@ -11,6 +14,10 @@ import {
 } from './bookshelfCatalog';
 
 describe('Bookshelf catalog identities', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('round trips provider-qualified foreign IDs with their service identity', () => {
     const id = makeBookshelfBookId(27, 'googlebooks:volume/a+b=');
 
@@ -124,5 +131,48 @@ describe('Bookshelf catalog identities', () => {
     );
 
     expect(details).toBeUndefined();
+  });
+
+  it('uses the explicit work lookup for numeric Bookshelf book IDs', async () => {
+    const lookupBook = vi
+      .spyOn(ReadarrAPI.prototype, 'lookupBook')
+      .mockImplementation(async (term) =>
+        term === 'work:139773'
+          ? [
+              {
+                title: 'The Fellowship of the Ring',
+                foreignBookId: '139773',
+                seriesTitle: 'The Lord of the Rings #1',
+                author: {
+                  foreignAuthorId: '1077326',
+                  authorName: 'J.R.R. Tolkien',
+                },
+                editions: [],
+              },
+            ]
+          : []
+      );
+    const server = {
+      id: 9,
+      name: 'BookshelfNG-Audiobooks',
+      hostname: 'bookshelf.test',
+      port: 8787,
+      apiKey: 'test-key',
+      useSsl: false,
+      baseUrl: '',
+      serviceType: 'audiobook',
+    } as ReadarrSettings;
+
+    const details = await getBookshelfBookDetails(
+      [server],
+      makeBookshelfBookId(server.id, '139773')
+    );
+
+    expect(lookupBook).toHaveBeenCalledOnce();
+    expect(lookupBook).toHaveBeenCalledWith('work:139773');
+    expect(details).toMatchObject({
+      title: 'The Fellowship of the Ring',
+      series: [{ title: 'The Lord of the Rings', position: '1' }],
+    });
   });
 });
