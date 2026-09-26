@@ -45,7 +45,10 @@ const BlocklistBlock = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const { addToast } = useToasts();
   const blocklistId =
-    mediaType === 'music' || mediaType === 'book'
+    mediaType === 'music' ||
+    mediaType === 'book' ||
+    mediaType === 'comic' ||
+    mediaType === 'magazine'
       ? externalId
         ? normalizeExternalTitleId(mediaType, externalId)
         : externalId
@@ -61,7 +64,10 @@ const BlocklistBlock = ({
   const removeFromBlocklist = async (id: number | string, title?: string) => {
     setIsUpdating(true);
     const normalizedId =
-      mediaType === 'music' || mediaType === 'book'
+      mediaType === 'music' ||
+      mediaType === 'book' ||
+      mediaType === 'comic' ||
+      mediaType === 'magazine'
         ? normalizeExternalTitleId(mediaType, id)
         : id;
 

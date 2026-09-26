@@ -44,6 +44,18 @@ describe('runMediaMutation', () => {
     assert.deepStrictEqual(getMediaAdmissionResources(book), [
       'request-canonical:book:openlibrary:OL1W',
     ]);
+    const comic = new Media({ id: 4, mediaType: MediaType.COMIC, tmdbId: 0 });
+    comic.identifiers = [
+      new MediaIdentifier({
+        media: comic,
+        provider: MediaIdentifierProvider.COMICVINE,
+        value: '4567',
+        canonical: true,
+      }),
+    ];
+    assert.deepStrictEqual(getMediaAdmissionResources(comic), [
+      'request-canonical:comic:comicvine:4567',
+    ]);
   });
 
   it('deduplicates and orders cross-instance media resources', async () => {

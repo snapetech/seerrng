@@ -285,7 +285,11 @@ const hasRequestedServiceLink = (request: RequestLike): boolean => {
     return hasRequestedBookFormat(request.media, 'ebook');
   }
 
-  if (request.type === MediaType.MOVIE || request.type === MediaType.TV) {
+  if (
+    request.type === MediaType.MOVIE ||
+    request.type === MediaType.TV ||
+    request.type === MediaType.COMIC
+  ) {
     return request.is4k
       ? hasLink(request.media.serviceId4k, request.media.externalServiceId4k)
       : hasLink(request.media.serviceId, request.media.externalServiceId);
@@ -645,6 +649,17 @@ const getMessage = (
       return queueFailure
         ? 'The connected book service reported a download or import failure. Check its queue or logs for the cause, fix it there, then retry here.'
         : 'The connected book service could not accept this request. Check its connection and metadata provider settings, then retry.';
+    }
+  }
+
+  if (mediaType === MediaType.COMIC) {
+    if (stage === RequestStatusStage.UNAVAILABLE) {
+      return 'No usable release is available from the connected comics service. Check the requested comic and the service catalog or acquisition sources, then retry when they are ready.';
+    }
+    if (stage === RequestStatusStage.FAILED) {
+      return queueFailure
+        ? 'The connected comics service reported a download or import failure. Check its queue or logs for the cause, fix it there, then retry here.'
+        : 'The connected comics service could not accept this request. Check its connection and ComicVine metadata settings, then retry.';
     }
   }
 

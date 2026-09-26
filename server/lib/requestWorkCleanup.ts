@@ -1,3 +1,4 @@
+import KapowarrAPI from '@server/api/comics/kapowarr';
 import LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import ReadarrAPI, { type ReadarrMediaType } from '@server/api/servarr/readarr';
@@ -17,6 +18,7 @@ type CleanupQueueItem = {
   albumId?: number;
   bookId?: number;
   book?: { id?: number };
+  volumeId?: number;
 };
 
 type CleanupQueueApi = {
@@ -264,6 +266,15 @@ class RequestWorkCleanupManager {
       );
     }
 
+    if (
+      request.type === MediaType.COMIC &&
+      request.media.comicServiceType === 'mylar'
+    ) {
+      throw new RequestWorkCleanupError(
+        'Mylar3 does not support cancelling an individual comic download through its API.'
+      );
+    }
+
     if (request.type === MediaType.BOOK) {
       const operations = await getRepository(BookRequestSearch).find({
         where: { requestId: request.id },
@@ -318,6 +329,27 @@ class RequestWorkCleanupManager {
           url: LidarrAPI.buildUrl(server, '/api/v1'),
         });
         matches = (item) => item.albumId === externalId;
+      }
+    } else if (
+      request.type === MediaType.COMIC &&
+      media.comicServiceType === 'kapowarr'
+    ) {
+      const server = settings.kapowarr.find((item) => item.id === serviceId);
+      if (server) {
+        const kapowarr = new KapowarrAPI({
+          apiKey: server.apiKey,
+          url: KapowarrAPI.buildUrl(server),
+        });
+        api = {
+          getQueue: async () =>
+            (await kapowarr.getQueue()).map((item) => ({
+              id: item.id,
+              volumeId: item.volumeId,
+            })),
+          deleteQueueItem: (queueId, options) =>
+            kapowarr.removeQueueItem(queueId, options.blocklist),
+        };
+        matches = (item) => item.volumeId === externalId;
       }
     }
     if (!api || !matches) {

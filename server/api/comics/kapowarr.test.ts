@@ -275,4 +275,41 @@ describe('KapowarrAPI', () => {
         error instanceof KapowarrTaskRunningError && error.volumeId === 2
     );
   });
+
+  it('parses the activity queue', async () => {
+    mockGet(async () => ({
+      error: null,
+      result: [
+        { id: 2, volume_id: 1, issue_id: null, status: 'downloading' },
+        { id: 3, volume_id: 1, issue_id: null, status: 'queued' },
+      ],
+    }));
+
+    const api = new KapowarrAPI({
+      url: 'http://localhost:5656',
+      apiKey: 'key',
+    });
+    const queue = await api.getQueue();
+
+    assert.deepStrictEqual(queue, [
+      { id: 2, volumeId: 1 },
+      { id: 3, volumeId: 1 },
+    ]);
+  });
+
+  it('removeQueueItem sends blocklist as a JSON body', async () => {
+    const requestMock = mockRequest(async () => ({ error: null, result: {} }));
+
+    const api = new KapowarrAPI({
+      url: 'http://localhost:5656',
+      apiKey: 'key',
+    });
+    await api.removeQueueItem(2, true);
+
+    assert.deepStrictEqual(requestMock.mock.calls[0].arguments, [
+      'DELETE',
+      '/api/activity/queue/2',
+      { blocklist: true },
+    ]);
+  });
 });

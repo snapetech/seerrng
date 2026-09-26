@@ -27,6 +27,11 @@ export interface KapowarrRootFolder {
   folder: string;
 }
 
+export interface KapowarrQueueItem {
+  id: number;
+  volumeId: number;
+}
+
 interface KapowarrEnvelope<T> {
   error: string | null;
   result: T;
@@ -89,6 +94,17 @@ const sanitizeRootFolder = (value: unknown): KapowarrRootFolder | undefined => {
   const id = boundedInteger(value.id);
   const folder = boundedString(value.folder, 2048);
   return id !== undefined && folder ? { id, folder } : undefined;
+};
+
+const sanitizeQueueItem = (value: unknown): KapowarrQueueItem | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const id = boundedInteger(value.id);
+  const volumeId = boundedInteger(value.volume_id);
+  return id !== undefined && volumeId !== undefined
+    ? { id, volumeId }
+    : undefined;
 };
 
 class KapowarrAPI extends ExternalAPI {
@@ -264,6 +280,32 @@ class KapowarrAPI extends ExternalAPI {
       }
       throw error;
     }
+  }
+
+  // Confirmed live and from source (frontend/api.py's api_downloads /
+  // api_delete_download): unlike Radarr/Sonarr/Lidarr, Kapowarr's queue
+  // delete takes a JSON body ({"blocklist": bool}), not a query param.
+  public async getQueue(): Promise<KapowarrQueueItem[]> {
+    const response = await this.get<KapowarrEnvelope<unknown>>(
+      '/api/activity/queue',
+      {},
+      0
+    );
+    if (!isRecord(response) || !Array.isArray(response.result)) {
+      return [];
+    }
+    return response.result
+      .map(sanitizeQueueItem)
+      .filter((item): item is KapowarrQueueItem => !!item);
+  }
+
+  public async removeQueueItem(
+    downloadId: number,
+    blocklist = false
+  ): Promise<void> {
+    await this.request('DELETE', `/api/activity/queue/${downloadId}`, {
+      blocklist,
+    });
   }
 }
 

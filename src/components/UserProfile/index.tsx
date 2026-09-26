@@ -571,6 +571,13 @@ const UserProfile = () => {
                       mediaType="book"
                       isAddedToWatchlist={true}
                     />
+                  ) : item.mediaType === 'comic' && item.externalId ? (
+                    <TitleCard
+                      id={item.externalId}
+                      title={item.title}
+                      mediaType="comic"
+                      isAddedToWatchlist={true}
+                    />
                   ) : item.tmdbId ? (
                     <TmdbTitleCard
                       id={item.tmdbId}
