@@ -1666,6 +1666,16 @@ requestRoutes.get<
           type: MediaType.BOOK,
         });
         break;
+      case 'comic':
+        query = query.andWhere('request.type = :type', {
+          type: MediaType.COMIC,
+        });
+        break;
+      case 'magazine':
+        query = query.andWhere('request.type = :type', {
+          type: MediaType.MAGAZINE,
+        });
+        break;
     }
 
     const [requestRows, requestCount] = await query
@@ -1986,6 +1996,21 @@ requestRoutes.get<
                       (!hasEbookLink || canRemoveEbook) &&
                       (!hasAudiobookLink || canRemoveAudiobook)
                     : canRemoveEbook,
+            };
+          }
+          case MediaType.COMIC: {
+            return {
+              ...r,
+              // Comics have a single destination server across two possible
+              // backends (Mylar or Kapowarr), unlike the dual ebook/audiobook
+              // shape book uses.
+              canRemove:
+                settings.mylar.some(
+                  (server) => server.id === r.media.serviceId
+                ) ||
+                settings.kapowarr.some(
+                  (server) => server.id === r.media.serviceId
+                ),
             };
           }
           default: {

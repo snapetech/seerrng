@@ -1218,6 +1218,65 @@ describe('GET /request', () => {
     assert.deepStrictEqual(response.body.serviceErrors.radarr, []);
   });
 
+  it('filters the request list by mediaType=comic and marks it removable', async (t) => {
+    const settings = getSettings();
+    settings.mylar = [
+      {
+        id: 40,
+        name: 'Mylar',
+        hostname: 'mylar.local',
+        port: 8090,
+        apiKey: 'mylar-key',
+        useSsl: false,
+        tags: [],
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+      },
+    ];
+    t.after(() => {
+      settings.mylar = [];
+    });
+
+    const movieMedia = await seedRequest();
+    const requestedBy = movieMedia.requestedBy;
+    const comicMedia = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.COMIC,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+        serviceId: 40,
+        comicServiceType: 'mylar',
+      })
+    );
+    await getRepository(MediaIdentifier).save(
+      new MediaIdentifier({
+        media: comicMedia,
+        provider: MediaIdentifierProvider.COMICVINE,
+        value: '4567',
+        canonical: true,
+      })
+    );
+    const comicRequest = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.COMIC,
+        status: MediaRequestStatus.PENDING,
+        media: comicMedia,
+        requestedBy,
+        is4k: false,
+      })
+    );
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const response = await agent.get('/request').query({ mediaType: 'comic' });
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.body.results.length, 1);
+    assert.strictEqual(response.body.results[0].id, comicRequest.id);
+    assert.strictEqual(response.body.results[0].canRemove, true);
+  });
+
   it('does not expose backend media routing fields to an ordinary request owner', async (t) => {
     const settings = getSettings();
     settings.radarr = [
