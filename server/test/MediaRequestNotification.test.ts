@@ -20,6 +20,7 @@ import {
   getNotificationMediaUrl,
   type NotificationPayload,
 } from '@server/lib/notifications/agents/agent';
+import { buildMediaRequestNotificationPayload } from '@server/lib/notifications/intents';
 
 function createUser() {
   return new User({
@@ -191,6 +192,14 @@ describe('MediaRequest.sendNotification', () => {
         value: '9780441478125',
       },
     ]);
+
+    entity.id = 21;
+    const savedPayload = await buildMediaRequestNotificationPayload(
+      entity,
+      media,
+      Notification.MEDIA_AVAILABLE
+    );
+    assert.strictEqual(savedPayload.mediaUrl, '/requests/status?requestId=21');
   });
 });
 

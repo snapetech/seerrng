@@ -169,7 +169,9 @@ export const buildMediaRequestNotificationPayload = async (
     event,
   };
   const notificationMediaUrl = (mediaUrl: string): string =>
-    type === Notification.MEDIA_AVAILABLE
+    type === Notification.MEDIA_AVAILABLE &&
+    Number.isSafeInteger(entity.id) &&
+    entity.id > 0
       ? `/requests/status?requestId=${entity.id}`
       : mediaUrl;
   if (entity.type === MediaType.MOVIE) {
