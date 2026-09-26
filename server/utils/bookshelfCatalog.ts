@@ -575,10 +575,19 @@ export const getBookshelfBookDetails = async (
   const server = servers.find((candidate) => candidate.id === parsed.serviceId);
   if (!server) return undefined;
   try {
-    const candidates = await getApi(server).lookupBook(parsed.foreignBookId);
-    const result = candidates.find(
-      (candidate) => candidate.foreignBookId === parsed.foreignBookId
-    );
+    const api = getApi(server);
+    const providerLookupId = /^\d+$/.test(parsed.foreignBookId)
+      ? `work:${parsed.foreignBookId}`
+      : undefined;
+    let result: ReadarrBookLookupResult | undefined;
+    for (const term of [...new Set([providerLookupId, parsed.foreignBookId])]) {
+      if (!term?.trim()) continue;
+      const candidates = await api.lookupBook(term);
+      result = candidates.find(
+        (candidate) => candidate.foreignBookId === parsed.foreignBookId
+      );
+      if (result) break;
+    }
     if (!result) return undefined;
     const base = mapBookshelfBook(result, server.id);
     const editions = result.editions ?? [];
