@@ -16,9 +16,35 @@
 
 # SeerrNG
 
-SeerrNG is a self-hosted request and discovery app for personal media libraries. It extends the Seerr/Jellyseerr/Overseerr lineage beyond movies and TV into music, ebooks, and audiobooks while keeping the familiar request approval workflow for Plex, Jellyfin, Emby, Radarr, and Sonarr users.
+SeerrNG is a self-hosted request and discovery app for personal media libraries. It extends the Seerr/Jellyseerr/Overseerr lineage beyond movies and TV into music, books, comics, magazines, emulation ROMs, and PC games while keeping the familiar request approval workflow for Plex, Jellyfin, Emby, and automation-service users.
 
 This fork is maintained by snapetech. Upstream Seerr remains the base project for inherited video, user, server, and deployment behavior; SeerrNG-specific work focuses on multi-format media requests, service routing, caching, and fork-owned packaging/docs. See [NOTICE.md](./NOTICE.md) for attribution rules.
+
+## Contents
+
+- [What SeerrNG Does](#what-seerrng-does)
+- [Project Status](#project-status)
+- [Documentation and feature guides](#documentation)
+  - [Software requests: ROMs and PC games](https://snapetech.github.io/seerrng/using-seerr/software-acquisition/)
+  - [Request Status and Download copy](https://snapetech.github.io/seerrng/using-seerr/request-status/)
+  - [Books, authors, and series](https://snapetech.github.io/seerrng/using-seerr/books-and-series/)
+  - [Configure services](https://snapetech.github.io/seerrng/using-seerr/settings/services/)
+- [Screenshots](#screenshots)
+- [Install](#install)
+  - [Docker](#docker)
+  - [Docker Compose](#docker-compose)
+  - [Unraid](#unraid)
+  - [Linux packages](#linux-packages)
+- [Required Setup](#required-setup)
+- [Bookshelf and Hardcover](#bookshelf-and-hardcover)
+- [Environment Variables](#environment-variables)
+- [Caching and Performance](#caching-and-performance)
+- [Development](#development)
+- [Testing Real Integrations](#testing-real-integrations)
+- [Legal Use](#legal-use)
+- [Support](#support)
+- [Contributing](#contributing)
+- [Attribution](#attribution)
 
 ## What SeerrNG Does
 
@@ -28,11 +54,13 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
 - Music discovery and metadata through MusicBrainz, ListenBrainz, Cover Art Archive, TheAudioDB, and archive-backed artwork sources.
 - Book discovery and identity matching through Open Library, ISBN-10/ISBN-13 normalization, foreign book IDs, and edition IDs.
 - Separate ebook and audiobook service routing so both formats can be requested, approved, scanned, retried, and removed independently.
+- Catalog browsing and requests for Retro and Modern emulation systems and PC games for Windows, Linux, and macOS, with QuestarrNG and ROMarrNG handling acquisition.
 - Bookshelf backend diagnostics that classify Hardcover, softcover/Goodreads, and unknown metadata providers.
 - Hardcover-first Bookshelf deployment and migration tooling for existing Readarr or softcover libraries.
 - Resumable, layered Readarr/softcover-to-Hardcover migration with strict matching, softcover metadata recovery, validation, cutover checks, and an opt-in deterministic local-record fallback for books Hardcover cannot import.
 - Watchlists, blocklists, request quotas, override rules, permissions, notifications, issue reporting, and request management.
-- Authenticated **Download copy** links in Request Status for imported movie, TV, book, comic, and magazine files when SeerrNG can verify and read the selected backend's artifact.
+- Authenticated **Download copy** links in Request Status for verified movie, TV, book, comic, magazine, ROM, and PC game files.
+- Request lifecycle tracking and availability notifications link users back to the matching Request Status item, where available files can be selected and saved.
 - Browser, service-worker, API, DNS, avatar, and image-proxy caching tuned for faster refreshes and tab restores.
 
 ## Project Status
@@ -47,6 +75,7 @@ Current focus:
 - Keeping image/API caching fast without blocking the visible page during refreshes.
 - Replacing upstream branding and docs with SeerrNG-owned assets and guidance.
 - Hardening request validation, notification settings, permission bounds, and service inputs.
+- Supporting ROM and PC game catalog, acquisition, status tracking, notifications, and download delivery through QuestarrNG and ROMarrNG. SeerrNG does not install, launch, or play games; general desktop applications remain outside the supported catalog.
 
 Release notes are maintained in [`CHANGELOG.md`](./CHANGELOG.md). User-facing
 pull requests add a concise release-note fragment under
@@ -70,6 +99,8 @@ starting points:
 - [Install on Unraid](https://snapetech.github.io/seerrng/getting-started/third-parties/unraid)
 - [Find books, authors, and series](https://snapetech.github.io/seerrng/using-seerr/books-and-series/)
 - [Track requests and status history](https://snapetech.github.io/seerrng/using-seerr/request-status/)
+- [Browse and request emulation games and PC games](https://snapetech.github.io/seerrng/using-seerr/software-acquisition/)
+- [Download verified files from Request Status](https://snapetech.github.io/seerrng/using-seerr/request-status/)
 - [Use media detail and playback controls](https://snapetech.github.io/seerrng/using-seerr/media-details-and-playback/)
 - [Configure media-server libraries, including Plex Music and Audiobooks](https://snapetech.github.io/seerrng/using-seerr/settings/mediaserver)
 - [Enable built-in HTTPS](https://snapetech.github.io/seerrng/using-seerr/advanced/built-in-tls/)
@@ -170,6 +201,13 @@ Books:
 - Optional second service marked as audiobook-capable for audiobook requests.
 - Separate defaults for ebook and audiobook if both-format requests should work cleanly.
 - Existing Readarr or softcover/Goodreads libraries should be migrated before switching to Hardcover metadata. The service settings modal links directly to the Bookshelf Hardcover migration runbook.
+
+Software requests:
+
+- QuestarrNG provides the IGDB catalog and acquisition for PC game requests.
+- ROMarrNG is also required for emulation requests. In **Settings > Services > Software Acquisition**, connect each provider and assign supported ROMarrNG systems to **Retro** or **Modern** before users can request them.
+- Provider hostnames and ports must be reachable from the SeerrNG server or container. Use each provider's SeerrNG integration API key; keys stay server-side.
+- See the [software requests guide](https://snapetech.github.io/seerrng/using-seerr/software-acquisition/) for provider setup, request targets, status, retries, notifications, and downloads. See [Request Status](https://snapetech.github.io/seerrng/using-seerr/request-status/) for the shared Download copy workflow.
 
 ## Bookshelf and Hardcover
 
