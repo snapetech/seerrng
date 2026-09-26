@@ -133,6 +133,13 @@ Users with **Manage Requests** permission can open **Manage Comic** from a
 tracked comic's details page. Administrators can open the comic in its backend,
 remove it from the backend, mark it available, or clear its SeerrNG data.
 
+Cancelling an active comic request removes it from Kapowarr's download queue
+directly. Mylar3 has no equivalent API to cancel an individual in-progress
+download (the same limitation LazyLibrarian has for magazines), so cancelling
+an active Mylar-backed request fails with an error; wait for it to reach a
+terminal status, or remove the download manually in Mylar3 or the download
+client first.
+
 ## Troubleshooting
 
 `No default Mylar or Kapowarr server is configured`:
