@@ -232,6 +232,24 @@ passes the same token to BookshelfNG. Hosted mode does not require a local token
 although Bookshelf's own Hardcover list-import settings still need an API key
 when that feature is used.
 
+#### Hardcover API token requirement
+
+Self-hosted `compatibility` and `native` modes require a Hardcover API token
+from an account you control. Create one in [Hardcover account API
+settings](https://hardcover.app/account/api). For compatibility mode, set
+`HARDCOVER_AUTH`; for managed native mode, set `BOOKSHELF_HARDCOVER_AUTH` or
+save the token in BookshelfNG **Settings > Metadata** when no environment
+value overrides it. Hosted mode uses its configured metadata endpoint and does
+not require a local Hardcover token for searches or lookups.
+
+Any token configured on a self-hosted BookshelfNG or rreading-glasses service is
+used server-side by all SeerrNG users connected to it. A shared hosted endpoint
+such as `hardcover.bookinfo.pro` manages its own upstream access; changing the
+local BookshelfNG token does not replace the hosted service's credential. To
+use a personal token, configure a self-hosted native or compatibility service
+with the token for that mode. The Hardcover list-import feature also requires
+its configured API key.
+
 ### Compatibility-mode outage behavior
 
 In compatibility mode, a metadata request follows this path:

@@ -1,3 +1,4 @@
+import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
@@ -42,7 +43,11 @@ const messages = defineMessages('components.Settings', {
   metadataSettingsSaved: 'Metadata provider settings saved',
   bookshelfCatalogSettings: 'Book Catalog Metadata Sources',
   bookshelfCatalogSettingsDescription:
-    'Seerr searches Open Library directly and merges results from connected BookshelfNG services. Configure each BookshelfNG instance under Settings > Metadata to enable fallback catalogs and add the Hardcover, Google Books, Europeana, or Apify credentials it needs.',
+    'Seerr searches Open Library directly and merges results from connected BookshelfNG services. Configure book catalogs and provider credentials in each BookshelfNG instance under Settings > Metadata.',
+  hardcoverTokenReminderTitle: 'Use your own Hardcover API token',
+  hardcoverTokenReminder:
+    'SeerrNG does not bundle a Hardcover token. A self-hosted BookshelfNG or rreading-glasses service uses its configured token for everyone connected to that service. A shared hosted endpoint such as hardcover.bookinfo.pro manages its own upstream access, which you cannot replace from BookshelfNG settings. To use your own token, configure native Hardcover in BookshelfNG Settings > Metadata or set the environment variable that overrides it (BOOKSHELF_HARDCOVER_AUTH for managed native mode, HARDCOVER_AUTH for compatibility mode).',
+  hardcoverTokenLink: 'Create a Hardcover API token',
   bookshelfServicesLink: 'Manage connected Bookshelf services',
 });
 
@@ -280,6 +285,21 @@ const SettingsMetadata = () => {
         <p className="description">
           {intl.formatMessage(messages.bookshelfCatalogSettingsDescription)}
         </p>
+        <Alert
+          type="warning"
+          title={intl.formatMessage(messages.hardcoverTokenReminderTitle)}
+          className="mt-4 mb-0"
+        >
+          <p>{intl.formatMessage(messages.hardcoverTokenReminder)}</p>
+          <a
+            href="https://hardcover.app/account/api"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex font-medium text-indigo-200 underline hover:text-white"
+          >
+            {intl.formatMessage(messages.hardcoverTokenLink)}
+          </a>
+        </Alert>
         <a
           href="/settings/services"
           className="mt-3 inline-flex text-sm text-indigo-400 hover:text-indigo-300 hover:underline"
