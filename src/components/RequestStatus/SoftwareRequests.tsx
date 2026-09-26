@@ -276,7 +276,7 @@ const SoftwareRequests = ({
                     <h3 className="mt-1 truncate text-sm font-semibold text-white sm:text-base">
                       {request.title}
                     </h3>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+                    <div className="refreshed-detail-text-muted mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                       {request.platform?.name && (
                         <span>{request.platform.name}</span>
                       )}

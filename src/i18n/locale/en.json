@@ -1411,6 +1411,7 @@
   "components.RequestStatus.musicFormat": "Music",
   "components.RequestStatus.network": "Network",
   "components.RequestStatus.noHistory": "No status history has been recorded yet",
+  "components.RequestStatus.noMediaResults": "No movie, show, music, book, comic, or magazine requests match these filters.",
   "components.RequestStatus.noReleaseFoundFilter": "No Release Found",
   "components.RequestStatus.noResults": "No requests match these filters",
   "components.RequestStatus.notAvailable": "Not available",

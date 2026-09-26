@@ -233,6 +233,8 @@ const messages = defineMessages('components.RequestStatus', {
   loadErrorHint: 'The request service did not respond. Try again.',
   retryLoad: 'Try Again',
   noResults: 'No requests match these filters',
+  noMediaResults:
+    'No movie, show, music, book, comic, or magazine requests match these filters.',
   clearFilters: 'Clear Filters',
   scrollProgressLeft: 'Scroll progress left',
   requestLifecycle: 'Request lifecycle',
@@ -2738,7 +2740,13 @@ const RequestStatus = () => {
 
       {data.results.length === 0 && (
         <div className="refreshed-card-surface flex min-h-12 flex-row flex-wrap items-center justify-center gap-2 rounded-xl border border-dashed border-gray-700 p-2 text-center">
-          <span>{intl.formatMessage(messages.noResults)}</span>
+          <span>
+            {intl.formatMessage(
+              mediaFilter === 'all'
+                ? messages.noMediaResults
+                : messages.noResults
+            )}
+          </span>
           {hasFilters && (
             <Button buttonType="default" buttonSize="sm" onClick={clearFilters}>
               {intl.formatMessage(messages.clearFilters)}
