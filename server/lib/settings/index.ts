@@ -100,6 +100,22 @@ export interface TautulliSettings {
   externalUrl?: string;
 }
 
+export interface SoftwareProviderSettings {
+  hostname: string;
+  port: number;
+  useSsl: boolean;
+  baseUrl: string;
+  apiKey: string;
+}
+
+export type EmulationSystemGroup = 'retro' | 'modern';
+
+export interface SoftwareAcquisitionSettings {
+  romarr: SoftwareProviderSettings;
+  questarr: SoftwareProviderSettings;
+  emulationSystemGroups: Record<string, EmulationSystemGroup>;
+}
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -297,6 +313,7 @@ interface FullPublicSettings extends PublicSettings {
   booksEnabled: boolean;
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
+  softwareEnabled: boolean;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;
@@ -472,6 +489,7 @@ export type JobId =
   | 'kapowarr-scan'
   | 'magazine-scan'
   | 'download-sync'
+  | 'software-request-reconciliation'
   | 'download-recovery'
   | 'download-sync-reset'
   | 'jellyfin-recently-added-scan'
@@ -497,6 +515,7 @@ export interface AllSettings {
   mylar: MylarSettings[];
   kapowarr: KapowarrSettings[];
   lazylibrarian: LazyLibrarianSettings[];
+  softwareAcquisition: SoftwareAcquisitionSettings;
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -603,6 +622,23 @@ class Settings {
       mylar: [],
       kapowarr: [],
       lazylibrarian: [],
+      softwareAcquisition: {
+        romarr: {
+          hostname: '',
+          port: 6868,
+          useSsl: false,
+          baseUrl: '',
+          apiKey: '',
+        },
+        questarr: {
+          hostname: '',
+          port: 3000,
+          useSsl: false,
+          baseUrl: '',
+          apiKey: '',
+        },
+        emulationSystemGroups: {},
+      },
       public: {
         initialized: false,
       },
@@ -755,6 +791,9 @@ class Settings {
           schedule: '0 0 5 * * *',
         },
         'download-sync': {
+          schedule: '0 * * * * *',
+        },
+        'software-request-reconciliation': {
           schedule: '0 * * * * *',
         },
         'download-recovery': {
@@ -1068,6 +1107,17 @@ class Settings {
     this.data.lazylibrarian = data;
   }
 
+  get softwareAcquisition(): SoftwareAcquisitionSettings {
+    return this.data.softwareAcquisition;
+  }
+
+  set softwareAcquisition(data: SoftwareAcquisitionSettings) {
+    this.data.softwareAcquisition = mergeSettings(
+      this.data.softwareAcquisition,
+      data
+    );
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -1099,6 +1149,10 @@ class Settings {
       comicsEnabled:
         this.data.mylar.length > 0 || this.data.kapowarr.length > 0,
       magazinesEnabled: this.data.lazylibrarian.length > 0,
+      softwareEnabled: Boolean(
+        this.data.softwareAcquisition.questarr.hostname &&
+        this.data.softwareAcquisition.questarr.apiKey
+      ),
       discoverRegion: this.data.main.discoverRegion,
       streamingRegion: this.data.main.streamingRegion,
       originalLanguage: this.data.main.originalLanguage,
@@ -1381,6 +1435,23 @@ class Settings {
       mylar: [],
       kapowarr: [],
       lazylibrarian: [],
+      softwareAcquisition: {
+        romarr: {
+          hostname: '',
+          port: 6868,
+          useSsl: false,
+          baseUrl: '',
+          apiKey: '',
+        },
+        questarr: {
+          hostname: '',
+          port: 3000,
+          useSsl: false,
+          baseUrl: '',
+          apiKey: '',
+        },
+        emulationSystemGroups: {},
+      },
       public: {
         initialized: false,
       },
@@ -1532,6 +1603,9 @@ class Settings {
           schedule: '0 0 5 * * *',
         },
         'download-sync': {
+          schedule: '0 * * * * *',
+        },
+        'software-request-reconciliation': {
           schedule: '0 * * * * *',
         },
         'download-recovery': {

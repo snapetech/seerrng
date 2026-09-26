@@ -9,6 +9,7 @@ import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import OverrideRuleTiles from '@app/components/Settings/OverrideRule/OverrideRuleTiles';
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
+import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { getSafeHref } from '@app/utils/safeUrl';
@@ -1118,6 +1119,7 @@ const SettingsServices = () => {
           )}
         </ul>
       </div>
+      <SettingsSoftwareAcquisition />
       {overrideRuleModal.open && radarrData && sonarrData && lidarrData && (
         <OverrideRuleModal
           rule={overrideRuleModal.rule}

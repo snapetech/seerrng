@@ -41,6 +41,7 @@ export interface PublicSettingsResponse {
   booksEnabled: boolean;
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
+  softwareEnabled: boolean;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;

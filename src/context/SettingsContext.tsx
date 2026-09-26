@@ -24,6 +24,7 @@ const defaultSettings: PublicSettingsResponse = {
   booksEnabled: false,
   comicsEnabled: false,
   magazinesEnabled: false,
+  softwareEnabled: false,
   discoverRegion: '',
   streamingRegion: '',
   originalLanguage: '',

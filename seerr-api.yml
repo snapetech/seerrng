@@ -4854,6 +4854,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublicSettings'
+  /settings/softwareAcquisition:
+    get:
+      summary: Get software acquisition provider settings
+      description: Returns ROMarrNG and QuestarrNG connection settings with API keys redacted, plus administrator-assigned Retro and Modern system groups.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Software acquisition settings returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  romarr:
+                    type: object
+                  questarr:
+                    type: object
+                  emulationSystemGroups:
+                    type: object
+    put:
+      summary: Update software acquisition settings
+      description: Updates provider connections and per-system emulation groups. API keys stay server-side and are redacted in responses.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Software acquisition settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid provider or system-group settings
+  /settings/softwareAcquisition/test/{provider}:
+    post:
+      summary: Test a software acquisition provider connection
+      description: Checks the selected NG provider's authenticated integration contract without saving the submitted settings.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+            enum: [romarr, questarr]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostname, port, useSsl, apiKey]
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                baseUrl:
+                  type: string
+                apiKey:
+                  type: string
+      responses:
+        '200':
+          description: Provider connection and integration contract verified
+        '400':
+          description: Invalid provider settings
+        '502':
+          description: Provider did not return a supported integration contract
   /settings/initialize:
     post:
       summary: Initialize application
@@ -10390,6 +10468,326 @@ paths:
                     type: number
                   completed:
                     type: number
+  /request/software:
+    post:
+      summary: Submit a ROM or PC game request
+      description: Creates a SeerrNG software request from a QuestarrNG catalog item. Emulation requests include a ROMarrNG system slug; PC game requests require operating system and architecture.
+      tags:
+        - request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, catalogId]
+              properties:
+                category:
+                  type: string
+                  enum: [retro, modern, game]
+                catalogId:
+                  type: integer
+                  minimum: 1
+                platformSlug:
+                  type: string
+                variant:
+                  type: object
+                  required: [operatingSystem, architecture]
+                  properties:
+                    operatingSystem:
+                      type: string
+                      enum: [windows, linux, macos]
+                    architecture:
+                      type: string
+                      enum: [x64, arm64, x86, universal]
+      responses:
+        '201':
+          description: Software request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid title, category, system, or PC target
+        '403':
+          description: Caller lacks request permission
+        '409':
+          description: Matching request already exists
+  /request/software/catalog/systems:
+    get:
+      summary: List ROMarrNG-supported emulation systems
+      description: Returns supported platform slugs and the Retro or Modern group assigned by an administrator. Unassigned systems are not requestable.
+      tags:
+        - request
+      responses:
+        '200':
+          description: Supported emulation systems returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+  /request/software/catalog/search:
+    get:
+      summary: Search ROM and PC game catalog
+      description: Searches the authenticated QuestarrNG IGDB catalog and filters results to the requested emulation group or PC platform.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [retro, modern, game]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 24
+      responses:
+        '200':
+          description: Matching catalog titles returned
+          content:
+            application/json:
+              schema:
+                type: object
+  /request/software/catalog/popular:
+    get:
+      summary: List popular ROM and PC game catalog titles
+      description: Returns popular QuestarrNG catalog titles filtered to the selected emulation group or PC platform.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [retro, modern, game]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 24
+      responses:
+        '200':
+          description: Popular catalog titles returned
+          content:
+            application/json:
+              schema:
+                type: object
+  /request/software/status:
+    get:
+      summary: List software request status
+      description: Returns request ownership, lifecycle state, and verified available assets. Users with request-view permission may inspect other users' software requests.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: take
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: requestedBy
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: requestId
+          description: Restrict the result to a single software request, as used by availability notification links.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Software request status returned
+          content:
+            application/json:
+              schema:
+                type: object
+  /request/software/status/{id}:
+    get:
+      summary: Get software request status and history
+      description: Returns one software request and its lifecycle history when the caller may view it.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Software request details returned
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Request not found or caller may not view it
+  /request/software/status/{id}/approve:
+    post:
+      summary: Approve a software request
+      description: Approves a pending software request and dispatches it idempotently to its acquisition provider. Requires MANAGE_REQUESTS.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Software request approved
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: Request is no longer pending
+  /request/software/status/{id}/decline:
+    post:
+      summary: Decline a software request
+      description: Declines a pending software request. Requires MANAGE_REQUESTS.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Software request declined
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: Request is no longer pending
+  /request/software/status/{id}/retry:
+    post:
+      summary: Retry a failed software request
+      description: Retries a failed provider request using its existing idempotency key. The original requester must still have REQUEST permission, or the caller must have MANAGE_REQUESTS. ROMarrNG can require explicit confirmation when it cannot determine whether a previous download handoff started.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmNoExistingDownload:
+                  type: boolean
+                  description: Set true only after checking the download client queue and history for a matching download.
+      responses:
+        '200':
+          description: Software request retry started
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: Request is not failed or the provider requires a download handoff confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  confirmationRequired:
+                    type: string
+                    enum: [confirmNoExistingDownload]
+                  error:
+                    type: string
+  /request/software/status/{id}/downloads:
+    get:
+      summary: List available files for a software request
+      description: Returns verified, imported request assets only. Provider URLs and local paths are never returned.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Downloadable software files returned
+          content:
+            application/json:
+              schema:
+                type: object
+  /request/software/status/{id}/downloads/{assetId}:
+    get:
+      summary: Download a software request asset through SeerrNG
+      description: Streams one verified, request-scoped provider asset after checking request access and current availability.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: path
+          name: assetId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset bytes streamed to the caller
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Requested byte range streamed when supported by the provider
+        '404':
+          description: Request or asset not found or no longer available
   /request/status:
     get:
       summary: Get request lifecycle status

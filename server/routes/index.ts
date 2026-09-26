@@ -73,6 +73,7 @@ import requestRoutes from './request';
 import searchRoutes from './search';
 import seriesRoutes from './series';
 import serviceRoutes from './service';
+import softwareRoutes from './software';
 import tvRoutes from './tv';
 import user from './user';
 
@@ -412,6 +413,7 @@ router.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
 router.use('/search', isAuthenticated(), searchRoutes);
 router.use('/discover', isAuthenticated(), discoverRoutes);
 router.use('/request', isAuthenticated(), requestRoutes);
+router.use('/request/software', softwareRoutes);
 router.use('/playlist', isAuthenticated(), playlistRoutes);
 router.use('/playback', isAuthenticated(), playbackRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);

@@ -164,6 +164,9 @@ class WebPushAgent
           mediaType,
         });
         break;
+      case Notification.SOFTWARE_AVAILABLE:
+        message = payload.message;
+        break;
       case Notification.MEDIA_DECLINED:
         message = intl.formatMessage(messages.declined, {
           quality,
@@ -216,7 +219,7 @@ class WebPushAgent
 
     const actionUrl = payload.issue
       ? `/issues/${payload.issue.id}`
-      : payload.media
+      : payload.media || payload.mediaUrl
         ? getNotificationMediaUrl(payload)
         : undefined;
 
@@ -224,7 +227,10 @@ class WebPushAgent
       ? intl.formatMessage(
           payload.issue
             ? messages.viewIssue
-            : payload.mediaUrl?.startsWith('/requests/status?requestId=')
+            : payload.mediaUrl?.startsWith('/requests/status?requestId=') ||
+                payload.mediaUrl?.startsWith(
+                  '/requests/status?softwareRequestId='
+                )
               ? messages.viewRequestStatus
               : messages.viewMedia
         )

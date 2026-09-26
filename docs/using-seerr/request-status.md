@@ -46,8 +46,15 @@ copies** and choose the episode, book format, comic issue, or magazine issue to
 save. The browser handles transfer progress after the download starts; SeerrNG
 keeps the request's availability and history on this page.
 
-Available notifications link directly to the matching request card. SeerrNG
-checks request access and current availability again before each download. It
+ROM and PC game requests also appear in Request Status with their provider
+confirmed lifecycle states and download actions. See
+[Software requests](./software-acquisition.md) for provider setup, emulation
+system groups, and PC target selection.
+
+Available notifications link directly to the matching request in Request
+Status. Software requests are reconciled in the background, so completion can
+be detected when the page is closed. SeerrNG checks request access and current
+availability again before each download. It
 does not expose provider credentials or server paths, and it only lists files
 that the configured backend reports as imported and SeerrNG can access.
 

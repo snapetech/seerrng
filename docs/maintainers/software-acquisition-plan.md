@@ -26,6 +26,11 @@ Do not build a new general-purpose game downloader. Create [ROMarrNG](https://gi
 
 Treat Retro, Modern Emulation, and Games as SeerrNG catalog/request experiences that route to providers by the selected platform and acquisition capabilities. They do not need a different backend just because they have different labels in the UI. Treat acquisition tracking and artifact delivery as separate provider capabilities across every request category.
 
+### Accepted catalog decisions
+
+- Emulation systems come from ROMarrNG's supported platform directory. SeerrNG administrators assign each system to the **Retro** or **Modern** group; the system-to-group mapping is explicit and editable instead of relying on a fixed generation boundary that could become stale.
+- Native PC-game requests must preserve both the selected operating system (`Windows`, `Linux`, or `macOS`) and architecture (`x64`, `ARM64`, `x86`, or `universal`) before approval. SeerrNG always sends both values to QuestarrNG even though the provider has a default for older callers.
+
 ## Candidate health and integration readiness
 
 This assessment uses release and commit information available on 2026-09-25. Stars and forks are weak adoption signals; tagged releases, documented APIs, persistent job state, and integration tests matter more.
@@ -148,9 +153,9 @@ Provider support is explicit; do not infer deliverability from a completed reque
 
 ### 0. Lock the supported matrix
 
-- Define which systems are Retro and which are Modern; use an explicit system list.
+- Load ROMarrNG's supported system directory and let administrators assign each system to Retro or Modern. A system without an explicit supported group is not requestable.
 - Decide whether each system's scope includes game files only or also firmware, updates, and DLC.
-- Specify whether game variants target Windows, Linux, macOS, console system, architecture, edition, and/or region.
+- Require OS and architecture for PC-game requests; specify separately whether edition and region become request dimensions.
 - Decide whether store-account downloads are included initially or remain an optional later Games provider.
 - Select the first shared library destination and define what confirms availability.
 
@@ -162,9 +167,9 @@ Create ROMarrNG from the current stable upstream baseline, retaining license att
 
 The ROMarrNG spike also checks how an imported ROM or multi-disc set can be delivered to the requesting user. The fork must expose an unambiguous imported file set for the request and an authenticated asset API correlated to the durable request/job contract. Update the fork README and API docs according to the fork policy above.
 
-### 2. Extend QuestarrNG for Games — in progress
+### 2. Extend QuestarrNG for Games — provider contract implemented
 
-QuestarrNG is created from actively maintained upstream main. Add an idempotent external request contract with durable correlation to Questarr's game and download records, selected target metadata, request status readback, and supported cancel/retry operations. Keep the fork's README and API documentation current with the NG branding and SeerrNG purpose.
+QuestarrNG is created from actively maintained upstream main. Its SeerrNG contract now includes IGDB catalog discovery, an idempotent external request contract with durable correlation to Questarr's game and download records, selected target metadata, request status readback, retry, and authenticated asset delivery. Its README and API documentation identify the fork, its SeerrNG purpose, and the upstream project.
 
 **Exit gate:** SeerrNG can request a specific game variant, reconcile the provider job after restart, and report truthful progress and availability without adopting Questarr's UI or request database as SeerrNG's source of truth.
 
@@ -187,8 +192,13 @@ Add the shared Request Status action and artifact-delivery route across current 
 - SeerrNG now has a shared Request Status asset listing and authenticated streaming route for imported movie, TV, ebook/audiobook, comic, and magazine files. Filesystem-backed providers use administrator path mappings; Mylar3 uses its authenticated issue-download stream, with credentials and paths kept server-side.
 - Available notifications link to the specific Request Status row. A single file uses the compact **Download copy** action, while multi-file requests show an accessible file picker; no bundle is offered unless a provider can construct one safely.
 - The download-copy setup is documented for operators, and its request-scoped endpoints and `requestId` status filter are described in `seerr-api.yml`.
-- `snapetech/QuestarrNG` is a separate fork of `Doezer/Questarr`. Its SeerrNG API now exposes authenticated IGDB search, popular-title, platform, and game-detail catalog routes, plus durable request/status and asset delivery routes. The SeerrNG adapter and request workflow are still pending.
-- ROMarrNG is required because upstream lacks stable external request correlation and a request-scoped asset API; the fork will preserve the upstream MIT license and attribution.
+- `snapetech/QuestarrNG` is a separate fork of `Doezer/Questarr`. Its authenticated integration contract exposes IGDB search, popular-title, platform, and game-detail catalog routes, plus durable request/status, retry, and request-scoped asset delivery routes. SeerrNG now uses that contract through a server-side adapter.
+- `snapetech/ROMarrNG` is a separate fork of `BlizzHacker/romarr`. Its SeerrNG integration contract adds durable request correlation, retry, request-scoped imported-file listing and streaming, and supported-system aliases while preserving the upstream MIT license and attribution.
+- SeerrNG now has provider connection settings and contract checks, an administrator-editable Retro/Modern assignment for every supported ROMarrNG system, IGDB catalog browsing, explicit PC OS and architecture selection, and a dedicated durable software-request model.
+- Users follow provider-confirmed states in Request Status. Active software requests are reconciled in the background and while Request Status is open; verified assets receive the same request-scoped **Download copy** and multi-file selection behavior as other media.
+- Failed retries preserve the local failed state until the provider accepts them. SeerrNG reads provider state before retrying to recover lost responses; ROMarrNG's uncertain-handoff case requires the requester or an administrator to confirm that no matching download remains in the download-client queue or history.
+- A configurable **Software Request Available** notification links the requester to the matching Request Status item. Provider credentials and upstream asset URLs remain server-side.
+- SeerrNG's OpenAPI contract and user/operator guides now describe software settings, catalog and request routes, notification behavior, and file delivery.
 - General desktop applications remain a future wishlist item.
 
 ## Acceptance criteria
@@ -198,6 +208,7 @@ Add the shared Request Status action and artifact-delivery route across current 
 - The user can distinguish searching, downloading, importing/verifying, available, failed, and cancelled.
 - The SeerrNG request maps to a provider request/job and resulting library entry.
 - Cancellation/retry reflects the actual provider capability.
+- Requesters can retry their own failed software requests only while they retain `REQUEST`; administrators with `MANAGE_REQUESTS` can retry any request. An uncertain ROMarrNG handoff requires an explicit duplicate-download check before retry.
 - A request becomes available only after file import/library confirmation.
 - For movies, TV, ebooks, audiobooks, comics, magazines, ROMs, and games, the requester is notified when the request reaches verified availability and sees the same **Download copy** action on its Request Status row.
 - Multi-file requests expose the available files and only offer a bundle when the provider can safely construct it.
@@ -211,10 +222,8 @@ General-purpose app catalog and acquisition for Windows, Linux, and macOS remain
 
 ## Open decisions
 
-1. What exact systems are included in Modern Emulation?
-2. Are native games requested by title only, or must the requester choose OS and architecture before approval?
-3. Is a Steam/itch.io account-backed acquisition provider required in the first Games release?
-4. Should acquired files land in one shared library or a user-specific destination?
+1. Is a Steam/itch.io account-backed acquisition provider required in the first Games release?
+2. Should acquired files land in one shared library or a user-specific destination?
 
 ## Sources reviewed
 

@@ -19,6 +19,7 @@ import {
   getFilterToggleButtonClass,
   type CompactSelectOption,
 } from '@app/components/Discover/FilterPanel/CompactFilterSelect';
+import SoftwareRequests from '@app/components/RequestStatus/SoftwareRequests';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import useRequestStatusScrollRestoration from '@app/hooks/useRequestStatusScrollRestoration';
 import { useSearchActivityReporter } from '@app/hooks/useSearchActivity';
@@ -1988,14 +1989,24 @@ const RequestStatus = () => {
   const rawFocusedRequestId = Array.isArray(router.query.requestId)
     ? router.query.requestId[0]
     : router.query.requestId;
+  const rawFocusedSoftwareRequestId = Array.isArray(
+    router.query.softwareRequestId
+  )
+    ? router.query.softwareRequestId[0]
+    : router.query.softwareRequestId;
   const focusedRequestId =
     rawFocusedRequestId && /^\d+$/.test(rawFocusedRequestId)
       ? Number(rawFocusedRequestId)
       : undefined;
+  const focusedSoftwareRequestId =
+    rawFocusedSoftwareRequestId && /^\d+$/.test(rawFocusedSoftwareRequestId)
+      ? Number(rawFocusedSoftwareRequestId)
+      : undefined;
   useEffect(() => {
     if (
-      !Number.isSafeInteger(focusedRequestId) ||
-      (focusedRequestId ?? 0) < 1
+      ![focusedRequestId, focusedSoftwareRequestId].some(
+        (requestId) => Number.isSafeInteger(requestId) && (requestId ?? 0) > 0
+      )
     ) {
       return;
     }
@@ -2007,7 +2018,7 @@ const RequestStatus = () => {
     setTimeFrame('all');
     setSearchFilter('');
     if (canViewOtherUsers) setSelectedUser('all');
-  }, [canViewOtherUsers, focusedRequestId]);
+  }, [canViewOtherUsers, focusedRequestId, focusedSoftwareRequestId]);
   const page = Math.max(Number(router.query.page) || 1, 1);
   const apiMediaType =
     mediaFilter === 'book' || mediaFilter === 'audiobook'
@@ -2696,6 +2707,12 @@ const RequestStatus = () => {
           })}
         </div>
       </section>
+
+      <SoftwareRequests
+        enabled={mediaFilter === 'all'}
+        requestedById={selectedOwnerId}
+        softwareRequestId={focusedSoftwareRequestId}
+      />
 
       <div className="space-y-4">
         {data.results.map((item) => (

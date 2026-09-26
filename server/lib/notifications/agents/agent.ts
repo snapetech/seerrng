@@ -224,7 +224,10 @@ export const getNotificationActionLabel = (
   payload: Pick<NotificationPayload, 'issue' | 'mediaUrl'>
 ) => {
   if (payload.issue) return globalMessages.viewIssue;
-  if (payload.mediaUrl?.startsWith('/requests/status?requestId=')) {
+  if (
+    payload.mediaUrl?.startsWith('/requests/status?requestId=') ||
+    payload.mediaUrl?.startsWith('/requests/status?softwareRequestId=')
+  ) {
     return globalMessages.viewRequestStatus;
   }
   return globalMessages.viewMedia;

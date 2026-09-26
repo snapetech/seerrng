@@ -28,6 +28,11 @@ const messages = defineMessages('components.NotificationTypeSelector', {
     'Send notifications when media requests become available.',
   usermediaavailableDescription:
     'Get notified when your media requests become available.',
+  softwareavailable: 'Software Request Available',
+  softwareavailableDescription:
+    'Send notifications when requested ROMs and PC games are ready to download.',
+  usersoftwareavailableDescription:
+    'Get notified when your requested ROMs and PC games are ready to download.',
   mediafailed: 'Request Processing Failed',
   mediafailedDescription:
     'Send notifications when media requests fail to be added to Radarr, Sonarr, Lidarr, or Bookshelf.',
@@ -105,6 +110,7 @@ export enum Notification {
   ISSUE_RESOLVED = 1024,
   ISSUE_REOPENED = 2048,
   MEDIA_AUTO_REQUESTED = 4096,
+  SOFTWARE_AVAILABLE = 8192,
 }
 
 export const ALL_NOTIFICATIONS = Object.values(Notification)
@@ -289,6 +295,17 @@ const NotificationTypeSelector = ({
             : messages.mediaavailableDescription
         ),
         value: Notification.MEDIA_AVAILABLE,
+        hasNotifyUser: true,
+      },
+      {
+        id: 'software-available',
+        name: intl.formatMessage(messages.softwareavailable),
+        description: intl.formatMessage(
+          user
+            ? messages.usersoftwareavailableDescription
+            : messages.softwareavailableDescription
+        ),
+        value: Notification.SOFTWARE_AVAILABLE,
         hasNotifyUser: true,
       },
       {

@@ -55,6 +55,8 @@
   "notifications.common.requestedBy": "Requested By",
   "notifications.common.resolved": "Resolved",
   "notifications.common.series": "series",
+  "notifications.common.softwareAvailableMessage": "Your requested software is ready. Open Request Status to download a copy.",
+  "notifications.common.softwareRequestAvailable": "Software Request Available",
   "notifications.common.viewIssue": "View Issue in {applicationTitle}",
   "notifications.common.viewMedia": "View Media in {applicationTitle}",
   "notifications.common.viewRequestStatus": "View Request Status in {applicationTitle}",

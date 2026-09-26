@@ -16,6 +16,9 @@ const globalMessages = defineMessages('notifications.common', {
   resolved: 'Resolved',
   viewIssue: 'View Issue in {applicationTitle}',
   viewRequestStatus: 'View Request Status in {applicationTitle}',
+  softwareRequestAvailable: 'Software Request Available',
+  softwareAvailableMessage:
+    'Your requested software is ready. Open Request Status to download a copy.',
   viewMedia: 'View Media in {applicationTitle}',
   openIn: 'Open in {applicationTitle}',
   movie: 'movie',

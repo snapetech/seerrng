@@ -21,6 +21,7 @@ import { readarrScanner } from '@server/lib/scanners/readarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import { refreshTrackedSoftwareRequests } from '@server/lib/softwareRequests';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
@@ -463,6 +464,30 @@ export const startJobs = (): void => {
   });
 
   scheduledJobs.push({
+    id: 'software-request-reconciliation',
+    name: 'Software Request Reconciliation',
+    type: 'process',
+    interval: 'minutes',
+    cronSchedule: jobs['software-request-reconciliation'].schedule,
+    job: schedule.scheduleJob(
+      jobs['software-request-reconciliation'].schedule,
+      () => {
+        logger.debug(
+          'Starting scheduled job: Software Request Reconciliation',
+          {
+            label: 'Jobs',
+          }
+        );
+        return runTrackedJob(
+          'Software Request Reconciliation',
+          refreshTrackedSoftwareRequests,
+          { logCompletion: true }
+        );
+      }
+    ),
+  });
+
+  scheduledJobs.push({
     id: 'download-recovery',
     name: 'Download Recovery',
     type: 'process',
@@ -567,6 +592,14 @@ export const startJobs = (): void => {
   void runTrackedJob('Request Status Reconciliation', () =>
     reconcileActiveRequests()
   );
+
+  if (jobs['software-request-reconciliation'].enabled !== false) {
+    void runTrackedJob(
+      'Software Request Reconciliation',
+      refreshTrackedSoftwareRequests,
+      { logCompletion: true }
+    );
+  }
 
   // Discover the existing music catalogue immediately after startup instead
   // of leaving ownership badges stale until the overnight Lidarr scan.

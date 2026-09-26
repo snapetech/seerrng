@@ -11,6 +11,7 @@ import {
   BookOpenIcon,
   ClockIcon,
   CogIcon,
+  CommandLineIcon,
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
@@ -35,6 +36,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browsemusic: 'Music',
   browsebooks: 'Books',
   browseaudiobooks: 'Audiobooks',
+  browsesoftware: 'Software',
   browsecomics: 'Comics',
   browsemagazines: 'Magazines',
   browsetv: 'Series',
@@ -113,6 +115,12 @@ const SidebarLinks: SidebarLinkProps[] = [
     messagesKey: 'browsemagazines',
     svgIcon: <NewspaperIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/(?:discover\/magazines(?:\/.*)?|magazine\/)/,
+  },
+  {
+    href: '/software',
+    messagesKey: 'browsesoftware',
+    svgIcon: <CommandLineIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/software(?:\/|$)/,
   },
   {
     href: '/requests',

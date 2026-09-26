@@ -104,6 +104,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'kapowarr-scan': 'Kapowarr Comics Scan',
     'magazine-scan': 'LazyLibrarian Magazine Scan',
     'download-sync': 'Download Sync',
+    'software-request-reconciliation': 'Software Request Reconciliation',
     'download-recovery': 'Download Recovery',
     'download-sync-reset': 'Download Sync Reset',
     'image-cache-cleanup': 'Image Cache Cleanup',

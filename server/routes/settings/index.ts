@@ -114,6 +114,7 @@ import mylarRoutes from './mylar';
 import notificationRoutes from './notifications';
 import radarrRoutes from './radarr';
 import readarrRoutes from './readarr';
+import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
 
 const settingsRoutes = Router();
@@ -1380,6 +1381,7 @@ settingsRoutes.use('/kapowarr', kapowarrRoutes);
 settingsRoutes.use('/lazylibrarian', lazyLibrarianRoutes);
 settingsRoutes.use('/discover', discoverSettingRoutes);
 settingsRoutes.use('/metadatas', metadataRoutes);
+settingsRoutes.use('/software-acquisition', softwareAcquisitionRoutes);
 
 export const filteredMainSettings = (
   user: User,

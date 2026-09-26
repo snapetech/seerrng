@@ -3,6 +3,7 @@ export interface OptionalServiceAvailability {
   booksEnabled: boolean;
   comicsEnabled: boolean;
   magazinesEnabled?: boolean;
+  softwareEnabled?: boolean;
 }
 
 export const isOptionalCatalogPathEnabled = (
@@ -19,6 +20,10 @@ export const isOptionalCatalogPathEnabled = (
 
   if (path === '/discover/magazines') {
     return Boolean(availability.magazinesEnabled);
+  }
+
+  if (path === '/software') {
+    return Boolean(availability.softwareEnabled);
   }
 
   return (

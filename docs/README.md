@@ -23,6 +23,7 @@ settings, and the media services SeerrNG connects to.
 
 - [Find books, authors, and series](/using-seerr/books-and-series/)
 - [Follow requests and status history](/using-seerr/request-status/)
+- [Browse and request ROMs and PC games](/using-seerr/software-acquisition/)
 - [Media details and playback controls](/using-seerr/media-details-and-playback/)
 - [Import a playlist as music requests](/using-seerr/playlist-requests/)
 - [Manage users and request preferences](/using-seerr/users/editing-users/)
