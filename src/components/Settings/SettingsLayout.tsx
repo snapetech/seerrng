@@ -26,6 +26,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Settings', {
   menuGeneralSettings: 'General',
   menuUsers: 'Users',
+  menuCategories: 'Media Categories',
   menuPlexSettings: 'Plex',
   menuJellyfinSettings: '{mediaServerName}',
   menuServices: 'Services',
@@ -95,6 +96,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuUsers),
       route: '/settings/users',
       regex: /^\/settings\/users/,
+    },
+    {
+      text: intl.formatMessage(messages.menuCategories),
+      route: '/settings/categories',
+      regex: /^\/settings\/categories/,
     },
     settings.currentSettings.mediaServerType === MediaServerType.PLEX
       ? {

@@ -4,9 +4,14 @@ import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
+import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  isAnySoftwareCategoryEnabled,
+  isConfiguredMediaCategoryEnabled,
+} from '@app/utils/serviceAvailability';
 import { Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type {
@@ -52,6 +57,7 @@ const messages = defineMessages('components.SoftwareCatalog', {
   requestError: 'This request could not be submitted.',
   existingRequest: 'This title is already requested for that target.',
   chooseAll: 'Choose an operating system and architecture to continue.',
+  noCategories: 'No software categories are currently available.',
 });
 
 type Category = 'retro' | 'modern' | 'game';
@@ -91,6 +97,7 @@ const architectures: PcArchitecture[] = ['x64', 'arm64', 'x86', 'universal'];
 const SoftwareCatalog = () => {
   const intl = useIntl();
   const { hasPermission } = useUser();
+  const { currentSettings } = useSettings();
   const canRequest = hasPermission(Permission.REQUEST);
   const [category, setCategory] = useState<Category>('retro');
   const [searchInput, setSearchInput] = useState('');
@@ -105,15 +112,33 @@ const SoftwareCatalog = () => {
   const [requestSuccess, setRequestSuccess] = useState('');
   const [requesting, setRequesting] = useState(false);
 
+  const visibleCategories = categories.filter((value) => {
+    if (!isAnySoftwareCategoryEnabled(currentSettings)) return false;
+    if (value === 'game') {
+      return isConfiguredMediaCategoryEnabled('game', currentSettings);
+    }
+    return (
+      currentSettings.romarrEnabled &&
+      isConfiguredMediaCategoryEnabled(value, currentSettings)
+    );
+  });
+  const selectedCategory = visibleCategories.includes(category)
+    ? category
+    : (visibleCategories[0] ?? category);
+
   const query = submittedQuery.trim();
   const url = useMemo(() => {
-    const params = new URLSearchParams({ category, limit: '24' });
+    if (visibleCategories.length === 0) return null;
+    const params = new URLSearchParams({
+      category: selectedCategory,
+      limit: '24',
+    });
     if (query) {
       params.set('q', query);
       return `/api/v1/request/software/catalog/search?${params.toString()}`;
     }
     return `/api/v1/request/software/catalog/popular?${params.toString()}`;
-  }, [category, query]);
+  }, [query, selectedCategory, visibleCategories.length]);
   const { data, error, isLoading } = useSWR<CatalogResponse>(url);
 
   const openRequest = (game: CatalogGame) => {
@@ -126,7 +151,7 @@ const SoftwareCatalog = () => {
   const submitRequest = async () => {
     if (!selectedGame) return;
     if (
-      category === 'game' &&
+      selectedCategory === 'game' &&
       (!variant.operatingSystem || !variant.architecture)
     ) {
       setRequestError(intl.formatMessage(messages.chooseAll));
@@ -138,9 +163,9 @@ const SoftwareCatalog = () => {
       const response = await axios.post<{ request: { status: string } }>(
         '/api/v1/request/software',
         {
-          category,
+          category: selectedCategory,
           catalogId: selectedGame.igdbId,
-          ...(category === 'game'
+          ...(selectedCategory === 'game'
             ? {
                 variant: {
                   operatingSystem: variant.operatingSystem,
@@ -170,9 +195,9 @@ const SoftwareCatalog = () => {
   };
 
   const categoryTitle = intl.formatMessage(
-    category === 'game'
+    selectedCategory === 'game'
       ? messages.games
-      : category === 'modern'
+      : selectedCategory === 'modern'
         ? messages.modern
         : messages.retro
   );
@@ -186,12 +211,12 @@ const SoftwareCatalog = () => {
         </Header>
 
         <div className="mt-6 flex flex-wrap gap-2" role="tablist">
-          {categories.map((value) => (
+          {visibleCategories.map((value) => (
             <button
               key={value}
               type="button"
               role="tab"
-              aria-selected={category === value}
+              aria-selected={selectedCategory === value}
               onClick={() => {
                 setCategory(value);
                 setSubmittedQuery('');
@@ -199,7 +224,7 @@ const SoftwareCatalog = () => {
                 setRequestSuccess('');
               }}
               className={`rounded-full border px-4 py-2 text-sm font-semibold transition focus:ring-2 focus:ring-indigo-400 focus:outline-none ${
-                category === value
+                selectedCategory === value
                   ? 'border-indigo-400 bg-indigo-600 text-white'
                   : 'border-gray-600 bg-gray-800 text-gray-200 hover:border-gray-400'
               }`}
@@ -259,7 +284,11 @@ const SoftwareCatalog = () => {
           <span className="text-sm text-gray-400">{categoryTitle}</span>
         </div>
 
-        {isLoading ? (
+        {visibleCategories.length === 0 ? (
+          <p className="mt-8 text-sm text-gray-400">
+            {intl.formatMessage(messages.noCategories)}
+          </p>
+        ) : isLoading ? (
           <div className="py-16">
             <LoadingSpinner />
           </div>
@@ -294,7 +323,7 @@ const SoftwareCatalog = () => {
                       {game.releaseDate || game.genres.slice(0, 2).join(' · ')}
                     </p>
                     <p className="mt-2 line-clamp-2 min-h-8 text-xs text-gray-300">
-                      {category === 'game'
+                      {selectedCategory === 'game'
                         ? game.platforms
                             .filter((platform) =>
                               /windows|linux|mac/i.test(platform)
@@ -341,15 +370,15 @@ const SoftwareCatalog = () => {
             cancelText={intl.formatMessage(globalMessages.cancel)}
             okDisabled={
               requesting ||
-              (category !== 'game' && !selectedSystem) ||
-              (category === 'game' &&
+              (selectedCategory !== 'game' && !selectedSystem) ||
+              (selectedCategory === 'game' &&
                 (!variant.operatingSystem || !variant.architecture))
             }
             loading={requesting}
             dialogClass="max-w-xl"
           >
             <div className="space-y-4">
-              {category === 'game' ? (
+              {selectedCategory === 'game' ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <label className="text-sm text-gray-200">
                     {intl.formatMessage(messages.chooseOperatingSystem)}

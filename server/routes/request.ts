@@ -7,6 +7,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import type { MediaCategoryKey } from '@server/constants/mediaCategories';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaIdentifier, {
@@ -49,6 +50,7 @@ import {
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import { cleanMagazineTitle } from '@server/lib/magazineIdentity';
+import { isMediaCategoryEnabled } from '@server/lib/mediaCategories';
 import { hydrateMediaRequestRelations } from '@server/lib/mediaRequestHydration';
 import { aliasDownloadId } from '@server/lib/mediaResponse';
 import { Permission } from '@server/lib/permissions';
@@ -257,6 +259,44 @@ const getRequestLogBody = (body: Partial<MediaRequestBody> | undefined) => ({
   authorId: body?.authorId,
   userId: body?.userId,
 });
+
+const getDisabledCategoryForRequest = (
+  mediaType: MediaType,
+  format?: MediaRequestBody['format']
+): MediaCategoryKey | undefined => {
+  const categories: MediaCategoryKey[] =
+    mediaType === MediaType.MOVIE
+      ? ['movie']
+      : mediaType === MediaType.TV
+        ? ['tv']
+        : mediaType === MediaType.MUSIC
+          ? ['music']
+          : mediaType === MediaType.COMIC
+            ? ['comic']
+            : mediaType === MediaType.MAGAZINE
+              ? ['magazine']
+              : format === 'both'
+                ? ['ebook', 'audiobook']
+                : [format === 'audiobook' ? 'audiobook' : 'ebook'];
+
+  return categories.find((category) => !isMediaCategoryEnabled(category));
+};
+
+const getMediaCategoryLabel = (category: MediaCategoryKey): string => {
+  const labels: Record<MediaCategoryKey, string> = {
+    movie: 'Movie',
+    tv: 'Series',
+    music: 'Music',
+    ebook: 'Book',
+    audiobook: 'Audiobook',
+    comic: 'Comic',
+    magazine: 'Magazine',
+    retro: 'Retro emulation',
+    modern: 'Modern emulation',
+    game: 'PC game',
+  };
+  return labels[category];
+};
 
 const protectRequestStatusDownloadId = <
   T extends { downloadId: string | null },
@@ -2177,6 +2217,17 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
         return next(body.error);
       }
 
+      const disabledCategory = getDisabledCategoryForRequest(
+        body.value.mediaType,
+        body.value.format
+      );
+      if (disabledCategory) {
+        return next({
+          status: 403,
+          message: `${getMediaCategoryLabel(disabledCategory)} requests are disabled by the administrator.`,
+        });
+      }
+
       const request = await MediaRequest.request(body.value, req.user, {
         expectedCredentialVersion: getExpectedCredentialVersion(req),
       });
@@ -2276,6 +2327,17 @@ requestRoutes.post<never, BulkMediaRequestResponse, BulkMediaRequestBody>(
         return next(sanitizedBody.error);
       }
       const body = sanitizedBody.value;
+
+      const disabledCategory = getDisabledCategoryForRequest(
+        body.mediaType,
+        body.format
+      );
+      if (disabledCategory) {
+        return next({
+          status: 403,
+          message: `${getMediaCategoryLabel(disabledCategory)} requests are disabled by the administrator.`,
+        });
+      }
 
       logger.info('Bulk request received', {
         label: 'Request',

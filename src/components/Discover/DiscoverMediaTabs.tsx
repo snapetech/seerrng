@@ -1,5 +1,11 @@
 import { getFilterToggleButtonClass } from '@app/components/Discover/FilterPanel/CompactFilterSelect';
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
+import type { DiscoverMediaType as DiscoverMediaCategory } from '@app/utils/serviceAvailability';
+import {
+  DISCOVER_MEDIA_TYPES,
+  isDiscoverMediaTypeEnabled,
+} from '@app/utils/serviceAvailability';
 import {
   BookOpenIcon,
   FilmIcon,
@@ -10,7 +16,7 @@ import {
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
 
-export type DiscoverMediaType = 'movie' | 'tv' | 'music' | 'book' | 'audiobook';
+export type DiscoverMediaType = DiscoverMediaCategory;
 
 interface DiscoverMediaTabsProps {
   selected?: DiscoverMediaType;
@@ -56,6 +62,10 @@ const tabs = [
 
 const DiscoverMediaTabs = ({ selected, basePath }: DiscoverMediaTabsProps) => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
+  const availableTypes = DISCOVER_MEDIA_TYPES.filter((type) =>
+    isDiscoverMediaTypeEnabled(type, currentSettings)
+  );
 
   return (
     <section aria-label={intl.formatMessage(messages.mediaFilters)}>
@@ -63,27 +73,29 @@ const DiscoverMediaTabs = ({ selected, basePath }: DiscoverMediaTabsProps) => {
         {intl.formatMessage(messages.mediaFilters)}
       </div>
       <nav className="flex flex-wrap gap-2" data-testid="discover-media-tabs">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isSelected = selected === tab.type;
+        {tabs
+          .filter((tab) => availableTypes.includes(tab.type))
+          .map((tab) => {
+            const Icon = tab.icon;
+            const isSelected = selected === tab.type;
 
-          return (
-            <Link
-              key={tab.type}
-              href={
-                basePath
-                  ? { pathname: basePath, query: { mediaType: tab.type } }
-                  : tab.href
-              }
-              aria-current={isSelected ? 'page' : undefined}
-              className={getFilterToggleButtonClass(isSelected)}
-              data-testid={`discover-media-tab-${tab.type}`}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              <span>{intl.formatMessage(tab.label)}</span>
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={tab.type}
+                href={
+                  basePath
+                    ? { pathname: basePath, query: { mediaType: tab.type } }
+                    : tab.href
+                }
+                aria-current={isSelected ? 'page' : undefined}
+                className={getFilterToggleButtonClass(isSelected)}
+                data-testid={`discover-media-tab-${tab.type}`}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                <span>{intl.formatMessage(tab.label)}</span>
+              </Link>
+            );
+          })}
       </nav>
     </section>
   );

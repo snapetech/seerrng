@@ -6,10 +6,12 @@ import Tooltip from '@app/components/Common/Tooltip';
 import { sliderTitles } from '@app/components/Discover/constants';
 import MediaSlider from '@app/components/MediaSlider';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { isConfiguredMediaCategoryEnabled } from '@app/utils/serviceAvailability';
 import { Transition } from '@headlessui/react';
 import {
   ArrowDownOnSquareIcon,
@@ -71,6 +73,53 @@ const messages = defineMessages('components.Discover', {
   createnewslider: 'Create New Slider',
 });
 
+const isDiscoverSliderEnabled = (
+  type: number,
+  availability: ReturnType<typeof useSettings>['currentSettings']
+): boolean => {
+  switch (type) {
+    case DiscoverSliderType.RECENTLY_ADDED:
+    case DiscoverSliderType.TRENDING:
+      return (
+        isConfiguredMediaCategoryEnabled('movie', availability) ||
+        isConfiguredMediaCategoryEnabled('tv', availability)
+      );
+    case DiscoverSliderType.POPULAR_MOVIES:
+    case DiscoverSliderType.MOVIE_GENRES:
+    case DiscoverSliderType.UPCOMING_MOVIES:
+    case DiscoverSliderType.STUDIOS:
+    case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
+    case DiscoverSliderType.TMDB_MOVIE_GENRE:
+    case DiscoverSliderType.TMDB_STUDIO:
+    case DiscoverSliderType.TMDB_MOVIE_STREAMING_SERVICES:
+      return isConfiguredMediaCategoryEnabled('movie', availability);
+    case DiscoverSliderType.POPULAR_TV:
+    case DiscoverSliderType.TV_GENRES:
+    case DiscoverSliderType.UPCOMING_TV:
+    case DiscoverSliderType.NETWORKS:
+    case DiscoverSliderType.TMDB_TV_KEYWORD:
+    case DiscoverSliderType.TMDB_TV_GENRE:
+    case DiscoverSliderType.TMDB_NETWORK:
+    case DiscoverSliderType.TMDB_TV_STREAMING_SERVICES:
+      return isConfiguredMediaCategoryEnabled('tv', availability);
+    case DiscoverSliderType.POPULAR_MUSIC:
+    case DiscoverSliderType.MUSICBRAINZ_MUSIC_GENRE:
+    case DiscoverSliderType.LISTENBRAINZ_MUSIC_CHART:
+      return (
+        availability.musicEnabled &&
+        isConfiguredMediaCategoryEnabled('music', availability)
+      );
+    case DiscoverSliderType.POPULAR_BOOKS:
+    case DiscoverSliderType.OPENLIBRARY_BOOK_SUBJECT:
+      return (
+        availability.booksEnabled &&
+        isConfiguredMediaCategoryEnabled('ebook', availability)
+      );
+    default:
+      return true;
+  }
+};
+
 type DiscoverProps = {
   initialSliders?: DiscoverSlider[];
 };
@@ -78,6 +127,7 @@ type DiscoverProps = {
 const Discover = ({ initialSliders }: DiscoverProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
+  const { currentSettings } = useSettings();
   const { addToast } = useToasts();
   const {
     data: discoverData,
@@ -93,6 +143,11 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
     initialSliders ?? []
   );
   const [isEditing, setIsEditing] = useState(false);
+  const visibleSliders = (isEditing ? sliders : discoverData)?.filter(
+    (slider) =>
+      slider.type === undefined ||
+      isDiscoverSliderEnabled(slider.type, currentSettings)
+  );
 
   // We need to sync the state here so that we can modify the changes locally without commiting
   // anything to the server until the user decides to save the changes
@@ -245,7 +300,7 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
           </Transition>
         </>
       )}
-      {(isEditing ? sliders : discoverData)?.map((slider, index) => {
+      {visibleSliders?.map((slider, index) => {
         let sliderComponent: React.ReactNode;
 
         switch (slider.type) {

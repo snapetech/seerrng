@@ -11,6 +11,7 @@ import SoftwareRequest, {
 } from '@server/entity/SoftwareRequest';
 import SoftwareRequestStatusEvent from '@server/entity/SoftwareRequestStatusEvent';
 import { User } from '@server/entity/User';
+import { isMediaCategoryEnabled } from '@server/lib/mediaCategories';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
@@ -44,6 +45,18 @@ const ACTIVE_STATUSES: SoftwareRequestStatus[] = [
   'downloading',
   'importing',
 ];
+
+const isSoftwareCategoryEnabled = (
+  category: SoftwareRequestCategory
+): boolean => isMediaCategoryEnabled(category);
+
+const disabledCategoryResponse = (
+  res: Parameters<Parameters<typeof softwareRoutes.get>[1]>[1],
+  category: SoftwareRequestCategory
+) =>
+  res.status(403).json({
+    error: `${category === 'game' ? 'PC game' : `${category} emulation`} requests are disabled by the administrator.`,
+  });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -270,6 +283,9 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
       error: 'A valid category, search query, and limit are required.',
     });
   }
+  if (!isSoftwareCategoryEnabled(parsed.category)) {
+    return disabledCategoryResponse(res, parsed.category);
+  }
 
   try {
     const api = getQuestarrApi();
@@ -324,6 +340,9 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
       .status(400)
       .json({ error: 'A valid category and limit are required.' });
   }
+  if (!isSoftwareCategoryEnabled(category)) {
+    return disabledCategoryResponse(res, category);
+  }
 
   try {
     const games = (await getQuestarrApi().getPopularCatalog(limit)).map(
@@ -376,6 +395,9 @@ softwareRoutes.post('/', async (req, res) => {
     return res.status(400).json({
       error: 'A valid software category and catalog title are required.',
     });
+  }
+  if (!isSoftwareCategoryEnabled(category)) {
+    return disabledCategoryResponse(res, category);
   }
   if (!req.user?.hasPermission(Permission.REQUEST)) {
     return res

@@ -193,6 +193,30 @@ afterEach(() => {
 });
 
 describe('software request routes', () => {
+  it('blocks catalog access and new requests for a disabled software category', async () => {
+    const settings = getSettings();
+    const original = { ...settings.main.enabledMediaCategories };
+    settings.main.enabledMediaCategories = { ...original, retro: false };
+
+    try {
+      const search = await request(createApp())
+        .get('/request/software/catalog/search')
+        .query({ category: 'retro', q: 'Test Game' });
+      const create = await request(createApp()).post('/request/software').send({
+        category: 'retro',
+        catalogId: pcGame.igdbId,
+        platformSlug: 'nes',
+      });
+
+      assert.strictEqual(search.status, 403);
+      assert.match(search.body.error, /retro emulation requests are disabled/);
+      assert.strictEqual(create.status, 403);
+      assert.match(create.body.error, /retro emulation requests are disabled/);
+    } finally {
+      settings.main.enabledMediaCategories = original;
+    }
+  });
+
   it('serves and validates software provider settings at the documented URLs', async () => {
     const app = createOpenApiValidatedSettingsApp();
     mock.method(QuestarrNGAPI.prototype, 'getHandshake', async () => ({

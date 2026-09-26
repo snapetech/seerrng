@@ -2645,6 +2645,61 @@ describe('POST /request', () => {
     assert.strictEqual(await getRepository(MediaRequest).count(), 0);
   });
 
+  it('rejects new requests when their media category is disabled', async () => {
+    const settings = getSettings();
+    const originalCategories = { ...settings.main.enabledMediaCategories };
+    settings.main.enabledMediaCategories = {
+      ...originalCategories,
+      movie: false,
+    };
+
+    try {
+      const agent = await loginAs('friend@seerr.dev', 'test1234');
+      const response = await agent.post('/request').send({
+        mediaType: MediaType.MOVIE,
+        mediaId: 991,
+      });
+
+      assert.strictEqual(response.status, 403);
+      assert.match(response.body.message, /Movie requests are disabled/);
+      assert.strictEqual(await getRepository(MediaRequest).count(), 0);
+    } finally {
+      settings.main.enabledMediaCategories = originalCategories;
+    }
+  });
+
+  it('blocks book and both-format requests when the ebook category is disabled', async () => {
+    const settings = getSettings();
+    const originalCategories = { ...settings.main.enabledMediaCategories };
+    settings.main.enabledMediaCategories = {
+      ...originalCategories,
+      ebook: false,
+      audiobook: true,
+    };
+
+    try {
+      const agent = await loginAs('friend@seerr.dev', 'test1234');
+      const ebook = await agent.post('/request').send({
+        mediaType: MediaType.BOOK,
+        mediaId: 'OLCATEGORY1W',
+        format: 'ebook',
+      });
+      const both = await agent.post('/request').send({
+        mediaType: MediaType.BOOK,
+        mediaId: 'OLCATEGORY2W',
+        format: 'both',
+      });
+
+      assert.strictEqual(ebook.status, 403);
+      assert.match(ebook.body.message, /Book requests are disabled/);
+      assert.strictEqual(both.status, 403);
+      assert.match(both.body.message, /Book requests are disabled/);
+      assert.strictEqual(await getRepository(MediaRequest).count(), 0);
+    } finally {
+      settings.main.enabledMediaCategories = originalCategories;
+    }
+  });
+
   it('rejects Open Library path-control IDs before request processing', async () => {
     const getWork = mock.method(OpenLibraryAPI.prototype, 'getWork');
     const agent = await loginAs('friend@seerr.dev', 'test1234');

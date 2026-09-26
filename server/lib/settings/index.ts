@@ -1,3 +1,7 @@
+import {
+  DEFAULT_ENABLED_MEDIA_CATEGORIES,
+  type EnabledMediaCategories,
+} from '@server/constants/mediaCategories';
 import { MediaServerType } from '@server/constants/server';
 import { assertNoSymlinkDirectoryComponents } from '@server/lib/pathSecurity';
 import { Permission } from '@server/lib/permissions';
@@ -242,6 +246,7 @@ export interface MainSettings {
     comic: Quota;
     magazine: Quota;
   };
+  enabledMediaCategories: EnabledMediaCategories;
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
@@ -314,6 +319,8 @@ interface FullPublicSettings extends PublicSettings {
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
   softwareEnabled: boolean;
+  romarrEnabled: boolean;
+  enabledMediaCategories: EnabledMediaCategories;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;
@@ -563,6 +570,7 @@ class Settings {
           comic: {},
           magazine: {},
         },
+        enabledMediaCategories: { ...DEFAULT_ENABLED_MEDIA_CATEGORIES },
         hideAvailable: false,
         hideBlocklisted: false,
         hideRequested: false,
@@ -1153,6 +1161,14 @@ class Settings {
         this.data.softwareAcquisition.questarr.hostname &&
         this.data.softwareAcquisition.questarr.apiKey
       ),
+      romarrEnabled: Boolean(
+        this.data.softwareAcquisition.romarr.hostname &&
+        this.data.softwareAcquisition.romarr.apiKey
+      ),
+      enabledMediaCategories: {
+        ...DEFAULT_ENABLED_MEDIA_CATEGORIES,
+        ...this.data.main.enabledMediaCategories,
+      },
       discoverRegion: this.data.main.discoverRegion,
       streamingRegion: this.data.main.streamingRegion,
       originalLanguage: this.data.main.originalLanguage,
@@ -1380,6 +1396,7 @@ class Settings {
           comic: {},
           magazine: {},
         },
+        enabledMediaCategories: { ...DEFAULT_ENABLED_MEDIA_CATEGORIES },
         hideAvailable: false,
         hideBlocklisted: false,
         hideRequested: false,

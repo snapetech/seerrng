@@ -7,6 +7,7 @@ interface SelectionCircleProps {
   disabled?: boolean;
   id?: string;
   name?: string;
+  'data-testid'?: string;
   label?: string;
   onBlur?: FocusEventHandler<HTMLButtonElement>;
   onClick: () => void;
@@ -18,6 +19,7 @@ const SelectionCircle = ({
   disabled = false,
   id,
   name,
+  'data-testid': dataTestId,
   label,
   onBlur,
   onClick,
@@ -26,6 +28,7 @@ const SelectionCircle = ({
     type="button"
     id={id}
     name={name}
+    data-testid={dataTestId}
     disabled={disabled}
     onClick={onClick}
     onBlur={onBlur}

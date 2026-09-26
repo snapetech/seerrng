@@ -23,6 +23,7 @@ import useDebouncedState from '@app/hooks/useDebouncedState';
 import useDiscover from '@app/hooks/useDiscover';
 import useDiscoverScrollRestoration from '@app/hooks/useDiscoverScrollRestoration';
 import { useSearchActivityReporter } from '@app/hooks/useSearchActivity';
+import useSettings from '@app/hooks/useSettings';
 import { useBatchUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import defineMessages from '@app/utils/defineMessages';
 import { parseQueryFromPath } from '@app/utils/routeQuery';
@@ -77,6 +78,7 @@ const DiscoverBooks = ({
 }: DiscoverBooksProps) => {
   const intl = useIntl();
   const router = useRouter();
+  const { currentSettings } = useSettings();
   const [currentPath, setCurrentPath] = useState<string>();
   useEffect(() => {
     const syncCurrentPath = () => {
@@ -100,7 +102,62 @@ const DiscoverBooks = ({
     routeQuery.format === 'ebook' || routeQuery.format === 'audiobook'
       ? routeQuery.format
       : undefined;
-  const activeFormat = routedFormat ?? format;
+  const ebookEnabled = currentSettings.enabledMediaCategories?.ebook !== false;
+  const audiobookEnabled =
+    currentSettings.enabledMediaCategories?.audiobook !== false;
+  const availableFormats: BookDiscoveryFormat[] = [
+    ...(ebookEnabled && audiobookEnabled ? ['all' as const] : []),
+    ...(ebookEnabled ? ['ebook' as const] : []),
+    ...(audiobookEnabled ? ['audiobook' as const] : []),
+  ];
+  const requestedFormat = routedFormat ?? format;
+  const activeFormat =
+    requestedFormat === 'all' && !(ebookEnabled && audiobookEnabled)
+      ? ebookEnabled
+        ? 'ebook'
+        : 'audiobook'
+      : requestedFormat === 'ebook' && !ebookEnabled && audiobookEnabled
+        ? 'audiobook'
+        : requestedFormat === 'audiobook' && !audiobookEnabled && ebookEnabled
+          ? 'ebook'
+          : requestedFormat;
+  const hasEnabledBookFormat = ebookEnabled || audiobookEnabled;
+
+  useEffect(() => {
+    if (
+      !currentPath ||
+      !hasEnabledBookFormat ||
+      activeFormat === requestedFormat
+    ) {
+      return;
+    }
+
+    const target = new URL(currentPath, window.location.origin);
+    if (router.pathname === '/discover/trending') {
+      target.searchParams.set(
+        'mediaType',
+        activeFormat === 'audiobook' ? 'audiobook' : 'book'
+      );
+    } else {
+      target.pathname =
+        activeFormat === 'audiobook'
+          ? '/discover/audiobooks'
+          : '/discover/books';
+      if (activeFormat === 'ebook') {
+        target.searchParams.set('format', 'ebook');
+      } else {
+        target.searchParams.delete('format');
+      }
+    }
+
+    void router.replace(`${target.pathname}${target.search}${target.hash}`);
+  }, [
+    activeFormat,
+    currentPath,
+    hasEnabledBookFormat,
+    requestedFormat,
+    router,
+  ]);
   const [search, debouncedSearch, setSearch] = useDebouncedState(query);
   const routedSearchRef = useRef(query.trim());
   useEffect(() => {
@@ -137,7 +194,7 @@ const DiscoverBooks = ({
       responseVersion: 2,
     },
     {
-      enabled: isRouteReady,
+      enabled: isRouteReady && hasEnabledBookFormat,
       randomizeOrder:
         sortBy === 'ranked' || sortBy === 'ranked.asc' || sortBy === 'random',
       showErrorToast: false,
@@ -228,6 +285,7 @@ const DiscoverBooks = ({
             </div>
             <BookFormatTabs
               format={activeFormat}
+              availableFormats={availableFormats}
               query={routeQuery}
               currentPath={currentPath}
             />

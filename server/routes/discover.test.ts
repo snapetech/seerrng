@@ -176,6 +176,46 @@ async function login(email = 'admin@seerr.dev') {
   }
 }
 
+describe('media category availability guards', () => {
+  it('hides disabled movie discovery at the API boundary', async () => {
+    const settings = getSettings();
+    const originalCategories = { ...settings.main.enabledMediaCategories };
+    settings.main.enabledMediaCategories = {
+      ...originalCategories,
+      movie: false,
+    };
+
+    try {
+      const agent = await login();
+      const response = await agent.get('/discover/movies');
+
+      assert.strictEqual(response.status, 404);
+    } finally {
+      settings.main.enabledMediaCategories = originalCategories;
+    }
+  });
+
+  it('hides a disabled book format at the API boundary', async () => {
+    const settings = getSettings();
+    const originalCategories = { ...settings.main.enabledMediaCategories };
+    settings.main.enabledMediaCategories = {
+      ...originalCategories,
+      ebook: false,
+    };
+
+    try {
+      const agent = await login();
+      const ebook = await agent.get('/discover/books?format=ebook');
+      const audiobook = await agent.get('/discover/books?format=audiobook');
+
+      assert.strictEqual(ebook.status, 404);
+      assert.notStrictEqual(audiobook.status, 404);
+    } finally {
+      settings.main.enabledMediaCategories = originalCategories;
+    }
+  });
+});
+
 describe('GET /discover/movies', () => {
   it('discovers locally available movies without contacting TMDB', async () => {
     const media = await getRepository(Media).save(

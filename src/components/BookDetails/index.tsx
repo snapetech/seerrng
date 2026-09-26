@@ -19,6 +19,7 @@ import {
   isRequestDestinationAvailable,
   isRequestDestinationRequested,
 } from '@app/components/RequestModal/requestAvailability';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { getQueryParamString } from '@app/hooks/useUpdateQueryParams';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -100,6 +101,11 @@ const BookDetails = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const { user, hasPermission } = useUser();
+  const { currentSettings } = useSettings();
+  const ebookCategoryEnabled =
+    currentSettings.enabledMediaCategories?.ebook !== false;
+  const audiobookCategoryEnabled =
+    currentSettings.enabledMediaCategories?.audiobook !== false;
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
   const [editRequest, setEditRequest] =
@@ -302,11 +308,13 @@ const BookDetails = () => {
       : undefined);
   const canRequestEbook =
     canRequest &&
+    ebookCategoryEnabled &&
     data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
     hasEbookService &&
     (canChooseAlternateTarget || !defaultEbookCovered);
   const canRequestAudiobook =
     canRequest &&
+    audiobookCategoryEnabled &&
     data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
     hasAudiobookService &&
     (canChooseAlternateTarget || !defaultAudiobookCovered);
@@ -570,38 +578,48 @@ const BookDetails = () => {
       {canRequest && (
         <FormatRequestControl
           options={[
-            {
-              id: 'ebook',
-              label: intl.formatMessage(getBookFormatMessage('ebook')),
-              onClick: () => openRequestModal('ebook'),
-              disabled: !canRequestEbook,
-              disabledReason:
-                data.mediaInfo?.status === MediaStatus.BLOCKLISTED
-                  ? intl.formatMessage(messages.blocklisted)
-                  : !hasEbookService
-                    ? intl.formatMessage(messages.noBookService)
-                    : hasEbookServiceLink
-                      ? intl.formatMessage(messages.bookAvailable)
-                      : hasActiveEbookRequest
-                        ? intl.formatMessage(messages.bookPending)
-                        : undefined,
-            },
-            {
-              id: 'audiobook',
-              label: intl.formatMessage(getBookFormatMessage('audiobook')),
-              onClick: () => openRequestModal('audiobook'),
-              disabled: !canRequestAudiobook,
-              disabledReason:
-                data.mediaInfo?.status === MediaStatus.BLOCKLISTED
-                  ? intl.formatMessage(messages.blocklisted)
-                  : !hasAudiobookService
-                    ? intl.formatMessage(messages.noAudiobookService)
-                    : hasAudiobookServiceLink
-                      ? intl.formatMessage(messages.audiobookAvailable)
-                      : hasActiveAudiobookRequest
-                        ? intl.formatMessage(messages.audiobookPending)
-                        : undefined,
-            },
+            ...(ebookCategoryEnabled
+              ? [
+                  {
+                    id: 'ebook',
+                    label: intl.formatMessage(getBookFormatMessage('ebook')),
+                    onClick: () => openRequestModal('ebook'),
+                    disabled: !canRequestEbook,
+                    disabledReason:
+                      data.mediaInfo?.status === MediaStatus.BLOCKLISTED
+                        ? intl.formatMessage(messages.blocklisted)
+                        : !hasEbookService
+                          ? intl.formatMessage(messages.noBookService)
+                          : hasEbookServiceLink
+                            ? intl.formatMessage(messages.bookAvailable)
+                            : hasActiveEbookRequest
+                              ? intl.formatMessage(messages.bookPending)
+                              : undefined,
+                  },
+                ]
+              : []),
+            ...(audiobookCategoryEnabled
+              ? [
+                  {
+                    id: 'audiobook',
+                    label: intl.formatMessage(
+                      getBookFormatMessage('audiobook')
+                    ),
+                    onClick: () => openRequestModal('audiobook'),
+                    disabled: !canRequestAudiobook,
+                    disabledReason:
+                      data.mediaInfo?.status === MediaStatus.BLOCKLISTED
+                        ? intl.formatMessage(messages.blocklisted)
+                        : !hasAudiobookService
+                          ? intl.formatMessage(messages.noAudiobookService)
+                          : hasAudiobookServiceLink
+                            ? intl.formatMessage(messages.audiobookAvailable)
+                            : hasActiveAudiobookRequest
+                              ? intl.formatMessage(messages.audiobookPending)
+                              : undefined,
+                  },
+                ]
+              : []),
           ]}
         />
       )}

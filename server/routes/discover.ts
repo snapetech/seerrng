@@ -51,6 +51,7 @@ import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { extractImageCacheUrls } from '@server/lib/imageCacheUrls';
 import { enqueueImageCacheWarm } from '@server/lib/imageCacheWarmer';
 import { normalizeMagazineTitle } from '@server/lib/magazineIdentity';
+import { isMediaCategoryEnabled } from '@server/lib/mediaCategories';
 import { hydrateMediaSummaryRelations } from '@server/lib/mediaSummaryHydration';
 import {
   getAvailableMusicQualities,
@@ -158,6 +159,50 @@ export const EXTERNAL_DISCOVER_RATE_LIMIT = {
 const MAX_TMDB_KEYWORD_ID = 1_000_000_000;
 const trendingMediaTypes = ['all', 'movie', 'tv'] as const;
 const trendingTimeWindows = ['day', 'week'] as const;
+
+discoverRoutes.use((req, res, next) => {
+  const route = req.path;
+  const category =
+    route === '/movies' || route.startsWith('/movies/')
+      ? 'movie'
+      : route === '/tv' || route.startsWith('/tv/')
+        ? 'tv'
+        : route === '/music'
+          ? 'music'
+          : route === '/comics'
+            ? 'comic'
+            : route === '/magazines'
+              ? 'magazine'
+              : route === '/genreslider/movie'
+                ? 'movie'
+                : route === '/genreslider/tv'
+                  ? 'tv'
+                  : undefined;
+
+  if (category && !isMediaCategoryEnabled(category)) {
+    return res.status(404).json({ status: 404, message: 'Not found.' });
+  }
+
+  if (route === '/books') {
+    const format = req.query.format;
+    const category = format === 'audiobook' ? 'audiobook' : 'ebook';
+    if (!isMediaCategoryEnabled(category)) {
+      return res.status(404).json({ status: 404, message: 'Not found.' });
+    }
+  }
+
+  if (route === '/trending') {
+    const mediaType = req.query.mediaType;
+    if (
+      (mediaType === 'movie' && !isMediaCategoryEnabled('movie')) ||
+      (mediaType === 'tv' && !isMediaCategoryEnabled('tv'))
+    ) {
+      return res.status(404).json({ status: 404, message: 'Not found.' });
+    }
+  }
+
+  return next();
+});
 
 discoverRoutes.use('/home', discoverHomeRoutes);
 discoverRoutes.use(
@@ -2354,10 +2399,17 @@ discoverRoutes.get('/trending', async (req, res, next) => {
       result: (typeof data.results)[number],
       media?: Media
     ) => unknown;
+    const availableTrendingResults = data.results.filter((result) =>
+      isMovie(result)
+        ? isMediaCategoryEnabled('movie')
+        : isPerson(result) || isCollection(result)
+          ? true
+          : isMediaCategoryEnabled('tv')
+    );
 
     const media = await Media.getRelatedMedia(
       req.user,
-      data.results.map((result) => ({
+      availableTrendingResults.map((result) => ({
         tmdbId: result.id,
         mediaType: isMovie(result) ? MediaType.MOVIE : MediaType.TV,
       })),
@@ -2368,7 +2420,7 @@ discoverRoutes.get('/trending', async (req, res, next) => {
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
-      results: data.results.map((result) => {
+      results: availableTrendingResults.map((result) => {
         // - If "type" is set (case: "movie" or "tv"), the mediaType must also match.
         // - If "type" is not set (case: "all"), only filter by tmdbId.
         const selectedMedia = media.find(

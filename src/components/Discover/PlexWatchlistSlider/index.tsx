@@ -2,8 +2,10 @@ import Slider from '@app/components/Slider';
 import LibraryTitleCard from '@app/components/TitleCard/LibraryTitleCard';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import useDiscoverRowSnapshot from '@app/hooks/useDiscoverRowSnapshot';
+import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { isDiscoverWatchlistTypeEnabled } from '@app/utils/serviceAvailability';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -20,6 +22,7 @@ const messages = defineMessages('components.Discover.PlexWatchlistSlider', {
 const PlexWatchlistSlider = () => {
   const intl = useIntl();
   const { user } = useUser();
+  const { currentSettings } = useSettings();
   const { ref, inView } = useInView({
     rootMargin: '450px 0px',
     triggerOnce: true,
@@ -43,44 +46,52 @@ const PlexWatchlistSlider = () => {
 
   const watchlistCards = useMemo(
     () =>
-      (watchlistItems?.results ?? []).flatMap((item) => {
-        const card =
-          item.mediaType === 'music' && item.mbId ? (
-            <LibraryTitleCard
-              id={item.mbId}
-              type="album"
-              title={item.title}
-              isAddedToWatchlist={true}
-            />
-          ) : item.mediaType === 'book' && item.externalId ? (
-            <LibraryTitleCard
-              id={item.externalId}
-              type="book"
-              title={item.title}
-              isAddedToWatchlist={true}
-            />
-          ) : (item.mediaType === 'comic' || item.mediaType === 'magazine') &&
-            item.externalId ? (
-            <LibraryTitleCard
-              id={item.externalId}
-              type={item.mediaType}
-              title={item.title}
-              isAddedToWatchlist={true}
-            />
-          ) : item.tmdbId ? (
-            <TmdbTitleCard
-              id={item.tmdbId}
-              tmdbId={item.tmdbId}
-              type={item.mediaType === 'tv' ? 'tv' : 'movie'}
-              isAddedToWatchlist={true}
-            />
-          ) : null;
+      (watchlistItems?.results ?? [])
+        .filter((item) =>
+          isDiscoverWatchlistTypeEnabled(item.mediaType, currentSettings)
+        )
+        .flatMap((item) => {
+          const card =
+            item.mediaType === 'music' && item.mbId ? (
+              <LibraryTitleCard
+                id={item.mbId}
+                type="album"
+                title={item.title}
+                isAddedToWatchlist={true}
+              />
+            ) : item.mediaType === 'book' && item.externalId ? (
+              <LibraryTitleCard
+                id={item.externalId}
+                type="book"
+                title={item.title}
+                isAddedToWatchlist={true}
+              />
+            ) : (item.mediaType === 'comic' || item.mediaType === 'magazine') &&
+              item.externalId ? (
+              <LibraryTitleCard
+                id={item.externalId}
+                type={item.mediaType}
+                title={item.title}
+                isAddedToWatchlist={true}
+              />
+            ) : item.tmdbId ? (
+              <TmdbTitleCard
+                id={item.tmdbId}
+                tmdbId={item.tmdbId}
+                type={item.mediaType === 'tv' ? 'tv' : 'movie'}
+                isAddedToWatchlist={true}
+              />
+            ) : null;
 
-        return card
-          ? [<div key={`watchlist-slider-item-${item.ratingKey}`}>{card}</div>]
-          : [];
-      }),
-    [watchlistItems?.results]
+          return card
+            ? [
+                <div key={`watchlist-slider-item-${item.ratingKey}`}>
+                  {card}
+                </div>,
+              ]
+            : [];
+        }),
+    [currentSettings, watchlistItems?.results]
   );
   const isWatchlistEmpty = !!watchlistItems && watchlistCards.length === 0;
 

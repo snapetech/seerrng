@@ -17,6 +17,7 @@ interface BookFormatTabsProps {
   query: ParsedUrlQuery;
   currentPath?: string;
   className?: string;
+  availableFormats?: readonly BookDiscoveryFormat[];
 }
 
 const getBookFormatHref = (
@@ -63,6 +64,7 @@ const BookFormatTabs = ({
   query,
   currentPath,
   className = '',
+  availableFormats = ['all', 'ebook', 'audiobook'],
 }: BookFormatTabsProps) => {
   const intl = useIntl();
   const tabs: {
@@ -104,27 +106,29 @@ const BookFormatTabs = ({
       className={`flex flex-wrap gap-2 ${className}`}
       data-testid="book-format-tabs"
     >
-      {tabs.map((tab) => {
-        const isSelected = tab.format === format;
-        const Icon = tab.icon;
+      {tabs
+        .filter((tab) => availableFormats.includes(tab.format))
+        .map((tab) => {
+          const isSelected = tab.format === format;
+          const Icon = tab.icon;
 
-        return (
-          <Link
-            key={tab.format}
-            href={getBookFormatHref(
-              tab.pathname,
-              preservedQuery,
-              tab.queryFormat
-            )}
-            aria-current={isSelected ? 'page' : undefined}
-            data-testid={`book-format-tab-${tab.format}`}
-            className={getFilterToggleButtonClass(isSelected)}
-          >
-            <Icon className="h-4 w-4" aria-hidden="true" />
-            <span>{intl.formatMessage(tab.label)}</span>
-          </Link>
-        );
-      })}
+          return (
+            <Link
+              key={tab.format}
+              href={getBookFormatHref(
+                tab.pathname,
+                preservedQuery,
+                tab.queryFormat
+              )}
+              aria-current={isSelected ? 'page' : undefined}
+              data-testid={`book-format-tab-${tab.format}`}
+              className={getFilterToggleButtonClass(isSelected)}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              <span>{intl.formatMessage(tab.label)}</span>
+            </Link>
+          );
+        })}
     </nav>
   );
 };

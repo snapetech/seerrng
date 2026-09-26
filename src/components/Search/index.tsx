@@ -12,7 +12,12 @@ import {
 import { prepareFilterValues } from '@app/components/Discover/constants';
 import useDiscover from '@app/hooks/useDiscover';
 import { setSearchActivity } from '@app/hooks/useSearchActivity';
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  isConfiguredMediaCategoryEnabled,
+  isOptionalCatalogPathEnabled,
+} from '@app/utils/serviceAvailability';
 import { BarsArrowDownIcon, BarsArrowUpIcon } from '@heroicons/react/24/solid';
 import type {
   AlbumResult,
@@ -286,9 +291,67 @@ const compareOptional = <T,>(
 const Search = () => {
   const intl = useIntl();
   const router = useRouter();
+  const { currentSettings } = useSettings();
   const query =
     typeof router.query.query === 'string' ? router.query.query.trim() : '';
-  const category = getSearchCategory(router.query.type, router.query.format);
+  const requestedCategory = getSearchCategory(
+    router.query.type,
+    router.query.format
+  );
+  const visibleSearchCategories = searchCategories.filter((searchCategory) => {
+    switch (searchCategory.key) {
+      case 'movie':
+        return isConfiguredMediaCategoryEnabled('movie', currentSettings);
+      case 'tv':
+        return isConfiguredMediaCategoryEnabled('tv', currentSettings);
+      case 'book':
+        return (
+          currentSettings.booksEnabled &&
+          isConfiguredMediaCategoryEnabled('ebook', currentSettings)
+        );
+      case 'audiobook':
+        return (
+          currentSettings.booksEnabled &&
+          isConfiguredMediaCategoryEnabled('audiobook', currentSettings)
+        );
+      case 'author':
+        return (
+          currentSettings.booksEnabled &&
+          (isConfiguredMediaCategoryEnabled('ebook', currentSettings) ||
+            isConfiguredMediaCategoryEnabled('audiobook', currentSettings))
+        );
+      case 'music':
+        return isOptionalCatalogPathEnabled('/discover/music', currentSettings);
+      case 'comic':
+        return isOptionalCatalogPathEnabled(
+          '/discover/comics',
+          currentSettings
+        );
+      case 'magazine':
+        return isOptionalCatalogPathEnabled(
+          '/discover/magazines',
+          currentSettings
+        );
+      default:
+        return true;
+    }
+  });
+  const category = visibleSearchCategories.some(
+    (searchCategory) => searchCategory.key === requestedCategory.key
+  )
+    ? requestedCategory
+    : searchCategories[0];
+  useEffect(() => {
+    if (!router.isReady || category.key === requestedCategory.key) return;
+    void router.replace(
+      {
+        pathname: router.pathname,
+        query: { query: query || undefined },
+      },
+      undefined,
+      { shallow: true, scroll: false }
+    );
+  }, [category.key, query, requestedCategory.key, router]);
   const preferredBookFormat =
     'format' in category ? (category.format as BookFormat) : undefined;
   const sortOptions = sortFieldsByCategory[category.key].map(
@@ -535,7 +598,7 @@ const Search = () => {
           className="flex flex-wrap items-center gap-2"
           aria-label={intl.formatMessage(messages.mediaFilters)}
         >
-          {searchCategories.map((searchCategory) => {
+          {visibleSearchCategories.map((searchCategory) => {
             const isSelected = category.key === searchCategory.key;
 
             return (

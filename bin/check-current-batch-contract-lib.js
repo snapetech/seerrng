@@ -465,7 +465,7 @@ const validateCurrentBatchContract = (files) => {
     'src/components/Search/index.tsx',
     [
       'intl.formatMessage(messages.mediaFilters)',
-      '{searchCategories.map',
+      '{visibleSearchCategories.map',
       'intl.formatMessage(messages.filter)',
       'getFilterResetButtonClass(!hasActiveFilters)',
       '<CardTextVisibilityToggle',

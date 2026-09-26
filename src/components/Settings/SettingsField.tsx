@@ -8,6 +8,7 @@ interface SettingsFieldProps {
   type?: string;
   id?: string;
   disabled?: boolean;
+  'data-testid'?: string;
   [key: string]: unknown;
 }
 
@@ -15,6 +16,7 @@ const SettingsCheckboxField = ({
   id,
   name,
   disabled,
+  'data-testid': dataTestId,
   onChange,
 }: SettingsFieldProps) => {
   const [field, , helpers] = useField<boolean>({ name, type: 'checkbox' });
@@ -23,6 +25,7 @@ const SettingsCheckboxField = ({
     <SelectionCircle
       id={id}
       name={name}
+      data-testid={dataTestId}
       selected={Boolean(field.value)}
       disabled={Boolean(disabled)}
       onBlur={() => void helpers.setTouched(true)}

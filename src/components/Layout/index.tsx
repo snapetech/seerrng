@@ -10,6 +10,12 @@ import useSearchActivity from '@app/hooks/useSearchActivity';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  DISCOVER_MEDIA_TYPES,
+  isConfiguredMediaCategoryEnabled,
+  isDiscoverMediaTypeEnabled,
+  isOptionalCatalogPathEnabled,
+} from '@app/utils/serviceAvailability';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { ArrowLeftIcon, Bars3BottomLeftIcon } from '@heroicons/react/24/solid';
 import type { AvailableLocale } from '@server/types/languages';
@@ -63,6 +69,84 @@ const Layout = ({ children }: LayoutProps) => {
       );
     }
   }, [setLocale, currentSettings.locale, user]);
+
+  useEffect(() => {
+    if (!currentSettings.initialized) return;
+
+    if (router.pathname === '/discover/trending') {
+      const requestedType =
+        typeof router.query.mediaType === 'string'
+          ? router.query.mediaType
+          : 'movie';
+      if (
+        (DISCOVER_MEDIA_TYPES as readonly string[]).includes(requestedType) &&
+        !isDiscoverMediaTypeEnabled(
+          requestedType as (typeof DISCOVER_MEDIA_TYPES)[number],
+          currentSettings
+        )
+      ) {
+        const fallbackType = DISCOVER_MEDIA_TYPES.find((type) =>
+          isDiscoverMediaTypeEnabled(type, currentSettings)
+        );
+        if (fallbackType) {
+          void router.replace(
+            {
+              pathname: '/discover/trending',
+              query: { ...router.query, mediaType: fallbackType },
+            },
+            undefined,
+            { scroll: false }
+          );
+        } else {
+          void router.replace('/');
+        }
+        return;
+      }
+    }
+
+    if (router.pathname.startsWith('/book/')) {
+      const format = router.query.format;
+      const disabledFormat =
+        (format === 'ebook' &&
+          !isConfiguredMediaCategoryEnabled('ebook', currentSettings)) ||
+        (format === 'audiobook' &&
+          !isConfiguredMediaCategoryEnabled('audiobook', currentSettings));
+      if (disabledFormat) {
+        const availableFormat = isConfiguredMediaCategoryEnabled(
+          format === 'ebook' ? 'audiobook' : 'ebook',
+          currentSettings
+        )
+          ? format === 'ebook'
+            ? 'audiobook'
+            : 'ebook'
+          : undefined;
+        if (availableFormat) {
+          const target = new URL(router.asPath, window.location.origin);
+          target.searchParams.set('format', availableFormat);
+          void router.replace(
+            `${target.pathname}${target.search}${target.hash}`
+          );
+          return;
+        }
+      }
+    }
+
+    if (
+      router.pathname === '/discover/audiobooks' &&
+      !isConfiguredMediaCategoryEnabled('audiobook', currentSettings) &&
+      isConfiguredMediaCategoryEnabled('ebook', currentSettings)
+    ) {
+      const target = new URL(router.asPath, window.location.origin);
+      target.pathname = '/discover/books';
+      target.searchParams.set('format', 'ebook');
+      void router.replace(`${target.pathname}${target.search}${target.hash}`);
+      return;
+    }
+
+    if (!isOptionalCatalogPathEnabled(router.pathname, currentSettings)) {
+      void router.replace('/');
+    }
+  }, [currentSettings, router]);
 
   useEffect(() => {
     if ('requestIdleCallback' in window) {

@@ -1119,6 +1119,35 @@ components:
           type: boolean
           description: Whether a LazyLibrarian instance is configured.
           example: true
+        romarrEnabled:
+          type: boolean
+          description: Whether a ROMarrNG instance is configured.
+          example: true
+        enabledMediaCategories:
+          type: object
+          description: Administrator-controlled visibility and request availability for each media category.
+          additionalProperties: false
+          properties:
+            movie:
+              type: boolean
+            tv:
+              type: boolean
+            music:
+              type: boolean
+            ebook:
+              type: boolean
+            audiobook:
+              type: boolean
+            comic:
+              type: boolean
+            magazine:
+              type: boolean
+            retro:
+              type: boolean
+            modern:
+              type: boolean
+            game:
+              type: boolean
     MovieResult:
       type: object
       required:

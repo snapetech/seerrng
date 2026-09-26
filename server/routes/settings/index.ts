@@ -11,6 +11,11 @@ import {
   MAX_TMDB_KEYWORD_ID,
 } from '@server/constants/blocklist';
 import { ApiErrorCode } from '@server/constants/error';
+import {
+  MEDIA_CATEGORY_KEYS,
+  type EnabledMediaCategories,
+  type MediaCategoryKey,
+} from '@server/constants/mediaCategories';
 import { MediaServerType } from '@server/constants/server';
 import {
   SETTINGS_LIBRARY_ROUTE_PATHS,
@@ -1038,6 +1043,31 @@ const parseMainSettingsBody = (
       };
     }
     value.blocklistedTags = [...new Set(tags)].join(',');
+  }
+
+  if (body.enabledMediaCategories !== undefined) {
+    const categories = body.enabledMediaCategories;
+    if (
+      !categories ||
+      typeof categories !== 'object' ||
+      Array.isArray(categories)
+    ) {
+      return { error: 'enabledMediaCategories must be an object.' };
+    }
+
+    const parsedCategories: Partial<EnabledMediaCategories> = {};
+    for (const [key, enabled] of Object.entries(
+      categories as Record<string, unknown>
+    )) {
+      if (!(MEDIA_CATEGORY_KEYS as readonly string[]).includes(key)) {
+        return { error: `Unknown media category: ${key}.` };
+      }
+      if (typeof enabled !== 'boolean') {
+        return { error: `enabledMediaCategories.${key} must be a boolean.` };
+      }
+      parsedCategories[key as MediaCategoryKey] = enabled;
+    }
+    value.enabledMediaCategories = parsedCategories;
   }
 
   for (const [key, fieldName] of [

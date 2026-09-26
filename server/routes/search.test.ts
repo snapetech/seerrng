@@ -382,6 +382,35 @@ describe('GET /search', () => {
     assert.strictEqual(bookSearch.mock.callCount(), 0);
   });
 
+  it('does not search an administrator-disabled book format', async () => {
+    const settings = getSettings();
+    const originalCategories = { ...settings.main.enabledMediaCategories };
+    settings.readarr = [{ serviceType: 'ebook' } as ReadarrSettings];
+    settings.main.enabledMediaCategories = {
+      ...originalCategories,
+      ebook: false,
+      audiobook: true,
+    };
+    const bookSearch = mock.method(OpenLibraryAPI.prototype, 'searchBooks');
+
+    try {
+      const agent = await loginAs('friend@seerr.dev', 'test1234');
+      const res = await agent.get('/search').query({
+        query: 'microsoft',
+        type: 'book',
+        format: 'ebook',
+      });
+
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body.results, []);
+      assert.strictEqual(res.body.totalResults, 0);
+      assert.strictEqual(bookSearch.mock.callCount(), 0);
+    } finally {
+      settings.main.enabledMediaCategories = originalCategories;
+      settings.readarr = [];
+    }
+  });
+
   it('limits global book keywords to visible title and author fields', async () => {
     const bookSearch = mock.method(
       OpenLibraryAPI.prototype,

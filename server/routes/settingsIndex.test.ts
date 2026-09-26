@@ -448,6 +448,43 @@ describe('Settings route input validation', () => {
     }
   });
 
+  it('saves category availability flags independently and validates their shape', async () => {
+    const settings = getSettings();
+    const original = { ...settings.main.enabledMediaCategories };
+
+    try {
+      const response = await request(app)
+        .post('/settings/main')
+        .send({ enabledMediaCategories: { movie: false, retro: false } });
+      const invalidBoolean = await request(app)
+        .post('/settings/main')
+        .send({ enabledMediaCategories: { tv: 'false' } });
+      const unknownCategory = await request(app)
+        .post('/settings/main')
+        .send({ enabledMediaCategories: { apps: false } });
+
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.body.enabledMediaCategories.movie, false);
+      assert.strictEqual(response.body.enabledMediaCategories.retro, false);
+      assert.strictEqual(response.body.enabledMediaCategories.tv, true);
+      assert.strictEqual(settings.main.enabledMediaCategories.movie, false);
+      assert.strictEqual(settings.main.enabledMediaCategories.retro, false);
+      assert.strictEqual(settings.main.enabledMediaCategories.tv, true);
+      assert.strictEqual(invalidBoolean.status, 400);
+      assert.match(
+        invalidBoolean.body.message,
+        /enabledMediaCategories\.tv must be a boolean/
+      );
+      assert.strictEqual(unknownCategory.status, 400);
+      assert.match(
+        unknownCategory.body.message,
+        /Unknown media category: apps/
+      );
+    } finally {
+      settings.main.enabledMediaCategories = original;
+    }
+  });
+
   it('rejects malformed main settings values before saving', async () => {
     const settings = getSettings();
     const saveMock = mock.method(settings, 'save', async () => undefined);

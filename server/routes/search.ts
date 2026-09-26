@@ -24,6 +24,7 @@ import {
 import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { normalizeMagazineTitle } from '@server/lib/magazineIdentity';
 import { findMagazineMediaByTitles } from '@server/lib/magazineMediaMatcher';
+import { isMediaCategoryEnabled } from '@server/lib/mediaCategories';
 import {
   getAvailableMusicQualities,
   getMusicQualityStatuses,
@@ -336,21 +337,43 @@ searchRoutes.get('/', async (req, res, next) => {
     });
   }
   const settings = getExternalRuntimeConfig();
-  const musicEnabled = settings.lidarr.length > 0;
+  const ebookServiceEnabled = settings.readarr.some(
+    (server) => (server.serviceType ?? 'ebook') === 'ebook'
+  );
+  const audiobookServiceEnabled = settings.readarr.some(
+    (server) => server.serviceType === 'audiobook'
+  );
+  const ebookEnabled = isMediaCategoryEnabled('ebook') && ebookServiceEnabled;
+  const audiobookEnabled =
+    isMediaCategoryEnabled('audiobook') && audiobookServiceEnabled;
+  const bookFormatEnabled = (format: BookFormat) =>
+    format === 'ebook' ? ebookEnabled : audiobookEnabled;
   const booksEnabled = bookFormat
-    ? settings.readarr.some(
-        (server) => (server.serviceType ?? 'ebook') === bookFormat
-      )
-    : settings.readarr.length > 0;
+    ? bookFormatEnabled(bookFormat)
+    : ebookEnabled || audiobookEnabled;
+  const bookFormatForProviderSearch =
+    bookFormat ??
+    (ebookEnabled && !audiobookEnabled
+      ? 'ebook'
+      : audiobookEnabled && !ebookEnabled
+        ? 'audiobook'
+        : undefined);
+  const musicEnabled =
+    settings.lidarr.length > 0 && isMediaCategoryEnabled('music');
   const comicVineApiKey = getSettings().main.comicVineApiKey;
-  const comicsEnabled = !!comicVineApiKey;
-  const magazinesEnabled = settings.lazylibrarian.length > 0;
+  const comicsEnabled = !!comicVineApiKey && isMediaCategoryEnabled('comic');
+  const magazinesEnabled =
+    settings.lazylibrarian.length > 0 && isMediaCategoryEnabled('magazine');
+  const moviesEnabled = isMediaCategoryEnabled('movie');
+  const seriesEnabled = isMediaCategoryEnabled('tv');
 
   if (
-    (typeFilter === 'album' ||
+    (typeFilter === 'movie' && !moviesEnabled) ||
+    (typeFilter === 'tv' && !seriesEnabled) ||
+    ((typeFilter === 'album' ||
       typeFilter === 'artist' ||
       typeFilter === 'music') &&
-    !musicEnabled
+      !musicEnabled)
   ) {
     return res.status(200).json({
       page,
@@ -467,7 +490,7 @@ searchRoutes.get('/', async (req, res, next) => {
               offset: musicOffset,
             })
           : Promise.resolve({ results: [], totalResults: 0 }),
-        shouldSearchBooks && booksEnabled
+        shouldSearchBooks && ebookEnabled
           ? openLibrary.searchBooks({
               query: toFieldedBooleanAndQuery(queryString, ['title', 'author']),
               page,
@@ -478,12 +501,10 @@ searchRoutes.get('/', async (req, res, next) => {
           ? searchBookshelfCatalogs(
               getSettings().readarr,
               queryString,
-              bookFormat === 'ebook' || bookFormat === 'audiobook'
-                ? bookFormat
-                : undefined
+              bookFormatForProviderSearch
             )
           : Promise.resolve([]),
-        shouldSearchAuthors && booksEnabled
+        shouldSearchAuthors && (ebookEnabled || audiobookEnabled)
           ? openLibrary.searchAuthors({
               query: queryString,
               page,
@@ -1127,6 +1148,8 @@ searchRoutes.get('/', async (req, res, next) => {
         !('mediaType' in result) ||
         (((result.mediaType !== 'album' && result.mediaType !== 'artist') ||
           musicEnabled) &&
+          (result.mediaType !== 'movie' || moviesEnabled) &&
+          (result.mediaType !== 'tv' || seriesEnabled) &&
           (result.mediaType !== 'book' || booksEnabled) &&
           (result.mediaType !== 'comic' || comicsEnabled) &&
           (result.mediaType !== 'magazine' || magazinesEnabled))

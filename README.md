@@ -25,6 +25,7 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
 - [What SeerrNG Does](#what-seerrng-does)
 - [Project Status](#project-status)
 - [Documentation and feature guides](#documentation)
+  - [Choose available media categories](https://snapetech.github.io/seerrng/using-seerr/settings/media-categories/)
   - [Software requests: ROMs and PC games](https://snapetech.github.io/seerrng/using-seerr/software-acquisition/)
   - [Request Status and Download copy](https://snapetech.github.io/seerrng/using-seerr/request-status/)
   - [Books, authors, and series](https://snapetech.github.io/seerrng/using-seerr/books-and-series/)
@@ -55,6 +56,7 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
 - Book discovery and identity matching through Open Library, ISBN-10/ISBN-13 normalization, foreign book IDs, and edition IDs.
 - Separate ebook and audiobook service routing so both formats can be requested, approved, scanned, retried, and removed independently.
 - Catalog browsing and requests for Retro and Modern emulation systems and PC games for Windows, Linux, and macOS, with QuestarrNG and ROMarrNG handling acquisition.
+- Administrator-controlled availability switches for each supported category, including separate ebook, audiobook, Retro, Modern, and PC Games controls.
 - Bookshelf backend diagnostics that classify Hardcover, softcover/Goodreads, and unknown metadata providers.
 - Hardcover-first Bookshelf deployment and migration tooling for existing Readarr or softcover libraries.
 - Resumable, layered Readarr/softcover-to-Hardcover migration with strict matching, softcover metadata recovery, validation, cutover checks, and an opt-in deterministic local-record fallback for books Hardcover cannot import.
@@ -106,6 +108,7 @@ starting points:
 - [Enable built-in HTTPS](https://snapetech.github.io/seerrng/using-seerr/advanced/built-in-tls/)
 - [Configure notifications](https://snapetech.github.io/seerrng/using-seerr/notifications/)
 - [Hide requested or available media](https://snapetech.github.io/seerrng/using-seerr/settings/general)
+- [Choose which media categories are available](https://snapetech.github.io/seerrng/using-seerr/settings/media-categories/)
 - [Configure Bookshelf](https://snapetech.github.io/seerrng/using-seerr/bookshelf-backend/)
 - [Bookshelf metadata sources](https://snapetech.github.io/seerrng/using-seerr/bookshelf-metadata-sources/)
 - [Configure override rules](https://snapetech.github.io/seerrng/using-seerr/override-rules/)
