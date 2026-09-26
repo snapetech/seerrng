@@ -140,6 +140,12 @@ an active Mylar-backed request fails with an error; wait for it to reach a
 terminal status, or remove the download manually in Mylar3 or the download
 client first.
 
+Comic requests dispatched to Kapowarr show live download progress (percent,
+size, and status) on the Requests page and in Manage, the same as other media
+types. Mylar3 has no API for reading an in-progress download's status, so a
+Mylar-backed request still moves through requested, approved, and available,
+just without a live progress bar in between.
+
 ## Troubleshooting
 
 `No default Mylar or Kapowarr server is configured`:

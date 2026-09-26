@@ -34,7 +34,7 @@ export interface ServarrServiceSettingsByType {
 // which only satisfy the smaller CollectorServiceSettings) - is4k and
 // serviceType stay Partial so services with no such concept (comics have
 // neither) still satisfy this type.
-type ServarrServiceAuthority = Pick<
+export type ServarrServiceAuthority = Pick<
   DVRSettings,
   'id' | 'hostname' | 'port' | 'useSsl' | 'baseUrl' | 'apiKey' | 'syncEnabled'
 > &

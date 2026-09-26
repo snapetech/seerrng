@@ -280,7 +280,16 @@ describe('KapowarrAPI', () => {
     mockGet(async () => ({
       error: null,
       result: [
-        { id: 2, volume_id: 1, issue_id: null, status: 'downloading' },
+        {
+          id: 2,
+          volume_id: 1,
+          issue_id: null,
+          title: 'Saga Volume 01 Issue 016 - 030',
+          size: 488748917,
+          status: 'downloading',
+          progress: 30.04,
+          speed: 34347085.54,
+        },
         { id: 3, volume_id: 1, issue_id: null, status: 'queued' },
       ],
     }));
@@ -292,8 +301,24 @@ describe('KapowarrAPI', () => {
     const queue = await api.getQueue();
 
     assert.deepStrictEqual(queue, [
-      { id: 2, volumeId: 1 },
-      { id: 3, volumeId: 1 },
+      {
+        id: 2,
+        volumeId: 1,
+        title: 'Saga Volume 01 Issue 016 - 030',
+        size: 488748917,
+        status: 'downloading',
+        progress: 30.04,
+        speed: 34347085.54,
+      },
+      {
+        id: 3,
+        volumeId: 1,
+        title: '',
+        size: 0,
+        status: 'queued',
+        progress: 0,
+        speed: 0,
+      },
     ]);
   });
 

@@ -138,6 +138,7 @@ type RequestMediaLike = {
   externalServiceId4k?: number | null;
   audiobookServiceId?: number | null;
   audiobookExternalServiceId?: number | null;
+  comicServiceType?: 'mylar' | 'kapowarr' | null;
   seasons?: {
     seasonNumber: number;
     status: MediaStatus;
@@ -497,6 +498,21 @@ const getDownloadItems = (request: RequestLike): DownloadingItem[] => {
       ? downloadTracker.getMusicProgress(
           target.serverId,
           target.externalServiceId
+        )
+      : [];
+  }
+  if (request.type === MediaType.COMIC) {
+    // Kapowarr exposes a live download queue with progress; Mylar3 does not
+    // (same limitation as its lack of a queue-cancel API), so a Mylar-backed
+    // comic never has progress data here.
+    return media.comicServiceType === 'kapowarr' &&
+      media.serviceId !== null &&
+      media.serviceId !== undefined &&
+      media.externalServiceId !== null &&
+      media.externalServiceId !== undefined
+      ? downloadTracker.getComicProgress(
+          media.serviceId,
+          media.externalServiceId
         )
       : [];
   }

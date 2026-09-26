@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import KapowarrAPI from '@server/api/comics/kapowarr';
 import RadarrAPI from '@server/api/servarr/radarr';
+import { MediaType } from '@server/constants/media';
 import {
   DOWNLOAD_TRACKER_SERVER_CONCURRENCY,
   DownloadTracker,
@@ -43,6 +45,76 @@ describe('DownloadTracker Bookshelf queues', () => {
       ),
       true
     );
+  });
+});
+
+describe('DownloadTracker Kapowarr queues', () => {
+  it('maps Kapowarr queue items into comic download progress', async (t) => {
+    const settings = getSettings();
+    const originalKapowarr = settings.kapowarr;
+    settings.kapowarr = [
+      {
+        id: 40,
+        name: 'Kapowarr',
+        hostname: 'kapowarr.local',
+        port: 5656,
+        apiKey: 'kapowarr-key',
+        useSsl: false,
+        baseUrl: '',
+        tags: [],
+        isDefault: true,
+        syncEnabled: true,
+        preventSearch: false,
+      },
+    ];
+
+    t.mock.method(KapowarrAPI.prototype, 'getQueue', async () => [
+      {
+        id: 9,
+        volumeId: 1,
+        title: 'Downloading Comic',
+        size: 1000,
+        status: 'downloading',
+        progress: 25,
+        speed: 100,
+      },
+      {
+        id: 10,
+        volumeId: 2,
+        title: 'Queued Comic',
+        size: 500,
+        status: 'queued',
+        progress: 0,
+        speed: 0,
+      },
+    ]);
+
+    const tracker = new DownloadTracker();
+    try {
+      await tracker.updateDownloads();
+
+      const downloading = tracker.getComicProgress(40, 1);
+      assert.strictEqual(downloading.length, 1);
+      assert.strictEqual(downloading[0].mediaType, MediaType.COMIC);
+      assert.strictEqual(downloading[0].size, 1000);
+      assert.strictEqual(downloading[0].sizeLeft, 750);
+      assert.strictEqual(downloading[0].status, 'downloading');
+      assert.strictEqual(downloading[0].downloadId, '9');
+      assert.ok(
+        !Number.isNaN(downloading[0].estimatedCompletionTime.getTime())
+      );
+
+      const queued = tracker.getComicProgress(40, 2);
+      assert.strictEqual(queued.length, 1);
+      assert.strictEqual(queued[0].sizeLeft, 500);
+      // A stalled/queued item with no measured speed yet has no usable ETA.
+      assert.ok(Number.isNaN(queued[0].estimatedCompletionTime.getTime()));
+
+      assert.deepStrictEqual(tracker.getComicProgress(40, 999), []);
+      assert.deepStrictEqual(tracker.getComicProgress(41, 1), []);
+    } finally {
+      settings.kapowarr = originalKapowarr;
+    }
   });
 });
 
@@ -163,6 +235,7 @@ describe('DownloadTracker update lifecycle', () => {
     const originalSonarr = settings.sonarr;
     const originalLidarr = settings.lidarr;
     const originalReadarr = settings.readarr;
+    const originalKapowarr = settings.kapowarr;
     const baseRadarr = {
       id: 1,
       name: 'Failing Radarr',
@@ -197,6 +270,7 @@ describe('DownloadTracker update lifecycle', () => {
     settings.sonarr = [];
     settings.lidarr = [];
     settings.readarr = [];
+    settings.kapowarr = [];
 
     let queueCalls = 0;
     t.mock.method(
@@ -241,6 +315,7 @@ describe('DownloadTracker update lifecycle', () => {
       settings.sonarr = originalSonarr;
       settings.lidarr = originalLidarr;
       settings.readarr = originalReadarr;
+      settings.kapowarr = originalKapowarr;
     }
   });
 
@@ -262,18 +337,19 @@ describe('DownloadTracker update lifecycle', () => {
       updateSonarrDownloads: immediateUpdate,
       updateLidarrDownloads: immediateUpdate,
       updateReadarrDownloads: immediateUpdate,
+      updateKapowarrDownloads: immediateUpdate,
     });
 
     const first = tracker.updateDownloads();
     const overlapping = tracker.updateDownloads();
 
     assert.strictEqual(overlapping, first);
-    assert.strictEqual(calls, 4);
+    assert.strictEqual(calls, 5);
     assert.ok(release);
 
     release();
     await first;
-    assert.strictEqual(calls, 4);
+    assert.strictEqual(calls, 5);
   });
 
   it('does not let an older queue update repopulate a completed reset', async () => {
@@ -306,6 +382,7 @@ describe('DownloadTracker update lifecycle', () => {
       updateSonarrDownloads: async () => undefined,
       updateLidarrDownloads: async () => undefined,
       updateReadarrDownloads: async () => undefined,
+      updateKapowarrDownloads: async () => undefined,
     });
 
     const update = tracker.updateDownloads();

@@ -711,6 +711,20 @@ class Media {
         );
       }
     }
+
+    if (
+      this.mediaType === MediaType.COMIC &&
+      this.comicServiceType === 'kapowarr' &&
+      this.externalServiceId !== undefined &&
+      this.externalServiceId !== null &&
+      this.serviceId !== undefined &&
+      this.serviceId !== null
+    ) {
+      this.downloadStatus = downloadTracker.getComicProgress(
+        this.serviceId,
+        this.externalServiceId
+      );
+    }
   }
 }
 

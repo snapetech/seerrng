@@ -30,6 +30,11 @@ export interface KapowarrRootFolder {
 export interface KapowarrQueueItem {
   id: number;
   volumeId: number;
+  title: string;
+  size: number;
+  status: string;
+  progress: number;
+  speed: number;
 }
 
 interface KapowarrEnvelope<T> {
@@ -58,6 +63,11 @@ const boundedString = (value: unknown, maxLength = 512): string | undefined =>
 
 const boundedInteger = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+
+const boundedNonNegativeNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
     : undefined;
 
@@ -102,9 +112,18 @@ const sanitizeQueueItem = (value: unknown): KapowarrQueueItem | undefined => {
   }
   const id = boundedInteger(value.id);
   const volumeId = boundedInteger(value.volume_id);
-  return id !== undefined && volumeId !== undefined
-    ? { id, volumeId }
-    : undefined;
+  if (id === undefined || volumeId === undefined) {
+    return undefined;
+  }
+  return {
+    id,
+    volumeId,
+    title: boundedString(value.title, 1_000) ?? '',
+    size: boundedNonNegativeNumber(value.size) ?? 0,
+    status: boundedString(value.status, 64) ?? 'queued',
+    progress: boundedNonNegativeNumber(value.progress) ?? 0,
+    speed: boundedNonNegativeNumber(value.speed) ?? 0,
+  };
 };
 
 class KapowarrAPI extends ExternalAPI {
