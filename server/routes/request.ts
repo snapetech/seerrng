@@ -2458,6 +2458,14 @@ requestRoutes.get('/count', async (req, res, next) => {
           'book'
         )
         .addSelect(
+          'SUM(CASE WHEN request.type = :comic THEN 1 ELSE 0 END)',
+          'comic'
+        )
+        .addSelect(
+          'SUM(CASE WHEN request.type = :magazine THEN 1 ELSE 0 END)',
+          'magazine'
+        )
+        .addSelect(
           'SUM(CASE WHEN request.status = :pending THEN 1 ELSE 0 END)',
           'pending'
         )
@@ -2500,6 +2508,8 @@ requestRoutes.get('/count', async (req, res, next) => {
           tv: MediaType.TV,
           music: MediaType.MUSIC,
           book: MediaType.BOOK,
+          comic: MediaType.COMIC,
+          magazine: MediaType.MAGAZINE,
           pending: MediaRequestStatus.PENDING,
           approved: MediaRequestStatus.APPROVED,
           declined: MediaRequestStatus.DECLINED,
@@ -2534,6 +2544,8 @@ requestRoutes.get('/count', async (req, res, next) => {
         tv: count('tv'),
         music: count('music'),
         book: count('book'),
+        comic: count('comic'),
+        magazine: count('magazine'),
         pending: count('pending'),
         approved: count('approved'),
         declined: count('declined'),

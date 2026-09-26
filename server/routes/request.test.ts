@@ -441,6 +441,41 @@ describe('GET /request/count', () => {
     assert.strictEqual(adminCounts.body.pending, 2);
   });
 
+  it('breaks out comic and magazine counts alongside the other media types', async () => {
+    const userRepo = getRepository(User);
+    const mediaRepo = getRepository(Media);
+    const requestRepo = getRepository(MediaRequest);
+    const requestedBy = await userRepo.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+
+    const comicMedia = await mediaRepo.save(
+      new Media({
+        mediaType: MediaType.COMIC,
+        tmdbId: 0,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    await requestRepo.save(
+      new MediaRequest({
+        type: MediaType.COMIC,
+        status: MediaRequestStatus.PENDING,
+        media: comicMedia,
+        requestedBy,
+        is4k: false,
+      })
+    );
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const counts = await agent.get('/request/count');
+
+    assert.strictEqual(counts.status, 200);
+    assert.strictEqual(counts.body.comic, 1);
+    assert.strictEqual(counts.body.magazine, 0);
+    assert.strictEqual(counts.body.total, 1);
+  });
+
   it('counts approved book requests by requested format availability', async () => {
     const userRepo = getRepository(User);
     const mediaRepo = getRepository(Media);
