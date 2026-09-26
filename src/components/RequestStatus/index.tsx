@@ -362,6 +362,12 @@ const getSortOptions = (
         { value: 'publisher', label: 'sortPublisher' },
         { value: 'releaseDate', label: 'sortFirstPublished' },
       ];
+    case 'comic':
+      return [
+        ...common,
+        { value: 'publisher', label: 'sortPublisher' },
+        { value: 'releaseDate', label: 'sortFirstPublished' },
+      ];
     default:
       return common;
   }
@@ -737,6 +743,12 @@ const getRuntime = (
       ? intl.formatNumber(issueCount)
       : notAvailable;
   }
+  if (item.request.type === 'comic') {
+    const issueCount = (details as ComicDetails).issueCount;
+    return issueCount !== undefined
+      ? intl.formatNumber(issueCount)
+      : notAvailable;
+  }
   return notAvailable;
 };
 
@@ -747,7 +759,7 @@ const getRuntimeLabel = (
   intl.formatMessage(
     item.request.type === 'book'
       ? messages.pages
-      : item.request.type === 'magazine'
+      : item.request.type === 'magazine' || item.request.type === 'comic'
         ? messages.issues
         : messages.runtime
   );
@@ -790,6 +802,10 @@ const getFeaturedCredits = (
           name: notAvailable,
         },
       ];
+    }
+
+    if (item.request.type === 'comic') {
+      return [];
     }
 
     return [
@@ -842,6 +858,11 @@ const getFeaturedCredits = (
     ];
   }
 
+  if (item.request.type === 'comic') {
+    // ComicVine's basic volume data has no creator/writer/artist credit.
+    return [];
+  }
+
   const mediaDetails = details as MovieDetails | TvDetails;
   const sortedCrew = sortCrewPriority(mediaDetails.credits?.crew ?? []);
   const featuredCrew =
@@ -875,6 +896,15 @@ const getSecondaryDetails = (
       {
         label: intl.formatMessage(messages.publisher),
         name: (details as BookDetails | undefined)?.publisher ?? notAvailable,
+      },
+    ];
+  }
+
+  if (item.request.type === 'comic') {
+    return [
+      {
+        label: intl.formatMessage(messages.publisher),
+        name: (details as ComicDetails | undefined)?.publisher ?? notAvailable,
       },
     ];
   }
@@ -950,6 +980,10 @@ const getGenres = (
           href: `/discover/music?genre=${encodeURIComponent(name)}`,
         })) ?? []
     );
+  }
+  if (item.request.type === 'comic') {
+    // ComicVine has no genre-equivalent field.
+    return [];
   }
   return (
     (details as BookDetails).subjects
