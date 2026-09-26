@@ -2001,16 +2001,7 @@ requestRoutes.get<
           case MediaType.COMIC: {
             return {
               ...r,
-              // Comics have a single destination server across two possible
-              // backends (Mylar or Kapowarr), unlike the dual ebook/audiobook
-              // shape book uses.
-              canRemove:
-                settings.mylar.some(
-                  (server) => server.id === r.media.serviceId
-                ) ||
-                settings.kapowarr.some(
-                  (server) => server.id === r.media.serviceId
-                ),
+              canRemove: canRemoveRequestFromService(r, settings),
             };
           }
           default: {
