@@ -1,6 +1,7 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SelectionCircle from '@app/components/Common/SelectionCircle';
 import defineMessages from '@app/utils/defineMessages';
 import type { EmulationSystemGroup } from '@server/lib/settings';
 import axios from 'axios';
@@ -106,7 +107,7 @@ const SettingsSoftwareAcquisition = () => {
     data: systemsData,
     error: systemsError,
     isLoading: systemsLoading,
-  } = useSWR<SystemResponse>('/api/v1/software/catalog/systems', {
+  } = useSWR<SystemResponse>('/api/v1/request/software/catalog/systems', {
     shouldRetryOnError: false,
   });
   const [romarr, setRomarr] = useState<ProviderSettings | null>(null);
@@ -155,7 +156,7 @@ const SettingsSoftwareAcquisition = () => {
         }),
       });
       if (provider === 'romarr') {
-        await mutate('/api/v1/software/catalog/systems');
+        await mutate('/api/v1/request/software/catalog/systems');
       }
     } catch {
       setTestState({
@@ -178,7 +179,10 @@ const SettingsSoftwareAcquisition = () => {
         questarr: getProviderPayload(questarr),
         emulationSystemGroups: systemGroups,
       });
-      await mutate('/api/v1/settings/software-acquisition');
+      await Promise.all([
+        mutate('/api/v1/settings/software-acquisition'),
+        mutate('/api/v1/request/software/catalog/systems'),
+      ]);
       setSaveState({
         success: true,
         message: intl.formatMessage(messages.saved),
@@ -272,32 +276,30 @@ const SettingsSoftwareAcquisition = () => {
             />
           </label>
           {current.apiKeyConfigured && (
-            <label className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={current.clearApiKey}
-                onChange={(event) =>
+            <div className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2">
+              <SelectionCircle
+                label={intl.formatMessage(messages.clearApiKey)}
+                selected={current.clearApiKey}
+                onClick={() =>
                   updateProvider(provider, {
-                    clearApiKey: event.target.checked,
+                    clearApiKey: !current.clearApiKey,
                     apiKey: '',
                   })
                 }
-                className="checkbox"
               />
-              {intl.formatMessage(messages.clearApiKey)}
-            </label>
+              <span>{intl.formatMessage(messages.clearApiKey)}</span>
+            </div>
           )}
-          <label className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={current.useSsl}
-              onChange={(event) =>
-                updateProvider(provider, { useSsl: event.target.checked })
+          <div className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
+            <SelectionCircle
+              label={intl.formatMessage(messages.useSsl)}
+              selected={current.useSsl}
+              onClick={() =>
+                updateProvider(provider, { useSsl: !current.useSsl })
               }
-              className="checkbox"
             />
-            {intl.formatMessage(messages.useSsl)}
-          </label>
+            <span>{intl.formatMessage(messages.useSsl)}</span>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button

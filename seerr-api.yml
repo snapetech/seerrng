@@ -4854,7 +4854,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublicSettings'
-  /settings/softwareAcquisition:
+  /settings/software-acquisition:
     get:
       summary: Get software acquisition provider settings
       description: Returns ROMarrNG and QuestarrNG connection settings with API keys redacted, plus administrator-assigned Retro and Modern system groups.
@@ -4894,7 +4894,7 @@ paths:
                 type: object
         '400':
           description: Invalid provider or system-group settings
-  /settings/softwareAcquisition/test/{provider}:
+  /settings/software-acquisition/test/{provider}:
     post:
       summary: Test a software acquisition provider connection
       description: Checks the selected NG provider's authenticated integration contract without saving the submitted settings.

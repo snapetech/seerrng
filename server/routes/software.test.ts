@@ -24,6 +24,7 @@ import type { Express } from 'express';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import request from 'supertest';
+import softwareAcquisitionRoutes from './settings/softwareAcquisition';
 import softwareRoutes from './software';
 
 setupTestDb();
@@ -123,6 +124,36 @@ const createOpenApiValidatedApp = (): Express => {
   return app;
 };
 
+const createOpenApiValidatedSettingsApp = (): Express => {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.user = new User({ id: 1, permissions: Permission.ADMIN });
+    next();
+  });
+  app.use(
+    OpenApiValidator.middleware({
+      apiSpec: path.join(process.cwd(), 'seerr-api.yml'),
+      validateRequests: true,
+      validateSecurity: false,
+    })
+  );
+  app.use('/api/v1/settings/software-acquisition', softwareAcquisitionRoutes);
+  app.use(
+    (
+      error: { status?: number | string; message?: string },
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction
+    ) =>
+      res.status(Number(error.status ?? 500)).json({
+        status: Number(error.status ?? 500),
+        message: error.message,
+      })
+  );
+  return app;
+};
+
 const createSoftwareRequest = async (options: {
   provider?: SoftwareRequestProvider;
   status?: SoftwareRequestStatus;
@@ -162,6 +193,36 @@ afterEach(() => {
 });
 
 describe('software request routes', () => {
+  it('serves and validates software provider settings at the documented URLs', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(QuestarrNGAPI.prototype, 'getHandshake', async () => ({
+      service: 'QuestarrNG',
+      apiVersion: 1,
+      requestContractVersion: 1,
+    }));
+
+    const settings = await request(app).get(
+      '/api/v1/settings/software-acquisition'
+    );
+    const connection = await request(app)
+      .post('/api/v1/settings/software-acquisition/test/questarr')
+      .send({
+        hostname: '127.0.0.1',
+        port: 3000,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: 'questarr-test-key',
+      });
+    const oldCamelCasePath = await request(app).get(
+      '/api/v1/settings/softwareAcquisition'
+    );
+
+    assert.strictEqual(settings.status, 200);
+    assert.strictEqual(connection.status, 200);
+    assert.strictEqual(connection.body.service, 'QuestarrNG');
+    assert.strictEqual(oldCamelCasePath.status, 404);
+  });
+
   it('validates the ROMarr retry confirmation against the OpenAPI contract', async () => {
     const app = createOpenApiValidatedApp();
     const valid = await request(app)

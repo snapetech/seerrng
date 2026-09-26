@@ -7,13 +7,14 @@ import PageTitle from '@app/components/Common/PageTitle';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type {
   PcArchitecture,
   PcOperatingSystem,
 } from '@server/api/software/types';
 import axios from 'axios';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -109,9 +110,9 @@ const SoftwareCatalog = () => {
     const params = new URLSearchParams({ category, limit: '24' });
     if (query) {
       params.set('q', query);
-      return `/api/v1/software/catalog/search?${params.toString()}`;
+      return `/api/v1/request/software/catalog/search?${params.toString()}`;
     }
-    return `/api/v1/software/catalog/popular?${params.toString()}`;
+    return `/api/v1/request/software/catalog/popular?${params.toString()}`;
   }, [category, query]);
   const { data, error, isLoading } = useSWR<CatalogResponse>(url);
 
@@ -328,107 +329,109 @@ const SoftwareCatalog = () => {
       </main>
 
       {selectedGame && (
-        <Modal
-          title={intl.formatMessage(messages.requestTitle, {
-            title: selectedGame.title,
-          })}
-          subTitle={intl.formatMessage(messages.requestDescription)}
-          onCancel={() => setSelectedGame(null)}
-          onOk={submitRequest}
-          okText={intl.formatMessage(messages.request)}
-          cancelText={intl.formatMessage(globalMessages.cancel)}
-          okDisabled={
-            requesting ||
-            (category !== 'game' && !selectedSystem) ||
-            (category === 'game' &&
-              (!variant.operatingSystem || !variant.architecture))
-          }
-          loading={requesting}
-          dialogClass="max-w-xl"
-        >
-          <div className="space-y-4">
-            {category === 'game' ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="text-sm text-gray-200">
-                  {intl.formatMessage(messages.chooseOperatingSystem)}
+        <Transition as={Fragment} show={Boolean(selectedGame)}>
+          <Modal
+            title={intl.formatMessage(messages.requestTitle, {
+              title: selectedGame.title,
+            })}
+            subTitle={intl.formatMessage(messages.requestDescription)}
+            onCancel={() => setSelectedGame(null)}
+            onOk={submitRequest}
+            okText={intl.formatMessage(messages.request)}
+            cancelText={intl.formatMessage(globalMessages.cancel)}
+            okDisabled={
+              requesting ||
+              (category !== 'game' && !selectedSystem) ||
+              (category === 'game' &&
+                (!variant.operatingSystem || !variant.architecture))
+            }
+            loading={requesting}
+            dialogClass="max-w-xl"
+          >
+            <div className="space-y-4">
+              {category === 'game' ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="text-sm text-gray-200">
+                    {intl.formatMessage(messages.chooseOperatingSystem)}
+                    <select
+                      className="input input-lite mt-1 w-full"
+                      value={variant.operatingSystem}
+                      onChange={(event) =>
+                        setVariant((current) => ({
+                          ...current,
+                          operatingSystem: event.target
+                            .value as PcVariant['operatingSystem'],
+                        }))
+                      }
+                    >
+                      <option value="" />
+                      {operatingSystems.map((os) => (
+                        <option key={os} value={os}>
+                          {intl.formatMessage(
+                            os === 'macos'
+                              ? messages.macos
+                              : os === 'linux'
+                                ? messages.linux
+                                : messages.windows
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm text-gray-200">
+                    {intl.formatMessage(messages.chooseArchitecture)}
+                    <select
+                      className="input input-lite mt-1 w-full"
+                      value={variant.architecture}
+                      onChange={(event) =>
+                        setVariant((current) => ({
+                          ...current,
+                          architecture: event.target
+                            .value as PcVariant['architecture'],
+                        }))
+                      }
+                    >
+                      <option value="" />
+                      {architectures.map((architecture) => (
+                        <option key={architecture} value={architecture}>
+                          {intl.formatMessage(
+                            architecture === 'arm64'
+                              ? messages.arm64
+                              : architecture === 'x86'
+                                ? messages.x86
+                                : architecture === 'universal'
+                                  ? messages.universal
+                                  : messages.x64
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : (
+                <label className="block text-sm text-gray-200">
+                  {intl.formatMessage(messages.chooseSystem)}
                   <select
                     className="input input-lite mt-1 w-full"
-                    value={variant.operatingSystem}
-                    onChange={(event) =>
-                      setVariant((current) => ({
-                        ...current,
-                        operatingSystem: event.target
-                          .value as PcVariant['operatingSystem'],
-                      }))
-                    }
+                    value={selectedSystem}
+                    onChange={(event) => setSelectedSystem(event.target.value)}
                   >
-                    <option value="" />
-                    {operatingSystems.map((os) => (
-                      <option key={os} value={os}>
-                        {intl.formatMessage(
-                          os === 'macos'
-                            ? messages.macos
-                            : os === 'linux'
-                              ? messages.linux
-                              : messages.windows
-                        )}
+                    {selectedGame.emulationSystems?.map((system) => (
+                      <option key={system.slug} value={system.slug}>
+                        {system.name}
                       </option>
                     ))}
                   </select>
                 </label>
-                <label className="text-sm text-gray-200">
-                  {intl.formatMessage(messages.chooseArchitecture)}
-                  <select
-                    className="input input-lite mt-1 w-full"
-                    value={variant.architecture}
-                    onChange={(event) =>
-                      setVariant((current) => ({
-                        ...current,
-                        architecture: event.target
-                          .value as PcVariant['architecture'],
-                      }))
-                    }
-                  >
-                    <option value="" />
-                    {architectures.map((architecture) => (
-                      <option key={architecture} value={architecture}>
-                        {intl.formatMessage(
-                          architecture === 'arm64'
-                            ? messages.arm64
-                            : architecture === 'x86'
-                              ? messages.x86
-                              : architecture === 'universal'
-                                ? messages.universal
-                                : messages.x64
-                        )}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : (
-              <label className="block text-sm text-gray-200">
-                {intl.formatMessage(messages.chooseSystem)}
-                <select
-                  className="input input-lite mt-1 w-full"
-                  value={selectedSystem}
-                  onChange={(event) => setSelectedSystem(event.target.value)}
-                >
-                  {selectedGame.emulationSystems?.map((system) => (
-                    <option key={system.slug} value={system.slug}>
-                      {system.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {requestError && (
-              <p role="alert" className="text-sm text-red-300">
-                {requestError}
-              </p>
-            )}
-          </div>
-        </Modal>
+              )}
+              {requestError && (
+                <p role="alert" className="text-sm text-red-300">
+                  {requestError}
+                </p>
+              )}
+            </div>
+          </Modal>
+        </Transition>
       )}
     </>
   );
