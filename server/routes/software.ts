@@ -290,7 +290,16 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
     const results = games.flatMap((game) => {
       const systemsForGame = systems.flatMap((system) => {
         const platform = systemMatchesGame(system, game);
-        return platform ? [{ ...system, catalogPlatformId: platform.id }] : [];
+        return platform
+          ? [
+              {
+                slug: system.slug,
+                name: system.name,
+                group: system.group,
+                catalogPlatformId: platform.id,
+              },
+            ]
+          : [];
       });
       return systemsForGame.length > 0
         ? [{ ...game, emulationSystems: systemsForGame }]
@@ -334,7 +343,16 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
     const results = games.flatMap((game) => {
       const systemsForGame = systems.flatMap((system) => {
         const platform = systemMatchesGame(system, game);
-        return platform ? [{ ...system, catalogPlatformId: platform.id }] : [];
+        return platform
+          ? [
+              {
+                slug: system.slug,
+                name: system.name,
+                group: system.group,
+                catalogPlatformId: platform.id,
+              },
+            ]
+          : [];
       });
       return systemsForGame.length > 0
         ? [{ ...game, emulationSystems: systemsForGame }]
