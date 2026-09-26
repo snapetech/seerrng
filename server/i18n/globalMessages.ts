@@ -15,6 +15,7 @@ const globalMessages = defineMessages('notifications.common', {
   open: 'Open',
   resolved: 'Resolved',
   viewIssue: 'View Issue in {applicationTitle}',
+  viewRequestStatus: 'View Request Status in {applicationTitle}',
   viewMedia: 'View Media in {applicationTitle}',
   openIn: 'Open in {applicationTitle}',
   movie: 'movie',

@@ -32,6 +32,7 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
 - Hardcover-first Bookshelf deployment and migration tooling for existing Readarr or softcover libraries.
 - Resumable, layered Readarr/softcover-to-Hardcover migration with strict matching, softcover metadata recovery, validation, cutover checks, and an opt-in deterministic local-record fallback for books Hardcover cannot import.
 - Watchlists, blocklists, request quotas, override rules, permissions, notifications, issue reporting, and request management.
+- Authenticated **Download copy** links in Request Status for imported movie, TV, book, comic, and magazine files when SeerrNG can verify and read the selected backend's artifact.
 - Browser, service-worker, API, DNS, avatar, and image-proxy caching tuned for faster refreshes and tab restores.
 
 ## Project Status

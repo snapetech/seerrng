@@ -28,6 +28,7 @@ import {
   BaseAgent,
   NOTIFICATION_DELIVERY_CONCURRENCY,
   NOTIFICATION_HTTP_OPTIONS,
+  getNotificationActionLabel,
   getNotificationActionUrl,
   truncateNotificationText,
 } from './agent';
@@ -283,10 +284,9 @@ class PushoverAgent
       url && url.length <= PUSHOVER_URL_LIMIT ? url : undefined;
     const url_title = boundedUrl
       ? truncateNotificationText(
-          intl.formatMessage(
-            payload.issue ? globalMessages.viewIssue : globalMessages.viewMedia,
-            { applicationTitle }
-          ),
+          intl.formatMessage(getNotificationActionLabel(payload), {
+            applicationTitle,
+          }),
           PUSHOVER_URL_TITLE_LIMIT
         )
       : undefined;

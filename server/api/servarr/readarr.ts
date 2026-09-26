@@ -141,6 +141,14 @@ export interface ReadarrBook extends ReadarrBookLookupResult {
   };
 }
 
+export interface ReadarrBookFile {
+  id: number;
+  bookId: number;
+  path?: string;
+  relativePath?: string;
+  size: number;
+}
+
 interface PagedReadarrBooksResponse {
   records?: unknown;
   totalCount?: unknown;
@@ -204,6 +212,36 @@ const getReadarrErrorMessage = (error: unknown): string => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const sanitizeReadarrBookFile = (
+  value: unknown
+): ReadarrBookFile | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = Number(value.id);
+  const bookId = Number(value.bookId);
+  if (
+    !Number.isSafeInteger(id) ||
+    id <= 0 ||
+    !Number.isSafeInteger(bookId) ||
+    bookId <= 0
+  ) {
+    return undefined;
+  }
+  const path =
+    typeof value.path === 'string' ? value.path.slice(0, 10_000) : '';
+  const relativePath =
+    typeof value.relativePath === 'string'
+      ? value.relativePath.slice(0, 10_000)
+      : '';
+  const size = Number(value.size);
+  return {
+    id,
+    bookId,
+    path: path || undefined,
+    relativePath: relativePath || undefined,
+    size: Number.isFinite(size) && size >= 0 ? size : 0,
+  };
+};
 
 const isReadarrBookLookupResult = (
   value: unknown
@@ -904,6 +942,32 @@ class ReadarrAPI extends ServarrBase<ReadarrQueueItem> {
       throw new Error(
         `[Readarr] Failed to retrieve book ${bookId}: ${e.message}`,
         { cause: e }
+      );
+    }
+  }
+
+  public async getBookFiles(bookId: number): Promise<ReadarrBookFile[]> {
+    try {
+      await this.ensureProvider();
+      const response = await this.request<unknown[]>(
+        'GET',
+        '/bookfile',
+        undefined,
+        this.getRequestConfig({ bookId })
+      );
+      return sanitizeServarrRecordArray<Record<string, unknown>>(
+        response.data,
+        MAX_SERVARR_LIBRARY_RESULTS
+      ).flatMap((file) => {
+        const normalized = sanitizeReadarrBookFile(file);
+        return normalized ? [normalized] : [];
+      });
+    } catch (error) {
+      throw new Error(
+        `[Readarr] Failed to retrieve book files: ${error.message}`,
+        {
+          cause: error,
+        }
       );
     }
   }

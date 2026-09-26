@@ -21,6 +21,7 @@ import {
   BaseAgent,
   NOTIFICATION_DELIVERY_CONCURRENCY,
   getMediaTypeLabel,
+  getNotificationActionLabel,
   getNotificationActionUrl,
 } from './agent';
 
@@ -204,6 +205,9 @@ class EmailAgent
           timestamp: new Date().toTimeString(),
           requestedBy: payload.request.requestedBy.displayName,
           actionUrl: getNotificationActionUrl(payload, applicationUrl),
+          actionLabel: intl.formatMessage(getNotificationActionLabel(payload), {
+            applicationTitle,
+          }),
           applicationUrl,
           applicationTitle,
           logoUrl,

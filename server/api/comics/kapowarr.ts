@@ -15,6 +15,21 @@ export interface KapowarrVolume {
   root_folder?: number;
   issue_count: number;
   issues_downloaded: number;
+  issues?: KapowarrIssue[];
+}
+
+export interface KapowarrIssueFile {
+  id: number;
+  filepath: string;
+  size: number;
+}
+
+export interface KapowarrIssue {
+  id: number;
+  volume_id: number;
+  issue_number?: string;
+  title?: string;
+  files: KapowarrIssueFile[];
 }
 
 export interface KapowarrSystemAbout {
@@ -71,6 +86,41 @@ const boundedNonNegativeNumber = (value: unknown): number | undefined =>
     ? value
     : undefined;
 
+const sanitizeIssueFile = (value: unknown): KapowarrIssueFile | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = boundedInteger(value.id);
+  const filepath =
+    typeof value.filepath === 'string' &&
+    value.filepath.length > 0 &&
+    value.filepath.length <= 4_096 &&
+    !value.filepath.includes('\0')
+      ? value.filepath
+      : undefined;
+  const size = boundedInteger(value.size);
+  return id !== undefined && filepath && size !== undefined
+    ? { id, filepath, size }
+    : undefined;
+};
+
+const sanitizeIssue = (value: unknown): KapowarrIssue | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = boundedInteger(value.id);
+  const volumeId = boundedInteger(value.volume_id);
+  if (id === undefined || volumeId === undefined) return undefined;
+  return {
+    id,
+    volume_id: volumeId,
+    issue_number: boundedString(value.issue_number, 64),
+    title: boundedString(value.title, 1_000),
+    files: (Array.isArray(value.files) ? value.files : [])
+      .slice(0, 100)
+      .flatMap((file) => {
+        const normalized = sanitizeIssueFile(file);
+        return normalized ? [normalized] : [];
+      }),
+  };
+};
+
 const sanitizeVolume = (value: unknown): KapowarrVolume | undefined => {
   if (!isRecord(value)) {
     return undefined;
@@ -94,6 +144,12 @@ const sanitizeVolume = (value: unknown): KapowarrVolume | undefined => {
     root_folder: boundedInteger(value.root_folder),
     issue_count: boundedInteger(value.issue_count) ?? 0,
     issues_downloaded: boundedInteger(value.issues_downloaded) ?? 0,
+    issues: (Array.isArray(value.issues) ? value.issues : [])
+      .slice(0, 10_000)
+      .flatMap((issue) => {
+        const normalized = sanitizeIssue(issue);
+        return normalized ? [normalized] : [];
+      }),
   };
 };
 

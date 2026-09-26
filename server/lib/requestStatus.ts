@@ -1590,6 +1590,7 @@ const getRequestStatusOlderCount = async (options: {
 export const getRequestStatusPage = async (options: {
   take: number;
   skip: number;
+  requestId?: number;
   ownerId?: number;
   mediaType?: MediaType;
   bookFormat?: 'ebook' | 'audiobook';
@@ -1609,6 +1610,11 @@ export const getRequestStatusPage = async (options: {
     .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
     .leftJoinAndSelect('request.seasons', 'seasons');
 
+  if (options.requestId) {
+    query.andWhere('request.id = :requestId', {
+      requestId: options.requestId,
+    });
+  }
   if (options.ownerId) {
     query.andWhere('requestedBy.id = :ownerId', { ownerId: options.ownerId });
   }

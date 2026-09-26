@@ -184,6 +184,9 @@ Add the shared Request Status action and artifact-delivery route across current 
 
 - Work is on the `feature/software-acquisition` branch, based on the current SeerrNG `origin/main`.
 - The plan update has been carried onto that branch before implementation.
+- SeerrNG now has a shared Request Status asset listing and authenticated streaming route for imported movie, TV, ebook/audiobook, comic, and magazine files. Filesystem-backed providers use administrator path mappings; Mylar3 uses its authenticated issue-download stream, with credentials and paths kept server-side.
+- Available notifications link to the specific Request Status row. A single file uses the compact **Download copy** action, while multi-file requests show an accessible file picker; no bundle is offered unless a provider can construct one safely.
+- The download-copy setup is documented for operators, and its request-scoped endpoints and `requestId` status filter are described in `seerr-api.yml`.
 - `snapetech/QuestarrNG` has been created as a separate fork of `Doezer/Questarr` for durable SeerrNG request/job correlation and variant-aware acquisition metadata.
 - ROMarrNG is required because upstream lacks stable external request correlation and a request-scoped asset API; the fork will preserve the upstream MIT license and attribution.
 - General desktop applications remain a future wishlist item.

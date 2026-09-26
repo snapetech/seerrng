@@ -37,3 +37,43 @@ separate. A combined request can therefore be incomplete while one format is
 available and the other is still requested or missing. See
 [Books, Authors, and Series](./books-and-series.md) for book discovery and
 series requests.
+
+## Download an available copy
+
+When an imported file is available to SeerrNG, its request card shows a
+**Download copy** action. If the request has several files, open **Download
+copies** and choose the episode, book format, comic issue, or magazine issue to
+save. The browser handles transfer progress after the download starts; SeerrNG
+keeps the request's availability and history on this page.
+
+Available notifications link directly to the matching request card. SeerrNG
+checks request access and current availability again before each download. It
+does not expose provider credentials or server paths, and it only lists files
+that the configured backend reports as imported and SeerrNG can access.
+
+### Administrator setup
+
+In **Settings > Main > Download Copies**, add a path mapping for file-based
+backends. The backend's `remoteRoot` is the library root it reports; `localRoot`
+is the corresponding absolute path mounted read-only inside SeerrNG. Use an
+instance-specific `serviceId` when more than one backend of that type uses
+different paths. For example:
+
+```json
+[
+  {
+    "serviceType": "radarr",
+    "serviceId": 1,
+    "remoteRoot": "/movies",
+    "localRoot": "/mnt/media/movies"
+  }
+]
+```
+
+Mappings are supported for Radarr, Sonarr, Readarr-compatible ebook and
+audiobook services, LazyLibrarian magazines, and Kapowarr comics. Mylar3 comic
+issues are streamed through its authenticated API and do not need a path
+mapping. Keep the mounted library read-only and map the narrowest practical
+folder. If the backend does not report an imported file, the path is not
+mounted, or a mapping cannot be resolved safely, the download action stays
+hidden.

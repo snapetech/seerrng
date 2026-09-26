@@ -176,6 +176,33 @@ const sanitizeSonarrEpisode = (value: unknown): EpisodeResult | undefined => {
   };
 };
 
+export interface SonarrEpisodeFile {
+  id: number;
+  seriesId: number;
+  seasonNumber: number;
+  relativePath?: string;
+  path?: string;
+  size: number;
+}
+
+const sanitizeSonarrEpisodeFile = (
+  value: unknown
+): SonarrEpisodeFile | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = integer(value.id);
+  const seriesId = integer(value.seriesId);
+  const seasonNumber = integer(value.seasonNumber);
+  if (id <= 0 || seriesId <= 0 || seasonNumber < 0) return undefined;
+  return {
+    id,
+    seriesId,
+    seasonNumber,
+    relativePath: text(value.relativePath) || undefined,
+    path: text(value.path) || undefined,
+    size: finiteNumber(value.size),
+  };
+};
+
 const isConflictError = (error: unknown): boolean =>
   (typeof error === 'object' &&
     error !== null &&
@@ -881,6 +908,31 @@ class SonarrAPI extends ServarrBase<{
         seriesId,
       });
       throw new Error('Failed to get episodes', { cause: e });
+    }
+  }
+
+  public async getEpisodeFiles(seriesId: number): Promise<SonarrEpisodeFile[]> {
+    try {
+      const response = await this.request<unknown[]>(
+        'GET',
+        '/episodefile',
+        undefined,
+        { params: { seriesId } }
+      );
+      return sanitizeServarrRecordArray<Record<string, unknown>>(
+        response.data,
+        MAX_SERVARR_LIBRARY_RESULTS
+      ).flatMap((file) => {
+        const normalized = sanitizeSonarrEpisodeFile(file);
+        return normalized ? [normalized] : [];
+      });
+    } catch (error) {
+      throw new Error(
+        `[Sonarr] Failed to retrieve episode files: ${error.message}`,
+        {
+          cause: error,
+        }
+      );
     }
   }
 

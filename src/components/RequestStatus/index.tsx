@@ -237,6 +237,9 @@ const messages = defineMessages('components.RequestStatus', {
   requestLifecycle: 'Request lifecycle',
   scrollProgressRight: 'Scroll progress right',
   unknownTitle: 'Unknown title',
+  downloadCopy: 'Download copy',
+  downloadCopies: 'Download copies',
+  downloadCopyFor: 'Download {name}',
 });
 
 type MediaDetails =
@@ -1046,6 +1049,81 @@ const getLastTimelineIndex = (
   return 0;
 };
 
+interface RequestDownloadAsset {
+  id: string;
+  name: string;
+  size?: number;
+}
+
+const RequestDownloadAction = ({
+  requestId,
+  enabled,
+}: {
+  requestId: number;
+  enabled: boolean;
+}) => {
+  const intl = useIntl();
+  const { data } = useSWR<{ results: RequestDownloadAsset[] }>(
+    enabled ? `/api/v1/request/status/${requestId}/downloads` : null,
+    { revalidateOnFocus: false }
+  );
+  const assets = data?.results ?? [];
+  if (assets.length === 0) return null;
+
+  const downloadHref = (asset: RequestDownloadAsset) =>
+    `/api/v1/request/status/${requestId}/downloads/${asset.id}`;
+  const buttonClassName =
+    'compact-control inline-flex items-center gap-1 rounded-md border border-indigo-500/80 bg-indigo-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-indigo-200 transition hover:border-indigo-400 hover:bg-indigo-800/45 hover:text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none';
+
+  if (assets.length === 1) {
+    const asset = assets[0];
+    return (
+      <a
+        href={downloadHref(asset)}
+        download
+        className={buttonClassName}
+        aria-label={intl.formatMessage(messages.downloadCopyFor, {
+          name: asset.name,
+        })}
+        title={asset.name}
+      >
+        <ArrowDownTrayIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        {intl.formatMessage(messages.downloadCopy)}
+      </a>
+    );
+  }
+
+  return (
+    <details className="group relative">
+      <summary className={`${buttonClassName} list-none`}>
+        <ArrowDownTrayIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        {intl.formatMessage(messages.downloadCopies)}
+        <ChevronDownIcon
+          className="h-3.5 w-3.5 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+          aria-hidden="true"
+        />
+      </summary>
+      <ol className="absolute right-0 z-30 mt-1 max-h-64 max-w-[min(24rem,80vw)] min-w-64 overflow-y-auto rounded-lg border border-gray-600 bg-gray-900 p-1 shadow-xl">
+        {assets.map((asset) => (
+          <li key={asset.id}>
+            <a
+              href={downloadHref(asset)}
+              download
+              className="block truncate rounded-md px-3 py-2 text-xs text-gray-100 hover:bg-gray-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+              title={asset.name}
+              aria-label={intl.formatMessage(messages.downloadCopyFor, {
+                name: asset.name,
+              })}
+            >
+              {asset.name}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+};
+
 interface RequestStatusCardProps {
   item: RequestStatusItem;
   isAdminView: boolean;
@@ -1719,6 +1797,10 @@ const RequestStatusCard = ({
             </span>
           </Tooltip>
           {actionControls}
+          <RequestDownloadAction
+            requestId={item.request.id}
+            enabled={currentStage === 'available'}
+          />
           <button
             type="button"
             className="compact-control inline-flex items-center gap-1 rounded-md border border-emerald-600/80 bg-emerald-800/25 px-2 text-[11px] leading-none font-semibold whitespace-nowrap text-emerald-200 transition hover:border-emerald-500 hover:bg-emerald-800/45 hover:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
@@ -1903,6 +1985,29 @@ const RequestStatus = () => {
       ? undefined
       : (selectedUser ?? currentUser?.id)
     : currentUser?.id;
+  const rawFocusedRequestId = Array.isArray(router.query.requestId)
+    ? router.query.requestId[0]
+    : router.query.requestId;
+  const focusedRequestId =
+    rawFocusedRequestId && /^\d+$/.test(rawFocusedRequestId)
+      ? Number(rawFocusedRequestId)
+      : undefined;
+  useEffect(() => {
+    if (
+      !Number.isSafeInteger(focusedRequestId) ||
+      (focusedRequestId ?? 0) < 1
+    ) {
+      return;
+    }
+
+    setFilter('all');
+    setMediaFilter('all');
+    setSort('added');
+    setSortDirection('desc');
+    setTimeFrame('all');
+    setSearchFilter('');
+    if (canViewOtherUsers) setSelectedUser('all');
+  }, [canViewOtherUsers, focusedRequestId]);
   const page = Math.max(Number(router.query.page) || 1, 1);
   const apiMediaType =
     mediaFilter === 'book' || mediaFilter === 'audiobook'
@@ -1925,23 +2030,35 @@ const RequestStatus = () => {
       return null;
     }
 
-    const params = new URLSearchParams({
-      take: String(pageSize),
-      skip: String((page - 1) * pageSize),
-      filter,
-      mediaType: apiMediaType,
-      sort,
-      sortDirection,
-      timeFrame,
-    });
-    if (bookFormat) {
-      params.set('bookFormat', bookFormat);
-    }
-    if (selectedOwnerId !== undefined) {
-      params.set('requestedBy', String(selectedOwnerId));
-    }
-    if (debouncedSearchFilter.trim()) {
-      params.set('search', debouncedSearchFilter.trim());
+    const isFocusedRequest =
+      Number.isSafeInteger(focusedRequestId) && (focusedRequestId ?? 0) > 0;
+    const params = new URLSearchParams(
+      isFocusedRequest
+        ? {
+            take: '1',
+            skip: '0',
+            requestId: String(focusedRequestId),
+          }
+        : {
+            take: String(pageSize),
+            skip: String((page - 1) * pageSize),
+            filter,
+            mediaType: apiMediaType,
+            sort,
+            sortDirection,
+            timeFrame,
+          }
+    );
+    if (!isFocusedRequest) {
+      if (bookFormat) {
+        params.set('bookFormat', bookFormat);
+      }
+      if (selectedOwnerId !== undefined) {
+        params.set('requestedBy', String(selectedOwnerId));
+      }
+      if (debouncedSearchFilter.trim()) {
+        params.set('search', debouncedSearchFilter.trim());
+      }
     }
     return `/api/v1/request/status?${params.toString()}`;
   }, [
@@ -1950,6 +2067,7 @@ const RequestStatus = () => {
     canViewOtherUsers,
     currentUser,
     debouncedSearchFilter,
+    focusedRequestId,
     filter,
     page,
     pageSize,

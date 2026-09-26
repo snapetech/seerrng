@@ -43,6 +43,7 @@ const messages = defineMessages('notifications.agents.webpush', {
   issueResolved: 'The {issueType} was marked as resolved by {userName}!',
   issueReopened: 'The {issueType} was reopened by {userName}.',
   viewIssue: 'View Issue',
+  viewRequestStatus: 'View Request Status',
   viewMedia: 'View Media',
 });
 
@@ -221,7 +222,11 @@ class WebPushAgent
 
     const actionUrlTitle = actionUrl
       ? intl.formatMessage(
-          payload.issue ? messages.viewIssue : messages.viewMedia
+          payload.issue
+            ? messages.viewIssue
+            : payload.mediaUrl?.startsWith('/requests/status?requestId=')
+              ? messages.viewRequestStatus
+              : messages.viewMedia
         )
       : undefined;
 

@@ -1,6 +1,7 @@
 import ExternalAPI from '@server/api/externalapi';
 import type { MylarSettings } from '@server/lib/settings';
 import { buildServiceUrl } from '@server/utils/serviceUrl';
+import type { Readable } from 'node:stream';
 
 // Mylar3's `?apikey=&cmd=` API is not uniformly enveloped - confirmed by
 // reading the running app's own mylar/api.py, not by guessing. Most commands
@@ -37,6 +38,12 @@ export interface MylarIssue {
 export interface MylarComicDetail {
   comic?: MylarComic;
   issues: MylarIssue[];
+}
+
+export interface MylarIssueDownload {
+  stream: Readable;
+  filename?: string;
+  size?: number;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -167,6 +174,77 @@ class MylarAPI extends ExternalAPI {
             .map(sanitizeIssue)
             .filter((issue): issue is MylarIssue => !!issue)
         : [],
+    };
+  }
+
+  public async downloadIssue(issueId: string): Promise<MylarIssueDownload> {
+    if (!/^\d{1,20}$/.test(issueId)) {
+      throw new Error('Mylar3 issue IDs must be numeric.');
+    }
+
+    const response = await this.request<Readable>('GET', '/api', undefined, {
+      params: {
+        apikey: this.apiKey,
+        cmd: 'downloadIssue',
+        id: issueId,
+      },
+      responseType: 'stream',
+      headers: { Accept: 'application/octet-stream' },
+    });
+    const contentType = String(response.headers['content-type'] ?? '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (contentType === 'application/json' || contentType === 'text/html') {
+      response.data.destroy();
+      throw new Error('Mylar3 did not return an issue file.');
+    }
+
+    const rawSize = response.headers['content-length'];
+    const parsedSize =
+      typeof rawSize === 'string' && /^\d+$/.test(rawSize)
+        ? Number(rawSize)
+        : undefined;
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    const extendedFilename = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(
+      disposition
+    )?.[1];
+    const plainFilename = /filename\s*=\s*(?:"((?:\\.|[^"])*)"|([^;]+))/i.exec(
+      disposition
+    );
+    let filename = extendedFilename;
+    if (filename) {
+      try {
+        filename = decodeURIComponent(filename.trim());
+      } catch {
+        filename = undefined;
+      }
+    } else if (plainFilename) {
+      filename = (plainFilename[1] ?? plainFilename[2] ?? '').replace(
+        /\\(["\\])/g,
+        '$1'
+      );
+    }
+    if (filename) {
+      filename = filename
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()!
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .trim()
+        .slice(0, 255);
+      if (filename === '.' || filename === '..' || !filename) {
+        filename = undefined;
+      }
+    }
+
+    return {
+      stream: response.data,
+      filename,
+      size:
+        parsedSize !== undefined && Number.isSafeInteger(parsedSize)
+          ? parsedSize
+          : undefined,
     };
   }
 

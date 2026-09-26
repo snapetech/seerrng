@@ -189,6 +189,16 @@ export interface MetadataSettings {
   anime: MetadataProviderType;
 }
 
+export type DownloadPathService =
+  'radarr' | 'sonarr' | 'readarr' | 'lazylibrarian' | 'kapowarr';
+
+export interface DownloadPathMapping {
+  serviceType: DownloadPathService;
+  serviceId?: number;
+  remoteRoot: string;
+  localRoot: string;
+}
+
 export interface ProxySettings {
   enabled: boolean;
   hostname: string;
@@ -202,6 +212,7 @@ export interface ProxySettings {
 
 export interface MainSettings {
   apiKey: string;
+  downloadPathMappings: DownloadPathMapping[];
   applicationTitle: string;
   applicationUrl: string;
   cacheImages: boolean;
@@ -519,6 +530,7 @@ class Settings {
       vapidPublic: '',
       main: {
         apiKey: '',
+        downloadPathMappings: [],
         applicationTitle: 'Seerr',
         applicationUrl: '',
         cacheImages: true,
@@ -1300,6 +1312,7 @@ class Settings {
       vapidPublic: '',
       main: {
         apiKey: '',
+        downloadPathMappings: [],
         applicationTitle: 'Seerr',
         applicationUrl: '',
         cacheImages: false,

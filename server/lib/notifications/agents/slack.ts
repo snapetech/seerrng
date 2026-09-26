@@ -19,6 +19,7 @@ import type { NotificationAgent, NotificationPayload } from './agent';
 import {
   BaseAgent,
   CONFIGURABLE_NOTIFICATION_HTTP_OPTIONS,
+  getNotificationActionLabel,
   getNotificationActionUrl,
 } from './agent';
 
@@ -282,12 +283,9 @@ class SlackAgent
             url,
             text: {
               type: 'plain_text',
-              text: intl.formatMessage(
-                payload.issue
-                  ? globalMessages.viewIssue
-                  : globalMessages.viewMedia,
-                { applicationTitle }
-              ),
+              text: intl.formatMessage(getNotificationActionLabel(payload), {
+                applicationTitle,
+              }),
             },
           },
         ],

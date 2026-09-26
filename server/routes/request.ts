@@ -54,6 +54,10 @@ import { aliasDownloadId } from '@server/lib/mediaResponse';
 import { Permission } from '@server/lib/permissions';
 import requestDispatchManager from '@server/lib/requestDispatch';
 import {
+  listRequestDownloadAssets,
+  openRequestDownloadAsset,
+} from '@server/lib/requestDownloadAssets';
+import {
   REQUEST_STATUS_TERMINAL_STAGES,
   RequestStatusStage,
   getRequestStatusHistory,
@@ -95,6 +99,7 @@ import {
   parseOptionalNonNegativeInteger,
 } from '@server/utils/validation';
 import { Router, type Request } from 'express';
+import { pipeline } from 'node:stream/promises';
 
 const requestRoutes = Router();
 export const REQUEST_SERVICE_PROFILE_CONCURRENCY = 10;
@@ -396,6 +401,78 @@ const parseOptionalRequestOptionId = (
 
 const parseRequestParamId = (value: unknown): number | undefined =>
   parsePositiveRouteId(value, maxRequestIdValue);
+
+const getRequestDownloadAccess = async (
+  req: Request,
+  requestId: number
+): Promise<{ request?: MediaRequest; status?: 403 | 404 }> => {
+  const request = await getRepository(MediaRequest).findOne({
+    where: { id: requestId },
+    relations: {
+      media: { identifiers: true, seasons: true },
+      modifiedBy: true,
+      requestedBy: true,
+      seasons: true,
+    },
+  });
+  if (!request) return { status: 404 };
+
+  const hasAccess = await runUserSecurityReadWithActor(
+    req.user!.id,
+    request.requestedBy.id,
+    [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+    async (actor) =>
+      actor.hasPermission(
+        [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+        {
+          type: 'or',
+        }
+      ) || request.requestedBy.id === actor.id,
+    { expectedCredentialVersion: getExpectedCredentialVersion(req) }
+  );
+  return hasAccess ? { request } : { status: 403 };
+};
+
+const parseRequestDownloadRange = (
+  value: string | undefined,
+  size: number
+): { start: number; end: number } | null | undefined => {
+  if (!value || !/^bytes=/i.test(value) || value.includes(',')) {
+    return undefined;
+  }
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(value.trim());
+  if (!match || (!match[1] && !match[2])) return undefined;
+  if (size <= 0) return null;
+
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return null;
+    return { start: Math.max(0, size - suffixLength), end: size - 1 };
+  }
+
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : size - 1;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= size
+  ) {
+    return null;
+  }
+  return { start, end: Math.min(end, size - 1) };
+};
+
+const getDownloadContentDisposition = (fileName: string): string => {
+  const fallback =
+    fileName.replace(/[^\x20-\x7e]|["\\]/g, '_').slice(0, 150) || 'download';
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+};
 
 const parseOptionalRequestString = (
   value: unknown,
@@ -2576,6 +2653,13 @@ requestRoutes.get<
       take: 10,
       maxTake: 100,
     });
+    const requestId = parseOptionalPositiveInt(req.query.requestId);
+    if (req.query.requestId !== undefined && requestId === undefined) {
+      return next({
+        status: 400,
+        message: 'Request id must be a positive integer.',
+      });
+    }
     const requestedBy = parseOptionalPositiveInt(req.query.requestedBy);
     const parsedMediaType = parseOptionalAllowedString(req.query.mediaType, {
       fieldName: 'Media type',
@@ -2671,6 +2755,7 @@ requestRoutes.get<
         const page = await getRequestStatusPage({
           take: pageSize,
           skip,
+          requestId,
           ownerId: canViewAllRequests ? (requestedBy ?? undefined) : actor.id,
           mediaType: mediaType === 'all' ? undefined : (mediaType as MediaType),
           bookFormat: parsedBookFormat.value,
@@ -2852,6 +2937,137 @@ requestRoutes.get<
     });
   }
 });
+
+requestRoutes.get('/status/:requestId/downloads', async (req, res, next) => {
+  try {
+    const requestId = parseRequestParamId(req.params.requestId);
+    if (!requestId) {
+      return next({ status: 404, message: 'Request not found.' });
+    }
+    const access = await getRequestDownloadAccess(req, requestId);
+    if (access.status === 404) {
+      return next({ status: 404, message: 'Request not found.' });
+    }
+    if (access.status === 403 || !access.request) {
+      return next({
+        status: 403,
+        message: 'You do not have permission to view this request.',
+      });
+    }
+
+    const current = await recordRequestStatus(access.request.id);
+    if (current?.stage !== RequestStatusStage.AVAILABLE) {
+      return res.status(200).json({ results: [] });
+    }
+    const results = await listRequestDownloadAssets(access.request);
+    return res.status(200).json({ results });
+  } catch (error) {
+    if (error instanceof UserMutationActorUnauthorizedError) {
+      return next({ status: 403, message: 'Access denied.' });
+    }
+    logger.error('Something went wrong listing request download copies', {
+      label: 'API',
+      ...getErrorLogFields(error),
+    });
+    return next({
+      status: 500,
+      message: 'Unable to list request download copies.',
+    });
+  }
+});
+
+requestRoutes.get(
+  '/status/:requestId/downloads/:assetId',
+  async (req, res, next) => {
+    let file: Awaited<ReturnType<typeof openRequestDownloadAsset>> = undefined;
+    try {
+      const requestId = parseRequestParamId(req.params.requestId);
+      if (!requestId) {
+        return next({ status: 404, message: 'Request not found.' });
+      }
+      const access = await getRequestDownloadAccess(req, requestId);
+      if (access.status === 404) {
+        return next({ status: 404, message: 'Request not found.' });
+      }
+      if (access.status === 403 || !access.request) {
+        return next({
+          status: 403,
+          message: 'You do not have permission to view this request.',
+        });
+      }
+
+      const current = await recordRequestStatus(access.request.id);
+      if (current?.stage !== RequestStatusStage.AVAILABLE) {
+        return next({ status: 404, message: 'Download copy not found.' });
+      }
+      file = await openRequestDownloadAsset(access.request, req.params.assetId);
+      if (!file) {
+        return next({ status: 404, message: 'Download copy not found.' });
+      }
+
+      const supportsRanges = file.file !== undefined && file.size !== undefined;
+      const range = supportsRanges
+        ? parseRequestDownloadRange(req.headers.range, file.size!)
+        : undefined;
+      if (range === null) {
+        await file.file!.close();
+        return res
+          .status(416)
+          .set({
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'private, no-store',
+            'Content-Range': `bytes */${file.size!}`,
+          })
+          .end();
+      }
+
+      const start = range?.start;
+      const end = range?.end;
+      const contentLength = range ? end! - start! + 1 : file.size;
+      const headers: Record<string, string> = {
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': getDownloadContentDisposition(file.name),
+        'Content-Type': 'application/octet-stream',
+        'X-Content-Type-Options': 'nosniff',
+      };
+      if (supportsRanges) headers['Accept-Ranges'] = 'bytes';
+      if (contentLength !== undefined) {
+        headers['Content-Length'] = String(contentLength);
+      }
+      if (range) {
+        headers['Content-Range'] = `bytes ${start}-${end}/${file.size!}`;
+      }
+      res.status(range ? 206 : 200).set(headers);
+      const stream = file.file
+        ? file.file.createReadStream({
+            autoClose: true,
+            ...(range ? { start, end } : {}),
+          })
+        : file.stream;
+      if (!stream) {
+        throw new Error('Request download provider returned no file stream.');
+      }
+      await pipeline(stream, res);
+      return;
+    } catch (error) {
+      if (file?.file) await file.file.close().catch(() => undefined);
+      if (file?.stream && !file.stream.destroyed) file.stream.destroy();
+      if (req.aborted) return;
+      if (res.headersSent) {
+        res.destroy(error instanceof Error ? error : undefined);
+        return;
+      }
+      if (error instanceof UserMutationActorUnauthorizedError) {
+        return next({ status: 403, message: 'Access denied.' });
+      }
+      logger.error('Something went wrong streaming a request download copy', {
+        label: 'API',
+        ...getErrorLogFields(error),
+      });
+      return next({ status: 500, message: 'Unable to download this copy.' });
+    }
+  }
+);
 
 requestRoutes.get('/:requestId', async (req, res, next) => {
   const requestRepository = getRepository(MediaRequest);

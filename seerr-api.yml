@@ -10419,6 +10419,12 @@ paths:
             type: number
             minimum: 1
         - in: query
+          name: requestId
+          description: Restrict results to one request; used by Request Status notification links.
+          schema:
+            type: number
+            minimum: 1
+        - in: query
           name: bookFormat
           description: Restrict book requests to ebook-compatible or audiobook-compatible requests.
           schema:
@@ -10569,6 +10575,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RequestStatusDetail'
+  /request/status/{requestId}/downloads:
+    get:
+      summary: List downloadable copies for a request
+      description: Returns verified imported files only when the caller may view the request and its current lifecycle stage is available. Filesystem paths and provider credentials are never returned.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          description: Request ID
+          schema:
+            type: string
+            example: '1'
+      responses:
+        '200':
+          description: Downloadable copies returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          description: Opaque, request-scoped asset ID.
+                        name:
+                          type: string
+                        size:
+                          type: integer
+                          minimum: 0
+                      required: [id, name]
+                required: [results]
+        '403':
+          description: Caller may not view this request
+        '404':
+          description: Request not found
+  /request/status/{requestId}/downloads/{assetId}:
+    get:
+      summary: Download a request asset through SeerrNG
+      description: Streams one verified request asset after rechecking request access and availability. Provider URLs, credentials, and filesystem paths stay server-side.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          description: Request ID
+          schema:
+            type: string
+            example: '1'
+        - in: path
+          name: assetId
+          required: true
+          description: Opaque asset ID returned by the downloads listing.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset bytes streamed to the caller
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Requested byte range streamed for a filesystem-backed asset
+        '403':
+          description: Caller may not view this request
+        '404':
+          description: Request or asset not found or no longer available
   /request/{requestId}:
     get:
       summary: Get MediaRequest

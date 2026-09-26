@@ -24,6 +24,7 @@ import {
   BaseAgent,
   NOTIFICATION_DELIVERY_CONCURRENCY,
   NOTIFICATION_HTTP_OPTIONS,
+  getNotificationActionLabel,
   getNotificationActionUrl,
 } from './agent';
 
@@ -230,10 +231,9 @@ class TelegramAgent
 
     if (url) {
       const link = `\n\n\[${escapeTelegramMarkdownText(
-        intl.formatMessage(
-          payload.issue ? globalMessages.viewIssue : globalMessages.viewMedia,
-          { applicationTitle }
-        )
+        intl.formatMessage(getNotificationActionLabel(payload), {
+          applicationTitle,
+        })
       )}\]\(${escapeTelegramMarkdownUrl(url)}\)`;
       if (message.length + link.length <= maxLength) {
         message += link;

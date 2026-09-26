@@ -42,6 +42,7 @@ import {
   runWithConfigurationAdmission,
   runWithConfigurationAdmissions,
 } from '@server/lib/configurationAdmission';
+import { parseDownloadPathMappings } from '@server/lib/downloadPathMappings';
 import ImageProxy from '@server/lib/imageproxy';
 import { assertNoSymlinkDirectoryComponents } from '@server/lib/pathSecurity';
 import {
@@ -1185,6 +1186,21 @@ const parseMainSettingsBody = (
     }
   }
 
+  if (body.downloadPathMappings !== undefined) {
+    try {
+      value.downloadPathMappings = parseDownloadPathMappings(
+        body.downloadPathMappings
+      );
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'downloadPathMappings must contain valid path mappings.',
+      };
+    }
+  }
+
   return { value };
 };
 
@@ -1370,7 +1386,7 @@ export const filteredMainSettings = (
   main: MainSettings
 ): Partial<MainSettings> => {
   if (!user?.hasPermission(Permission.ADMIN)) {
-    return omit(main, 'apiKey');
+    return omit(main, 'apiKey', 'downloadPathMappings');
   }
 
   return {

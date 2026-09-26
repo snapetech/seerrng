@@ -1,3 +1,4 @@
+import { parseDownloadPathMappings } from '@server/lib/downloadPathMappings';
 import type { AllSettings, NotificationAgentKey } from '@server/lib/settings';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -98,9 +99,16 @@ const validate = (value: unknown): ExternalRuntimeConfig => {
     assertRecord(root[section], section);
   }
   const notifications = assertRecord(root.notifications, 'notifications');
+  const main = assertRecord(root.main, 'main');
   assertRecord(notifications.agents, 'notifications.agents');
   return {
     ...root,
+    main: {
+      ...main,
+      downloadPathMappings: parseDownloadPathMappings(
+        main.downloadPathMappings
+      ),
+    },
     radarr: normalizeServarrServices(root.radarr, 'radarr'),
     sonarr: normalizeServarrServices(root.sonarr, 'sonarr'),
     lidarr: normalizeServarrServices(root.lidarr, 'lidarr'),

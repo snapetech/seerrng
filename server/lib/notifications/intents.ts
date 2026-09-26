@@ -168,11 +168,15 @@ export const buildMediaRequestNotificationPayload = async (
     notifyUser: notifyAdmin ? undefined : entity.requestedBy,
     event,
   };
+  const notificationMediaUrl = (mediaUrl: string): string =>
+    type === Notification.MEDIA_AVAILABLE
+      ? `/requests/status?requestId=${entity.id}`
+      : mediaUrl;
   if (entity.type === MediaType.MOVIE) {
     const movie = await new TheMovieDb().getMovie({ movieId: media.tmdbId });
     return {
       ...base,
-      mediaUrl: `/movie/${media.tmdbId}`,
+      mediaUrl: notificationMediaUrl(`/movie/${media.tmdbId}`),
       subject: `${movie.title}${
         movie.release_date ? ` (${movie.release_date.slice(0, 4)})` : ''
       }`,
@@ -188,7 +192,7 @@ export const buildMediaRequestNotificationPayload = async (
     const tv = await new TheMovieDb().getTvShow({ tvId: media.tmdbId });
     return {
       ...base,
-      mediaUrl: `/tv/${media.tmdbId}`,
+      mediaUrl: notificationMediaUrl(`/tv/${media.tmdbId}`),
       subject: `${tv.name}${
         tv.first_air_date ? ` (${tv.first_air_date.slice(0, 4)})` : ''
       }`,
@@ -216,7 +220,7 @@ export const buildMediaRequestNotificationPayload = async (
     const releaseYear = releaseGroup.date?.slice(0, 4);
     return {
       ...base,
-      mediaUrl: `/music/${mbId}`,
+      mediaUrl: notificationMediaUrl(`/music/${mbId}`),
       subject: `${releaseGroup.name}${releaseYear ? ` (${releaseYear})` : ''}`,
       message: artist.name,
       image: album.caa_release_mbid
@@ -259,7 +263,7 @@ export const buildMediaRequestNotificationPayload = async (
       editions.entries.find(({ isbn_10 }) => isbn_10?.[0])?.isbn_10?.[0];
     return {
       ...base,
-      mediaUrl: `/book/${normalizedId}`,
+      mediaUrl: notificationMediaUrl(`/book/${normalizedId}`),
       subject: `${work.title}${releaseYear ? ` (${releaseYear})` : ''}`,
       message: description
         ? truncate(description, {
@@ -289,9 +293,10 @@ export const buildMediaRequestNotificationPayload = async (
           )?.value);
     return {
       ...base,
-      mediaUrl: mediaUrl
-        ? `/${entity.type}/${encodeURIComponent(mediaUrl)}`
-        : undefined,
+      mediaUrl:
+        notificationMediaUrl(
+          mediaUrl ? `/${entity.type}/${encodeURIComponent(mediaUrl)}` : ''
+        ) || undefined,
       subject: title,
       message: `${mediaType} request details are available in SeerrNG.`,
       image,

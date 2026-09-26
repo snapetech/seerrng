@@ -110,6 +110,7 @@ export interface RequestStatusUsersResponse extends PaginatedResponse {
 }
 
 export type RequestStatusQuery = {
+  requestId?: number;
   requestedBy?: number;
   mediaType?: MediaType | 'all';
   bookFormat?: 'ebook' | 'audiobook';
