@@ -1,5 +1,6 @@
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type {
+  ComicServiceOption,
   ServiceCommonServer,
   ServiceCommonServerWithDetails,
 } from '@server/interfaces/api/serviceInterfaces';
@@ -13,6 +14,31 @@ interface OverrideStatus {
   languageProfile?: string;
 }
 
+// Comics have no quality-profile/root-folder/language-profile concept, so
+// they use the lightweight /service/comic listing instead of the Servarr
+// "WithDetails" shape the other media types need.
+const useComicRequestOverride = (request: MediaRequest): OverrideStatus => {
+  const { data: allServers } = useSWR<ComicServiceOption[]>(
+    request.type === 'comic' ? '/api/v1/service/comic' : null
+  );
+
+  if (!allServers) {
+    return {};
+  }
+
+  const defaultServer = allServers.find((server) => server.isDefault);
+  const activeServer = allServers.find(
+    (server) => server.id === request.serverId
+  );
+
+  return {
+    server:
+      activeServer && request.serverId !== defaultServer?.id
+        ? activeServer.name
+        : undefined,
+  };
+};
+
 const useRequestOverride = (request: MediaRequest): OverrideStatus => {
   const serviceType =
     request.type === 'movie'
@@ -23,14 +49,19 @@ const useRequestOverride = (request: MediaRequest): OverrideStatus => {
           ? 'readarr'
           : 'sonarr';
   const { data: allServers } = useSWR<ServiceCommonServer[]>(
-    `/api/v1/service/${serviceType}`
+    request.type === 'comic' ? null : `/api/v1/service/${serviceType}`
   );
 
   const { data } = useSWR<ServiceCommonServerWithDetails>(
-    request.serverId !== null
+    request.type !== 'comic' && request.serverId !== null
       ? `/api/v1/service/${serviceType}/${request.serverId}`
       : null
   );
+
+  const comicOverride = useComicRequestOverride(request);
+  if (request.type === 'comic') {
+    return comicOverride;
+  }
 
   if (!data || !allServers) {
     return {};
