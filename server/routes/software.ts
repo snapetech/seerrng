@@ -20,6 +20,7 @@ import {
   hasSoftwareRequestAccess,
   isValidPcVariant,
   listSoftwareRequestAssets,
+  notifySoftwareRequestStatus,
   refreshSoftwareRequest,
   refreshSoftwareRequests,
   retrySoftwareRequest,
@@ -27,6 +28,7 @@ import {
   SoftwareRequestConfirmationRequiredError,
   SoftwareRequestStateError,
   streamSoftwareRequestAsset,
+  withdrawPendingSoftwareRequest,
   type PcGameVariant,
 } from '@server/lib/softwareRequests';
 import logger from '@server/logger';
@@ -404,6 +406,13 @@ softwareRoutes.post('/', async (req, res) => {
       .status(403)
       .json({ error: 'You do not have permission to request software.' });
   }
+  const softwareQuota = (await req.user.getQuota()).software;
+  if (
+    softwareQuota.restricted &&
+    !req.user.hasPermission(Permission.MANAGE_REQUESTS)
+  ) {
+    return res.status(403).json({ error: 'SOFTWARE_QUOTA_EXCEEDED' });
+  }
 
   const repository = getRepository(SoftwareRequest);
   try {
@@ -530,6 +539,7 @@ softwareRoutes.post('/', async (req, res) => {
       where: { id: request.id },
       relations: { requestedBy: true },
     });
+    await notifySoftwareRequestStatus(hydrated ?? request, 'pending');
     return res
       .status(201)
       .json({ request: serializeRequest(hydrated ?? request) });
@@ -610,7 +620,12 @@ softwareRoutes.get('/status', async (req, res) => {
         url: `/api/v1/request/software/status/${request.id}/downloads/${encodeURIComponent(asset.id)}`,
       })),
     })),
-    pageInfo: { pageSize, results: requests.length, total },
+    pageInfo: {
+      pages: Math.ceil(total / pageSize),
+      pageSize,
+      results: requests.length,
+      page: Math.floor(skip / pageSize) + 1,
+    },
   });
 });
 
@@ -687,6 +702,30 @@ softwareRoutes.post('/status/:id/decline', async (req, res) => {
     return res
       .status(500)
       .json({ error: 'Software request could not be declined.' });
+  }
+});
+
+softwareRoutes.post('/status/:id/withdraw', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid software request id.' });
+  }
+  const request = await getRequestForViewer(id, req.user!.id);
+  if (!request || request.requestedById !== req.user!.id) {
+    return res.status(404).json({ error: 'Software request not found.' });
+  }
+  if (!req.user!.hasPermission(Permission.REQUEST)) {
+    return res.status(403).json({ error: 'Request permission is required.' });
+  }
+  try {
+    const withdrawn = await withdrawPendingSoftwareRequest(request);
+    return res.status(200).json({ request: serializeRequest(withdrawn) });
+  } catch (error) {
+    if (error instanceof SoftwareRequestStateError)
+      return res.status(409).json({ error: error.message });
+    return res
+      .status(500)
+      .json({ error: 'Software request could not be withdrawn.' });
   }
 });
 

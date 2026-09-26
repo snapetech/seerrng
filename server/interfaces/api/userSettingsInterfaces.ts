@@ -58,6 +58,8 @@ export interface UserSettingsGeneralResponse {
   comicQuotaDays?: number;
   magazineQuotaLimit?: number;
   magazineQuotaDays?: number;
+  softwareQuotaLimit?: number;
+  softwareQuotaDays?: number;
   globalMovieQuotaDays?: number;
   globalMovieQuotaLimit?: number;
   globalTvQuotaLimit?: number;
@@ -70,6 +72,8 @@ export interface UserSettingsGeneralResponse {
   globalComicQuotaLimit?: number;
   globalMagazineQuotaDays?: number;
   globalMagazineQuotaLimit?: number;
+  globalSoftwareQuotaDays?: number;
+  globalSoftwareQuotaLimit?: number;
   watchlistSyncMovies?: boolean;
   watchlistSyncTv?: boolean;
   watchlistSyncMusic?: boolean;

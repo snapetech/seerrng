@@ -11,7 +11,10 @@ and dispatches requests to either [Mylar3](https://github.com/mylar3/mylar3)
 or [Kapowarr](https://github.com/Casvt/Kapowarr). Both backends can be
 configured at the same time. Users with advanced request permission can choose
 any configured instance when more than one is available; other requests go to
-the single default instance across both backends.
+the single default instance across both backends. For Kapowarr requests,
+advanced requesters can also select any root folder already configured in
+Kapowarr. The configured default remains selected unless the requester chooses
+another folder.
 
 ## ComicVine API Key
 
@@ -113,9 +116,11 @@ Point Kapowarr's FlareSolverr setting at the `flaresolverr` container, then:
 This is a first-pass integration; the following is a deliberate scope cut, not
 a bug:
 
-- No per-request root-folder or profile picker. Users with advanced request
-  permission can choose a comic server when multiple instances are configured;
-  other requests use a configured default.
+- Mylar3 does not expose per-request folder or profile choices through the API
+  used by SeerrNG. Kapowarr supports a per-request root-folder choice for users
+  with **Advanced Request** or **Manage Requests**; other requests use the
+  folder configured for that Kapowarr server. Neither comic backend exposes a
+  quality-profile choice.
 - Comic issue reports support the **Other** category only. Users with **Create
   Issues** can report problems for an available tracked comic; users with
   **View Issues** or **Manage Issues** can see open reports on comic details.

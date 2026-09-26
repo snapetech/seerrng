@@ -244,6 +244,26 @@ components:
           nullable: true
           description: 'Time period in days for TV quota'
           example: 14
+        softwareQuotaLimit:
+          type: number
+          nullable: true
+          description: 'Maximum number of software requests allowed'
+          example: 5
+        softwareQuotaDays:
+          type: number
+          nullable: true
+          description: 'Time period in days for software quota'
+          example: 7
+        globalSoftwareQuotaLimit:
+          type: number
+          nullable: true
+          description: 'Global software quota limit setting'
+          example: 5
+        globalSoftwareQuotaDays:
+          type: number
+          nullable: true
+          description: 'Global software quota days setting'
+          example: 7
         globalMovieQuotaDays:
           type: number
           nullable: true
@@ -1101,6 +1121,267 @@ components:
         restricted:
           type: boolean
           example: false
+    SoftwareRequest:
+      type: object
+      required:
+        [id, category, provider, status, title, attempt, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        requestedBy:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            displayName:
+              type: string
+            avatar:
+              type: string
+              nullable: true
+        approvedById:
+          type: integer
+          nullable: true
+        category:
+          type: string
+          enum: [retro, modern, game]
+        provider:
+          type: string
+          enum: [romarr, questarr]
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              approved,
+              searching,
+              downloading,
+              importing,
+              available,
+              failed,
+              declined,
+              cancelled,
+            ]
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+        catalogId:
+          type: integer
+          nullable: true
+        platform:
+          type: object
+          nullable: true
+          properties:
+            slug:
+              type: string
+            name:
+              type: string
+              nullable: true
+            catalogId:
+              type: integer
+              nullable: true
+        variant:
+          type: object
+          nullable: true
+          properties:
+            operatingSystem:
+              type: string
+              enum: [windows, linux, macos]
+            architecture:
+              type: string
+              enum: [x64, arm64, x86, universal]
+        attempt:
+          type: integer
+        percent:
+          type: number
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SoftwareRequestAsset:
+      type: object
+      required: [id, name, size, url]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        url:
+          type: string
+          description: Same-origin authenticated SeerrNG download route.
+    SoftwareRequestStatusEvent:
+      type: object
+      required: [id, requestId, requestedById, status, fingerprint, createdAt]
+      properties:
+        id:
+          type: integer
+        requestId:
+          type: integer
+        requestedById:
+          type: integer
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              approved,
+              searching,
+              downloading,
+              importing,
+              available,
+              failed,
+              declined,
+              cancelled,
+            ]
+        message:
+          type: string
+          nullable: true
+        percent:
+          type: number
+          nullable: true
+        fingerprint:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    SoftwareRequestStatusResult:
+      type: object
+      required: [request, status, message, assets]
+      properties:
+        request:
+          $ref: '#/components/schemas/SoftwareRequest'
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              approved,
+              searching,
+              downloading,
+              importing,
+              available,
+              failed,
+              declined,
+              cancelled,
+            ]
+        message:
+          type: string
+          nullable: true
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareRequestAsset'
+    SoftwareRequestPageInfo:
+      type: object
+      required: [page, pages, pageSize, results]
+      properties:
+        page:
+          type: integer
+        pages:
+          type: integer
+        pageSize:
+          type: integer
+        results:
+          type: integer
+          description: Number of requests on the current page.
+    SoftwareRequestsResponse:
+      type: object
+      required: [results, pageInfo]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareRequestStatusResult'
+        pageInfo:
+          $ref: '#/components/schemas/SoftwareRequestPageInfo'
+    SoftwareRequestDetailResponse:
+      type: object
+      required: [request, status, message, history, assets]
+      properties:
+        request:
+          $ref: '#/components/schemas/SoftwareRequest'
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              approved,
+              searching,
+              downloading,
+              importing,
+              available,
+              failed,
+              declined,
+              cancelled,
+            ]
+        message:
+          type: string
+          nullable: true
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareRequestStatusEvent'
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareRequestAsset'
+    SoftwareRequestMutationResponse:
+      type: object
+      required: [request]
+      properties:
+        request:
+          $ref: '#/components/schemas/SoftwareRequest'
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              approved,
+              searching,
+              downloading,
+              importing,
+              available,
+              failed,
+              declined,
+              cancelled,
+            ]
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoftwareRequestAsset'
+    KapowarrRootFolder:
+      type: object
+      required: [id, path]
+      properties:
+        id:
+          type: integer
+        path:
+          type: string
+    KapowarrRootFoldersResponse:
+      type: object
+      required: [defaultRootFolder, rootFolders]
+      properties:
+        defaultRootFolder:
+          type: string
+          nullable: true
+        rootFolders:
+          type: array
+          items:
+            $ref: '#/components/schemas/KapowarrRootFolder'
     PublicSettings:
       type: object
       required:
@@ -6842,6 +7123,8 @@ paths:
                     $ref: '#/components/schemas/QuotaStatus'
                   magazine:
                     $ref: '#/components/schemas/QuotaStatus'
+                  software:
+                    $ref: '#/components/schemas/QuotaStatus'
   /blocklist:
     get:
       summary: Returns blocklisted items
@@ -9698,6 +9981,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ComicServiceOption'
+  /service/comic/{id}/rootfolders:
+    get:
+      summary: List Kapowarr comic root folders
+      description: Returns a Kapowarr instance's configured folders for requesters with Advanced Request or Manage Requests permission.
+      tags:
+        - service
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Kapowarr folders and the configured default returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KapowarrRootFoldersResponse'
+        '403':
+          description: Advanced Request or Manage Requests permission is required
+        '404':
+          description: Kapowarr service not found
   /service/magazine:
     get:
       summary: Get LazyLibrarian magazine service summaries
@@ -10400,6 +10707,7 @@ paths:
                   type: number
                 rootFolder:
                   type: string
+                  description: For an advanced Kapowarr comic request, choose a path returned by /service/comic/{id}/rootfolders. If omitted, the service's configured default is used.
                 languageProfileId:
                   type: number
                 metadataProfileId:
@@ -10535,11 +10843,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestMutationResponse'
         '400':
           description: Invalid title, category, system, or PC target
         '403':
-          description: Caller lacks request permission
+          description: Caller lacks request permission or has reached the software request quota
         '409':
           description: Matching request already exists
   /request/software/catalog/systems:
@@ -10624,7 +10932,7 @@ paths:
   /request/software/status:
     get:
       summary: List software request status
-      description: Returns request ownership, lifecycle state, and verified available assets. Users with request-view permission may inspect other users' software requests.
+      description: Returns request ownership, lifecycle state, verified available assets, and pageInfo. Users with request-view permission may inspect other users' software requests.
       tags:
         - request
       parameters:
@@ -10658,7 +10966,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestsResponse'
   /request/software/status/{id}:
     get:
       summary: Get software request status and history
@@ -10678,7 +10986,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestDetailResponse'
         '404':
           description: Request not found or caller may not view it
   /request/software/status/{id}/approve:
@@ -10700,7 +11008,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestMutationResponse'
         '409':
           description: Request is no longer pending
   /request/software/status/{id}/decline:
@@ -10722,7 +11030,33 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestMutationResponse'
+        '409':
+          description: Request is no longer pending
+  /request/software/status/{id}/withdraw:
+    post:
+      summary: Withdraw a pending software request
+      description: Allows the requester to withdraw their own request before provider dispatch. Requires REQUEST permission.
+      tags:
+        - request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Software request withdrawn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoftwareRequestMutationResponse'
+        '403':
+          description: Request permission is required
+        '404':
+          description: Request not found or caller is not the requester
         '409':
           description: Request is no longer pending
   /request/software/status/{id}/retry:
@@ -10754,7 +11088,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SoftwareRequestMutationResponse'
         '409':
           description: Request is not failed or the provider requires a download handoff confirmation
           content:

@@ -33,6 +33,11 @@ const messages = defineMessages('components.NotificationTypeSelector', {
     'Send notifications when requested ROMs and PC games are ready to download.',
   usersoftwareavailableDescription:
     'Get notified when your requested ROMs and PC games are ready to download.',
+  softwareStatus: 'Software Request Updates',
+  softwareStatusDescription:
+    'Send notifications for software requests awaiting approval or that were approved, declined, or failed.',
+  userSoftwareStatusDescription:
+    'Get notified when your software request is awaiting approval or is approved, declined, or fails.',
   mediafailed: 'Request Processing Failed',
   mediafailedDescription:
     'Send notifications when media requests fail to be added to Radarr, Sonarr, Lidarr, or Bookshelf.',
@@ -111,6 +116,7 @@ export enum Notification {
   ISSUE_REOPENED = 2048,
   MEDIA_AUTO_REQUESTED = 4096,
   SOFTWARE_AVAILABLE = 8192,
+  SOFTWARE_STATUS = 16384,
 }
 
 export const ALL_NOTIFICATIONS = Object.values(Notification)
@@ -306,6 +312,17 @@ const NotificationTypeSelector = ({
             : messages.softwareavailableDescription
         ),
         value: Notification.SOFTWARE_AVAILABLE,
+        hasNotifyUser: true,
+      },
+      {
+        id: 'software-status',
+        name: intl.formatMessage(messages.softwareStatus),
+        description: intl.formatMessage(
+          user
+            ? messages.userSoftwareStatusDescription
+            : messages.softwareStatusDescription
+        ),
+        value: Notification.SOFTWARE_STATUS,
         hasNotifyUser: true,
       },
       {

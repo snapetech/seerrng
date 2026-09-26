@@ -2383,7 +2383,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         if (!kapowarrSettings) {
           throw new Error('Selected Kapowarr server no longer exists');
         }
-        if (!kapowarrSettings.rootFolder) {
+        const rootFolderPath = entity.rootFolder ?? kapowarrSettings.rootFolder;
+        if (!rootFolderPath) {
           throw new Error(
             'Selected Kapowarr server has no root folder configured'
           );
@@ -2393,9 +2394,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           url: KapowarrAPI.buildUrl(kapowarrSettings),
           apiKey: kapowarrSettings.apiKey,
         });
-        const rootFolderId = await kapowarr.resolveRootFolderId(
-          kapowarrSettings.rootFolder
-        );
+        const rootFolderId = await kapowarr.resolveRootFolderId(rootFolderPath);
         const volume = await kapowarr.addVolume({
           comicVineId: Number(comicVineId),
           rootFolderId,

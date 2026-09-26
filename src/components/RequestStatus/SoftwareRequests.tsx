@@ -1,6 +1,7 @@
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import PaginationFooter from '@app/components/Common/PaginationFooter';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
@@ -13,7 +14,7 @@ import type {
   PcOperatingSystem,
 } from '@server/api/software/types';
 import axios from 'axios';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -28,6 +29,7 @@ const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
   available: 'Available',
   failed: 'Failed',
   declined: 'Declined',
+  cancelled: 'Withdrawn',
   retro: 'Retro',
   modern: 'Modern',
   game: 'PC game',
@@ -43,6 +45,7 @@ const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
   submitted: 'Requested {date}',
   approve: 'Approve',
   decline: 'Decline',
+  withdraw: 'Withdraw',
   retry: 'Retry',
   manageError: 'This software request could not be updated.',
   downloadCopy: 'Download copy',
@@ -54,6 +57,12 @@ const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
   cancelRetry: 'Cancel',
   loadError: 'Software request status could not be loaded.',
   noRequests: 'No software requests yet.',
+  quotaExceeded: 'Your software request limit has been reached.',
+  showHistory: 'Show status history',
+  hideHistory: 'Hide status history',
+  historyLoading: 'Loading status history…',
+  historyError: 'Status history could not be loaded.',
+  noHistory: 'No saved status updates are available.',
 });
 
 type SoftwareStatus =
@@ -64,7 +73,8 @@ type SoftwareStatus =
   | 'importing'
   | 'available'
   | 'failed'
-  | 'declined';
+  | 'declined'
+  | 'cancelled';
 
 interface SoftwareRequestRow {
   id: number;
@@ -95,6 +105,17 @@ interface SoftwareRequestResult {
 
 interface SoftwareRequestsResponse {
   results: SoftwareRequestResult[];
+  pageInfo: { page: number; pages: number; pageSize: number; results: number };
+}
+
+interface SoftwareRequestHistoryResponse {
+  history: {
+    id: number;
+    status: SoftwareStatus;
+    message?: string | null;
+    percent?: number | null;
+    createdAt: string;
+  }[];
 }
 
 const DownloadCopies = ({
@@ -172,28 +193,49 @@ const SoftwareRequests = ({
   const { addToast } = useToasts();
   const canManage = hasPermission(Permission.MANAGE_REQUESTS);
   const canRequest = hasPermission(Permission.REQUEST);
+  const [page, setPage] = useState(1);
   const endpoint = useMemo(() => {
     if (!enabled) return null;
-    const params = new URLSearchParams({ take: '20', skip: '0' });
+    const params = new URLSearchParams({
+      take: '20',
+      skip: String((page - 1) * 20),
+    });
     if (requestedById !== undefined)
       params.set('requestedBy', String(requestedById));
     if (softwareRequestId !== undefined) {
       params.set('requestId', String(softwareRequestId));
     }
     return `/api/v1/request/software/status?${params.toString()}`;
-  }, [enabled, requestedById, softwareRequestId]);
+  }, [enabled, page, requestedById, softwareRequestId]);
   const { data, error, mutate } = useSWR<SoftwareRequestsResponse>(endpoint, {
     refreshInterval: 30_000,
     revalidateOnFocus: true,
   });
   const [workingId, setWorkingId] = useState<number | null>(null);
+  const [historyRequestId, setHistoryRequestId] = useState<number | null>(null);
   const [retryConfirmationId, setRetryConfirmationId] = useState<number | null>(
     null
   );
+  const historyEndpoint = historyRequestId
+    ? `/api/v1/request/software/status/${historyRequestId}`
+    : null;
+  const { data: historyData, error: historyError } =
+    useSWR<SoftwareRequestHistoryResponse>(historyEndpoint);
+
+  useEffect(() => {
+    setPage(1);
+    setHistoryRequestId(null);
+  }, [enabled, requestedById, softwareRequestId]);
+
+  useEffect(() => {
+    if (data && data.pageInfo.pages > 0 && page > data.pageInfo.pages) {
+      setPage(data.pageInfo.pages);
+    }
+  }, [data, page]);
 
   const mutateRequest = async (
     requestId: number,
-    action: 'approve' | 'decline' | 'retry',
+    action: 'approve' | 'decline' | 'retry' | 'withdraw',
     confirmNoExistingDownload = false
   ) => {
     setWorkingId(requestId);
@@ -219,7 +261,12 @@ const SoftwareRequests = ({
         setRetryConfirmationId(requestId);
         return;
       }
-      addToast(intl.formatMessage(messages.manageError), {
+      const errorMessage =
+        axios.isAxiosError(actionError) &&
+        actionError.response?.data?.error === 'SOFTWARE_QUOTA_EXCEEDED'
+          ? messages.quotaExceeded
+          : messages.manageError;
+      addToast(intl.formatMessage(errorMessage), {
         appearance: 'error',
       });
     } finally {
@@ -372,6 +419,18 @@ const SoftwareRequests = ({
                         </Button>
                       </>
                     )}
+                    {canRequest &&
+                      status === 'pending' &&
+                      request.requestedBy?.id === user?.id && (
+                        <Button
+                          buttonType="default"
+                          buttonSize="sm"
+                          disabled={workingId === request.id}
+                          onClick={() => mutateRequest(request.id, 'withdraw')}
+                        >
+                          {intl.formatMessage(messages.withdraw)}
+                        </Button>
+                      )}
                     {status === 'failed' && canRetryRequest(request) && (
                       <Button
                         buttonType="default"
@@ -417,11 +476,85 @@ const SoftwareRequests = ({
                     </div>
                   </div>
                 )}
+                <div className="mt-3">
+                  <Button
+                    buttonSize="sm"
+                    onClick={() =>
+                      setHistoryRequestId((current) =>
+                        current === request.id ? null : request.id
+                      )
+                    }
+                  >
+                    {intl.formatMessage(
+                      historyRequestId === request.id
+                        ? messages.hideHistory
+                        : messages.showHistory
+                    )}
+                  </Button>
+                </div>
+                {historyRequestId === request.id && (
+                  <div className="mt-3 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+                    {historyError ? (
+                      <p className="text-xs text-red-200">
+                        {intl.formatMessage(messages.historyError)}
+                      </p>
+                    ) : !historyData ? (
+                      <p className="text-xs text-gray-400">
+                        {intl.formatMessage(messages.historyLoading)}
+                      </p>
+                    ) : historyData.history.length === 0 ? (
+                      <p className="text-xs text-gray-400">
+                        {intl.formatMessage(messages.noHistory)}
+                      </p>
+                    ) : (
+                      <ol className="space-y-2">
+                        {historyData.history.map((event) => (
+                          <li
+                            key={event.id}
+                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs"
+                          >
+                            <span className="font-medium text-gray-100">
+                              {statusLabel(event.status)}
+                              {event.percent !== null &&
+                                event.percent !== undefined &&
+                                ` · ${Math.round(event.percent)}%`}
+                            </span>
+                            <time
+                              className="text-gray-400"
+                              dateTime={event.createdAt}
+                            >
+                              {intl.formatDate(event.createdAt, {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}
+                            </time>
+                            {event.message && (
+                              <p className="w-full text-gray-400">
+                                {event.message}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </article>
         ))}
       </div>
+      {data.pageInfo.pages > 1 && (
+        <PaginationFooter
+          defaultPageSize={20}
+          page={page}
+          pageSize={20}
+          totalPages={data.pageInfo.pages}
+          onPageChange={setPage}
+          onPageSizeChange={() => undefined}
+          pageSizeOptions={[20]}
+        />
+      )}
     </section>
   );
 };

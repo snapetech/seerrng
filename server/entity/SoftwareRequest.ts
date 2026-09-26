@@ -20,7 +20,8 @@ export type SoftwareRequestStatus =
   | 'importing'
   | 'available'
   | 'failed'
-  | 'declined';
+  | 'declined'
+  | 'cancelled';
 
 @Entity('software_request')
 @Index('IDX_software_request_requester_created', ['requestedById', 'createdAt'])

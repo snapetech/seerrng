@@ -204,15 +204,15 @@ Music:
 Books:
 
 - Bookshelf or another Readarr-compatible service configured in **Settings > Services**. New deployments should use the Hardcover-backed Bookshelf image.
-- One service marked as ebook-capable for ebook requests.
-- Optional second service marked as audiobook-capable for audiobook requests.
-- Separate defaults for ebook and audiobook if both-format requests should work cleanly.
+- One BookshelfNG instance can manage both ebooks and audiobooks. Add two SeerrNG service entries with the same connection details and mark one as ebook-capable and one as audiobook-capable.
+- Separate defaults for ebook and audiobook so **Both** format requests can route to each format.
 - Existing Readarr or softcover/Goodreads libraries should be migrated before switching to Hardcover metadata. The service settings modal links directly to the Bookshelf Hardcover migration runbook.
 
 Software requests:
 
 - QuestarrNG provides the IGDB catalog and acquisition for PC game requests.
 - ROMarrNG is also required for emulation requests. In **Settings > Services > Software Acquisition**, connect each provider and assign supported ROMarrNG systems to **Retro** or **Modern** before users can request them.
+- Software requests support global and per-user quotas. Requesters can withdraw their own requests before approval; provider-wide cancellation after approval is not available across both integrations.
 - Provider hostnames and ports must be reachable from the SeerrNG server or container. Use each provider's SeerrNG integration API key; keys stay server-side.
 - See the [software requests guide](https://snapetech.github.io/seerrng/using-seerr/software-acquisition/) for provider setup, request targets, status, retries, notifications, and downloads. See [Request Status](https://snapetech.github.io/seerrng/using-seerr/request-status/) for the shared Download copy workflow.
 

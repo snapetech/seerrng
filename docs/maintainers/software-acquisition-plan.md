@@ -1,6 +1,6 @@
 # Software acquisition plan: ROMs and games
 
-**Status:** Implementation in progress
+**Status:** Core acquisition workflow implemented; request-parity work continues
 
 **Researched:** 2026-09-25
 
@@ -181,14 +181,12 @@ Compare the supported console/platform matrix with ROMarr and QuestarrNG. If Gam
 
 ### 4. Implement and expand the SeerrNG domain
 
-After the first backend passes, implement one vertical slice using a dedicated software request/job model and the provider boundary above. Add further systems and providers through the same contract. Pin backend versions and schedule routine compatibility/security reviews; do not follow floating `latest` tags.
+The core vertical slice is implemented with a dedicated software request/job model and both provider adapters. Continue adding parity improvements through the same contract. Pin backend versions and schedule routine compatibility/security reviews; do not follow floating `latest` tags.
 
 Add the shared Request Status action and artifact-delivery route across current media request types in the same provider-capability model. The request timeline and artifact availability remain separate so a file can be downloadable without changing the existing approval/quota behavior.
 
 ### Current implementation record
 
-- Work is on the `feature/software-acquisition` branch, based on the current SeerrNG `origin/main`.
-- The plan update has been carried onto that branch before implementation.
 - SeerrNG now has a shared Request Status asset listing and authenticated streaming route for imported movie, TV, ebook/audiobook, comic, and magazine files. Filesystem-backed providers use administrator path mappings; Mylar3 uses its authenticated issue-download stream, with credentials and paths kept server-side.
 - Available notifications link to the specific Request Status row. A single file uses the compact **Download copy** action, while multi-file requests show an accessible file picker; no bundle is offered unless a provider can construct one safely.
 - The download-copy setup is documented for operators, and its request-scoped endpoints and `requestId` status filter are described in `seerr-api.yml`.
@@ -197,7 +195,8 @@ Add the shared Request Status action and artifact-delivery route across current 
 - SeerrNG now has provider connection settings and contract checks, an administrator-editable Retro/Modern assignment for every supported ROMarrNG system, IGDB catalog browsing, explicit PC OS and architecture selection, and a dedicated durable software-request model.
 - Users follow provider-confirmed states in Request Status. Active software requests are reconciled in the background and while Request Status is open; verified assets receive the same request-scoped **Download copy** and multi-file selection behavior as other media.
 - Failed retries preserve the local failed state until the provider accepts them. SeerrNG reads provider state before retrying to recover lost responses; ROMarrNG's uncertain-handoff case requires the requester or an administrator to confirm that no matching download remains in the download-client queue or history.
-- A configurable **Software Request Available** notification links the requester to the matching Request Status item. Provider credentials and upstream asset URLs remain server-side.
+- Global and per-user software request quotas use the same administrator settings as other request categories. Requesters can withdraw pending requests; the Request Status list is paginated and exposes saved status history.
+- **Software Request Updates** notifications cover pending approval, approval, decline, and provider failure. **Software Request Available** continues to notify users when verified files are ready. Provider credentials and upstream asset URLs remain server-side.
 - SeerrNG's OpenAPI contract and user/operator guides now describe software settings, catalog and request routes, notification behavior, and file delivery.
 - General desktop applications remain a future wishlist item.
 
@@ -205,9 +204,9 @@ Add the shared Request Status action and artifact-delivery route across current 
 
 - A request preserves its exact title and selected system/OS/architecture variant.
 - Dispatch is idempotent, durable, and recoverable across SeerrNG and provider restarts.
-- The user can distinguish searching, downloading, importing/verifying, available, failed, and cancelled.
+- The user can distinguish pending approval, approved, searching, downloading, importing/verifying, available, failed, declined, and withdrawn.
 - The SeerrNG request maps to a provider request/job and resulting library entry.
-- Cancellation/retry reflects the actual provider capability.
+- Requesters can withdraw before approval. After provider dispatch, cancellation is not exposed because the current provider adapters do not provide a shared cancellation contract; retries reflect provider capability.
 - Requesters can retry their own failed software requests only while they retain `REQUEST`; administrators with `MANAGE_REQUESTS` can retry any request. An uncertain ROMarrNG handoff requires an explicit duplicate-download check before retry.
 - A request becomes available only after file import/library confirmation.
 - For movies, TV, ebooks, audiobooks, comics, magazines, ROMs, and games, the requester is notified when the request reaches verified availability and sees the same **Download copy** action on its Request Status row.

@@ -43,6 +43,7 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   bookRequestLimitLabel: 'Global Book Request Limit',
   comicRequestLimitLabel: 'Global Comic Request Limit',
   magazineRequestLimitLabel: 'Global Magazine Request Limit',
+  softwareRequestLimitLabel: 'Global Software Request Limit',
   defaultPermissions: 'Default Permissions',
   defaultPermissionsTip: 'Initial permissions assigned to new users',
   disabledMediaServerLoginWarning:
@@ -127,6 +128,8 @@ const SettingsUsers = () => {
             comicQuotaDays: data?.defaultQuotas.comic.quotaDays ?? 7,
             magazineQuotaLimit: data?.defaultQuotas.magazine.quotaLimit ?? 0,
             magazineQuotaDays: data?.defaultQuotas.magazine.quotaDays ?? 7,
+            softwareQuotaLimit: data?.defaultQuotas.software.quotaLimit ?? 0,
+            softwareQuotaDays: data?.defaultQuotas.software.quotaDays ?? 7,
             defaultPermissions: data?.defaultPermissions ?? 0,
           }}
           validationSchema={schema}
@@ -162,6 +165,10 @@ const SettingsUsers = () => {
                     quotaLimit: values.magazineQuotaLimit,
                     quotaDays: values.magazineQuotaDays,
                   },
+                  software: {
+                    quotaLimit: values.softwareQuotaLimit,
+                    quotaDays: values.softwareQuotaDays,
+                  },
                 },
                 defaultPermissions: values.defaultPermissions,
               });
@@ -196,6 +203,21 @@ const SettingsUsers = () => {
                       mediaType="magazine"
                       defaultDays={values.magazineQuotaDays}
                       defaultLimit={values.magazineQuotaLimit}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label htmlFor="softwareRequestLimit" className="text-label">
+                    {intl.formatMessage(messages.softwareRequestLimitLabel)}
+                  </label>
+                  <div className="form-input-area">
+                    <QuotaSelector
+                      onChange={setFieldValue}
+                      dayFieldName="softwareQuotaDays"
+                      limitFieldName="softwareQuotaLimit"
+                      mediaType="software"
+                      defaultDays={values.softwareQuotaDays}
+                      defaultLimit={values.softwareQuotaLimit}
                     />
                   </div>
                 </div>

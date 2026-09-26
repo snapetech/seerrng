@@ -1,3 +1,4 @@
+import KapowarrAPI from '@server/api/comics/kapowarr';
 import ListenBrainzAPI from '@server/api/listenbrainz';
 import MusicBrainz from '@server/api/musicbrainz';
 import OpenLibraryAPI from '@server/api/openlibrary';
@@ -1530,6 +1531,28 @@ export class MediaRequest {
       }
 
       const serverId = selectedServer?.id;
+      let selectedRootFolder = selectedServer?.rootFolder;
+      if (useAdvancedOptions && requestBody.rootFolder) {
+        if (comicBackendType !== 'kapowarr' || !selectedServer) {
+          throw new ServiceConfigurationError(
+            'Per-request comic folders are only supported by Kapowarr.'
+          );
+        }
+        const kapowarrSettings = selectedServer as KapowarrSettings;
+        const kapowarr = new KapowarrAPI({
+          url: KapowarrAPI.buildUrl(kapowarrSettings),
+          apiKey: kapowarrSettings.apiKey,
+        });
+        const rootFolders = await kapowarr.getRootFolders();
+        if (
+          !rootFolders.some(({ folder }) => folder === requestBody.rootFolder)
+        ) {
+          throw new ServiceConfigurationError(
+            'Selected Kapowarr root folder is no longer available.'
+          );
+        }
+        selectedRootFolder = requestBody.rootFolder;
+      }
       const selectedDestination: RequestDestination | undefined =
         serverId === undefined || comicBackendType === undefined
           ? undefined
@@ -1537,7 +1560,7 @@ export class MediaRequest {
               serviceType: comicBackendType,
               format: 'comic',
               serverId,
-              rootFolder: selectedServer?.rootFolder ?? null,
+              rootFolder: selectedRootFolder ?? null,
             };
 
       const destinationRequests = media.id
@@ -1616,7 +1639,7 @@ export class MediaRequest {
         modifiedBy: autoApproved ? user : undefined,
         is4k: false,
         serverId,
-        rootFolder: selectedServer?.rootFolder,
+        rootFolder: selectedRootFolder,
         serviceTargets:
           serverId === undefined || comicBackendType === undefined
             ? []
@@ -1625,7 +1648,7 @@ export class MediaRequest {
                   serviceType: comicBackendType,
                   format: 'comic',
                   serverId,
-                  rootFolder: selectedServer?.rootFolder ?? null,
+                  rootFolder: selectedRootFolder ?? null,
                   status: MediaStatus.PENDING,
                 },
               ],

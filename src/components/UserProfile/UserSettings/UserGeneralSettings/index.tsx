@@ -64,6 +64,7 @@ const messages = defineMessages(
     bookrequestlimit: 'Book Request Limit',
     comicrequestlimit: 'Comic Request Limit',
     magazinerequestlimit: 'Magazine Request Limit',
+    softwarerequestlimit: 'Software Request Limit',
     enableOverride: 'Override Global Limit',
     applanguage: 'Display Language',
     languageDefault: 'Default ({language})',
@@ -118,6 +119,7 @@ const UserGeneralSettings = () => {
   const [bookQuotaEnabled, setBookQuotaEnabled] = useState(false);
   const [comicQuotaEnabled, setComicQuotaEnabled] = useState(false);
   const [magazineQuotaEnabled, setMagazineQuotaEnabled] = useState(false);
+  const [softwareQuotaEnabled, setSoftwareQuotaEnabled] = useState(false);
   const router = useRouter();
   const userId = getPositiveQueryParamNumber(router.query.userId);
   const {
@@ -197,6 +199,10 @@ const UserGeneralSettings = () => {
     setMagazineQuotaEnabled(
       data?.magazineQuotaLimit != undefined &&
         data?.magazineQuotaDays != undefined
+    );
+    setSoftwareQuotaEnabled(
+      data?.softwareQuotaLimit != undefined &&
+        data?.softwareQuotaDays != undefined
     );
   }, [data]);
 
@@ -279,6 +285,8 @@ const UserGeneralSettings = () => {
           comicQuotaDays: data?.comicQuotaDays,
           magazineQuotaLimit: data?.magazineQuotaLimit,
           magazineQuotaDays: data?.magazineQuotaDays,
+          softwareQuotaLimit: data?.softwareQuotaLimit,
+          softwareQuotaDays: data?.softwareQuotaDays,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
           watchlistSyncMusic: data?.watchlistSyncMusic,
@@ -350,6 +358,12 @@ const UserGeneralSettings = () => {
                 : null,
               magazineQuotaDays: magazineQuotaEnabled
                 ? values.magazineQuotaDays
+                : null,
+              softwareQuotaLimit: softwareQuotaEnabled
+                ? values.softwareQuotaLimit
+                : null,
+              softwareQuotaDays: softwareQuotaEnabled
+                ? values.softwareQuotaDays
                 : null,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
@@ -904,6 +918,48 @@ const UserGeneralSettings = () => {
                             limitOverride={
                               !magazineQuotaEnabled
                                 ? data?.globalMagazineQuotaLimit
+                                : undefined
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="text-label">
+                        <span>
+                          {intl.formatMessage(messages.softwarerequestlimit)}
+                        </span>
+                      </div>
+                      <div className="form-input-area">
+                        <div className="flex flex-col">
+                          <div className="mb-4 flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={softwareQuotaEnabled}
+                              onChange={() =>
+                                setSoftwareQuotaEnabled((enabled) => !enabled)
+                              }
+                            />
+                            <span className="ml-2 text-gray-300">
+                              {intl.formatMessage(messages.enableOverride)}
+                            </span>
+                          </div>
+                          <QuotaSelector
+                            isDisabled={!softwareQuotaEnabled}
+                            dayFieldName="softwareQuotaDays"
+                            limitFieldName="softwareQuotaLimit"
+                            mediaType="software"
+                            onChange={setFieldValue}
+                            defaultDays={values.softwareQuotaDays}
+                            defaultLimit={values.softwareQuotaLimit}
+                            dayOverride={
+                              !softwareQuotaEnabled
+                                ? data?.globalSoftwareQuotaDays
+                                : undefined
+                            }
+                            limitOverride={
+                              !softwareQuotaEnabled
+                                ? data?.globalSoftwareQuotaLimit
                                 : undefined
                             }
                           />

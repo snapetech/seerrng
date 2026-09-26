@@ -215,7 +215,10 @@ class EmailAgent
           recipientEmail,
         },
       };
-    } else if (type === Notification.SOFTWARE_AVAILABLE) {
+    } else if (
+      type === Notification.SOFTWARE_AVAILABLE ||
+      type === Notification.SOFTWARE_STATUS
+    ) {
       return {
         template: path.join(
           __dirname,

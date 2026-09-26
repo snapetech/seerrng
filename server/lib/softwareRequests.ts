@@ -163,6 +163,63 @@ const notifySoftwareAvailable = async (
   }
 };
 
+export const notifySoftwareRequestStatus = async (
+  request: SoftwareRequest,
+  status: 'pending' | 'approved' | 'declined' | 'failed'
+): Promise<void> => {
+  try {
+    const requester =
+      request.requestedBy ??
+      (await getRepository(User).findOneBy({ id: request.requestedById }));
+    if (!requester) return;
+
+    const intl = getIntl(
+      requester.settings?.locale as AvailableLocale | undefined
+    );
+    const event = intl.formatMessage(
+      status === 'pending'
+        ? globalMessages.softwareRequestPending
+        : status === 'approved'
+          ? globalMessages.softwareRequestApproved
+          : status === 'declined'
+            ? globalMessages.softwareRequestDeclined
+            : globalMessages.softwareRequestFailed
+    );
+    const message = intl.formatMessage(
+      status === 'pending'
+        ? globalMessages.softwarePendingMessage
+        : status === 'approved'
+          ? globalMessages.softwareApprovedMessage
+          : status === 'declined'
+            ? globalMessages.softwareDeclinedMessage
+            : globalMessages.softwareFailedMessage
+    );
+
+    await notificationManager.sendNotification(Notification.SOFTWARE_STATUS, {
+      event,
+      subject: request.title,
+      notifySystem: false,
+      notifyAdmin: status === 'pending' || status === 'failed',
+      notifyUser: requester,
+      mediaUrl: `/requests/status?softwareRequestId=${request.id}`,
+      message,
+      image: request.coverUrl ?? undefined,
+      extra: [
+        {
+          name: intl.formatMessage(globalMessages.requestedBy),
+          value: requester.displayName,
+        },
+      ],
+    });
+  } catch (error) {
+    logger.error('Could not queue software request status notification', {
+      requestId: request.id,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 const getProviderRequest = async (
   request: SoftwareRequest,
   dispatchIfMissing: boolean
@@ -229,7 +286,8 @@ export const refreshSoftwareRequest = async (
   if (
     request.status === 'pending' ||
     request.status === 'declined' ||
-    request.status === 'failed'
+    request.status === 'failed' ||
+    request.status === 'cancelled'
   ) {
     return {
       request,
@@ -275,6 +333,8 @@ export const refreshSoftwareRequest = async (
       await recordStatusEvent(request, request.errorMessage);
       if (nextStatus === 'available') {
         await notifySoftwareAvailable(request);
+      } else if (nextStatus === 'failed') {
+        await notifySoftwareRequestStatus(request, 'failed');
       }
     } else {
       await getRepository(SoftwareRequest).update(request.id, {
@@ -313,12 +373,28 @@ export const approveSoftwareRequest = async (
     );
   }
   getProviderSettings(request.provider);
+  const attempt = request.attempt + 1;
+  const repository = getRepository(SoftwareRequest);
+  const result = await repository.update(
+    { id: request.id, status: 'pending' },
+    {
+      status: 'approved',
+      approvedById,
+      attempt,
+      errorMessage: null,
+    }
+  );
+  if (!result.affected) {
+    throw new SoftwareRequestStateError(
+      'Only pending requests can be approved.'
+    );
+  }
   request.status = 'approved';
   request.approvedById = approvedById;
-  request.attempt += 1;
+  request.attempt = attempt;
   request.errorMessage = null;
-  await getRepository(SoftwareRequest).save(request);
   await recordStatusEvent(request, 'Request approved.');
+  await notifySoftwareRequestStatus(request, 'approved');
   return refreshSoftwareRequest(request);
 };
 
@@ -331,10 +407,38 @@ export const declineSoftwareRequest = async (
       'Only pending requests can be declined.'
     );
   }
+  const repository = getRepository(SoftwareRequest);
+  const result = await repository.update(
+    { id: request.id, status: 'pending' },
+    { status: 'declined', approvedById }
+  );
+  if (!result.affected) {
+    throw new SoftwareRequestStateError(
+      'Only pending requests can be declined.'
+    );
+  }
   request.status = 'declined';
   request.approvedById = approvedById;
-  await getRepository(SoftwareRequest).save(request);
   await recordStatusEvent(request, 'Request declined.');
+  await notifySoftwareRequestStatus(request, 'declined');
+  return request;
+};
+
+export const withdrawPendingSoftwareRequest = async (
+  request: SoftwareRequest
+): Promise<SoftwareRequest> => {
+  const repository = getRepository(SoftwareRequest);
+  const result = await repository.update(
+    { id: request.id, status: 'pending' },
+    { status: 'cancelled' }
+  );
+  if (!result.affected) {
+    throw new SoftwareRequestStateError(
+      'Only pending requests can be withdrawn.'
+    );
+  }
+  request.status = 'cancelled';
+  await recordStatusEvent(request, 'Request withdrawn by requester.');
   return request;
 };
 

@@ -1138,6 +1138,7 @@ const parseMainSettingsBody = (
       'book',
       'comic',
       'magazine',
+      'software',
     ] as const) {
       if (incomingDefaultQuotas[mediaType] === undefined) {
         continue;

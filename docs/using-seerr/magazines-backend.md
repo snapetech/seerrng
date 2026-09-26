@@ -89,3 +89,14 @@ Connection tests fail:
 - Confirm the host, port, API key, SSL setting, and URL base match
   LazyLibrarian's configuration.
 - Make sure SeerrNG can reach LazyLibrarian over the configured network.
+
+## Current boundaries
+
+- Magazine discovery uses titles already tracked by LazyLibrarian. SeerrNG can
+  request an untracked title by name, but it does not provide a separate public
+  magazine metadata catalog.
+- LazyLibrarian controls the magazine folder and search settings globally.
+  SeerrNG does not offer per-request folders or profiles.
+- The LazyLibrarian API used here does not provide SeerrNG with individual
+  in-progress magazine search cancellation or live download progress. Reports
+  use the **Other** issue category.

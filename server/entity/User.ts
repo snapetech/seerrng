@@ -1,6 +1,7 @@
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import SoftwareRequest from '@server/entity/SoftwareRequest';
 import { Watchlist } from '@server/entity/Watchlist';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import PreparedEmail from '@server/lib/email';
@@ -238,6 +239,12 @@ export class User {
 
   @Column({ nullable: true })
   public magazineQuotaDays?: number;
+
+  @Column({ nullable: true })
+  public softwareQuotaLimit?: number;
+
+  @Column({ nullable: true })
+  public softwareQuotaDays?: number;
 
   @OneToOne(() => UserSettings, (settings) => settings.user, {
     cascade: true,
@@ -697,6 +704,27 @@ export class User {
         })
       : 0;
 
+    const softwareQuotaLimit = !canBypass
+      ? (this.softwareQuotaLimit ?? defaultQuotas.software.quotaLimit)
+      : 0;
+    const softwareQuotaDays =
+      this.softwareQuotaDays ?? defaultQuotas.software.quotaDays;
+    const softwareDate = new Date();
+    if (softwareQuotaDays) {
+      softwareDate.setDate(softwareDate.getDate() - softwareQuotaDays);
+    }
+    const softwareQuotaUsed = softwareQuotaLimit
+      ? await getRepository(SoftwareRequest).count({
+          where: {
+            requestedById: this.id,
+            ...(softwareQuotaDays
+              ? { createdAt: AfterDate(softwareDate) }
+              : {}),
+            status: Not(In(['declined', 'failed', 'cancelled'])),
+          },
+        })
+      : 0;
+
     return {
       movie: {
         days: movieQuotaDays,
@@ -758,6 +786,17 @@ export class User {
           : undefined,
         restricted: !!(
           magazineQuotaLimit && magazineQuotaLimit - magazineQuotaUsed <= 0
+        ),
+      },
+      software: {
+        days: softwareQuotaDays,
+        limit: softwareQuotaLimit,
+        used: softwareQuotaUsed,
+        remaining: softwareQuotaLimit
+          ? Math.max(0, softwareQuotaLimit - softwareQuotaUsed)
+          : undefined,
+        restricted: !!(
+          softwareQuotaLimit && softwareQuotaLimit - softwareQuotaUsed <= 0
         ),
       },
     };

@@ -15,18 +15,22 @@ const messages = defineMessages('components.QuotaSelector', {
     '{quotaLimit} <quotaUnits>{comics} per {quotaDays} {days}</quotaUnits>',
   magazineRequests:
     '{quotaLimit} <quotaUnits>{magazines} per {quotaDays} {days}</quotaUnits>',
+  softwareRequests:
+    '{quotaLimit} <quotaUnits>{software} per {quotaDays} {days}</quotaUnits>',
   movies: '{count, plural, one {movie} other {movies}}',
   seasons: '{count, plural, one {season} other {seasons}}',
   albums: '{count, plural, one {album} other {albums}}',
   books: '{count, plural, one {book} other {books}}',
   comics: '{count, plural, one {comic} other {comics}}',
   magazines: '{count, plural, one {magazine} other {magazines}}',
+  software: '{count, plural, one {software request} other {software requests}}',
   days: '{count, plural, one {day} other {days}}',
   unlimited: 'Unlimited',
 });
 
 interface QuotaSelectorProps {
-  mediaType: 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
+  mediaType:
+    'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine' | 'software';
   defaultDays?: number;
   defaultLimit?: number;
   dayOverride?: number;
@@ -73,9 +77,11 @@ const QuotaSelector = ({
               ? messages.bookRequests
               : mediaType === 'comic'
                 ? messages.comicRequests
-                : mediaType === 'magazine'
-                  ? messages.magazineRequests
-                  : messages.tvRequests,
+                : mediaType === 'software'
+                  ? messages.softwareRequests
+                  : mediaType === 'magazine'
+                    ? messages.magazineRequests
+                    : messages.tvRequests,
         {
           quotaLimit: (
             <select
@@ -117,6 +123,9 @@ const QuotaSelector = ({
           books: intl.formatMessage(messages.books, { count: quotaLimit }),
           comics: intl.formatMessage(messages.comics, { count: quotaLimit }),
           magazines: intl.formatMessage(messages.magazines, {
+            count: quotaLimit,
+          }),
+          software: intl.formatMessage(messages.software, {
             count: quotaLimit,
           }),
           days: intl.formatMessage(messages.days, { count: quotaDays }),

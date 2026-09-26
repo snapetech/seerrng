@@ -245,6 +245,7 @@ export interface MainSettings {
     book: Quota;
     comic: Quota;
     magazine: Quota;
+    software: Quota;
   };
   enabledMediaCategories: EnabledMediaCategories;
   hideAvailable: boolean;
@@ -569,6 +570,7 @@ class Settings {
           book: {},
           comic: {},
           magazine: {},
+          software: {},
         },
         enabledMediaCategories: { ...DEFAULT_ENABLED_MEDIA_CATEGORIES },
         hideAvailable: false,
@@ -1395,6 +1397,7 @@ class Settings {
           book: {},
           comic: {},
           magazine: {},
+          software: {},
         },
         enabledMediaCategories: { ...DEFAULT_ENABLED_MEDIA_CATEGORIES },
         hideAvailable: false,

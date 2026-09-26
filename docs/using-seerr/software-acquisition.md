@@ -98,11 +98,19 @@ request is either approved and sent to its provider or waits for an
 administrator to approve or decline it. Repeating a request for the same
 title and target is rejected instead of creating a duplicate SeerrNG request.
 
+An administrator can set a global software request limit in **Settings >
+Users** and per-user overrides from that user's **General** profile settings.
+The quota counts each Retro, Modern, or PC game request as one item. Failed,
+declined, and withdrawn requests do not count. Users can withdraw their own
+request while it is pending approval; after approval, SeerrNG has no shared
+cancel operation across both acquisition providers.
+
 ## Follow progress
 
 Open **Requests > Request Status** to see software requests beside media
 requests. Each software card includes its title, category, selected emulation
-system or PC target, current state, and request date. The lifecycle is saved in
+system or PC target, current state, and request date. Open **Show status
+history** on a card to review saved lifecycle events. The history is saved in
 SeerrNG, so the status page can be reopened after a restart.
 
 | Status | Meaning |
@@ -115,11 +123,15 @@ SeerrNG, so the status page can be reopened after a restart.
 | Available | The provider reports the request as available and SeerrNG has verified at least one deliverable file. |
 | Failed | The provider reports that acquisition failed. The requester or an authorized administrator may be able to retry. |
 | Declined | An administrator declined the request. |
+| Withdrawn | The requester withdrew the request before approval. |
 
 SeerrNG refreshes active provider requests in the background once per minute
 and while Request Status is open. A provider-reported completion alone does
 not expose a download action: SeerrNG also needs a request-scoped imported file
 from that provider.
+
+Request Status is paginated, so older software requests remain available after
+the first page.
 
 ### Retry a failed request
 
@@ -156,6 +168,19 @@ preferences for a configured notification provider. The notification points
 to the matching software request in Request Status. The user can then download
 the verified file from the request card. Notification delivery depends on the
 user's notification preferences and the administrator's configured provider.
+
+The separate **Software Request Updates** preference sends pending requests
+to request managers and notifies requesters when software requests are
+approved, declined, or fail. Enable both preferences if you also want a notice
+when the verified download is ready.
+
+### API access
+
+The authenticated status endpoint supports `take` and `skip` pagination and
+returns `pageInfo`. A requester with **Request** permission can withdraw their
+own request with `POST /api/v1/request/software/status/{id}/withdraw` while its
+state is `pending`. `GET /api/v1/user/{id}/quota` includes the `software` quota
+alongside other media quotas.
 
 ## Troubleshooting
 

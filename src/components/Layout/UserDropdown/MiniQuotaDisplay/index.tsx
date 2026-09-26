@@ -13,6 +13,9 @@ const messages = defineMessages(
     seriesrequests: 'Series Requests',
     musicrequests: 'Music Requests',
     bookrequests: 'Book Requests',
+    comicrequests: 'Comic Requests',
+    magazinerequests: 'Magazine Requests',
+    softwarerequests: 'Software Requests',
   }
 );
 
@@ -52,6 +55,21 @@ const MiniQuotaDisplay = ({ userId }: MiniQuotaDisplayProps) => {
       key: 'book',
       label: intl.formatMessage(messages.bookrequests),
       quota: data?.book,
+    },
+    {
+      key: 'comic',
+      label: intl.formatMessage(messages.comicrequests),
+      quota: data?.comic,
+    },
+    {
+      key: 'magazine',
+      label: intl.formatMessage(messages.magazinerequests),
+      quota: data?.magazine,
+    },
+    {
+      key: 'software',
+      label: intl.formatMessage(messages.softwarerequests),
+      quota: data?.software,
     },
   ].filter((item) => (item.quota?.limit ?? 0) !== 0);
 

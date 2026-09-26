@@ -165,6 +165,7 @@ class WebPushAgent
         });
         break;
       case Notification.SOFTWARE_AVAILABLE:
+      case Notification.SOFTWARE_STATUS:
         message = payload.message;
         break;
       case Notification.MEDIA_DECLINED:

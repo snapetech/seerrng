@@ -147,7 +147,8 @@ Core policy:
 
   The default mode should be `auto`.
 - In `auto` mode:
-  - if no existing config or database exists, create fresh Hardcover instances;
+  - if no existing config or database exists, create one combined Hardcover
+    BookshelfNG instance for ebooks and audiobooks;
   - if an existing Readarr or softcover config/database exists, run the
     migration flow.
 - For fresh Hardcover installs:
@@ -172,9 +173,11 @@ Core policy:
   `http://127.0.0.1:*` or already use the `rreading-glasses` Compose profile
   are detected as `compatibility` on rerun. Set the mode explicitly to change
   that behavior.
-- Keep two instances:
-  - ebook on `8787`;
-  - audiobook on `8788`.
+- Use one BookshelfNG process and database for fresh ebook and audiobook
+  deployments. SeerrNG still uses two format-specific service entries that
+  point to that same instance. The optional `--split-instances` mode is for
+  operators who need separate settings or databases; it is not required for
+  either format.
 
 ### Migration Flow
 

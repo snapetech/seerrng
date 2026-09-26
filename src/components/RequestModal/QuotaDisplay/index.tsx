@@ -15,6 +15,10 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
   booklimit: '{limit, plural, one {book} other {books}}',
   comiclimit: '{limit, plural, one {comic} other {comics}}',
   magazinelimit: '{limit, plural, one {magazine} other {magazines}}',
+  softwarelimit:
+    '{limit, plural, one {software request} other {software requests}}',
+  softwareRequestsRemaining:
+    '{remaining, plural, one {One software request remains} other {# software requests remain}}',
   allowedRequests:
     'You are allowed to request <strong>{limit}</strong> {type}{days, plural, =0 {} one { every day} other { every <strong>{days}</strong> days}}.',
   allowedRequestsUser:
@@ -29,6 +33,7 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
   book: 'book',
   comic: 'comic',
   magazine: 'magazine',
+  software: 'software',
   notenoughseasonrequests: 'Not enough season requests remaining',
   requiredquota:
     'You need to have at least <strong>{seasons}</strong> {seasons, plural, one {season request} other {season requests}} remaining in order to submit a request for this series.',
@@ -38,7 +43,8 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
 
 interface QuotaDisplayProps {
   quota?: QuotaStatus;
-  mediaType: 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
+  mediaType:
+    'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine' | 'software';
   userOverride?: number | null;
   remaining?: number;
   overLimit?: number;
@@ -83,23 +89,27 @@ const QuotaDisplay = ({
           <div className="ml-2 text-lg">
             {overLimit !== undefined
               ? intl.formatMessage(messages.notenoughseasonrequests)
-              : intl.formatMessage(messages.requestsremaining, {
-                  remaining: remaining ?? quota?.remaining ?? 0,
-                  type: intl.formatMessage(
-                    mediaType === 'movie'
-                      ? messages.movie
-                      : mediaType === 'music'
-                        ? messages.music
-                        : mediaType === 'book'
-                          ? messages.book
-                          : mediaType === 'comic'
-                            ? messages.comic
-                            : mediaType === 'magazine'
-                              ? messages.magazine
-                              : messages.season
-                  ),
-                  strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
-                })}
+              : mediaType === 'software'
+                ? intl.formatMessage(messages.softwareRequestsRemaining, {
+                    remaining: remaining ?? quota?.remaining ?? 0,
+                  })
+                : intl.formatMessage(messages.requestsremaining, {
+                    remaining: remaining ?? quota?.remaining ?? 0,
+                    type: intl.formatMessage(
+                      mediaType === 'movie'
+                        ? messages.movie
+                        : mediaType === 'music'
+                          ? messages.music
+                          : mediaType === 'book'
+                            ? messages.book
+                            : mediaType === 'comic'
+                              ? messages.comic
+                              : mediaType === 'magazine'
+                                ? messages.magazine
+                                : messages.season
+                    ),
+                    strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+                  })}
           </div>
         </div>
         <div className="flex flex-1 justify-end">
@@ -142,7 +152,9 @@ const QuotaDisplay = ({
                         ? messages.booklimit
                         : mediaType === 'comic'
                           ? messages.comiclimit
-                          : messages.seasonlimit,
+                          : mediaType === 'software'
+                            ? messages.softwarelimit
+                            : messages.seasonlimit,
                   { limit: quota?.limit }
                 ),
                 strong: (msg: React.ReactNode) => <strong>{msg}</strong>,

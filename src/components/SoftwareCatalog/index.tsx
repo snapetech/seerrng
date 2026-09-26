@@ -4,6 +4,7 @@ import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
+import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -18,6 +19,7 @@ import type {
   PcArchitecture,
   PcOperatingSystem,
 } from '@server/api/software/types';
+import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import axios from 'axios';
 import { Fragment, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -55,6 +57,7 @@ const messages = defineMessages('components.SoftwareCatalog', {
   requestSuccessApproved:
     'Request approved and sent to its acquisition service.',
   requestError: 'This request could not be submitted.',
+  quotaExceeded: 'Your software request limit has been reached.',
   existingRequest: 'This title is already requested for that target.',
   chooseAll: 'Choose an operating system and architecture to continue.',
   noCategories: 'No software categories are currently available.',
@@ -96,9 +99,13 @@ const architectures: PcArchitecture[] = ['x64', 'arm64', 'x86', 'universal'];
 
 const SoftwareCatalog = () => {
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { user, hasPermission } = useUser();
   const { currentSettings } = useSettings();
   const canRequest = hasPermission(Permission.REQUEST);
+  const canManageRequests = hasPermission(Permission.MANAGE_REQUESTS);
+  const { data: quota } = useSWR<QuotaResponse>(
+    user ? `/api/v1/user/${user.id}/quota` : null
+  );
   const [category, setCategory] = useState<Category>('retro');
   const [searchInput, setSearchInput] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -184,11 +191,15 @@ const SoftwareCatalog = () => {
       );
       setSelectedGame(null);
     } catch (submitError) {
-      setRequestError(
-        axios.isAxiosError(submitError) && submitError.response?.status === 409
-          ? intl.formatMessage(messages.existingRequest)
-          : intl.formatMessage(messages.requestError)
-      );
+      const requestFailure =
+        axios.isAxiosError(submitError) &&
+        submitError.response?.data?.error === 'SOFTWARE_QUOTA_EXCEEDED'
+          ? messages.quotaExceeded
+          : axios.isAxiosError(submitError) &&
+              submitError.response?.status === 409
+            ? messages.existingRequest
+            : messages.requestError;
+      setRequestError(intl.formatMessage(requestFailure));
     } finally {
       setRequesting(false);
     }
@@ -370,6 +381,7 @@ const SoftwareCatalog = () => {
             cancelText={intl.formatMessage(globalMessages.cancel)}
             okDisabled={
               requesting ||
+              (quota?.software?.restricted && !canManageRequests) ||
               (selectedCategory !== 'game' && !selectedSystem) ||
               (selectedCategory === 'game' &&
                 (!variant.operatingSystem || !variant.architecture))
@@ -378,6 +390,9 @@ const SoftwareCatalog = () => {
             dialogClass="max-w-xl"
           >
             <div className="space-y-4">
+              {(quota?.software?.limit ?? 0) > 0 && (
+                <QuotaDisplay quota={quota?.software} mediaType="software" />
+              )}
               {selectedCategory === 'game' ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <label className="text-sm text-gray-200">
