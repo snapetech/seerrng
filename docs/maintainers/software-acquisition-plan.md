@@ -4,7 +4,7 @@
 
 **Researched:** 2026-09-25
 
-**Confidence:** High that ROMarr and Questarr are actively developed as of this date. Moderate that the current ROMarr API meets the full request lifecycle without compatibility work. High that Questarr needs an extension for durable external request/job status. Gamarr remains a conditional fallback pending a defined platform gap.
+**Confidence:** High that ROMarr and Questarr are actively developed as of this date. High that ROMarr needs an extension for durable external request correlation and safe artifact delivery. High that Questarr needs an extension for durable external request/job status and safe artifact delivery. Gamarr remains a conditional fallback pending a defined platform gap.
 
 ## Scope
 
@@ -14,15 +14,17 @@ Plan request-driven catalog and acquisition for:
 - Modern emulation systems and their game files.
 - Windows, Linux, and macOS games.
 
-The scope includes catalog discovery, request approval, acquisition dispatch, download progress, import or file organization, and availability in a library. Playback, launching, emulator setup, and runtime or compatibility-layer configuration are out of scope.
+The scope includes catalog discovery, request approval, acquisition dispatch, download progress, import or file organization, availability in a library, and user access to a downloaded copy. Playback, launching, emulator setup, and runtime or compatibility-layer configuration are out of scope.
+
+This also adds a universal user-copy requirement to the existing request categories: movies, TV, ebooks, audiobooks, comics, and magazines. The shared Request Status experience must show a small **Download copy** action when the completed artifact is deliverable. For requests with multiple files, let the user choose a file or a supported bundle. A library status alone does not mean the user can download a copy.
 
 General desktop applications for Windows, Linux, and macOS are deferred to a future wishlist item. They are not part of this plan.
 
 ## Recommendation
 
-Do not build a new general-purpose game downloader. Use ROMarr as the initial backend for supported ROM systems; it is actively maintained and its current API covers the main request-to-import path. Maintain [QuestarrNG](https://github.com/snapetech/QuestarrNG) as the separate Games acquisition service and add the request/job contract SeerrNG needs. The upstream API does not expose durable external request identity or request-specific job status. Keep Gamarr as a forkable fallback for a demonstrated platform gap; its source is active and MIT-licensed, but its request API is not a dependable external contract as-is.
+Do not build a new general-purpose game downloader. Create [ROMarrNG](https://github.com/snapetech/ROMarrNG) as the separate Retro and Modern Emulation acquisition service, adapting actively maintained ROMarr for durable SeerrNG request correlation and verified artifact listing/delivery. Maintain [QuestarrNG](https://github.com/snapetech/QuestarrNG) as the separate Games acquisition service and add the request/job and asset contract SeerrNG needs. Keep Gamarr as a forkable fallback for a demonstrated platform gap; its source is active and MIT-licensed, but its request API is not a dependable external contract as-is.
 
-Treat Retro, Modern Emulation, and Games as SeerrNG catalog/request experiences that route to providers by the selected platform and acquisition capabilities. They do not need a different backend just because they have different labels in the UI.
+Treat Retro, Modern Emulation, and Games as SeerrNG catalog/request experiences that route to providers by the selected platform and acquisition capabilities. They do not need a different backend just because they have different labels in the UI. Treat acquisition tracking and artifact delivery as separate provider capabilities across every request category.
 
 ## Candidate health and integration readiness
 
@@ -30,7 +32,7 @@ This assessment uses release and commit information available on 2026-09-25. Sta
 
 | Backend | Maintenance and maturity evidence | Integration assessment |
 | --- | --- | --- |
-| [ROMarr](https://github.com/BlizzHacker/romarr) | MIT. v0.9.0 was released 2026-09-19, with 79 commits since v0.8.0; the latest commit was on the release date. The v0.9.0 notes describe a persisted queue, failed-download recovery, and a state-file security fix. The repository has an OpenAPI description and tests for the served API. It is still pre-1.0 and had a small public contributor base at review time. | **Integrate as-is for the first ROM pilot, pinned to v0.9.0.** It is active and has the API and queue behavior needed to prove the flow. Keep the SeerrNG adapter separate so a breaking upstream change cannot take down request tracking. Recheck its release health before implementation. [v0.9.0 notes](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0) · [activity](https://github.com/BlizzHacker/romarr/commits/main) · [API](https://github.com/BlizzHacker/romarr#api) |
+| [ROMarr](https://github.com/BlizzHacker/romarr) / [ROMarrNG](https://github.com/snapetech/ROMarrNG) | MIT. v0.9.0 was released 2026-09-19, with 79 commits since v0.8.0; the latest commit was on the release date. The v0.9.0 notes describe a persisted queue, failed-download recovery, and a state-file security fix. The repository has an OpenAPI description and tests for the served API. It is still pre-1.0 and had a small public contributor base at review time. | **Fork as ROMarrNG for the first ROM pilot.** Upstream has `POST /api/request`, `GET /api/v1/wanted/missing`, `GET /api/v1/queue`, and history, but request submission does not accept an external idempotency key or return a durable request/job identifier. Its library response does not give SeerrNG a request-scoped, verified file set or byte stream. Add those contracts in the fork; keep all upstream changes isolated behind a SeerrNG adapter. [v0.9.0 notes](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0) · [activity](https://github.com/BlizzHacker/romarr/commits/main) · [API](https://github.com/BlizzHacker/romarr#api) |
 | [Questarr](https://github.com/Doezer/Questarr) / [QuestarrNG](https://github.com/snapetech/QuestarrNG) | GPL-3.0-only. Latest tagged release v1.4.2 was published 2026-08-11. Upstream main was pushed 2026-09-24 and contains package version 1.5.0; QuestarrNG currently tracks upstream main commit `6f31f2999d6b6e029eca557551039526f89615d0`. The project has a versioned integration API, API documentation, and integration tests. | **Maintain QuestarrNG as a separate service and extend the integration API before using it for SeerrNG requests.** Existing v1 accepts title-only requests and does not persist caller request IDs or return request-specific acquisition status/job IDs. The selected platform/OS/architecture must also be recorded and applied before SeerrNG can claim a variant-specific acquisition. The fork remains separate under GPL-3.0-only. [v1.4.2 notes](https://github.com/Doezer/Questarr/releases/tag/v1.4.2) · [recent upstream activity](https://github.com/Doezer/Questarr/commits/main) · [API docs](https://github.com/Doezer/Questarr/blob/main/docs/API.md) · [integration routes](https://github.com/Doezer/Questarr/blob/main/server/routes/integration.ts) · [fork](https://github.com/snapetech/QuestarrNG) |
 | [Gamarr](https://github.com/JeremiahM37/gamarr) | MIT. Latest release v1.3.0 was published 2026-08-05; commits continued through 2026-09-25. The project documents an OpenAPI 3.1 API and reports 43 automated end-to-end tests. | **Do not use its request workflow as-is for production. Keep it as the MIT-licensed fork fallback.** The code has request create/list/search/download routes, but those routes are absent from the published OpenAPI document. A request row does not persist the download job ID, and request completion is watched by an in-process goroutine. A fork would need a versioned external contract, idempotency, persisted request-to-job correlation, restart recovery, and dependable status/import reconciliation. [v1.3.0 notes](https://github.com/JeremiahM37/gamarr/releases/tag/v1.3.0) · [recent activity](https://github.com/JeremiahM37/gamarr/commits/main) · [request handlers](https://github.com/JeremiahM37/gamarr/blob/main/internal/api/requests.go) · [OpenAPI document](https://github.com/JeremiahM37/gamarr/blob/main/internal/api/openapi.json) · [request model](https://github.com/JeremiahM37/gamarr/blob/main/internal/models/request.go) |
 
@@ -38,18 +40,18 @@ This assessment uses release and commit information available on 2026-09-25. Sta
 
 | SeerrNG area | Preferred route | Fallback and boundary |
 | --- | --- | --- |
-| Retro Emulation | ROMarr for platforms it supports. It can search through Prowlarr/indexers, dispatch to download clients, validate imports, and target RomM, Gaseous, Retrom, Gameyfin, or a platform-organized folder. | Keep library services as destinations, not acquisition managers. |
-| Modern Emulation | ROMarr wherever the exact system and file format are supported. Its documented matrix spans 58 systems, including newer consoles; validate the exact matrix at implementation time. | Use Gamarr only for a demonstrated coverage gap, and then only through the planned fork/adaptation work. Do not route based on an undefined “modern” label. |
+| Retro Emulation | ROMarrNG for supported platforms. It retains upstream search/indexer/download/import behavior and adds the external SeerrNG request, status, and asset contract. | Keep library services as destinations, not acquisition managers. |
+| Modern Emulation | ROMarrNG wherever the exact system and file format are supported. Its documented matrix spans 58 systems, including newer consoles; validate the exact matrix at implementation time. | Use Gamarr only for a demonstrated coverage gap, and then only through the planned fork/adaptation work. Do not route based on an undefined “modern” label. |
 | Native PC games | QuestarrNG, after its versioned integration API carries SeerrNG request identity and the target variant and exposes durable job state. It retains Questarr's discovery, Prowlarr/Torznab and Newznab, downloader, and post-processing support. | Gamarr is a fallback if QuestarrNG cannot cover a required platform or source and a GamarrNG fork passes the recovery and API gates. |
 | Store-account games | Store-specific connector only when that store is explicitly included in the product matrix. itch.io's butlerd is an official, documented per-store JSON-RPC service with queued tasks, progress, and cancellation. | This does not provide a general game-store API. Steam catalog IDs do not grant download entitlement; Valve's Steamworks API requires a running Steam client and a license for the app. Treat store download as a separate, account-authorized provider. [butlerd](https://itch.io/docs/butler/launcher-integration.html) · [Steamworks API overview](https://partner.steamgames.com/doc/sdk/api) |
 
 ## Required provider adaptation
 
-### ROMarr: integrate through a pinned adapter
+### ROMarrNG: extend through a pinned adapter
 
-ROMarr documents request submission, release search, queue, history, health, and webhook endpoints. Its v0.9.0 queue is persisted across restarts, addressing an earlier loss of request-to-download association. The first integration should call the supported API and normalize its queue/history into SeerrNG's local job record.
+ROMarr documents request submission, release search, queue, history, health, and webhook endpoints. Its v0.9.0 queue is persisted across restarts, addressing an earlier loss of request-to-download association. However, `POST /api/request` accepts only a title and platform, and returned queue/history rows do not carry a caller-supplied request ID. The library API also does not identify an exact imported file set for that external request. A local title match is not a safe substitute for those contracts.
 
-The spike must confirm duplicate submission handling, stable correlation from SeerrNG request to ROMarr request and download, authentication, cancellation, failed-download retry, import results, and state recovery after both systems restart. Do not use its `latest` container tag as a production pin. [ROMarr API and v0.9.0 release](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0)
+Create ROMarrNG from the active upstream and add a stable external request ID with idempotent dispatch, durable request-to-queue/job correlation, exact imported asset listing, and authenticated server-side asset streaming. The SeerrNG adapter must verify import state and request ownership before showing or serving any file. The spike must confirm duplicate submission handling, authentication, cancellation, failed-download retry, import results, request/asset correlation, and state recovery after both systems restart. Do not use its `latest` container tag as a production pin. [ROMarr API and v0.9.0 release](https://github.com/BlizzHacker/romarr/releases/tag/v0.9.0)
 
 ### QuestarrNG: add a durable, versioned machine contract
 
@@ -64,7 +66,7 @@ For SeerrNG's full request experience, extend that contract with:
 - Cancel/retry operations tied to the same request.
 - A clear signal that import/library registration is complete, rather than only that a request was accepted.
 
-The fork was created from active upstream main at `6f31f2999d6b6e029eca557551039526f89615d0` (package version 1.5.0; latest tagged release v1.4.2). Keep the QuestarrNG application separate from SeerrNG and comply with its GPL-3.0-only terms. Do not copy its code into SeerrNG. The fork README and API docs must identify the upstream, explain the SeerrNG request/job contract, and link to the main SeerrNG repository. [Questarr integration API](https://github.com/Doezer/Questarr/blob/main/docs/API.md#integration-api-external-clients) · [upstream release history](https://github.com/Doezer/Questarr/releases) · [QuestarrNG](https://github.com/snapetech/QuestarrNG)
+The fork was created from active upstream main at `6f31f2999d6b6e029eca557551039526f89615d0` (package version 1.5.0; latest tagged release v1.4.2). Keep the QuestarrNG application separate from SeerrNG and comply with its GPL-3.0-only terms. Do not copy its code into SeerrNG. The fork README and API docs must identify the upstream, explain the SeerrNG request/job and asset-delivery contract, and link to the main SeerrNG repository. [Questarr integration API](https://github.com/Doezer/Questarr/blob/main/docs/API.md#integration-api-external-clients) · [upstream release history](https://github.com/Doezer/Questarr/releases) · [QuestarrNG](https://github.com/snapetech/QuestarrNG)
 
 ### Gamarr: fork only if it fills a proven platform gap
 
@@ -97,8 +99,9 @@ Separate these responsibilities:
 2. **Variant resolver** — captures exact platform/system, OS, architecture, version/build, edition, region/language, and file/package format as applicable. The approved variant must not change if catalog metadata later changes.
 3. **Acquisition provider** — offers configuration health, idempotent enqueue, job readback, cancellation/retry when supported, and a webhook or polling contract.
 4. **Library adapter** — confirms import and availability in the selected folder/library destination.
+5. **Artifact delivery adapter** — lists deliverable files and streams a selected asset through SeerrNG after checking request ownership. It may proxy an authenticated provider download API or read from an explicitly configured shared library root. It never returns provider credentials, private file paths, or long-lived provider URLs to the browser.
 
-Record external provider request/job IDs and source/verification metadata. Mark a SeerrNG request available only after the result is imported or registered. Keep external credentials and temporary download URLs on the server side. Route by the provider's declared platform and variant capabilities, not by the display category alone.
+Record external provider request/job IDs and source/verification metadata. Mark a SeerrNG request available only after the result is imported or registered. Show **Download copy** only after the provider confirms a deliverable artifact. Keep external credentials and temporary download URLs on the server side. Route by the provider's declared platform, variant, and delivery capabilities, not by the display category alone.
 
 ```mermaid
 flowchart LR
@@ -109,8 +112,37 @@ flowchart LR
     A --> D[Download job and files]
     D --> L[Import and verify]
     L --> I[Library adapter]
-    I --> U[Available in SeerrNG]
+    I --> U[Available in Request Status]
+    I --> X[Authenticated artifact delivery]
+    X --> U
 ```
+
+## Universal Download copy experience
+
+Use the existing Request Status surface as the common place to read progress and get the result for every request category. Show the lifecycle there as it moves through searching, downloading, importing, and available. When the verified artifact becomes available, use the existing available-request notification path to tell the requester and link back to that request in Request Status. The request row then shows **Download copy** as a compact secondary action in the same position for movies, TV, books, comics, magazines, ROMs, and games.
+
+The browser requests a SeerrNG-authenticated download route scoped to the request and selected asset. For one asset, **Download copy** starts the normal browser file download. For several assets, it opens a compact accessible file picker; **Download all** appears only when the provider can safely construct a complete bundle. SeerrNG verifies that the caller can view the request, resolves the asset through its provider adapter, and streams the bytes or supported archive with a safe `Content-Disposition` filename. Provider URLs, API keys, and server filesystem paths stay on the server. Use streaming/backpressure for large assets; do not load whole game or video files into application memory. Once the browser accepts the stream, its own download UI reports transfer progress; SeerrNG reports the request as available and does not claim it can verify the user's local copy after transfer.
+
+Provider adapters declare whether they can deliver one file, list several files, or package a multi-file result. The UI lists individual episodes, issues, or discs when the provider can identify them; a bundle action is offered only where the provider can construct it safely. A backend that only confirms a library import must be paired with a validated shared-library file adapter before SeerrNG presents the item as downloadable.
+
+### Provider delivery readiness audit
+
+This is based on the current SeerrNG clients and the linked upstream API/controller source reviewed on 2026-09-25. “Available” in a manager means the manager sees an imported file; it does not prove SeerrNG can read that file or send it to a user.
+
+| Request type / backend | What identifies the imported artifact | Existing provider byte-download API | Delivery requirement |
+| --- | --- | --- | --- |
+| Movie — Radarr | `movieFile.path` and size from the movie resource. [Radarr resource](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/MovieFiles/MovieFileResource.cs) | No movie-file stream action in the [movie-file controller](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/MovieFiles/MovieFileController.cs). | Stream the verified file through SeerrNG from the movie directory after the configured path mapping resolves it. |
+| TV — Sonarr | Episode file records expose a path and are linked to episodes. | No user-copy route is part of the episode-file API; its file records are manager metadata. | List the imported files for the requested seasons, then stream a selected file through SeerrNG. |
+| Ebook / audiobook — BookshelfNG or Readarr | `GET /api/v1/bookfile?bookId=…` returns `Path` and size. [BookshelfNG-compatible controller](https://github.com/snapetech/bookshelfng/blob/main/src/Readarr.Api.V1/BookFiles/BookFileController.cs) | No file-content action in the book-file controller. | Resolve each returned path through the configured SeerrNG path mapping; keep ebook and audiobook format separation from the request. |
+| Comic — Mylar3 | Downloaded issue IDs from `getComic`. | Mylar documents `downloadIssue&id=…` as a browser download. [API reference](https://github.com/mylar3/mylar3/blob/master/API_REFERENCE) | SeerrNG can proxy the authenticated issue stream server-side, after confirming the issue belongs to the requested comic. |
+| Comic — Kapowarr | Issue records include file IDs, path, and size; `/api/files/{id}` returns file metadata. [Issue and file handlers](https://github.com/Casvt/Kapowarr/blob/main/frontend/api.py) | The file handler returns metadata and does not stream the comic bytes. | Resolve file IDs only from the requested volume, then stream from a validated mapped library path. |
+| Magazine — LazyLibrarian | `getIssues` returns an `IssueFile` path when the issue is imported; SeerrNG currently parses that field. | No file-content action is used by the current integration. | Resolve the path through the configured SeerrNG path mapping and stream the verified issue file. |
+| Retro / modern ROM — ROMarrNG | The upstream import event and library integrations do not give SeerrNG a request-scoped file set. [Upstream API](https://github.com/BlizzHacker/romarr/blob/main/romarr/openapi.py) | No supported API route to list exact imported request assets or stream ROM bytes. | ROMarrNG adds a request-correlated asset list and authenticated stream. Preserve multi-file/disc relationships; never guess files by title. |
+| PC game — QuestarrNG | Questarr exposes imported game files from a game’s managed library path. [API contract](https://github.com/snapetech/QuestarrNG/blob/main/docs/API.md) | Its current external integration API does not provide a request-scoped file stream. | Extend QuestarrNG v2 with authenticated asset listing and streaming tied to the durable SeerrNG request/job record. |
+
+For filesystem-backed providers, SeerrNG must have read-only access to the library path and a server-side mapping from the manager's reported path to the SeerrNG container path. This is an operator setup requirement; the browser only receives an opaque asset ID, display name, and size. Use canonical paths, reject symlink escapes, and re-check the file at stream time. Providers with their own authenticated download API are proxied by SeerrNG instead. A missing mount, path mapping, file, or provider stream must hide the action and leave an operator-visible delivery error; it must never be reported as a successful user download.
+
+Provider support is explicit; do not infer deliverability from a completed request state.
 
 ## Phased plan
 
@@ -122,11 +154,13 @@ flowchart LR
 - Decide whether store-account downloads are included initially or remain an optional later Games provider.
 - Select the first shared library destination and define what confirms availability.
 
-### 1. Integrate ROMarr as the first provider
+### 1. Build ROMarrNG as the first provider
 
-Use pinned v0.9.0 for a disposable integration spike. Test one Retro system and one system from the agreed Modern matrix. Keep the SeerrNG request UI and approval policy authoritative.
+Create ROMarrNG from the current stable upstream baseline, retaining license attribution and documenting the purpose and upstream links in README and API docs. Implement the external request/job/asset contract, then pin a disposable SeerrNG integration spike. Test one Retro system and one system from the agreed Modern matrix. Keep the SeerrNG request UI and approval policy authoritative.
 
 **Exit gate:** repeated dispatch cannot create duplicate provider work; the local request remains correlated to its provider job across restarts; SeerrNG can show search/download/import outcomes; and “available” follows library confirmation.
+
+The ROMarrNG spike also checks how an imported ROM or multi-disc set can be delivered to the requesting user. The fork must expose an unambiguous imported file set for the request and an authenticated asset API correlated to the durable request/job contract. Update the fork README and API docs according to the fork policy above.
 
 ### 2. Extend QuestarrNG for Games — in progress
 
@@ -144,12 +178,14 @@ Compare the supported console/platform matrix with ROMarr and QuestarrNG. If Gam
 
 After the first backend passes, implement one vertical slice using a dedicated software request/job model and the provider boundary above. Add further systems and providers through the same contract. Pin backend versions and schedule routine compatibility/security reviews; do not follow floating `latest` tags.
 
+Add the shared Request Status action and artifact-delivery route across current media request types in the same provider-capability model. The request timeline and artifact availability remain separate so a file can be downloadable without changing the existing approval/quota behavior.
+
 ### Current implementation record
 
 - Work is on the `feature/software-acquisition` branch, based on the current SeerrNG `origin/main`.
 - The plan update has been carried onto that branch before implementation.
 - `snapetech/QuestarrNG` has been created as a separate fork of `Doezer/Questarr` for durable SeerrNG request/job correlation and variant-aware acquisition metadata.
-- ROMarr remains an upstream integration target; no ROMarr fork is planned unless a required capability cannot be adapted at the SeerrNG provider boundary.
+- ROMarrNG is required because upstream lacks stable external request correlation and a request-scoped asset API; the fork will preserve the upstream MIT license and attribution.
 - General desktop applications remain a future wishlist item.
 
 ## Acceptance criteria
@@ -160,6 +196,9 @@ After the first backend passes, implement one vertical slice using a dedicated s
 - The SeerrNG request maps to a provider request/job and resulting library entry.
 - Cancellation/retry reflects the actual provider capability.
 - A request becomes available only after file import/library confirmation.
+- For movies, TV, ebooks, audiobooks, comics, magazines, ROMs, and games, the requester is notified when the request reaches verified availability and sees the same **Download copy** action on its Request Status row.
+- Multi-file requests expose the available files and only offer a bundle when the provider can safely construct it.
+- Download routes enforce request ownership and stream via SeerrNG without exposing provider credentials, private paths, or long-lived provider URLs.
 - Backend credentials and download URLs are not exposed to the browser.
 - No UI or backend work launches or plays games or configures emulation/compatibility runtimes.
 
