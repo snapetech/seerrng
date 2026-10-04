@@ -51,6 +51,8 @@ const messages = defineMessages('components.SoftwareCatalog', {
   searchPlaceholder: 'Search software titles',
   search: 'Search',
   popular: 'Popular titles',
+  browseDat: 'Browse DAT titles',
+  datCatalog: 'DAT catalog',
   noResults: 'No titles match this search.',
   loadMore: 'Load more titles',
   retryLoad: 'Retry loading titles',
@@ -59,6 +61,10 @@ const messages = defineMessages('components.SoftwareCatalog', {
     'Update QuestarrNG to browse software by genre or release year.',
   configureHint:
     'Ask an administrator to connect QuestarrNG and the required acquisition service in Settings → Services.',
+  datConfigureHint:
+    'Ask an administrator to load DAT files in ROMarrNG and select ROMarrNG · DAT in Settings → Services.',
+  datUnavailable:
+    'The ROMarrNG DAT catalog is unavailable. Ask an administrator to check that DAT files are loaded.',
   request: 'Request',
   details: 'Details',
   requestTitle: 'Request {title}',
@@ -114,13 +120,15 @@ interface CatalogSystemOption {
 
 interface CatalogGame {
   id: string;
-  igdbId: number;
+  catalogProvider: 'igdb' | 'dat';
+  catalogId: string;
+  igdbId?: number;
   title: string;
   summary: string;
   coverUrl: string;
   releaseDate: string;
   platforms: string[];
-  platformOptions: { id: number; name: string }[];
+  platformOptions: { id?: number; key?: string; name: string }[];
   genres: string[];
   emulationSystems?: EmulationSystemOption[];
   availability?:
@@ -177,23 +185,27 @@ const SoftwareCatalog = ({
   const [requestError, setRequestError] = useState('');
   const [requestSuccess, setRequestSuccess] = useState('');
   const [requesting, setRequesting] = useState(false);
-  const hydratedGameId = useRef<number | undefined>(undefined);
+  const hydratedGameId = useRef<string | undefined>(undefined);
   const openedFromCatalog = useRef(false);
   const linkedCategory =
     typeof router.query.category === 'string' &&
     categories.includes(router.query.category as Category)
       ? (router.query.category as Category)
       : undefined;
+  const linkedCatalogProvider =
+    router.query.catalogProvider === 'dat' ? 'dat' : 'igdb';
   const linkedGameId =
     typeof router.query.game === 'string' &&
-    /^[1-9]\d*$/.test(router.query.game)
-      ? Number(router.query.game)
+    (linkedCatalogProvider === 'dat'
+      ? /^dat-[0-9a-f]{64}$/.test(router.query.game)
+      : /^[1-9]\d*$/.test(router.query.game))
+      ? router.query.game
       : undefined;
   const { data: linkedGame, error: linkedGameError } = useSWR<{
     game: CatalogGame;
   }>(
-    linkedCategory && Number.isSafeInteger(linkedGameId)
-      ? `/api/v1/request/software/catalog/games/${linkedGameId}?category=${linkedCategory}`
+    linkedCategory && linkedGameId
+      ? `/api/v1/request/software/catalog/games/${encodeURIComponent(linkedGameId)}?category=${linkedCategory}&catalogProvider=${linkedCatalogProvider}`
       : null
   );
 
@@ -207,7 +219,11 @@ const SoftwareCatalog = ({
       openedFromCatalog.current = false;
       hydratedGameId.current = undefined;
       setSelectedGame(null);
-    } else if (linkedGame?.game && linkedGame.game.igdbId === linkedGameId) {
+    } else if (
+      linkedGame?.game &&
+      linkedGame.game.catalogId === linkedGameId &&
+      linkedGame.game.catalogProvider === linkedCatalogProvider
+    ) {
       if (hydratedGameId.current !== linkedGameId) {
         hydratedGameId.current = linkedGameId;
         setSelectedSystem(linkedGame.game.emulationSystems?.[0]?.slug ?? '');
@@ -216,7 +232,7 @@ const SoftwareCatalog = ({
       }
       setSelectedGame(linkedGame.game);
     }
-  }, [linkedGame?.game, linkedGameId, router.isReady]);
+  }, [linkedGame?.game, linkedCatalogProvider, linkedGameId, router.isReady]);
 
   const visibleCategories = categories.filter((value) => {
     if (!isAnySoftwareCategoryEnabled(currentSettings)) return false;
@@ -231,13 +247,25 @@ const SoftwareCatalog = ({
   const selectedCategory = visibleCategories.includes(category)
     ? category
     : (visibleCategories[0] ?? category);
-  const { data: systemCatalog } = useSWR<{ results: CatalogSystemOption[] }>(
+  const { data: systemCatalog } = useSWR<{
+    results: CatalogSystemOption[];
+    catalogProvider?: 'questarr' | 'igdb' | 'dat';
+    catalogSystemSlugs?: string[];
+  }>(
     selectedCategory !== 'game' && visibleCategories.length
       ? '/api/v1/request/software/catalog/systems'
       : null
   );
+  const catalogProvider =
+    selectedCategory === 'game'
+      ? 'igdb'
+      : (systemCatalog?.catalogProvider ?? 'igdb');
+  const isDatCatalog = catalogProvider === 'dat';
+  const datSystemSlugs = new Set(systemCatalog?.catalogSystemSlugs ?? []);
   const systemsForCategory = (systemCatalog?.results ?? []).filter(
-    (system) => system.group === selectedCategory
+    (system) =>
+      system.group === selectedCategory &&
+      (!isDatCatalog || datSystemSlugs.has(system.slug))
   );
 
   const query = (externalQuery ?? submittedQuery).trim();
@@ -264,7 +292,11 @@ const SoftwareCatalog = ({
   });
   const getCatalogKey = useCallback(
     (pageIndex: number, previousPage: CatalogResponse | null) => {
-      if (visibleCategories.length === 0 || !validReleaseYear) return null;
+      if (
+        visibleCategories.length === 0 ||
+        (!isDatCatalog && !validReleaseYear)
+      )
+        return null;
       if (pageIndex > 0 && !previousPage) return null;
       const params = new URLSearchParams({
         category: selectedCategory,
@@ -275,8 +307,12 @@ const SoftwareCatalog = ({
       } else if (selectedCategory !== 'game' && systemFilter) {
         params.set('system', systemFilter);
       }
-      if (genreFilter.trim()) params.set('genre', genreFilter.trim());
-      if (releaseYearFilter) params.set('releaseYear', releaseYearFilter);
+      if (!isDatCatalog && genreFilter.trim()) {
+        params.set('genre', genreFilter.trim());
+      }
+      if (!isDatCatalog && releaseYearFilter) {
+        params.set('releaseYear', releaseYearFilter);
+      }
       if (query) {
         params.set('q', query);
         if (pageIndex > 0) {
@@ -300,6 +336,7 @@ const SoftwareCatalog = ({
       systemFilter,
       validReleaseYear,
       visibleCategories.length,
+      isDatCatalog,
     ]
   );
   const {
@@ -315,11 +352,11 @@ const SoftwareCatalog = ({
     dedupingInterval: 30000,
   });
   const games = useMemo(() => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     return (pages ?? []).flatMap((page) =>
       page.results.filter((game) => {
-        if (seen.has(game.igdbId)) return false;
-        seen.add(game.igdbId);
+        if (seen.has(`${game.catalogProvider}:${game.catalogId}`)) return false;
+        seen.add(`${game.catalogProvider}:${game.catalogId}`);
         return true;
       })
     );
@@ -335,7 +372,11 @@ const SoftwareCatalog = ({
     error.response.data?.error ===
       'Upgrade QuestarrNG to use software genre and year filters.'
       ? messages.upgradeQuestarr
-      : messages.loadError;
+      : isDatCatalog &&
+          axios.isAxiosError(error) &&
+          error.response?.status === 503
+        ? messages.datUnavailable
+        : messages.loadError;
 
   useEffect(() => {
     if (loadMoreInView && hasMore && !isLoadingMore && !error) {
@@ -345,7 +386,7 @@ const SoftwareCatalog = ({
 
   const openRequest = (game: CatalogGame) => {
     openedFromCatalog.current = true;
-    hydratedGameId.current = game.igdbId;
+    hydratedGameId.current = game.catalogId;
     setSelectedGame(game);
     setSelectedSystem(game.emulationSystems?.[0]?.slug ?? '');
     setVariant({
@@ -359,7 +400,8 @@ const SoftwareCatalog = ({
         query: {
           ...router.query,
           category: selectedCategory,
-          game: game.igdbId,
+          game: game.catalogId,
+          catalogProvider: game.catalogProvider,
         },
       },
       undefined,
@@ -375,6 +417,7 @@ const SoftwareCatalog = ({
     }
     const nextQuery = { ...router.query };
     delete nextQuery.game;
+    delete nextQuery.catalogProvider;
     void router.replace(
       { pathname: router.pathname, query: nextQuery },
       undefined,
@@ -398,7 +441,10 @@ const SoftwareCatalog = ({
         '/api/v1/request/software',
         {
           category: selectedCategory,
-          catalogId: selectedGame.igdbId,
+          catalogProvider: selectedGame.catalogProvider,
+          ...(selectedGame.catalogProvider === 'dat'
+            ? { catalogKey: selectedGame.catalogId }
+            : { catalogId: selectedGame.igdbId }),
           ...(selectedCategory === 'game'
             ? {
                 variant: {
@@ -538,28 +584,32 @@ const SoftwareCatalog = ({
                     </option>
                   ))}
             </select>
-            <input
-              className="input input-lite min-w-40 flex-1"
-              aria-label={intl.formatMessage(messages.genreFilter)}
-              placeholder={intl.formatMessage(messages.genreFilter)}
-              maxLength={64}
-              value={genreInput}
-              onChange={(event) => setGenreInput(event.target.value)}
-            />
-            <input
-              className="input input-lite w-36"
-              aria-label={intl.formatMessage(messages.releaseYearFilter)}
-              placeholder={intl.formatMessage(messages.releaseYearFilter)}
-              type="number"
-              min={1950}
-              max={2200}
-              aria-invalid={!validReleaseYear}
-              value={releaseYearInput}
-              onChange={(event) => setReleaseYearInput(event.target.value)}
-            />
+            {!isDatCatalog && (
+              <>
+                <input
+                  className="input input-lite min-w-40 flex-1"
+                  aria-label={intl.formatMessage(messages.genreFilter)}
+                  placeholder={intl.formatMessage(messages.genreFilter)}
+                  maxLength={64}
+                  value={genreInput}
+                  onChange={(event) => setGenreInput(event.target.value)}
+                />
+                <input
+                  className="input input-lite w-36"
+                  aria-label={intl.formatMessage(messages.releaseYearFilter)}
+                  placeholder={intl.formatMessage(messages.releaseYearFilter)}
+                  type="number"
+                  min={1950}
+                  max={2200}
+                  aria-invalid={!validReleaseYear}
+                  value={releaseYearInput}
+                  onChange={(event) => setReleaseYearInput(event.target.value)}
+                />
+              </>
+            )}
           </div>
         )}
-        {!validReleaseYear && (
+        {!isDatCatalog && !validReleaseYear && (
           <p className="mt-2 text-sm text-red-300" role="alert">
             {intl.formatMessage(messages.invalidReleaseYear)}
           </p>
@@ -612,9 +662,14 @@ const SoftwareCatalog = ({
           <h2 className="text-xl font-semibold text-gray-100">
             {query
               ? intl.formatMessage(messages.searchPlaceholder)
-              : intl.formatMessage(messages.popular)}
+              : intl.formatMessage(
+                  isDatCatalog ? messages.browseDat : messages.popular
+                )}
           </h2>
-          <span className="text-sm text-gray-400">{categoryTitle}</span>
+          <span className="text-sm text-gray-400">
+            {categoryTitle}
+            {isDatCatalog && ` · ${intl.formatMessage(messages.datCatalog)}`}
+          </span>
         </div>
 
         {visibleCategories.length === 0 ? (
@@ -628,9 +683,14 @@ const SoftwareCatalog = ({
         ) : error && !games.length ? (
           <div className="mt-5 rounded-lg border border-gray-700 bg-gray-800 px-5 py-6 text-sm text-gray-300">
             <p>{intl.formatMessage(catalogErrorMessage)}</p>
-            {catalogErrorMessage === messages.loadError && (
+            {(catalogErrorMessage === messages.loadError ||
+              catalogErrorMessage === messages.datUnavailable) && (
               <p className="mt-2 text-gray-400">
-                {intl.formatMessage(messages.configureHint)}
+                {intl.formatMessage(
+                  isDatCatalog
+                    ? messages.datConfigureHint
+                    : messages.configureHint
+                )}
               </p>
             )}
           </div>
@@ -643,7 +703,7 @@ const SoftwareCatalog = ({
             )}
             <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {games.map((game) => (
-                <li key={game.igdbId}>
+                <li key={game.id}>
                   <article className="group h-full overflow-hidden rounded-lg border border-gray-700 bg-gray-800 shadow transition hover:border-gray-500 hover:shadow-lg">
                     <div className="relative aspect-[2/3] overflow-hidden bg-gray-900">
                       {availabilityLabel(game) && (

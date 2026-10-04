@@ -12,6 +12,7 @@ import { User } from './User';
 
 export type SoftwareRequestCategory = 'retro' | 'modern' | 'game';
 export type SoftwareRequestProvider = 'romarr' | 'questarr';
+export type SoftwareCatalogProvider = 'igdb' | 'dat';
 export type SoftwareRequestStatus =
   | 'pending'
   | 'approved'
@@ -64,6 +65,12 @@ export class SoftwareRequest {
   @Column({ type: 'integer', nullable: true })
   public catalogId?: number | null;
 
+  @Column({ type: 'varchar', length: 16, default: 'igdb' })
+  public catalogProvider: SoftwareCatalogProvider;
+
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public catalogKey?: string | null;
+
   @Column({ type: 'varchar', length: 512 })
   public title: string;
 
@@ -93,6 +100,12 @@ export class SoftwareRequest {
 
   @Column({ type: 'real', nullable: true })
   public percent?: number | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  public providerStage?: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  public failureCode?: string | null;
 
   @Column({ type: 'varchar', length: 512, nullable: true })
   public errorMessage?: string | null;

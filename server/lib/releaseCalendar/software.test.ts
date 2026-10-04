@@ -47,6 +47,7 @@ const configureProviders = () => {
     },
     emulationCatalogProvider: 'romarr',
     emulationSystemGroups: {},
+    emulationPlatformMappings: {},
   };
 };
 

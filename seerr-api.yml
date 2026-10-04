@@ -2320,6 +2320,14 @@ components:
         catalogId:
           type: integer
           nullable: true
+          description: Numeric IGDB ID; null for DAT catalog requests.
+        catalogProvider:
+          type: string
+          enum: [igdb, dat]
+        catalogKey:
+          type: string
+          nullable: true
+          description: Stable catalog identity used to deduplicate requests across catalog providers.
         actions:
           $ref: '#/components/schemas/SoftwareRequestActions'
         platform:
@@ -2349,6 +2357,14 @@ components:
         percent:
           type: number
           nullable: true
+        stage:
+          type: string
+          nullable: true
+          description: Sanitized provider stage, when available.
+        failureCode:
+          type: string
+          nullable: true
+          description: Stable provider failure code, when available.
         error:
           type: string
           nullable: true
@@ -2401,6 +2417,12 @@ components:
           nullable: true
         percent:
           type: number
+          nullable: true
+        providerStage:
+          type: string
+          nullable: true
+        failureCode:
+          type: string
           nullable: true
         fingerprint:
           type: string
@@ -6866,7 +6888,7 @@ paths:
   /settings/software-acquisition:
     get:
       summary: Get software acquisition provider settings
-      description: Returns ROMarrNG and QuestarrNG connection settings with API keys redacted, the selected emulation catalog provider, and administrator-assigned Retro and Modern system groups.
+      description: Returns ROMarrNG and QuestarrNG connection settings with API keys redacted, the selected emulation catalog provider, administrator-assigned Retro and Modern system groups, and optional ROMarrNG-to-IGDB platform overrides.
       tags:
         - settings
       responses:
@@ -6883,15 +6905,20 @@ paths:
                     $ref: '#/components/schemas/SoftwareProviderSettingsView'
                   emulationCatalogProvider:
                     type: string
-                    enum: [questarr, romarr]
+                    enum: [questarr, romarr, romarr-dat]
                   emulationSystemGroups:
                     type: object
                     additionalProperties:
                       type: string
                       enum: [retro, modern]
+                  emulationPlatformMappings:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      minimum: 1
     put:
       summary: Update software acquisition settings
-      description: Updates provider connections, the selected emulation IGDB catalog, and per-system emulation groups. API keys stay server-side and are redacted in responses.
+      description: Updates provider connections, the selected emulation catalog, per-system emulation groups, and optional ROMarrNG-to-IGDB platform overrides. API keys stay server-side and are redacted in responses.
       tags:
         - settings
       requestBody:
@@ -6907,12 +6934,17 @@ paths:
                   $ref: '#/components/schemas/SoftwareProviderSettingsInput'
                 emulationCatalogProvider:
                   type: string
-                  enum: [questarr, romarr]
+                  enum: [questarr, romarr, romarr-dat]
                 emulationSystemGroups:
                   type: object
                   additionalProperties:
                     type: string
                     enum: [retro, modern]
+                emulationPlatformMappings:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                    minimum: 1
       responses:
         '200':
           description: Software acquisition settings updated
@@ -6927,12 +6959,28 @@ paths:
                     $ref: '#/components/schemas/SoftwareProviderSettingsView'
                   emulationCatalogProvider:
                     type: string
-                    enum: [questarr, romarr]
+                    enum: [questarr, romarr, romarr-dat]
                   emulationSystemGroups:
                     type: object
                     additionalProperties:
                       type: string
                       enum: [retro, modern]
+                  emulationPlatformMappings:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      minimum: 1
+  /settings/software-acquisition/platform-mapping/preview:
+    get:
+      summary: Preview ROMarrNG to IGDB platform matches
+      description: Returns unique automatic name and alias matches, saved overrides, unmatched ROMarrNG systems, and IGDB platforms not currently selected.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Platform matching preview returned
+        '502':
+          description: ROMarrNG platform or IGDB catalog could not be read
         '400':
           description: Invalid provider or system-group settings
   /settings/software-acquisition/test/{provider}:
@@ -13514,7 +13562,7 @@ paths:
   /request/software:
     post:
       summary: Submit a ROM or PC game request
-      description: Creates a SeerrNG software request from the configured IGDB catalog. Emulation uses the selected QuestarrNG or ROMarrNG catalog and is acquired by ROMarrNG; PC game requests use QuestarrNG and require operating system and architecture.
+      description: Creates a SeerrNG software request from the configured IGDB or ROMarrNG DAT catalog. Emulation is acquired by ROMarrNG; PC game requests use QuestarrNG and require operating system and architecture.
       tags:
         - request
       requestBody:
@@ -13523,14 +13571,26 @@ paths:
           application/json:
             schema:
               type: object
-              required: [category, catalogId]
+              required: [category]
+              oneOf:
+                - required: [catalogId]
+                - required: [catalogProvider, catalogKey]
               properties:
                 category:
                   type: string
                   enum: [retro, modern, game]
                 catalogId:
-                  type: integer
-                  minimum: 1
+                  oneOf:
+                    - type: integer
+                      minimum: 1
+                    - type: string
+                      pattern: '^dat-[0-9a-f]{64}$'
+                catalogProvider:
+                  type: string
+                  enum: [igdb, dat]
+                catalogKey:
+                  type: string
+                  pattern: '^dat-[0-9a-f]{64}$'
                 platformSlug:
                   type: string
                 variant:
@@ -13559,7 +13619,7 @@ paths:
   /request/software/catalog/systems:
     get:
       summary: List ROMarrNG-supported emulation systems
-      description: Returns ROMarrNG-supported platform slugs and the Retro or Modern group assigned by an administrator. Unassigned systems are not requestable, regardless of which service supplies the emulation IGDB catalog.
+      description: Returns ROMarrNG-supported platform slugs and the Retro or Modern group assigned by an administrator, plus the selected emulation catalog source. When ROMarrNG DAT is selected, matched DAT systems and unmatched DAT header names are included. Unassigned systems are not requestable.
       tags:
         - request
       responses:
@@ -13574,10 +13634,22 @@ paths:
                     type: array
                     items:
                       type: object
+                  catalogProvider:
+                    type: string
+                    enum: [questarr, igdb, dat]
+                  catalogSystemSlugs:
+                    type: array
+                    items:
+                      type: string
+                  unmatchedDatNames:
+                    type: array
+                    description: DAT header names that ROMarrNG could not match to an unambiguous supported system.
+                    items:
+                      type: string
   /request/software/catalog/search:
     get:
       summary: Search ROM and PC game catalog
-      description: Searches the selected QuestarrNG or ROMarrNG IGDB catalog for emulation categories, or QuestarrNG for PC games. Results are filtered to the requested emulation group or PC platform and include availability (available, tracked, downloading, missing, or unknown) and ROM availableSystems when known. Pass the returned nextCursor to load the next page.
+      description: Searches the selected QuestarrNG or ROMarrNG IGDB or DAT catalog for emulation categories, or QuestarrNG for PC games. DAT results support title and system filters and page through an alphabetical catalog; IGDB results also support genre and release year. Results include availability and ROM availableSystems when known.
       tags:
         - request
       parameters:
@@ -13651,8 +13723,8 @@ paths:
           description: Selected emulation catalog is unavailable, unconfigured, or needs the SeerrNG integration contract.
   /request/software/catalog/popular:
     get:
-      summary: List popular ROM and PC game catalog titles
-      description: Returns popular titles from the selected QuestarrNG or ROMarrNG IGDB catalog for emulation, or QuestarrNG for PC games. Results are filtered to the selected emulation group or PC platform and include provider and SeerrNG request availability. Pass the returned nextOffset to load the next page.
+      summary: Browse ROM and PC game catalog titles
+      description: Returns popular titles from IGDB or QuestarrNG, or alphabetically browsed titles from the ROMarrNG DAT catalog. Results are filtered to the selected emulation group or PC platform and include provider and SeerrNG request availability. Pass the returned nextOffset to load the next page.
       tags:
         - request
       parameters:
@@ -13721,7 +13793,7 @@ paths:
   /request/software/catalog/games/{id}:
     get:
       summary: Get one ROM or PC game catalog title
-      description: Returns metadata from the selected QuestarrNG or ROMarrNG IGDB catalog for emulation, or QuestarrNG for PC games, with supported request targets, screenshots, video IDs, rating normalized to a 0-10 scale, and provider or SeerrNG request availability.
+      description: Returns metadata from the selected QuestarrNG or ROMarrNG IGDB or DAT catalog for emulation, or QuestarrNG for PC games, with supported request targets and provider or SeerrNG request availability.
       tags:
         - request
       parameters:
@@ -13729,14 +13801,23 @@ paths:
           name: id
           required: true
           schema:
-            type: integer
-            minimum: 1
+            oneOf:
+              - type: integer
+                minimum: 1
+              - type: string
+                pattern: '^dat-[0-9a-f]{64}$'
         - in: query
           name: category
           required: true
           schema:
             type: string
             enum: [retro, modern, game]
+        - in: query
+          name: catalogProvider
+          description: Set to dat when the path ID is a stable DAT key. Defaults to igdb.
+          schema:
+            type: string
+            enum: [igdb, dat]
       responses:
         '200':
           description: Software catalog title returned

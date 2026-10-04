@@ -123,8 +123,9 @@ export type EmulationSystemGroup = 'retro' | 'modern';
 export interface SoftwareAcquisitionSettings {
   romarr: SoftwareProviderSettings;
   questarr: SoftwareProviderSettings;
-  emulationCatalogProvider: 'questarr' | 'romarr';
+  emulationCatalogProvider: 'questarr' | 'romarr' | 'romarr-dat';
   emulationSystemGroups: Record<string, EmulationSystemGroup>;
+  emulationPlatformMappings: Record<string, number>;
 }
 
 export interface ProwlarrSettings extends SoftwareProviderSettings {
@@ -691,6 +692,7 @@ class Settings {
         },
         emulationCatalogProvider: 'questarr',
         emulationSystemGroups: {},
+        emulationPlatformMappings: {},
       },
       prowlarr: {
         hostname: '',
@@ -1564,6 +1566,7 @@ class Settings {
         },
         emulationCatalogProvider: 'questarr',
         emulationSystemGroups: {},
+        emulationPlatformMappings: {},
       },
       prowlarr: {
         hostname: '',
