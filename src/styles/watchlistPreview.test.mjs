@@ -78,7 +78,11 @@ test('blocked poster visibility follows management permission on filtering and r
     discover,
     (node) =>
       ts.isIfStatement(node) &&
-      node.expression.getText() === 'hideBlocklisted && !canManageBlocklist'
+      node.expression.getText().includes('hideBlocklisted') &&
+      node.expression.getText().includes('canManageBlocklist') &&
+      node.expression
+        .getText()
+        .includes('settings.currentSettings.hideBlocklisted')
   )[0];
   assert.ok(discoverGate);
   const renderGate = nodes(
@@ -90,23 +94,19 @@ test('blocked poster visibility follows management permission on filtering and r
   )[0];
   assert.ok(renderGate);
   for (const canManageBlocklist of [false, true]) {
-    const filter = evaluate(listFilter, {
-      canManageBlocklist,
-      MediaStatus: statuses,
-    });
-    assert.equal(
-      filter({ mediaInfo: { status: statuses.BLOCKLISTED } }),
-      canManageBlocklist
-    );
-    assert.equal(filter({ mediaInfo: { status: statuses.AVAILABLE } }), true);
-    assert.equal(filter({}), true);
-    assert.equal(
-      evaluate(discoverGate.expression, {
-        hideBlocklisted: true,
+    for (const hidePreference of [false, true]) {
+      const filter = evaluate(listFilter, {
         canManageBlocklist,
-      }),
-      !canManageBlocklist
-    );
+        currentSettings: { hideBlocklisted: hidePreference },
+        MediaStatus: statuses,
+      });
+      assert.equal(
+        filter({ mediaInfo: { status: statuses.BLOCKLISTED } }),
+        canManageBlocklist && !hidePreference
+      );
+      assert.equal(filter({ mediaInfo: { status: statuses.AVAILABLE } }), true);
+      assert.equal(filter({}), true);
+    }
     assert.equal(
       evaluate(renderGate.expression, {
         currentStatus: statuses.BLOCKLISTED,
@@ -115,6 +115,21 @@ test('blocked poster visibility follows management permission on filtering and r
       }),
       !canManageBlocklist
     );
+  }
+  // Managers bypass the default hide, but the explicit user preference still applies.
+  for (const hideBlocklisted of [false, true]) {
+    for (const canManageBlocklist of [false, true]) {
+      for (const hidePreference of [false, true]) {
+        assert.equal(
+          evaluate(discoverGate.expression, {
+            hideBlocklisted,
+            canManageBlocklist,
+            settings: { currentSettings: { hideBlocklisted: hidePreference } },
+          }),
+          hideBlocklisted && (!canManageBlocklist || hidePreference)
+        );
+      }
+    }
   }
   assert.doesNotMatch(card.getText(), /wasBlocklistedHere/);
   const removeHandler = nodes(
