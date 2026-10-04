@@ -857,16 +857,23 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
             'Upgrade ROMarrNG to the SeerrNG catalog contract or switch the emulation catalog source to QuestarrNG.',
         });
       }
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      const canUseUnpagedFallback =
+        status === 404 ||
+        status === 405 ||
+        (status !== undefined && status >= 500);
       if (
         parsed.cursor ||
         parsed.filters.genre ||
         parsed.filters.releaseYear ||
-        !axios.isAxiosError(error) ||
-        error.response?.status !== 404
+        !canUseUnpagedFallback
       ) {
         throw error;
       }
-      // Older QuestarrNG installs have only the capped array endpoint.
+      // The unpaged catalog can still return useful results when the optional
+      // paged endpoint is unavailable or rejects a search query.
       games = await api.searchCatalog(
         parsed.query,
         CATALOG_PROVIDER_FETCH_LIMIT

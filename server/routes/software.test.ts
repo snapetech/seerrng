@@ -1046,6 +1046,70 @@ describe('software request routes', () => {
     );
   });
 
+  it('uses unpaged game results when QuestarrNG paged search fails', async () => {
+    mock.method(QuestarrNGAPI.prototype, 'getCatalogPlatforms', async () => [
+      { id: 6, name: 'PC (Microsoft Windows)' },
+    ]);
+    const pagedSearch = mock.method(
+      QuestarrNGAPI.prototype,
+      'searchCatalogPage',
+      async () => {
+        throw Object.assign(new AxiosError('Bad gateway'), {
+          response: { status: 502 },
+        });
+      }
+    );
+    const unpagedSearch = mock.method(
+      QuestarrNGAPI.prototype,
+      'searchCatalog',
+      async () => [
+        {
+          ...pcGame,
+          igdbId: 2650,
+          id: 'igdb-2650',
+          title: 'Prison Architect',
+        },
+      ]
+    );
+
+    const response = await request(createApp())
+      .get('/request/software/catalog/search')
+      .query({ category: 'game', q: 'Prison Architect' });
+
+    assert.strictEqual(response.status, 200);
+    assert.deepStrictEqual(
+      response.body.results.map((game: SoftwareCatalogGame) => game.title),
+      ['Prison Architect']
+    );
+    assert.strictEqual(response.body.nextCursor, null);
+    assert.strictEqual(pagedSearch.mock.callCount(), 1);
+    assert.deepStrictEqual(unpagedSearch.mock.calls[0].arguments, [
+      'Prison Architect',
+      50,
+    ]);
+  });
+
+  it('does not hide QuestarrNG search transport errors with unpaged results', async () => {
+    mock.method(QuestarrNGAPI.prototype, 'getCatalogPlatforms', async () => [
+      { id: 6, name: 'PC (Microsoft Windows)' },
+    ]);
+    mock.method(QuestarrNGAPI.prototype, 'searchCatalogPage', async () => {
+      throw new AxiosError('Network Error');
+    });
+    const unpagedSearch = mock.method(
+      QuestarrNGAPI.prototype,
+      'searchCatalog',
+      async () => [pcGame]
+    );
+
+    const response = await request(createApp())
+      .get('/request/software/catalog/search')
+      .query({ category: 'game', q: 'Prison Architect' });
+
+    assert.notStrictEqual(response.status, 200);
+    assert.strictEqual(unpagedSearch.mock.callCount(), 0);
+  });
+
   it('uses the selected ROMarr catalog for emulation and keeps Questarr for PC games', async () => {
     getSettings().softwareAcquisition.emulationCatalogProvider = 'romarr';
     const emulationGame = {
