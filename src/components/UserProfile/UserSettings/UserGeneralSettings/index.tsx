@@ -5,6 +5,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import LanguageSelector from '@app/components/LanguageSelector';
 import QuotaSelector from '@app/components/QuotaSelector';
 import RegionSelector from '@app/components/RegionSelector';
+import ExternalRequestLists from '@app/components/UserProfile/UserSettings/UserGeneralSettings/ExternalRequestLists';
 import RequestRootFolderSettings from '@app/components/UserProfile/UserSettings/UserGeneralSettings/RequestRootFolderSettings';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useLocale from '@app/hooks/useLocale';
@@ -1260,6 +1261,7 @@ const UserGeneralSettings = () => {
           );
         }}
       </Formik>
+      {user?.id === currentUser?.id && <ExternalRequestLists />}
     </>
   );
 };

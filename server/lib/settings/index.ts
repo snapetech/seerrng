@@ -523,6 +523,7 @@ export type JobId =
   | 'image-cache-cleanup'
   | 'release-calendar-history'
   | 'availability-sync'
+  | 'external-request-list-sync'
   | 'process-blocklisted-tags';
 
 export interface DiscoveryIntegrationsSettings {
@@ -820,6 +821,9 @@ class Settings {
         },
         'plex-watchlist-sync': {
           schedule: '0 */3 * * * *',
+        },
+        'external-request-list-sync': {
+          schedule: '0 0 3 * * *',
         },
         'plex-refresh-token': {
           schedule: '0 0 5 * * *',
@@ -1692,6 +1696,9 @@ class Settings {
         },
         'plex-watchlist-sync': {
           schedule: '0 */3 * * * *',
+        },
+        'external-request-list-sync': {
+          schedule: '0 0 3 * * *',
         },
         'plex-refresh-token': {
           schedule: '0 0 5 * * *',

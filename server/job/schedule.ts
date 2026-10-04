@@ -6,6 +6,7 @@ import { syncManagedCollections } from '@server/lib/collectionSync';
 import downloadRecovery from '@server/lib/downloadRecovery';
 import downloadTracker from '@server/lib/downloadtracker';
 import episodeWatchAhead from '@server/lib/episodeWatchAhead';
+import { syncAllExternalRequestLists } from '@server/lib/externalRequestLists';
 import ImageProxy from '@server/lib/imageproxy';
 import refreshToken from '@server/lib/refreshToken';
 import { captureReleaseCalendarHistory } from '@server/lib/releaseCalendar/history';
@@ -178,6 +179,27 @@ export const startJobs = (): void => {
 
   const jobs = getSettings().jobs;
   const mediaServerType = getSettings().main.mediaServerType;
+
+  scheduledJobs.push({
+    id: 'external-request-list-sync',
+    name: 'External Request List Sync',
+    type: 'process',
+    interval: 'days',
+    cronSchedule: jobs['external-request-list-sync'].schedule,
+    job: schedule.scheduleJob(
+      jobs['external-request-list-sync'].schedule,
+      () => {
+        logger.info('Starting scheduled job: External Request List Sync', {
+          label: 'Jobs',
+        });
+        return runTrackedJob(
+          'External Request List Sync',
+          syncAllExternalRequestLists,
+          { logCompletion: true }
+        );
+      }
+    ),
+  });
 
   if (mediaServerType === MediaServerType.PLEX) {
     // Run recently added plex scan every 5 minutes
