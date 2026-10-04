@@ -1,11 +1,13 @@
 # ROMarrNG DAT catalog integration
 
-**Status:** Implemented and pushed for review; SeerrNG finalization is pending.
+**Status:** Implemented and pushed for review; ROMarrNG `v0.14.0` is released.
+SeerrNG validation and production build pass on the current `v3.49.0` mainline;
+its pull request and release steps remain pending.
 
 ## Pinned source and release
 
-- SeerrNG base: `origin/main` at `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`.
-- SeerrNG implementation commit: `0d16cc688ec591f470bb4315479e7e90cc800abe` on
+- SeerrNG base: `origin/main` at `b84785a83` (`v3.49.0`).
+- SeerrNG implementation commit: `e72f113e6` on
   `codex/romarrng-integration-20261004`.
 - ROMarrNG base: `origin/main` at `503106f74070aa36ce6be62888382678e87aa933`.
 - ROMarrNG integration commit: `1495853becee3df54215a1fa06f82510c1314b4d`
@@ -40,7 +42,7 @@ release note is available with `pnpm release-notes:preview --base origin/main
 
 ## Verification evidence
 
-The final candidate used Node `24.21.0` and pnpm `10.24.0`. The complete gate
+The earlier candidate used Node `24.21.0` and pnpm `10.24.0`. Its complete gate
 discovered 92 Vitest files, 373 native TypeScript files, 56 native JavaScript
 files, and 32 tooling files, with zero platform exclusions. Translations,
 current-batch contract (555 files), shared-style reference check (384
@@ -59,19 +61,17 @@ types passed.
   desktop and narrow-layout review. No real provider account or live ROMarrNG
   instance was used.
 
-The full `pnpm validate:development` command failed in the native JavaScript
-lane at `src/styles/watchlistPreview.test.mjs:83`. That unchanged test expects
-the AST expression `hideBlocklisted && !canManageBlocklist` in unchanged
-`src/hooks/useDiscover.ts`; the current hook includes the existing
-`settings.currentSettings.hideBlocklisted` option in its guard. Neither file is
-part of this integration diff. The failure is outside the requested software
-catalog scope. Repository instructions require maintainer direction before
-expanding into unrelated repair, so no assertion, hook behavior, exclusion, or
-gate was changed to conceal it.
+The first full run stopped in the native JavaScript lane at
+`src/styles/watchlistPreview.test.mjs:83`: the test expected the old literal AST
+guard and did not cover the saved hide preference. The newer upstream
+`v3.49.0` base includes a behavior-based update for the list and discovery
+guards. The integration branch was rebased onto that release, and the focused
+file now passes all four tests, including the permission/preference matrix.
+This upstream change preserves and expands behavioral coverage; no production
+hook behavior or validation rule was changed for this integration.
 
-No production build was run after this failure. Therefore this candidate does
-not have a complete gate or build pass. The separate tooling run does not
-replace the full gate.
+The previous full-run totals are historical and do not certify the rebased
+candidate. A fresh full gate and production build are pending below.
 
 ## Visual review and publication gates
 
@@ -81,10 +81,33 @@ Local Cypress screenshots are ignored generated files and were not committed:
 - DAT catalog, desktop and narrow: `cypress/screenshots/software-acquisition-romarrng.cy.ts/romarrng-dat-catalog-desktop.png` and `romarrng-dat-catalog-mobile.png`.
 - Request progress, desktop and narrow: `cypress/screenshots/software-acquisition-romarrng.cy.ts/romarrng-request-progress-desktop.png` and `romarrng-request-progress-mobile.png`.
 
-Automated rendering is not human acceptance. John must review the six concrete
-screens before a SeerrNG release tag. The contribution guide also requires John
-to write the pull-request description and accurate AI disclosure in his own
-words. No SeerrNG pull request, merge, or release tag has been created. After
-the unrelated baseline test receives maintainer direction, rerun the exact full
-gate, build the exact accepted candidate, and complete the human review before
-release.
+John accepted the six reviewed desktop and narrow-layout screenshots in this
+session. The contribution guide requires the pull-request description and
+accurate AI disclosure to be written by the contributor in their own words.
+No SeerrNG pull request, merge, or release tag has been created.
+
+## Rebased candidate verification
+
+Validated on `origin/main` `b84785a83` with Node `24.21.0` and pnpm `10.24.0`.
+The plan selected 92 Vitest files, 373 TypeScript files, 56 JavaScript files,
+and 32 tooling files, with zero platform exclusions. Translation extraction,
+the 555-file current-batch contract, the 384-component shared-style check,
+formatting, lint, server types, client route types and client types all passed.
+
+- Vitest: 92 files, 426 tests passed.
+- Native TypeScript: 573 suites and 2,845 tests; 2,841 passed, four skipped,
+  zero failed.
+- Native JavaScript: 56 files, 484 tests passed, zero skipped or failed.
+- Tooling: 15 suites, 238 tests passed, zero skipped or failed.
+- Production `pnpm build`: passed. Next.js compiled successfully and generated
+  all 112 static pages; the server TypeScript build also passed.
+- Release-note preview: the software note says administrators can choose the
+  ROMarrNG DAT catalog, browse matched systems and search titles; the action is
+  to load DAT files in ROMarrNG.
+- Mocked Cypress integration spec: three tests passed. No live SeerrNG or
+  ROMarrNG provider was used.
+
+No SeerrNG pull request, merge, or release tag has been created. The repository
+contribution guide requires the contributor to write the PR description and
+accurate AI disclosure in their own words. The branch is ready for that review
+step; ROMarrNG `v0.14.0` is already published.
