@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createIntl, createIntlCache } from 'react-intl';
 import { styleContract } from '../../styles/cssContract.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -235,11 +236,31 @@ test('disabled View Issues shares normal disabled styling without text or icon s
   }
 });
 
-test('English wording uses the current catalog instead of a preserved state snapshot', () => {
+test('English defaults render without bundling the catalogue into the app entry', () => {
   const app = read('../../pages/_app.tsx');
+  assert.doesNotMatch(
+    app,
+    /import enMessages from ['"]@app\/i18n\/locale\/en\.json['"]/
+  );
+  assert.match(app, /const emptyMessages: MessagesType = \{\}/);
   assert.match(
     app,
-    /messages=\{currentLocale === 'en' \? enMessages : loadedMessages\}/
+    /messages=\{currentLocale === 'en' \? emptyMessages : loadedMessages\}/
+  );
+
+  const descriptors = read('../../utils/defineMessages.ts');
+  assert.match(descriptors, /defaultMessage: messages\[key\]/);
+
+  const intl = createIntl(
+    { locale: 'en', defaultLocale: 'en', messages: {} },
+    createIntlCache()
+  );
+  assert.equal(
+    intl.formatMessage({
+      id: 'components.example.title',
+      defaultMessage: 'English title',
+    }),
+    'English title'
   );
 });
 
