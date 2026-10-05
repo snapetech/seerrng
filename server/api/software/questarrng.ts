@@ -309,8 +309,7 @@ export class QuestarrNGAPI extends ExternalAPI {
   }
 
   public async streamBundle(
-    externalRequestId: string,
-    range?: string
+    externalRequestId: string
   ): Promise<SoftwareBundleStream> {
     const response = await this.request<Readable>(
       'GET',
@@ -318,23 +317,28 @@ export class QuestarrNGAPI extends ExternalAPI {
       undefined,
       {
         responseType: 'stream',
-        headers: range ? { Range: range } : undefined,
-        validateStatus: (status) => status >= 200 && status < 300,
+        validateStatus: (status) => status === 200,
       }
     );
+    const rawContentLength = response.headers['content-length'];
+    const parsedContentLength =
+      typeof rawContentLength === 'string' &&
+      /^\d{1,16}$/.test(rawContentLength)
+        ? Number(rawContentLength)
+        : undefined;
     return {
       stream: response.data,
       filename: this.getFilenameFromDisposition(
         response.headers['content-disposition']
       ),
-      contentLength: Number(response.headers['content-length']) || undefined,
-      contentType:
-        typeof response.headers['content-type'] === 'string'
-          ? response.headers['content-type']
+      contentLength:
+        parsedContentLength !== undefined &&
+        Number.isSafeInteger(parsedContentLength)
+          ? parsedContentLength
           : undefined,
-      rangeSupported: response.headers['accept-ranges'] === 'bytes',
-      statusCode: response.status,
-      contentRange: response.headers['content-range'],
+      contentType: 'application/gzip',
+      rangeSupported: false,
+      statusCode: 200,
     };
   }
 

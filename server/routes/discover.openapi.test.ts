@@ -1,11 +1,34 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
 import type { Express } from 'express';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
+import * as yaml from 'js-yaml';
 import request from 'supertest';
+
+const api = yaml.load(
+  readFileSync(path.join(process.cwd(), 'seerr-api.yml'), 'utf8')
+) as {
+  paths: Record<
+    string,
+    {
+      get: {
+        responses: {
+          '200': {
+            content: {
+              'application/json': {
+                schema: { properties: Record<string, unknown> };
+              };
+            };
+          };
+        };
+      };
+    }
+  >;
+};
 
 const createValidatedApp = (): Express => {
   const app = express();
@@ -71,5 +94,24 @@ describe('book discovery responseVersion OpenAPI contract', () => {
 
     assert.strictEqual(response.status, 400);
     assert.match(response.body.message, /responseVersion/);
+  });
+});
+
+describe('movie discovery outage fallback OpenAPI contract', () => {
+  it('documents stale results on movie discovery rather than generic search', () => {
+    const movieDiscoveryProperties =
+      api.paths['/discover/movies'].get.responses['200'].content[
+        'application/json'
+      ].schema.properties;
+    const searchProperties =
+      api.paths['/search'].get.responses['200'].content['application/json']
+        .schema.properties;
+
+    assert.deepStrictEqual(movieDiscoveryProperties.stale, {
+      type: 'boolean',
+      description:
+        'True when saved results are served because TMDB is unavailable.',
+    });
+    assert.strictEqual(searchProperties.stale, undefined);
   });
 });

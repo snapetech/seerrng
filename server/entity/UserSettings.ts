@@ -235,6 +235,9 @@ export class UserSettings {
   @Column({ type: 'simple-json', nullable: true })
   public advancedThemeOverrides?: AdvancedThemeOverrides | null;
 
+  @Column({ default: 'seerr' })
+  public themePalette: string = 'seerr';
+
   @Column({ type: 'simple-json', nullable: true })
   public requestRootFolders?: UserRequestRootFolders;
 
@@ -290,6 +293,7 @@ export class UserSettings {
       detailDisclosureOrder: this.detailDisclosureOrder,
       mediaFilterPins: this.mediaFilterPins,
       advancedThemeOverrides: this.advancedThemeOverrides,
+      themePalette: this.themePalette,
     };
   }
 

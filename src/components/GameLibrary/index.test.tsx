@@ -7,8 +7,8 @@ import GameLibrary from './index';
 
 const state = vi.hoisted(() => ({
   canRequest: true,
-  library: [] as Record<string, unknown>[],
-  shared: [] as Record<string, unknown>[],
+  library: [] as Array<Record<string, unknown>>,
+  shared: [] as Array<Record<string, unknown>>,
   steamStatus: {
     connected: true,
     lastSyncedAt: null,
@@ -108,7 +108,7 @@ vi.mock('@app/components/Discover/FilterPanel/CompactFilterSelect', () => ({
   }: {
     label: string;
     value: string;
-    options: { value: string; label: string }[];
+    options: Array<{ value: string; label: string }>;
   }) => (
     <label>
       {label}

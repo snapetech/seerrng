@@ -4,6 +4,7 @@ import DownloadBlock from '@app/components/DownloadBlock';
 import IssueMediaSummary from '@app/components/IssueDetails/IssueMediaSummary';
 import ManageMediaActions from '@app/components/ManageSlideOver/ManageMediaActions';
 import AvailabilityValue from '@app/components/MediaDetails/AvailabilityValue';
+import type { RequestBlockMediaIdentity } from '@app/components/RequestBlock';
 import RequestBlock from '@app/components/RequestBlock';
 import SelectableDownloadList from '@app/components/SelectableDownloadList';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -98,6 +99,18 @@ const ExternalMediaManageSlideOver = ({
       : mediaType === MediaType.COMIC || mediaType === MediaType.MAGAZINE
         ? String(data.id)
         : normalizeOpenLibraryWorkId(data.id);
+  const requestBlockIdentity: RequestBlockMediaIdentity = (() => {
+    switch (mediaType) {
+      case MediaType.MUSIC:
+        return { mediaType, mbId: externalId };
+      case MediaType.BOOK:
+        return { mediaType, bookId: externalId };
+      case MediaType.COMIC:
+        return { mediaType, comicId: externalId };
+      case MediaType.MAGAZINE:
+        return { mediaType, magazineTitle: externalId };
+    }
+  })();
   const mediaTitleLabel = intl.formatMessage(
     mediaType === MediaType.MUSIC
       ? messages.musicTitle
@@ -290,28 +303,7 @@ const ExternalMediaManageSlideOver = ({
                         <RequestBlock
                           hideDeleteAction
                           request={request}
-                          mediaType={mediaType}
-                          tmdbId={mediaInfo?.tmdbId}
-                          mbId={
-                            mediaType === MediaType.MUSIC
-                              ? externalId
-                              : undefined
-                          }
-                          bookId={
-                            mediaType === MediaType.BOOK
-                              ? externalId
-                              : undefined
-                          }
-                          comicId={
-                            mediaType === MediaType.COMIC
-                              ? externalId
-                              : undefined
-                          }
-                          magazineTitle={
-                            mediaType === MediaType.MAGAZINE
-                              ? data.title
-                              : undefined
-                          }
+                          {...requestBlockIdentity}
                           onUpdate={revalidate}
                         />
                       </li>

@@ -53,21 +53,21 @@ describe('Discover', () => {
   });
 
   it('loads a trending item', () => {
+    const movie = {
+      id: 438148,
+      mediaType: 'movie',
+      title: 'Minions: The Rise of Gru',
+      overview: '',
+      releaseDate: '2022-06-29',
+      posterPath: null,
+    };
     cy.intercept('GET', '/api/v1/discover/trending*', {
       page: 1,
       totalPages: 1,
       totalResults: 1,
-      results: [
-        {
-          id: 438148,
-          mediaType: 'movie',
-          title: 'Minions: The Rise of Gru',
-          overview: '',
-          releaseDate: '2022-06-29',
-          posterPath: null,
-        },
-      ],
+      results: [movie],
     });
+    stubTitleDetails('movie', movie);
     cy.visit('/');
     cy.contains('.slider-header', 'Trending').scrollIntoView();
     cy.contains('[data-testid=title-card-title]', 'Minions: The Rise of Gru', {
@@ -76,21 +76,21 @@ describe('Discover', () => {
   });
 
   it('loads popular movies', () => {
+    const movie = {
+      id: 438148,
+      mediaType: 'movie',
+      title: 'Minions: The Rise of Gru',
+      overview: '',
+      releaseDate: '2022-06-29',
+      posterPath: null,
+    };
     cy.intercept('GET', '/api/v1/discover/movies*', {
       page: 1,
       totalPages: 1,
       totalResults: 1,
-      results: [
-        {
-          id: 438148,
-          mediaType: 'movie',
-          title: 'Minions: The Rise of Gru',
-          overview: '',
-          releaseDate: '2022-06-29',
-          posterPath: null,
-        },
-      ],
+      results: [movie],
     });
+    stubTitleDetails('movie', movie);
     cy.visit('/');
     cy.contains('.slider-header', 'Popular Movies').scrollIntoView();
     cy.contains('[data-testid=title-card-title]', 'Minions: The Rise of Gru', {

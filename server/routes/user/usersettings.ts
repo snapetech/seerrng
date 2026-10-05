@@ -72,6 +72,7 @@ import {
   preserveRedactedSecrets,
   redactSecrets,
 } from '@server/utils/security';
+import { parseThemePalette } from '@server/utils/themePreference';
 import {
   parseBoundedString,
   parseOptionalBodyBoolean,
@@ -276,6 +277,48 @@ userSettingsRoutes.post<{ id: string; scope: string }>(
       next({
         status: error instanceof UserMutationActorUnauthorizedError ? 403 : 500,
         message: 'Could not save media filter pin.',
+      });
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/theme',
+  isOwnProfile(),
+  async (req, res, next) => {
+    const palette =
+      req.body && !Array.isArray(req.body) && Object.keys(req.body).length === 1
+        ? parseThemePalette(req.body.palette)
+        : null;
+    if (!palette)
+      return next({ status: 400, message: 'Invalid theme palette.' });
+    const userId = parseUserSettingsRouteId(req.params.id);
+    if (!userId) return next({ status: 404, message: 'User not found.' });
+    try {
+      return await runUserSecurityMutationWithActor(
+        req.user!.id,
+        userId,
+        Permission.MANAGE_USERS,
+        async () => {
+          const repository = getRepository(User);
+          const user = await repository.findOne({ where: { id: userId } });
+          if (!user) return next({ status: 404, message: 'User not found.' });
+          if (!user.settings) user.settings = new UserSettings({ user });
+          user.settings.themePalette = palette;
+          await repository.save(user);
+          return res.status(200).json({ themePalette: palette });
+        },
+        {
+          expectedCredentialVersion:
+            req.session?.userId === req.user!.id
+              ? (req.session.credentialVersion ?? 0)
+              : undefined,
+        }
+      );
+    } catch (error) {
+      return next({
+        status: error instanceof UserMutationActorUnauthorizedError ? 403 : 500,
+        message: 'Could not save theme preference.',
       });
     }
   }

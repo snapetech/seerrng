@@ -1,8 +1,7 @@
 import { CreateGameLibrary1791020000000 as SqliteGameLibraryMigration } from '@server/migration/sqlite/1791020000000-CreateGameLibrary';
-import type { QueryRunner } from 'typeorm';
 
 export class CreateGameLibrary1791020000000 extends SqliteGameLibraryMigration {
-  async up(queryRunner: QueryRunner): Promise<void> {
+  async up(queryRunner: import('typeorm').QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE "game_library_entry" (
         "id" SERIAL NOT NULL,

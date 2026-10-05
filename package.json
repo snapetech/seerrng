@@ -25,6 +25,7 @@
     "release-notes:preview": "node scripts/preview-release-notes.mjs",
     "backissue:service": "node scripts/backissue-service.mjs",
     "bookshelf:move": "node scripts/bookshelf-media-move.mjs",
+    "setup:assistant": "node scripts/setup-assistant.mjs",
     "attribution:check": "node bin/run-bash.mjs scripts/check-attribution.sh",
     "lintfix": "eslint \"./server/**/*.{ts,tsx}\" \"./src/**/*.{ts,tsx}\" --fix",
     "test": "vitest run",

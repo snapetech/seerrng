@@ -297,9 +297,9 @@ test('the comprehensive gate is an explicit package command while ordinary scrip
   );
 });
 
-test('agent routes require the manual full gate while the normal hook stays bounded', () => {
+test('agent routes require the current engine while the normal hook stays bounded', () => {
   const agents =
-    'Read docs/maintainers/ui-style-standard.md docs/maintainers/ui-fix-it.md docs/maintainers/ui-forward-merge-guide.md and run pnpm validate:development';
+    'Read docs/maintainers/ui-style-standard.md docs/maintainers/ui-fix-it.md docs/maintainers/ui-forward-merge-guide.md and follow tools/validation-engine/README.md';
   const hook =
     '[ -n "$HUSKY_BYPASS" ] || pnpm attribution:check || exit $?\npnpm exec lint-staged || exit $?\n';
   assert.doesNotThrow(() => validateGovernanceSources(agents, hook));
@@ -307,7 +307,7 @@ test('agent routes require the manual full gate while the normal hook stays boun
     'docs/maintainers/ui-style-standard.md',
     'docs/maintainers/ui-fix-it.md',
     'docs/maintainers/ui-forward-merge-guide.md',
-    'pnpm validate:development',
+    'tools/validation-engine/README.md',
   ])
     assert.throws(
       () => validateGovernanceSources(agents.replace(missing, ''), hook),
@@ -376,7 +376,7 @@ test('runtime preflight rejects unsupported engines, dependency drift, and incom
     );
     f.write(
       'AGENTS.md',
-      'docs/maintainers/ui-style-standard.md docs/maintainers/ui-fix-it.md docs/maintainers/ui-forward-merge-guide.md pnpm validate:development'
+      'docs/maintainers/ui-style-standard.md docs/maintainers/ui-fix-it.md docs/maintainers/ui-forward-merge-guide.md tools/validation-engine/README.md'
     );
     f.write(
       '.husky/pre-commit',
@@ -386,6 +386,7 @@ test('runtime preflight rejects unsupported engines, dependency drift, and incom
       'docs/maintainers/ui-style-standard.md',
       'docs/maintainers/ui-fix-it.md',
       'docs/maintainers/ui-forward-merge-guide.md',
+      'tools/validation-engine/README.md',
     ])
       f.write(path, '# Required source document');
     assert.doesNotThrow(() =>

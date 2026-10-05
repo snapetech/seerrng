@@ -160,6 +160,72 @@ describe('POST /user/:id/settings/linked-accounts/jellyfin/quickconnect', () => 
   });
 });
 
+describe('POST /user/:id/settings/theme', () => {
+  it('starts on SeerrNG and preserves a newly saved account theme through later logins', async () => {
+    const { sessionCookie, userId } = await loginAs(
+      'demo@seerr.dev',
+      'test1234'
+    );
+    const repository = getRepository(User);
+    const initial = await repository.findOneOrFail({ where: { id: userId } });
+    assert.equal(initial.settings?.themePalette ?? 'seerr', 'seerr');
+    const response = await request(app)
+      .post(`/user/${userId}/settings/theme`)
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', sessionCookie)
+      .send({ palette: 'aurora' });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.deepEqual(response.body, { themePalette: 'aurora' });
+    const secondLogin = await loginAs('demo@seerr.dev', 'test1234');
+    const current = await request(app)
+      .get('/auth/me')
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', secondLogin.sessionCookie);
+    assert.equal(current.status, 200);
+    assert.equal(current.body.settings.themePalette, 'aurora');
+    const saved = await repository.findOneOrFail({ where: { id: userId } });
+    assert.equal(saved.settings?.themePalette, 'aurora');
+  });
+
+  it('rejects malformed and unsupported choices without changing the saved theme', async () => {
+    const { sessionCookie, userId } = await loginAs(
+      'demo@seerr.dev',
+      'test1234'
+    );
+    for (const body of [
+      {},
+      { palette: 'unknown' },
+      { palette: 1 },
+      { palette: 'classic', extra: true },
+      { palette: 'x'.repeat(100) },
+    ]) {
+      const response = await request(app)
+        .post(`/user/${userId}/settings/theme`)
+        .set('X-Forwarded-Proto', 'https')
+        .set('Cookie', sessionCookie)
+        .send(body);
+      assert.equal(response.status, 400);
+    }
+    const saved = await getRepository(User).findOneOrFail({
+      where: { id: userId },
+    });
+    assert.equal(saved.settings?.themePalette ?? 'seerr', 'seerr');
+  });
+
+  it('does not allow one user to set another user theme', async () => {
+    const { sessionCookie, userId } = await loginAs(
+      'demo@seerr.dev',
+      'test1234'
+    );
+    const response = await request(app)
+      .post(`/user/${userId + 1}/settings/theme`)
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', sessionCookie)
+      .send({ palette: 'classic' });
+    assert.equal(response.status, 403);
+  });
+});
+
 describe('POST /user/:id/settings/advanced-theme', () => {
   it('saves validated overrides for the signed-in user and clears them on reset', async () => {
     const { sessionCookie, userId } = await loginAs(

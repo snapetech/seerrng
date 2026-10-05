@@ -75,6 +75,9 @@ const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
   historyLoading: 'Loading status history…',
   historyError: 'Status history could not be loaded.',
   noHistory: 'No saved status updates are available.',
+  failureCode: 'Failure code: {code}',
+  progress: '{percent}% downloaded',
+  stage: 'Stage: {stage}',
 });
 
 type SoftwareStatus =
@@ -96,6 +99,10 @@ interface SoftwareRequestRow {
   status: SoftwareStatus;
   title: string;
   coverUrl?: string | null;
+  percent?: number | null;
+  stage?: string | null;
+  failureCode?: string | null;
+  error?: string | null;
   platform?: {
     slug: string;
     name: string | null;
@@ -132,6 +139,8 @@ interface SoftwareRequestHistoryResponse {
     status: SoftwareStatus;
     message?: string | null;
     percent?: number | null;
+    providerStage?: string | null;
+    failureCode?: string | null;
     createdAt: string;
   }[];
 }
@@ -531,6 +540,57 @@ const SoftwareRequests = ({
                     {message && status === 'failed' && (
                       <p className="app-compact-request-warning">{message}</p>
                     )}
+                    {status === 'failed' && request.failureCode && (
+                      <p className="app-compact-request-note">
+                        {intl.formatMessage(messages.failureCode, {
+                          code: request.failureCode,
+                        })}
+                      </p>
+                    )}
+                    {status === 'downloading' &&
+                      request.percent != null &&
+                      Number.isFinite(request.percent) &&
+                      request.percent >= 0 &&
+                      request.percent <= 100 && (
+                        <div className="app-progress-card card-spacing-before">
+                          <div className="app-progress-header">
+                            <span className="app-progress-summary">
+                              {intl.formatMessage(messages.progress, {
+                                percent: request.percent
+                                  .toFixed(1)
+                                  .replace(/\.0$/, ''),
+                              })}
+                            </span>
+                            {request.stage && request.stage !== status && (
+                              <span className="refreshed-detail-text-muted">
+                                {intl.formatMessage(messages.stage, {
+                                  stage: request.stage.replace(/[_-]+/g, ' '),
+                                })}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className="app-progress-track"
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={request.percent}
+                            aria-valuetext={intl.formatMessage(
+                              messages.progress,
+                              {
+                                percent: request.percent
+                                  .toFixed(1)
+                                  .replace(/\.0$/, ''),
+                              }
+                            )}
+                          >
+                            <div
+                              className="app-progress-fill"
+                              style={{ width: `${request.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     {request.actions?.cancel === false &&
                       request.actions.cancelReason && (
                         <p className="app-compact-request-note">
@@ -690,6 +750,9 @@ const SoftwareRequests = ({
                           >
                             <span className="refreshed-detail-text app-compact-request-history-status">
                               {statusLabel(event.status)}
+                              {event.providerStage &&
+                                event.providerStage !== event.status &&
+                                ` · ${event.providerStage.replace(/[_-]+/g, ' ')}`}
                               {event.percent !== null &&
                                 event.percent !== undefined &&
                                 ` · ${Math.round(event.percent)}%`}
@@ -706,6 +769,13 @@ const SoftwareRequests = ({
                             {event.message && (
                               <p className="refreshed-detail-text-muted app-compact-request-history-message">
                                 {event.message}
+                              </p>
+                            )}
+                            {event.failureCode && (
+                              <p className="refreshed-detail-text-muted app-compact-request-history-message">
+                                {intl.formatMessage(messages.failureCode, {
+                                  code: event.failureCode,
+                                })}
                               </p>
                             )}
                           </li>

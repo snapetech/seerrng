@@ -31,6 +31,12 @@ export class SoftwareRequestStatusEvent {
   @Column({ type: 'real', nullable: true })
   public percent?: number | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  public providerStage?: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  public failureCode?: string | null;
+
   @Column({ type: 'varchar', length: 255 })
   public fingerprint: string;
 

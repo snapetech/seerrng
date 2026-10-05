@@ -141,9 +141,18 @@ describe('Books and Music discover parity', () => {
     });
 
     themePalettes.forEach((palette) => {
+      // Palettes now belong to the signed-in account. Save through the real
+      // preference API before reload; a legacy browser value must not win.
+      cy.request('/api/v1/auth/me').then(({ body: user }) => {
+        cy.request('POST', `/api/v1/user/${user.id}/settings/theme`, {
+          palette,
+        })
+          .its('body.themePalette')
+          .should('eq', palette);
+      });
       cy.visit('/discover/movies', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('seerr-theme-palette', palette);
+          win.localStorage.setItem('seerr-theme-palette', 'classic');
           win.localStorage.setItem('seerr-theme-mode', 'dark');
         },
       });
@@ -169,7 +178,7 @@ describe('Books and Music discover parity', () => {
 
         cy.visit('/discover/movies', {
           onBeforeLoad(win) {
-            win.localStorage.setItem('seerr-theme-palette', palette);
+            win.localStorage.setItem('seerr-theme-palette', 'classic');
             win.localStorage.setItem('seerr-theme-mode', 'light');
           },
         });

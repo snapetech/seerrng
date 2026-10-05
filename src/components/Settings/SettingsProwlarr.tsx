@@ -1,4 +1,5 @@
 import SelectionCircle from '@app/components/Common/SelectionCircle';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import defineMessages from '@app/utils/defineMessages';
 import { detectProwlarrCategoryMatches } from '@app/utils/prowlarrCategories';
 import {
@@ -176,6 +177,7 @@ const getPayload = (form: ProwlarrForm) => ({
 
 const SettingsProwlarr = () => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('prowlarr');
   const { data, error } = useSWR<ProwlarrSettingsResponse>(
     '/api/v1/settings/prowlarr'
   );
@@ -195,8 +197,17 @@ const SettingsProwlarr = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (data) setForm(toForm(data));
-  }, [data]);
+    if (!data) return;
+    setForm((current) => {
+      const next = current ?? toForm(data);
+      if (data.hostname || next.hostname || !setupConnection) return next;
+      return {
+        ...next,
+        hostname: setupConnection.hostname,
+        port: setupConnection.port,
+      };
+    });
+  }, [data, setupConnection]);
 
   const usingSavedConnection = Boolean(
     data &&

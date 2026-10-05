@@ -177,6 +177,15 @@ const TitleCard = ({
     useState<boolean>(!isAddedToWatchlist);
   const [previewWatchlisted, setPreviewWatchlisted] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const watchlistMutationActive = useRef(false);
+  const addWatchlistDescription = intl.formatMessage(
+    messages.watchlistPreviewAdd,
+    { title }
+  );
+  const removeWatchlistDescription = intl.formatMessage(
+    messages.watchlistPreviewRemove,
+    { title }
+  );
   const statusBadges = getTitleCardStatusBadges({
     mediaType,
     status: currentStatus,
@@ -233,6 +242,11 @@ const TitleCard = ({
   }, []);
 
   const onClickWatchlistBtn = async (): Promise<void> => {
+    if (watchlistMutationActive.current) {
+      return;
+    }
+
+    watchlistMutationActive.current = true;
     setIsUpdating(true);
     const actionId = normalizeExternalTitleId(mediaType, id);
     try {
@@ -258,30 +272,42 @@ const TitleCard = ({
                 title,
               }
       );
-      mutate('/api/v1/discover/watchlist');
-      if (response.data) {
-        addToast(
-          <span>
-            {intl.formatMessage(messages.watchlistSuccess, {
-              title,
-              strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
-            })}
-          </span>,
-          { appearance: 'success', autoDismiss: true }
-        );
+      if (!Number.isInteger(response.data?.id) || response.data.id <= 0) {
+        addToast(intl.formatMessage(messages.watchlistError), {
+          appearance: 'error',
+          autoDismiss: true,
+        });
+        return;
       }
+
+      mutate('/api/v1/discover/watchlist');
+      addToast(
+        <span>
+          {intl.formatMessage(messages.watchlistSuccess, {
+            title,
+            strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+          })}
+        </span>,
+        { appearance: 'success', autoDismiss: true }
+      );
+      setToggleWatchlist(false);
     } catch {
       addToast(intl.formatMessage(messages.watchlistError), {
         appearance: 'error',
         autoDismiss: true,
       });
     } finally {
+      watchlistMutationActive.current = false;
       setIsUpdating(false);
-      setToggleWatchlist((prevState) => !prevState);
     }
   };
 
   const onClickDeleteWatchlistBtn = async (): Promise<void> => {
+    if (watchlistMutationActive.current) {
+      return;
+    }
+
+    watchlistMutationActive.current = true;
     setIsUpdating(true);
     const actionId = normalizeExternalTitleId(mediaType, id);
     try {
@@ -291,29 +317,34 @@ const TitleCard = ({
         }`
       );
 
-      if (response.status === 204) {
-        addToast(
-          <span>
-            {intl.formatMessage(messages.watchlistDeleted, {
-              title,
-              strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
-            })}
-          </span>,
-          { appearance: 'info', autoDismiss: true }
-        );
+      if (response.status !== 204) {
+        addToast(intl.formatMessage(messages.watchlistError), {
+          appearance: 'error',
+          autoDismiss: true,
+        });
+        return;
       }
+
+      addToast(
+        <span>
+          {intl.formatMessage(messages.watchlistDeleted, {
+            title,
+            strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+          })}
+        </span>,
+        { appearance: 'info', autoDismiss: true }
+      );
+      mutate('/api/v1/discover/watchlist');
+      mutateParent?.();
+      setToggleWatchlist(true);
     } catch {
       addToast(intl.formatMessage(messages.watchlistError), {
         appearance: 'error',
         autoDismiss: true,
       });
     } finally {
+      watchlistMutationActive.current = false;
       setIsUpdating(false);
-      mutate('/api/v1/discover/watchlist');
-      if (mutateParent) {
-        mutateParent();
-      }
-      setToggleWatchlist((prevState) => !prevState);
     }
   };
 
@@ -1058,27 +1089,46 @@ const TitleCard = ({
                 <div>
                   {canUseWatchlistActions &&
                     !watchlistPreview &&
-                    user?.userType !== UserType.PLEX &&
-                    (toggleWatchlist ? (
-                      <Button
-                        buttonType={'ghost'}
-                        className="poster-control poster-control-icon"
-                        buttonSize={'sm'}
-                        iconOnly
-                        onClick={onClickWatchlistBtn}
+                    user?.userType !== UserType.PLEX && (
+                      <Tooltip
+                        content={
+                          toggleWatchlist
+                            ? addWatchlistDescription
+                            : removeWatchlistDescription
+                        }
                       >
-                        <StarIcon data-icon-tone="accent" />
-                      </Button>
-                    ) : (
-                      <Button
-                        className="poster-control poster-control-icon"
-                        buttonSize={'sm'}
-                        iconOnly
-                        onClick={onClickDeleteWatchlistBtn}
-                      >
-                        <MinusCircleIcon />
-                      </Button>
-                    ))}
+                        <div data-poster-region="watchlist-slot">
+                          {toggleWatchlist ? (
+                            <Button
+                              aria-busy={isUpdating}
+                              aria-label={addWatchlistDescription}
+                              buttonType={'ghost'}
+                              className="poster-control poster-control-icon"
+                              buttonSize={'sm'}
+                              disabled={isUpdating}
+                              iconOnly
+                              onClick={onClickWatchlistBtn}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <StarIcon data-icon-tone="accent" />
+                            </Button>
+                          ) : (
+                            <Button
+                              aria-busy={isUpdating}
+                              aria-label={removeWatchlistDescription}
+                              className="poster-control poster-control-icon"
+                              buttonSize={'sm'}
+                              disabled={isUpdating}
+                              iconOnly
+                              onClick={onClickDeleteWatchlistBtn}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <MinusCircleIcon />
+                            </Button>
+                          )}
+                        </div>
+                      </Tooltip>
+                    )}
                 </div>
               </div>
             )}

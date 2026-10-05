@@ -138,7 +138,11 @@ it('opens the movie edit modal when the detail API omits the request media back-
   await act(async () =>
     root.render(
       <IntlProvider locale="en">
-        <RequestBlock request={request} mediaType="movie" tmdbId={1234} />
+        <RequestBlock
+          request={request}
+          mediaType={MediaType.MOVIE}
+          tmdbId={1234}
+        />
       </IntlProvider>
     )
   );
@@ -179,8 +183,8 @@ it('opens the book edit modal from the external detail identity without a media 
       <IntlProvider locale="en">
         <RequestBlock
           request={request}
-          mediaType="book"
-          bookId="works/OL123W"
+          mediaType={MediaType.BOOK}
+          bookId="OL123W"
         />
       </IntlProvider>
     )
@@ -198,7 +202,7 @@ it('opens the book edit modal from the external detail identity without a media 
   ).not.toBeNull();
   expect(state.modalProps).toMatchObject({
     show: true,
-    type: 'book',
+    type: MediaType.BOOK,
     bookId: 'OL123W',
     editRequest: request,
   });

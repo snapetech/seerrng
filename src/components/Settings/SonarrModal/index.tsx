@@ -4,6 +4,7 @@ import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
 import type { SonarrTestResponse } from '@app/components/Settings/SettingsServices';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -105,6 +106,7 @@ interface SonarrModalProps {
 
 const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('sonarr');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(sonarr ? true : false);
@@ -236,8 +238,8 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
       <Formik
         initialValues={{
           name: sonarr?.name,
-          hostname: sonarr?.hostname,
-          port: sonarr?.port ?? 8989,
+          hostname: sonarr?.hostname ?? setupConnection?.hostname,
+          port: sonarr?.port ?? setupConnection?.port ?? 8989,
           ssl: sonarr?.useSsl ?? false,
           apiKey: sonarr?.apiKey,
           baseUrl: sonarr?.baseUrl,

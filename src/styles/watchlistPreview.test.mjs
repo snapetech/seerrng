@@ -134,6 +134,7 @@ test('blocked poster filtering and rendering respect permission and saved visibi
     assert.equal(filter({ mediaInfo: { status: statuses.AVAILABLE } }), true);
     assert.equal(filter({}), true);
   }
+  // Managers bypass the default hide, but the explicit user preference still applies.
   // Each row is [filter requested, can manage blocklist, saved hide preference, should filter].
   const discoverCases = [
     [false, false, false, false],

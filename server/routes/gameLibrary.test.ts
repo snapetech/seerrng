@@ -96,6 +96,7 @@ const configureSettings = () => {
     },
     emulationCatalogProvider: 'questarr',
     emulationSystemGroups: {},
+    emulationPlatformMappings: {},
     steamApiKey: 'steam-server-test-key',
   };
 };
@@ -218,6 +219,84 @@ describe('game library routes', () => {
       .query({ category: 'game', catalogId: 42 });
     assert.equal(lookup.status, 200, JSON.stringify(lookup.body));
     assert.equal(lookup.body.entry.id, existing.id);
+  });
+
+  it('stores the validated catalog ID when adding a new catalog title', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+
+    const response = await request(createApp().app)
+      .post('/api/v1/game-library')
+      .send({ category: 'game', catalogId: 42 });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.catalogId, 42);
+    assert.equal(response.body.entry.externalKey, 'igdb:42');
+  });
+
+  it('preserves unmatched library state when a title is linked with minimal input', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+    const imported = await manualEntry({
+      status: 'completed',
+      isOwned: true,
+      storeName: 'GOG',
+      platformName: 'Linux',
+      shareWithHousehold: true,
+    });
+
+    const response = await request(createApp().app)
+      .post(`/api/v1/game-library/${imported.id}/match`)
+      .send({ category: 'game', catalogId: 42 });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.status, 'completed');
+    assert.equal(response.body.entry.isOwned, true);
+    assert.equal(response.body.entry.storeName, 'GOG');
+    assert.equal(response.body.entry.platformName, 'Linux');
+    assert.equal(response.body.entry.shareWithHousehold, true);
+  });
+
+  it('allows household sharing for a Steam-owned match and retains Steam facts', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+    const imported = await manualEntry({
+      externalKey: 'steam:413150',
+      source: 'steam',
+      steamAppId: 413150,
+      steamOwned: true,
+      playtimeMinutes: 125,
+      status: 'playing',
+      storeName: 'Steam',
+      platformName: 'PC',
+    });
+
+    const response = await request(createApp().app)
+      .post(`/api/v1/game-library/${imported.id}/match`)
+      .send({
+        category: 'game',
+        catalogId: 42,
+        status: 'playing',
+        isOwned: false,
+        storeName: 'Steam',
+        platformName: 'PC',
+        shareWithHousehold: true,
+      });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.shareWithHousehold, true);
+    assert.equal(response.body.entry.steamOwned, true);
+    assert.equal(response.body.entry.playtimeMinutes, 125);
+    assert.equal(response.body.entry.storeName, 'Steam');
   });
 
   it('requires a signed-in browser session for changes, even with an API key', async () => {

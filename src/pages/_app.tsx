@@ -6,6 +6,7 @@ import { InteractionProvider } from '@app/context/InteractionContext';
 import { LanguageContext } from '@app/context/LanguageContext';
 import { NativeRuntimeProvider } from '@app/context/NativeRuntimeContext';
 import { SettingsProvider } from '@app/context/SettingsContext';
+import { SetupConnectionsProvider } from '@app/context/SetupConnectionsContext';
 import { ThemeProvider } from '@app/context/ThemeContext';
 import { UserContext } from '@app/context/UserContext';
 import useSettings from '@app/hooks/useSettings';
@@ -214,7 +215,9 @@ const CoreApp = ({ Component, pageProps, router }: AppProps) => {
                 <StatusChecker />
                 <ServiceWorkerSetup />
                 <UserContext>
-                  <NativeRuntimeProvider>{component}</NativeRuntimeProvider>
+                  <SetupConnectionsProvider>
+                    <NativeRuntimeProvider>{component}</NativeRuntimeProvider>
+                  </SetupConnectionsProvider>
                 </UserContext>
                 <ButtonHelp key={router.asPath} />
                 <Toaster

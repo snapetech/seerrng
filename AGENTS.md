@@ -60,14 +60,17 @@ do not choose a new design merely to make a check pass.
 ## Required verification
 
 Work in approved page/asset batches. During editing, run affected focused checks
-and record a preview as an iteration, not a release candidate. Run the complete
-`pnpm validate:development` gate for the exact final review candidate before
-commit/PR and again on the integrated tree after conflicts. Use the same gate on
-contributor and maintainer sides. This comprehensive runner remains an explicit
-command; do not add it to ordinary build, development, or commit-hook commands.
-Public builds keep their translation and shared-visual checks, and the commit
-hook keeps attribution and staged lint checks. Avoid repeating the full gate
-immediately before `pnpm build`.
+and record a preview as an iteration, not a release candidate. Use the reviewed
+combined test engine for the exact final candidate, with repository-owned tests
+and supplemental checks discovered for that source revision. Use the same
+source-specific scope on contributor and maintainer sides. The retired archived
+comprehensive suite is not a second mandatory prebuild run. Compilation follows
+passing tests and is a separate action; build guards remain required. Existing
+public commands and commit hooks are not changed by these instructions. Inspect
+their actual bindings and reconcile obsolete gate instructions explicitly before
+integration; do not disable hooks or bypass a failure. Avoid repeating a complete
+suite or production compile for an unchanged candidate merely because two stages
+invoke it; report any still-required duplicate binding rather than hiding it.
 Follow the fix-it audit too: prose instructions are not executable tests.
 Inspect the plan/inventory for connected native/source/DOM/style suites; report
 actual execution, counts, skips and exclusions separately from discovery.
@@ -102,6 +105,53 @@ collections, watchlists, or databases. A mocked provider pass is not a live
 round-trip pass. Perform desktop/narrow and interaction review of changed
 roles. Record human review evidence separately from automated checks;
 acceptance may be provided by the project owner or an authorized reviewer.
+
+## Test-engine maintenance for contributors and maintainers
+
+Read `tools/validation-engine/README.md` and the extracted engine setup guide
+before using the saved engine. This is a preserved reusable implementation and
+reference packet, not an automatically installed package command. Extract outside
+test discovery paths. Do not copy archived test files over the chosen source.
+
+The engine runs the repository's existing test files through their compatible
+runners; tests do not need rewriting into an engine-specific format. On every
+preview change or upstream merge:
+
+1. Identify changed behavior and all affected test owners, fixtures, mocks,
+   selectors and shared contracts. Inspect workflow, package and runner discovery
+   too; a test not used by GitHub can still be required local coverage.
+2. Maintain affected tests and fixtures with the implementation. Preserve valid
+   canonical GitHub assertions. When an approved behavior supersedes an obsolete
+   local expectation, document the replacement and retain meaningful positive
+   and negative coverage. Never change application styling or weaken a test merely
+   to obtain a pass. Update the Fix-it guide for a proven reusable failure mode.
+3. Refresh and review discovery, ownership, expected case identities, dependency
+   impact mappings and source/lock/runtime/recipe pins for the actual candidate.
+   Add newly introduced tests; remove duplicates only with proved equivalent
+   coverage on our supplemental side. Do not reuse reference file counts, pass
+   receipts or a previous revision's inventory as current acceptance.
+4. Run focused affected checks during development. For final verification, queue
+   independent files concurrently using detected effective CPU capacity and a
+   sealed worker budget, dependency-aware priorities and staggered setup types.
+   Preserve timing-sensitive/global-state barriers and per-file disposable
+   fixtures. Share only proven immutable cached inputs, never mutable databases,
+   mocks or test state. Unknown setup requirements keep the conservative path.
+5. Queue genuine failures for an authorized agent or maintainer to diagnose and
+   repair. The engine does not itself invent fixes. Coordinate conflicting writes
+   per file, preserve unrelated edits, verify base/after hashes, then freeze a new
+   candidate and rerun failed tests plus transitive affected checks. Retain green
+   results only when complete input closures prove them unchanged; unknown impact
+   requires broader verification. Record raw failures and actual retest receipts.
+6. Compile the unchanged passing candidate once at the authorized build gate.
+   Keep CSS/i18n/security/network guards and separate browser, CodeQL, platform,
+   packaging and deployment gates visible. A test-engine pass is not the entire
+   GitHub pipeline. Report files, cases, failures, skips, elapsed time, worker
+   budget, repairs and remaining gates; visual approval occurs during development
+   and review, not an exhaustive visual crawl before every compile.
+
+The saved 3.48.1 reference packet does not establish acceptance of this preview or
+a later merge. A version-specific compiler experiment is optional, not authority
+to patch dependencies or transplant configuration into a different revision.
 
 ## Safe collaboration and records
 

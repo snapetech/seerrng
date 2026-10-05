@@ -18,6 +18,7 @@ connects to.
 - [Kubernetes installation](/getting-started/kubernetes/)
 - [Unraid installation](/getting-started/third-parties/unraid)
 - [YunoHost installation](/getting-started/third-parties/yunohost)
+- [Cross-platform setup assistant](/using-seerr/setup-assistant)
 - [Troubleshooting](/troubleshooting/)
 
 ## Use SeerrNG

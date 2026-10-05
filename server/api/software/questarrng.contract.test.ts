@@ -138,9 +138,12 @@ it('streams the request-scoped multi-file bundle through the provider client', a
   let requestPath = '';
   const server = createServer((request, response) => {
     assert.equal(request.headers['x-api-key'], 'questarr-contract-test');
+    assert.equal(request.headers.range, undefined);
     requestPath = request.url ?? '';
     response.writeHead(200, {
       'Content-Type': 'application/gzip',
+      'Content-Length': '4',
+      'Accept-Ranges': 'bytes',
       'Content-Disposition':
         "attachment; filename*=UTF-8''Example%20Game.tar.gz",
     });
@@ -166,10 +169,40 @@ it('streams the request-scoped multi-file bundle through the provider client', a
     );
     assert.equal(bundle.filename, 'Example Game.tar.gz');
     assert.equal(bundle.contentType, 'application/gzip');
+    assert.equal(bundle.contentLength, 4);
+    assert.equal(bundle.rangeSupported, false);
+    assert.equal(bundle.statusCode, 200);
+    assert.equal(bundle.contentRange, undefined);
     assert.deepEqual(
       Buffer.concat(chunks),
       Buffer.from([0x1f, 0x8b, 0x08, 0x00])
     );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it('rejects a partial response when streaming a Questarr bundle', async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(206, {
+      'Content-Type': 'application/gzip',
+      'Content-Length': '0',
+      'Content-Range': 'bytes 0-0/1',
+    });
+    response.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const api = new QuestarrNGAPI({
+      hostname: '127.0.0.1',
+      port: (server.address() as AddressInfo).port,
+      baseUrl: '',
+      useSsl: false,
+      apiKey: 'questarr-contract-test',
+    });
+    await assert.rejects(api.streamBundle('seerrng:request:17'));
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

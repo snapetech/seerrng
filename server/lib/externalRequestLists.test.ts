@@ -17,8 +17,10 @@ import {
   parseImdbWatchlistHtml,
   resolveGoodreadsItem,
   resolveImdbItem,
+  syncAllExternalRequestLists,
   syncExternalRequestList,
   type ExternalRequestListSyncAdapters,
+  type ExternalRequestListSyncResult,
 } from '@server/lib/externalRequestLists';
 import { setupTestDb } from '@server/test/db';
 
@@ -241,5 +243,52 @@ describe('external request list synchronization', () => {
     assert.equal(result.alreadyRequested, 1);
     assert.equal(result.failed, 0);
     assert.deepEqual(list.processedItemIds, ['tt9876543']);
+  });
+
+  it('synchronizes every saved list through bounded ID batches', async () => {
+    const user = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    const repository = getRepository(ExternalRequestList);
+    await repository.save(
+      Array.from(
+        { length: 5 },
+        (_, index) =>
+          new ExternalRequestList({
+            user,
+            provider: 'imdb',
+            sourceId: `ur${12345678 + index}`,
+            sourceUrl: `https://www.imdb.com/user/ur${12345678 + index}/watchlist/`,
+            processedItemIds: [],
+          })
+      )
+    );
+
+    const processedIds: number[] = [];
+    const syncOne = async (
+      list: ExternalRequestList,
+      owner: User
+    ): Promise<ExternalRequestListSyncResult> => {
+      assert.equal(owner.id, user.id);
+      processedIds.push(list.id);
+      return {
+        listId: list.id,
+        provider: list.provider,
+        sourceItems: 0,
+        requested: 0,
+        alreadyRequested: 0,
+        unmatched: 0,
+        failed: 0,
+        lastSyncedAt: '2026-10-04T12:00:00.000Z',
+      };
+    };
+
+    await syncAllExternalRequestLists(syncOne, 2);
+
+    assert.equal(processedIds.length, 5);
+    assert.deepEqual(
+      processedIds,
+      [...processedIds].sort((a, b) => a - b)
+    );
   });
 });

@@ -10,6 +10,10 @@ import {
   getAdvancedThemeCssValue,
   validateAdvancedThemeOverrides,
 } from '@server/utils/advancedThemeOverrides';
+import {
+  DEFAULT_THEME_PALETTE_ID,
+  parseThemePalette,
+} from '@server/utils/themePreference';
 import axios from 'axios';
 import type { ReactNode } from 'react';
 import {
@@ -21,6 +25,7 @@ import {
   useRef,
   useState,
 } from 'react';
+export { DEFAULT_THEME_PALETTE_ID } from '@server/utils/themePreference';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -224,8 +229,6 @@ export const themePalettes: ThemePalette[] = [
     secondary: 'sietchNeon',
   },
 ];
-
-export const DEFAULT_THEME_PALETTE_ID = 'seerr';
 
 const shades = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 
@@ -804,7 +807,7 @@ type ThemeContextValue = {
   palette: string;
   advancedThemeOverrides: AdvancedThemeOverrides | null;
   setMode: (mode: ThemeMode) => void;
-  setPalette: (palette: string) => void;
+  setPalette: (palette: string) => Promise<void>;
   toggleMode: () => void;
   saveAdvancedThemeOverrides: (
     overrides: AdvancedThemeOverrides | null
@@ -819,14 +822,6 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const getStoredMode = (): ThemeMode => {
   const storedMode = readLocalStorageValue(THEME_MODE_KEY);
   return storedMode === 'light' || storedMode === 'dark' ? storedMode : 'dark';
-};
-
-const getStoredPalette = (): string => {
-  const storedPalette = readLocalStorageValue(THEME_PALETTE_KEY);
-  return storedPalette &&
-    themePalettes.some((palette) => palette.id === storedPalette)
-    ? storedPalette
-    : DEFAULT_THEME_PALETTE_ID;
 };
 
 const getThemePalette = (palette: string): ThemePalette =>
@@ -997,15 +992,35 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     useState<AdvancedThemeOverrides | null>(null);
   const hasRestoredTheme = useRef(false);
   const { user, revalidate } = useUser();
+  const currentUserId = useRef(user?.id);
+  currentUserId.current = user?.id;
+  const currentMode = useRef(mode);
+  currentMode.current = mode;
+  const themeSaveActive = useRef(false);
 
   useEffect(() => {
     const validation = validateAdvancedThemeOverrides(
       user?.settings?.advancedThemeOverrides ?? null
     );
     const savedOverrides = 'error' in validation ? null : validation.value;
-
+    const savedPalette =
+      parseThemePalette(user?.settings?.themePalette) ??
+      DEFAULT_THEME_PALETTE_ID;
+    const restoredMode = hasRestoredTheme.current
+      ? currentMode.current
+      : getStoredMode();
+    // Old browser palettes must not override the one-time account migration.
+    // Later logins and releases restore the user's newly saved account choice.
+    hasRestoredTheme.current = true;
+    setModeState(restoredMode);
+    setPaletteState(savedPalette);
     setAdvancedThemeOverrides(savedOverrides);
-  }, [user?.id, user?.settings?.advancedThemeOverrides]);
+    applyTheme(restoredMode, savedPalette, savedOverrides);
+  }, [
+    user?.id,
+    user?.settings?.themePalette,
+    user?.settings?.advancedThemeOverrides,
+  ]);
 
   useEffect(() => {
     if (!hasRestoredTheme.current) {
@@ -1014,16 +1029,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
     applyTheme(mode, palette, advancedThemeOverrides);
   }, [mode, palette, advancedThemeOverrides]);
-
-  useEffect(() => {
-    const storedMode = getStoredMode();
-    const storedPalette = getStoredPalette();
-
-    hasRestoredTheme.current = true;
-    setModeState(storedMode);
-    setPaletteState(storedPalette);
-    applyTheme(storedMode, storedPalette);
-  }, []);
 
   const setMode = useCallback(
     (nextMode: ThemeMode) => {
@@ -1034,13 +1039,45 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const setPalette = useCallback(
-    (nextPalette: string) => {
-      const activePalette = getThemePalette(nextPalette);
-
-      setPaletteState(activePalette.id);
-      applyTheme(mode, activePalette.id, advancedThemeOverrides);
+    async (nextPalette: string) => {
+      const userId = user?.id;
+      const selectedPalette = parseThemePalette(nextPalette);
+      if (!userId || !selectedPalette || themeSaveActive.current) {
+        throw new Error(
+          'Sign in and choose a valid theme after the current save finishes.'
+        );
+      }
+      themeSaveActive.current = true;
+      try {
+        const { data } = await axios.post<{ themePalette: string }>(
+          `/api/v1/user/${userId}/settings/theme`,
+          { palette: selectedPalette }
+        );
+        if (data.themePalette !== selectedPalette)
+          throw new Error('Theme preference was not confirmed.');
+        // A delayed response from a previous login must not affect another user.
+        if (currentUserId.current !== userId) return;
+        setPaletteState(selectedPalette);
+        await revalidate(
+          (currentUser) =>
+            currentUser?.id === userId
+              ? {
+                  ...currentUser,
+                  settings: {
+                    ...currentUser.settings,
+                    notificationTypes:
+                      currentUser.settings?.notificationTypes ?? {},
+                    themePalette: selectedPalette,
+                  },
+                }
+              : currentUser,
+          false
+        );
+      } finally {
+        themeSaveActive.current = false;
+      }
     },
-    [mode, advancedThemeOverrides]
+    [revalidate, user?.id]
   );
 
   const toggleMode = useCallback(() => {

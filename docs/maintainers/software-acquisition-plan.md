@@ -192,6 +192,7 @@ Add the shared Request Status action and artifact-delivery route across current 
 - The download-copy setup is documented for operators, and its request-scoped endpoints and `requestId` status filter are described in `seerr-api.yml`.
 - `snapetech/QuestarrNG` is a separate fork of `Doezer/Questarr`. Its authenticated integration contract exposes IGDB search, popular-title, platform, and game-detail catalog routes, plus durable request/status, retry, and request-scoped asset delivery routes. SeerrNG now uses that contract through a server-side adapter.
 - `snapetech/ROMarrNG` is a separate fork of `BlizzHacker/romarr`. Its SeerrNG integration contract adds durable request correlation, retry, request-scoped imported-file listing and streaming, and supported-system aliases while preserving the upstream MIT license and attribution.
+- ROMarrNG v0.14.0 now exposes a bounded DAT catalog keyed by matched emulation systems. SeerrNG can select that source, browse systems and titles alphabetically, search titles, preview and override platform mappings, and preserve a stable DAT identity through the request and provider-reported status history.
 - SeerrNG now has provider connection settings and contract checks, an administrator-editable Retro/Modern assignment for every supported ROMarrNG system, IGDB catalog browsing, explicit PC OS and architecture selection, and a dedicated durable software-request model.
 - Users follow provider-confirmed states in Request Status. Active software requests are reconciled in the background and while Request Status is open; verified assets receive the same request-scoped **Download copy** and multi-file selection behavior as other media.
 - Failed retries preserve the local failed state until the provider accepts them. SeerrNG reads provider state before retrying to recover lost responses; an uncertain QuestarrNG or ROMarrNG handoff requires the requester or an administrator to confirm that no matching download remains in the download-client queue or history.
@@ -199,6 +200,9 @@ Add the shared Request Status action and artifact-delivery route across current 
 - **Software Request Updates** notifications cover pending approval, approval, decline, and provider failure. **Software Request Available** continues to notify users when verified files are ready. Provider credentials and upstream asset URLs remain server-side.
 - SeerrNG's OpenAPI contract and user/operator guides now describe software settings, catalog and request routes, notification behavior, and file delivery.
 - General desktop applications remain a future wishlist item.
+
+The 2026-10-04 integration evidence and outstanding finalization gates are in
+[`romarrng-dat-catalog-integration-2026-10-04.md`](romarrng-dat-catalog-integration-2026-10-04.md).
 
 ## Acceptance criteria
 

@@ -12,6 +12,7 @@ import ReaderDeliverySettings from '@app/components/Settings/ReaderDeliverySetti
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
+import SetupConnectionsImport from '@app/components/Settings/SetupConnectionsImport';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { getSafeHref } from '@app/utils/safeUrl';
@@ -75,6 +76,10 @@ const SonarrModal = dynamic(
 
 const messages = defineMessages('components.Settings', {
   services: 'Services',
+  setupAssistantTitle: 'Connect your apps',
+  setupAssistantDescription:
+    'Generate a Docker Compose starter, discover apps on a Docker network, probe common ports on a selected host, or create a manual report. Import suggestions to prefill hostnames and ports, then test each API connection before saving.',
+  setupAssistantGuide: 'Open the setup guide',
   radarrsettings: 'Radarr Settings',
   sonarrsettings: 'Sonarr Settings',
   lidarrsettings: 'Lidarr Settings',
@@ -543,6 +548,25 @@ const SettingsServices = () => {
           intl.formatMessage(globalMessages.settings),
         ]}
       />
+      <section className="app-card-sub section">
+        <h2 className="heading">
+          {intl.formatMessage(messages.setupAssistantTitle)}
+        </h2>
+        <p className="description">
+          {intl.formatMessage(messages.setupAssistantDescription)}
+        </p>
+        <Button
+          as="a"
+          href="https://github.com/snapetech/seerrng/blob/main/docs/using-seerr/setup-assistant.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          buttonType="default"
+          buttonSize="standard"
+        >
+          {intl.formatMessage(messages.setupAssistantGuide)}
+        </Button>
+        <SetupConnectionsImport />
+      </section>
       <div className="mb-6">
         <h3 className="heading">
           {intl.formatMessage(messages.radarrsettings)}

@@ -57,10 +57,81 @@ const getProviderSettings = (provider: SoftwareRequestProvider) => {
 const getQuestarr = () => new QuestarrNGAPI(getProviderSettings('questarr'));
 const getRomarr = () => new ROMarrNGAPI(getProviderSettings('romarr'));
 
-const safeErrorMessage = (status: SoftwareProviderStatus): string | null =>
-  status === 'failed'
-    ? 'The acquisition provider could not complete this request.'
+const SAFE_FAILURE_CODES = new Set([
+  'REQUEST_FAILED',
+  'NO_RELEASE_FOUND',
+  'DOWNLOAD_CLIENT_NOT_CONFIGURED',
+  'DOWNLOAD_HANDOFF_FAILED',
+  'IMPORT_FAILED',
+]);
+
+const normalizePercent = (value: unknown): number | null =>
+  typeof value === 'number' &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= 100
+    ? Math.round(value * 100) / 100
     : null;
+
+const normalizeProviderStage = (
+  value: unknown,
+  status: SoftwareProviderStatus
+): string => {
+  if (
+    typeof value === 'string' &&
+    /^[a-z][a-z0-9_-]{0,31}$/i.test(value.trim())
+  ) {
+    return value.trim().toLowerCase();
+  }
+  return status;
+};
+
+const normalizeFailureCode = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const code = value.trim().toUpperCase();
+  return /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : null;
+};
+
+const safeErrorMessage = (
+  status: SoftwareProviderStatus,
+  failureCode: string | null
+): string | null => {
+  if (status !== 'failed') return null;
+  if (failureCode && SAFE_FAILURE_CODES.has(failureCode)) {
+    switch (failureCode) {
+      case 'NO_RELEASE_FOUND':
+        return 'No usable release was found.';
+      case 'DOWNLOAD_CLIENT_NOT_CONFIGURED':
+        return 'The acquisition service needs a download client for this release.';
+      case 'DOWNLOAD_HANDOFF_FAILED':
+        return 'The selected release could not be handed to the download client.';
+      case 'IMPORT_FAILED':
+        return 'The download could not be imported into the library.';
+      default:
+        return 'The acquisition provider could not complete this request.';
+    }
+  }
+  return 'The acquisition provider could not complete this request.';
+};
+
+const applyProviderSnapshot = (
+  request: SoftwareRequest,
+  providerRequest: SoftwareProviderRequest
+) => {
+  request.providerStage = normalizeProviderStage(
+    providerRequest.stage,
+    providerRequest.status
+  );
+  request.percent = normalizePercent(providerRequest.percent);
+  request.failureCode =
+    providerRequest.status === 'failed'
+      ? normalizeFailureCode(providerRequest.failureCode)
+      : null;
+  request.errorMessage = safeErrorMessage(
+    providerRequest.status,
+    request.failureCode
+  );
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -176,7 +247,13 @@ const recordStatusEvent = async (
   message: string | null
 ): Promise<void> => {
   const repository = getRepository(SoftwareRequestStatusEvent);
-  const fingerprint = `${request.status}:${request.attempt}:${request.percent ?? 'na'}`;
+  const fingerprint = [
+    request.status,
+    request.attempt,
+    request.providerStage ?? 'na',
+    request.percent ?? 'na',
+    request.failureCode ?? 'na',
+  ].join(':');
   const existing = await repository.findOneBy({
     requestId: request.id,
     fingerprint,
@@ -189,6 +266,8 @@ const recordStatusEvent = async (
       status: request.status,
       message: message?.slice(0, 512) ?? null,
       percent: request.percent ?? null,
+      providerStage: request.providerStage ?? null,
+      failureCode: request.failureCode ?? null,
       fingerprint,
     })
   );
@@ -319,7 +398,13 @@ const getProviderRequest = async (
           request.title,
           request.platformSlug ?? '',
           request.catalogId ?? undefined,
-          request.platformId ?? undefined
+          request.platformId ?? undefined,
+          request.catalogProvider === 'dat' && request.catalogKey
+            ? {
+                catalogKey: request.catalogKey,
+                platformSlug: request.platformSlug ?? '',
+              }
+            : undefined
         );
   }
 };
@@ -378,11 +463,23 @@ export const refreshSoftwareRequest = async (
     const nextStatus = mapProviderStatus(providerRequest);
     const previousStatus = request.status;
     request.status = nextStatus;
-    request.errorMessage = safeErrorMessage(providerRequest.status);
+    const previousSnapshot = [
+      request.providerStage ?? null,
+      request.percent ?? null,
+      request.failureCode ?? null,
+      request.errorMessage ?? null,
+    ].join('|');
+    applyProviderSnapshot(request, providerRequest);
+    const nextSnapshot = [
+      request.providerStage ?? null,
+      request.percent ?? null,
+      request.failureCode ?? null,
+      request.errorMessage ?? null,
+    ].join('|');
     request.lastCheckedAt = new Date();
-    if (nextStatus !== previousStatus) {
+    if (nextStatus !== previousStatus || previousSnapshot !== nextSnapshot) {
       await getRepository(SoftwareRequest).save(request);
-      await recordStatusEvent(request, request.errorMessage);
+      await recordStatusEvent(request, request.errorMessage ?? null);
       if (nextStatus === 'available') {
         await notifySoftwareAvailable(request);
       } else if (nextStatus === 'failed') {
@@ -442,6 +539,9 @@ export const approveSoftwareRequest = async (
       approvedById,
       attempt,
       errorMessage: null,
+      failureCode: null,
+      providerStage: 'approved',
+      percent: null,
     }
   );
   if (!result.affected) {
@@ -453,6 +553,9 @@ export const approveSoftwareRequest = async (
   request.approvedById = approvedById;
   request.attempt = attempt;
   request.errorMessage = null;
+  request.failureCode = null;
+  request.providerStage = 'approved';
+  request.percent = null;
   await recordStatusEvent(request, 'Request approved.');
   await notifySoftwareRequestStatus(request, 'approved');
   return refreshSoftwareRequest(request);
@@ -546,6 +649,9 @@ export const cancelSoftwareRequest = async (
 
   request.status = 'cancelled';
   request.errorMessage = null;
+  request.failureCode = null;
+  request.providerStage = 'cancelled';
+  request.percent = null;
   request.lastCheckedAt = new Date();
   await getRepository(SoftwareRequest).save(request);
   await recordStatusEvent(request, 'Request cancelled by requester.');
@@ -574,7 +680,7 @@ export const retrySoftwareRequest = async (
     const nextStatus = mapProviderStatus(providerRequest);
     request.attempt += 1;
     request.status = nextStatus;
-    request.errorMessage = safeErrorMessage(providerRequest.status);
+    applyProviderSnapshot(request, providerRequest);
     request.lastCheckedAt = new Date();
     await getRepository(SoftwareRequest).save(request);
     await recordStatusEvent(request, request.errorMessage ?? 'Retry started.');
@@ -586,7 +692,7 @@ export const retrySoftwareRequest = async (
       assets,
       bundleName,
       status: nextStatus,
-      message: request.errorMessage,
+      message: request.errorMessage ?? null,
       actions: resolveProviderActions(
         request.provider,
         providerRequest.status,
@@ -660,13 +766,12 @@ export const streamSoftwareRequestAsset = async (
 };
 
 export const streamSoftwareRequestBundle = async (
-  request: SoftwareRequest,
-  range?: string
+  request: SoftwareRequest
 ): Promise<SoftwareAssetStream> => {
   if (request.provider !== 'questarr') {
     throw new Error('This software provider does not support bundles.');
   }
-  return getQuestarr().streamBundle(request.externalRequestId, range);
+  return getQuestarr().streamBundle(request.externalRequestId);
 };
 
 export const refreshSoftwareRequests = async (

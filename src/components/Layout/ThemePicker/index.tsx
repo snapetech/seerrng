@@ -1,4 +1,6 @@
 import { themePalettes, useTheme } from '@app/context/ThemeContext';
+import { useToasts } from '@app/hooks/useToasts';
+import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Menu } from '@headlessui/react';
 import {
@@ -7,6 +9,7 @@ import {
   PaintBrushIcon,
   SunIcon,
 } from '@heroicons/react/24/outline';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Layout.ThemePicker', {
@@ -14,11 +17,32 @@ const messages = defineMessages('components.Layout.ThemePicker', {
   darkMode: 'Dark mode',
   lightMode: 'Light mode',
   toggle: 'Toggle',
+  saveError: 'Could not save your theme. Please try again.',
 });
 
 const ThemePicker = () => {
   const intl = useIntl();
   const { mode, palette, setPalette, toggleMode } = useTheme();
+  const { user } = useUser();
+  const { addToast } = useToasts();
+  const [saving, setSaving] = useState(false);
+  const saveActive = useRef(false);
+  const choosePalette = async (nextPalette: string) => {
+    if (!user || saveActive.current) return;
+    saveActive.current = true;
+    setSaving(true);
+    try {
+      await setPalette(nextPalette);
+    } catch {
+      addToast(intl.formatMessage(messages.saveError), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      saveActive.current = false;
+      setSaving(false);
+    }
+  };
 
   return (
     <Menu as="div" className="relative">
@@ -55,7 +79,9 @@ const ThemePicker = () => {
                 key={themePalette.id}
                 as="button"
                 type="button"
-                onClick={() => setPalette(themePalette.id)}
+                onClick={() => void choosePalette(themePalette.id)}
+                disabled={!user || saving}
+                aria-busy={saving}
                 className={({ active }) =>
                   `flex min-w-0 items-center rounded border px-2 py-2 text-left text-sm font-medium transition ${
                     palette === themePalette.id

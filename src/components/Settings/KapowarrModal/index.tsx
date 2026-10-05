@@ -3,6 +3,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -72,6 +73,7 @@ interface KapowarrModalProps {
 
 const KapowarrModal = ({ onClose, kapowarr, onSave }: KapowarrModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('kapowarr');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(kapowarr ? true : false);
@@ -170,8 +172,8 @@ const KapowarrModal = ({ onClose, kapowarr, onSave }: KapowarrModalProps) => {
       <Formik
         initialValues={{
           name: kapowarr?.name ?? '',
-          hostname: kapowarr?.hostname ?? '',
-          port: kapowarr?.port ?? 5656,
+          hostname: kapowarr?.hostname ?? setupConnection?.hostname ?? '',
+          port: kapowarr?.port ?? setupConnection?.port ?? 5656,
           ssl: kapowarr?.useSsl ?? false,
           apiKey: kapowarr?.apiKey ?? '',
           baseUrl: kapowarr?.baseUrl ?? '',

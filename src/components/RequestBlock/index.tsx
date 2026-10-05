@@ -11,10 +11,6 @@ import Tooltip from '@app/components/Common/Tooltip';
 import useRequestOverride from '@app/hooks/useRequestOverride';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
-import {
-  normalizeMusicBrainzId,
-  normalizeOpenLibraryWorkId,
-} from '@app/utils/apiPath';
 import defineMessages from '@app/utils/defineMessages';
 import {
   CalendarIcon,
@@ -25,6 +21,7 @@ import {
   UserIcon,
   XMarkIcon,
 } from '@heroicons/react/24/solid';
+import type { MediaType } from '@server/constants/media';
 import { MediaRequestStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import axios from 'axios';
@@ -56,48 +53,25 @@ const messages = defineMessages('components.RequestBlock', {
   delete: 'Delete Request',
 });
 
-type RequestModalMediaType =
-  'movie' | 'tv' | 'collection' | 'music' | 'book' | 'comic' | 'magazine';
+export type RequestBlockMediaIdentity =
+  | { mediaType: MediaType.MOVIE | MediaType.TV; tmdbId: number }
+  | { mediaType: MediaType.MUSIC; mbId: string }
+  | { mediaType: MediaType.BOOK; bookId: string }
+  | { mediaType: MediaType.COMIC; comicId: string }
+  | { mediaType: MediaType.MAGAZINE; magazineTitle: string };
 
-const getRequestModalMediaType = (
-  mediaType: string
-): RequestModalMediaType | undefined => {
-  switch (mediaType) {
-    case 'movie':
-    case 'tv':
-    case 'collection':
-    case 'music':
-    case 'book':
-    case 'comic':
-    case 'magazine':
-      return mediaType;
-    default:
-      return undefined;
-  }
-};
-
-interface RequestBlockProps {
+type RequestBlockProps = {
   request: MediaRequest;
-  mediaType?: RequestModalMediaType;
-  tmdbId?: number;
-  mbId?: string;
-  bookId?: string;
-  comicId?: string;
-  magazineTitle?: string;
   onUpdate?: () => void;
   hideDeleteAction?: boolean;
-}
+} & RequestBlockMediaIdentity;
 
 const RequestBlock = ({
   request,
-  mediaType: providedMediaType,
-  tmdbId: providedTmdbId,
-  mbId: providedMbId,
-  bookId: providedBookId,
-  comicId: providedComicId,
-  magazineTitle: providedMagazineTitle,
+  mediaType,
   onUpdate,
   hideDeleteAction = false,
+  ...mediaIdentity
 }: RequestBlockProps) => {
   const { user } = useUser();
   const intl = useIntl();
@@ -105,42 +79,6 @@ const RequestBlock = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const { profile, metadataProfile, rootFolder, server, languageProfile } =
     useRequestOverride(request);
-  const mediaType = getRequestModalMediaType(providedMediaType ?? request.type);
-  const tmdbId = providedTmdbId ?? request.media?.tmdbId;
-  const rawBookId = request.media?.identifiers?.find(
-    (identifier) => identifier.provider === 'openlibrary'
-  )?.value;
-  const bookId = providedBookId
-    ? normalizeOpenLibraryWorkId(providedBookId)
-    : rawBookId
-      ? normalizeOpenLibraryWorkId(rawBookId)
-      : undefined;
-  const rawMusicId = providedMbId ?? request.media?.mbId;
-  const musicId = rawMusicId ? normalizeMusicBrainzId(rawMusicId) : undefined;
-  const comicId =
-    providedComicId ??
-    request.media?.identifiers?.find(
-      (identifier) => identifier.provider === 'comicvine'
-    )?.value;
-  const magazineTitle = providedMagazineTitle;
-  const canEditRequest = (() => {
-    switch (mediaType) {
-      case 'movie':
-      case 'tv':
-      case 'collection':
-        return tmdbId !== undefined;
-      case 'music':
-        return Boolean(musicId);
-      case 'book':
-        return Boolean(bookId);
-      case 'comic':
-        return Boolean(comicId);
-      case 'magazine':
-        return Boolean(magazineTitle);
-      default:
-        return false;
-    }
-  })();
   const updateRequest = async (type: 'approve' | 'decline'): Promise<void> => {
     setIsUpdating(true);
     await axios.post(`/api/v1/request/${request.id}/${type}`);
@@ -166,14 +104,10 @@ const RequestBlock = ({
 
   return (
     <div className="block">
-      {showEditModal && canEditRequest && mediaType && (
+      {showEditModal && (
         <RequestModal
           show={showEditModal}
-          tmdbId={tmdbId}
-          mbId={musicId}
-          bookId={bookId}
-          comicId={comicId}
-          magazineTitle={magazineTitle}
+          {...mediaIdentity}
           type={mediaType}
           is4k={request.is4k}
           editRequest={request}
@@ -271,18 +205,16 @@ const RequestBlock = ({
                     <XMarkIcon />
                   </Button>
                 </Tooltip>
-                {canEditRequest && (
-                  <Tooltip content={intl.formatMessage(messages.edit)}>
-                    <Button
-                      buttonType="warning"
-                      onClick={() => setShowEditModal(true)}
-                      disabled={isUpdating}
-                      aria-label={intl.formatMessage(messages.edit)}
-                    >
-                      <PencilIcon className="icon-sm" />
-                    </Button>
-                  </Tooltip>
-                )}
+                <Tooltip content={intl.formatMessage(messages.edit)}>
+                  <Button
+                    buttonType="warning"
+                    onClick={() => setShowEditModal(true)}
+                    disabled={isUpdating}
+                    aria-label={intl.formatMessage(messages.edit)}
+                  >
+                    <PencilIcon className="icon-sm" />
+                  </Button>
+                </Tooltip>
               </>
             )}
             {!hideDeleteAction &&

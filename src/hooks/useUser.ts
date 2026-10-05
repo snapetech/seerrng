@@ -65,6 +65,7 @@ export interface UserSettings {
   detailDisclosureOrder?: DetailDisclosureOrder;
   mediaFilterPins?: UserMediaFilterPins;
   advancedThemeOverrides?: AdvancedThemeOverrides | null;
+  themePalette?: string;
 }
 
 interface UserHookResponse {

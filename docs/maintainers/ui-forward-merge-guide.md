@@ -66,12 +66,14 @@ workflows or waive required checks. Retain the source manifest and tool versions
 1. Follow the fix-it audit against changed assets and their affected consumers,
    including effective CSS cascade, structural ownership, dynamic/secondary class
    props, hit areas, fixed headers versus scrollers, state, and narrow layouts.
-   Run `pnpm validate:development --plan` to inspect connected suites, then run
-   `pnpm validate:development` and one `pnpm build` on the exact integrated tree.
-   The full runner is explicit; `pnpm build` runs translation and shared-visual
-   checks before production compilation. Keep an unchanged-source receipt between
-   validation and build. Do not run the full gate twice. Any failed required
-   check blocks finalization; do not bypass a hook or redefine success.
+   Read `tools/validation-engine/README.md` and the extracted setup instructions.
+   Regenerate and review the source-specific inventory and invocation plan, then
+   run the combined engine on the exact integrated candidate. Preserve an
+   unchanged-source receipt, then run one guarded `pnpm build`. The current build
+   runs translation/shared-visual guards and compilation; it does not run the
+   engine. Do not repeat the archived comprehensive gate after engine acceptance.
+   Any failed required check blocks finalization; do not bypass a hook or redefine
+   success.
 2. Retain validation and compilation results with the target's pinned
    runtime/dependencies. If validation and compilation are separate phases,
    retain an exact unchanged-source receipt before using `build:compile`;

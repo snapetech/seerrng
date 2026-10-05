@@ -146,6 +146,10 @@ describe('reader delivery settings API', () => {
     await getRepository(User).update(1, { permissions: Permission.REQUEST });
 
     await request(createApp(Permission.REQUEST))
+      .get('/settings/reader-delivery')
+      .expect(403);
+
+    await request(createApp(Permission.REQUEST))
       .put('/settings/reader-delivery')
       .send({
         grimmoryUrl: 'https://grimmory.example',

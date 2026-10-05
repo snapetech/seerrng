@@ -14,10 +14,12 @@ import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces'
 import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import logger from '@server/logger';
+import { MoreThan } from 'typeorm';
 import xml2js from 'xml2js';
 
 export const MAX_EXTERNAL_REQUEST_LISTS_PER_USER = 10;
 export const MAX_EXTERNAL_REQUEST_LIST_ITEMS = 100;
+export const MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE = 100;
 
 export type ExternalRequestListProvider = 'imdb' | 'goodreads';
 
@@ -423,24 +425,44 @@ export const syncExternalRequestList = async (
   return result;
 };
 
-export const syncAllExternalRequestLists = async (): Promise<void> => {
-  const lists = await getRepository(ExternalRequestList).find({
-    relations: { user: true },
-    order: { id: 'ASC' },
-  });
+export const syncAllExternalRequestLists = async (
+  syncOne: typeof syncExternalRequestList = syncExternalRequestList,
+  requestedBatchSize = MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE
+): Promise<void> => {
+  const repository = getRepository(ExternalRequestList);
+  const batchSize = Number.isSafeInteger(requestedBatchSize)
+    ? Math.max(
+        1,
+        Math.min(requestedBatchSize, MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE)
+      )
+    : MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE;
+  let lastId = 0;
 
-  for (const list of lists) {
-    if (!list.user) continue;
-    const result = await syncExternalRequestList(list, list.user);
-    logger.info('External request list synchronization completed.', {
-      label: 'External Request Lists',
-      listId: list.id,
-      provider: list.provider,
-      requested: result.requested,
-      alreadyRequested: result.alreadyRequested,
-      unmatched: result.unmatched,
-      failed: result.failed,
-      error: result.error,
+  while (true) {
+    const lists = await repository.find({
+      where: { id: MoreThan(lastId) },
+      relations: { user: true },
+      order: { id: 'ASC' },
+      take: batchSize,
     });
+    if (!lists.length) return;
+
+    for (const list of lists) {
+      lastId = list.id;
+      if (!list.user) continue;
+      const result = await syncOne(list, list.user);
+      logger.info('External request list synchronization completed.', {
+        label: 'External Request Lists',
+        listId: list.id,
+        provider: list.provider,
+        requested: result.requested,
+        alreadyRequested: result.alreadyRequested,
+        unmatched: result.unmatched,
+        failed: result.failed,
+        error: result.error,
+      });
+    }
+
+    if (lists.length < batchSize) return;
   }
 };

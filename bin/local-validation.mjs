@@ -96,7 +96,7 @@ export function validateGovernanceSources(agents, hook) {
     'docs/maintainers/ui-style-standard.md',
     'docs/maintainers/ui-fix-it.md',
     'docs/maintainers/ui-forward-merge-guide.md',
-    'pnpm validate:development',
+    'tools/validation-engine/README.md',
   ]) {
     if (!agents.includes(route))
       throw new Error(
@@ -187,6 +187,7 @@ export function preflight(
       'docs/maintainers/ui-style-standard.md',
       'docs/maintainers/ui-fix-it.md',
       'docs/maintainers/ui-forward-merge-guide.md',
+      'tools/validation-engine/README.md',
     ])
       requireFile(root, file);
     validateGovernanceSources(

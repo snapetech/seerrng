@@ -309,7 +309,7 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
         </form>
       </div>
 
-      <article className="app-card-main settings-main-card">
+      <article className="app-card-main settings-main-card max-w-full min-w-0">
         <div
           ref={contentRef}
           className={`settings-page-content ${

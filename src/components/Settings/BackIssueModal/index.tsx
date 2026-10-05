@@ -3,6 +3,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -64,6 +65,7 @@ const BackIssueModal = ({
   onSave,
 }: BackIssueModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('backissue');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(Boolean(backissue));
@@ -147,8 +149,8 @@ const BackIssueModal = ({
       <Formik
         initialValues={{
           name: backissue?.name ?? '',
-          hostname: backissue?.hostname ?? '',
-          port: backissue?.port ?? 8787,
+          hostname: backissue?.hostname ?? setupConnection?.hostname ?? '',
+          port: backissue?.port ?? setupConnection?.port ?? 8787,
           useSsl: backissue?.useSsl ?? false,
           apiKey: backissue?.apiKey ?? '',
           baseUrl: backissue?.baseUrl ?? '',
