@@ -82,6 +82,18 @@ describe('Prowlarr settings on a short mobile screen', () => {
           emulationCatalogProvider: 'questarr',
           emulationSystemGroups: {},
         });
+      } else if (pathname === '/api/v1/settings/reader-delivery') {
+        request.reply({
+          grimmoryUrl: '',
+          grimmoryUsername: '',
+          grimmoryPassword: '',
+          bookorbitUrl: '',
+          bookorbitUsername: '',
+          bookorbitPassword: '',
+          preferredProvider: 'grimmory',
+        });
+      } else if (pathname === '/api/v1/settings/reader-delivery/groupings') {
+        request.reply([]);
       } else {
         request.reply([]);
       }

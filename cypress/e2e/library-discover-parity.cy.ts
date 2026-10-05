@@ -75,6 +75,15 @@ describe('Books and Music discover parity', () => {
     });
   };
 
+  const assertDialogFieldDescription = (label: string, description: string) => {
+    cy.get('[role="dialog"]')
+      .contains('label', label)
+      .scrollIntoView()
+      .closest('.form-row')
+      .contains(description)
+      .should('be.visible');
+  };
+
   beforeEach(() => {
     cy.loginAsAdmin();
     cy.mockConfiguredMediaAvailability({
@@ -742,43 +751,20 @@ describe('Books and Music discover parity', () => {
     cy.contains('[data-testid=modal-title]', 'Add New Lidarr Server').should(
       'be.visible'
     );
-    cy.contains('label', 'API Key')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains('.settings-form-row-description', 'Find it in Lidarr')
-      .should('be.visible');
-    cy.contains('label', 'URL Base')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'If you set a URL Base in Lidarr'
-      )
-      .should('be.visible');
-    cy.contains('label', 'External URL')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'For clickable links on media pages'
-      )
-      .should('be.visible');
-    cy.contains('label', 'Enable Scan')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'Scan Lidarr for existing media'
-      )
-      .should('be.visible');
-    cy.contains('label', 'Enable Automatic Search')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'Automatically trigger a search in Lidarr'
-      )
-      .should('be.visible');
+    assertDialogFieldDescription('API Key', 'Find it in Lidarr');
+    assertDialogFieldDescription('URL Base', 'If you set a URL Base in Lidarr');
+    assertDialogFieldDescription(
+      'External URL',
+      'For clickable links on media pages'
+    );
+    assertDialogFieldDescription(
+      'Enable Scan',
+      'Scan Lidarr for existing media'
+    );
+    assertDialogFieldDescription(
+      'Enable Automatic Search',
+      'Automatically trigger a search in Lidarr'
+    );
     cy.get('select[name=activeMetadataProfileId]')
       .scrollIntoView()
       .should('be.visible');
@@ -800,46 +786,26 @@ describe('Books and Music discover parity', () => {
       .and('have.attr', 'target', '_blank');
     cy.contains('label', 'Book Format').should('be.visible');
     cy.get('select[name=serviceType]').should('be.visible');
-    cy.contains('label', 'API Key')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'Find the key in Bookshelf or Readarr under Settings > General > Security > API Key'
-      )
-      .should('be.visible');
-    cy.contains('label', 'URL Base')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'If you set a URL Base in Bookshelf, Chaptarr, or Readarr'
-      )
-      .should('be.visible');
-    cy.contains('label', 'External URL')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'For clickable links on media pages'
-      )
-      .should('be.visible');
-    cy.contains('label', 'Enable Scan')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'Scan Bookshelf for existing books'
-      )
-      .should('be.visible');
-    cy.contains('label', 'Enable Automatic Search')
-      .scrollIntoView()
-      .closest('.form-row')
-      .contains(
-        '.settings-form-row-description',
-        'Automatically trigger a search in Bookshelf'
-      )
-      .should('be.visible');
+    assertDialogFieldDescription(
+      'API Key',
+      'Find the key in Bookshelf or Readarr under Settings > General > Security > API Key'
+    );
+    assertDialogFieldDescription(
+      'URL Base',
+      'If you set a URL Base in Bookshelf, Chaptarr, or Readarr'
+    );
+    assertDialogFieldDescription(
+      'External URL',
+      'For clickable links on media pages'
+    );
+    assertDialogFieldDescription(
+      'Enable Scan',
+      'Scan Bookshelf for existing books'
+    );
+    assertDialogFieldDescription(
+      'Enable Automatic Search',
+      'Automatically trigger a search in Bookshelf'
+    );
     cy.get('select[name=activeMetadataProfileId]')
       .scrollIntoView()
       .should('be.visible');

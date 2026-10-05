@@ -614,3 +614,131 @@ acceptance. Tests used disposable SQLite and local app endpoints only; no live
 Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was contacted.
 Release-note preview and branch push remain pending. John's human visual
 acceptance is still required before release.
+
+## v3.52.0 publication and CI repair — October 5, 2026
+
+This entry supersedes the earlier pending-release status above. The integrated
+feature candidate was released as `v3.52.0` from
+`fb50d1f70fdbe44579d89386d70bc50e9f181063`; the GitHub release is published and
+the release workflow's Discord announcement job succeeded. The release-note
+preview and changelog-tag check passed. The complete development gate on that
+integrated source passed 4,083 tests with four PostgreSQL-only skips and zero
+platform exclusions. Its production build also passed. Existing desktop/narrow
+game and reader browser flows passed 1/1 each; their rendered captures were
+inspected earlier in this work. No live Grimmory, BookOrbit, Steam, QuestarrNG
+or ROMarrNG provider round trip was performed, and John's release visual
+acceptance remains pending.
+
+Post-publication GitHub checks exposed three separate results:
+
+1. SeerrNG CI run `37258284100` failed the bundle budget at
+   `.next/static/chunks/pages/_app-98ffa76db6165a35.js` (1027.1 KB against
+   1024.0 KB). Its unit, i18n, security, and deployment jobs succeeded. A
+   separate isolated candidate removes the eager English catalog from the
+   shared app entry and has passed its complete `pnpm validate:development`
+   gate on the `fb50d1f` base (receipt:
+   `/tmp/seerrng-bundle-budget-validation-final3.log`). That candidate has not
+   yet been integrated here; its production build and `pnpm bundle:check` are
+   still pending.
+2. Cypress run `37258284096` failed two settings assertions. The Lidarr help
+   copy was present in the rendered modal, but its Cypress query was not scoped
+   to that dialog and could select the background service form. The Prowlarr
+   responsive spec returned an array for the new reader-settings API route,
+   although the rendered settings component requires the object response shape.
+   The specs now scope field-copy checks to the open dialog and return the
+   reader-settings object plus an empty grouping list from the Prowlarr fixture.
+   On the exact `v3.52.0` production build with a disposable seeded config, the
+   affected run passed 27/27 discovery tests and 1/1 Prowlarr test, with no
+   final failures, skips, or pending cases. The reader settings flow also
+   passed 1/1. One discovery test needed a retry before passing; it remains
+   recorded in `/tmp/seerrng-v352-cypress-repaired-focused.log`.
+3. Chocolatey publish run `37263774763` built the package but received HTTP 403
+   from `push.chocolatey.org`. The repository cannot establish package-owner
+   authorization through a source change. This channel is not verified as
+   published.
+
+The Cypress repairs are test-harness changes only; the visible settings UI did
+not change. They are recorded in
+`cypress/e2e/library-discover-parity.cy.ts` and
+`cypress/e2e/settings/prowlarr-responsive.cy.ts`. The follow-up Cypress checks
+used `/tmp/seerrng-v352-prowlarr-isolated`, a disposable seeded test config.
+The production server ran from the isolated build worktree
+`/home/keith/.cache/seerrng-v352-cypress-repro` at the release commit; no live
+service credentials or databases were used.
+
+After publication, `origin/main` advanced to
+`6d54a07bce12e222096a9ba5a34add8709bd39e8` for an internal YunoHost manifest
+alignment. The Cypress repair is not yet integrated on that new main tip. Before
+finalizing a follow-up candidate, preserve its source checkpoint, forward
+integrate the latest main and any completed bundle repair, then rerun the exact
+full development gate, production build, and affected browser flows. The
+Chocolatey 403 and John's visual acceptance remain explicit release limitations.
+
+## Post-release CI repairs — October 5, 2026
+
+The repair candidate is now based on the current `origin/main` tip,
+`6d54a07bce12e222096a9ba5a34add8709bd39e8`. It combines the English startup
+bundle reduction from the separately validated candidate with both Cypress
+harness fixes described above. The candidate bundle patch is present in
+`src/pages/_app.tsx`, its focused regression is in
+`src/components/ManageSlideOver/manageActions.test.mjs`, and the user-facing
+performance note is `release-notes/initial-load-performance.md`. The Cypress
+fixes are in `cypress/e2e/library-discover-parity.cy.ts` and
+`cypress/e2e/settings/prowlarr-responsive.cy.ts`.
+
+The bundle candidate's full development gate passed on its pre-integration
+`fb50d1f` base (4,083 passed, four PostgreSQL-only skips, zero failures and
+platform exclusions). The Cypress repair passed the 28 affected assertions and
+the reader-delivery settings flow on the published `v3.52.0` build, with a
+disposable seeded config. These are component evidence only; they do not replace
+verification on this combined exact source tree. A preserved source bundle is
+`/tmp/seerrng-reader-groupings-before-v352-forward-integration.bundle`; the
+integrated candidate's final validation, build, bundle budget and complete
+Cypress results will be appended here when available.
+
+The Chocolatey publish 403 and John's human visual acceptance remain
+outstanding. No provider round trips against live services were attempted.
+
+## Post-release CI repair verification — October 5, 2026
+
+The repair candidate is based on `origin/main`
+`6d54a07bce12e222096a9ba5a34add8709bd39e8`. The full development gate passed
+on this code candidate: 99 Vitest files/452 tests, 385 Node TypeScript files/2,912
+tests (2,908 passed and four PostgreSQL-only skips), 56 Node JavaScript
+files/485 tests, and 32 tooling files/238 tests. Totals were 4,083 passed,
+zero failed, four skipped, and zero platform exclusions. Log:
+`/tmp/seerrng-v352-repair-validation-final.log`.
+
+The production build passed on this application source. `pnpm bundle:check`
+checked 305 JavaScript chunks (11.54 MB total); the shared `_app` chunk is
+662.7 KB, below the 1,024 KB limit, compared with the failed 1,027.1 KB release
+chunk. Logs: `/tmp/seerrng-v352-repair-build-final.log` and
+`/tmp/seerrng-v352-repair-bundle-check-final.log`.
+
+Affected browser checks on the disposable Cypress database passed in Electron
+146: `library-discover-parity.cy.ts` 27/27, with one retry before passing;
+`reader-delivery-settings.cy.ts` 1/1; and `current-batch-layout.cy.ts` 8/8.
+The corrected Prowlarr fixture passed `prowlarr-responsive.cy.ts` 1/1 in a
+separate Electron run. Logs:
+`/tmp/seerrng-v352-repair-cypress-full-electron-final.log`,
+`/tmp/seerrng-v352-repair-cypress-current-batch-electron.log`, and
+`/tmp/seerrng-v352-repair-cypress-prowlarr-electron.log`.
+
+Two broader browser attempts do not count as full-suite passes. A Chromium run
+was interrupted during spec 6/43 after navigation began resolving to the cached
+`/offline.html` fallback; log:
+`/tmp/seerrng-v352-repair-cypress-full-final.log`. An Electron run was
+interrupted at spec 38/43; it did not produce aggregate suite totals or a full
+suite result. While reviewing that run, I discovered `providers/tvdb.cy.ts`
+invokes the real `/api/v1/settings/metadatas/test` route, which calls
+`Tvdb.test()` without a stub. The disposable server log also recorded outbound
+TMDB requests and Plex watchlist requests. That verification attempt therefore
+did not meet the no-live-provider requirement; the server was stopped and no
+further provider tests were run. Do not describe the full Cypress suite as
+provider-isolated or passing. Its log is retained with the test worktree output.
+
+The published release remains `v3.52.0`; its release workflow announced
+successfully. The Chocolatey publish still has the recorded HTTP 403. The
+John-specific visual acceptance remains pending under the release contract, so
+no follow-up release is claimed here. No live provider round-trip is claimed as
+verified.
