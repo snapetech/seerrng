@@ -4,6 +4,7 @@ import type { SwipeMediaType } from '@server/entity/SwipeDecision';
 import type { SwipeSettings } from '@server/lib/settings';
 import type { SwipeCard, TasteSignals } from '@server/lib/swipe/candidates';
 import logger from '@server/logger';
+import axios from 'axios';
 import { z } from 'zod';
 
 const RANKED_LIMIT = 30;
@@ -91,7 +92,10 @@ export const applyRanking = (
 };
 
 export const isAiRankingConfigured = (settings: SwipeSettings) =>
-  settings.aiProvider === 'anthropic' && !!settings.aiApiKey;
+  (settings.aiProvider === 'anthropic' && !!settings.aiApiKey) ||
+  (settings.aiProvider === 'openai' &&
+    !!settings.aiBaseUrl &&
+    !!settings.aiModel);
 
 export type RankingCall = (
   settings: SwipeSettings,
@@ -123,6 +127,125 @@ export const callClaudeRanking: RankingCall = async (settings, prompt) => {
   return response.parsed_output ?? undefined;
 };
 
+/** JSON Schema matching RankingSchema, for OpenAI-compatible servers. */
+const RANKING_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['picks'],
+  properties: {
+    picks: {
+      type: 'array',
+      maxItems: RANKED_LIMIT,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['index', 'reason'],
+        properties: {
+          index: { type: 'integer' },
+          reason: { type: 'string' },
+        },
+      },
+    },
+  },
+} as const;
+
+export class AiProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number
+  ) {
+    super(message);
+    this.name = 'AiProviderError';
+  }
+}
+
+/** Joins the base URL and path without doubling slashes. */
+export const openAiUrl = (baseUrl: string, path: string) =>
+  `${baseUrl.trim().replace(/\/+$/, '')}${path}`;
+
+/**
+ * Calls an OpenAI-compatible Chat Completions endpoint (OpenAI, Ollama,
+ * LM Studio, and similar). Asks for a JSON-schema response and, for servers
+ * that reject `json_schema`, retries once in JSON mode. The reply is always
+ * validated against RankingSchema.
+ */
+export const callOpenAiRanking: RankingCall = async (settings, prompt) => {
+  const send = (responseFormat: Record<string, unknown>) =>
+    axios.post(
+      openAiUrl(settings.aiBaseUrl, '/chat/completions'),
+      {
+        model: settings.aiModel,
+        messages: [
+          {
+            role: 'system',
+            content: `${SYSTEM_PROMPT}\nReply with JSON only: {"picks":[{"index":0,"reason":"..."}]}.`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        response_format: responseFormat,
+      },
+      {
+        timeout: 120_000,
+        maxContentLength: 2 * 1024 * 1024,
+        validateStatus: () => true,
+        headers: settings.aiApiKey
+          ? { Authorization: `Bearer ${settings.aiApiKey}` }
+          : undefined,
+      }
+    );
+
+  let response = await send({
+    type: 'json_schema',
+    json_schema: {
+      name: 'swipe_ranking',
+      strict: true,
+      schema: RANKING_JSON_SCHEMA,
+    },
+  });
+  if (response.status === 400 || response.status === 422) {
+    response = await send({ type: 'json_object' });
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new AiProviderError('The AI provider rejected the API key.', 401);
+  }
+  if (response.status === 404) {
+    throw new AiProviderError(
+      'The AI provider did not find that model or URL.',
+      404
+    );
+  }
+  if (response.status === 429) {
+    throw new AiProviderError(
+      'The AI provider is rate limiting requests.',
+      429
+    );
+  }
+  if (response.status < 200 || response.status >= 300) {
+    throw new AiProviderError(
+      `The AI provider returned HTTP ${response.status}.`,
+      response.status
+    );
+  }
+  const choice = response.data?.choices?.[0];
+  if (choice?.finish_reason === 'content_filter' || choice?.message?.refusal) {
+    return undefined;
+  }
+  const content = choice?.message?.content;
+  if (typeof content !== 'string') {
+    throw new AiProviderError('The AI provider returned no content.');
+  }
+  // Some local models wrap JSON in a code fence.
+  const json = content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '');
+  const parsed = RankingSchema.safeParse(JSON.parse(json));
+  if (!parsed.success) {
+    throw new AiProviderError('The AI provider returned an invalid ranking.');
+  }
+  return parsed.data;
+};
+
+export const rankingCallFor = (settings: SwipeSettings): RankingCall =>
+  settings.aiProvider === 'openai' ? callOpenAiRanking : callClaudeRanking;
+
 /**
  * Ranks the deck with the configured AI provider. Any failure keeps the
  * catalog order, so swiping never depends on the AI provider being up.
@@ -133,7 +256,7 @@ export const rankCandidates = async (
   candidates: SwipeCard[],
   signals: TasteSignals,
   tasteNotes: string,
-  call: RankingCall = callClaudeRanking
+  call: RankingCall = rankingCallFor(settings)
 ): Promise<{ cards: SwipeCard[]; ranked: boolean }> => {
   if (!isAiRankingConfigured(settings) || candidates.length < 2) {
     return { cards: candidates, ranked: false };
@@ -160,10 +283,10 @@ export const rankCandidates = async (
 };
 
 /** Minimal call used by the settings test button. */
-export const testClaudeConnection = async (
+export const testAiConnection = async (
   settings: SwipeSettings
 ): Promise<void> => {
-  const ranking = await callClaudeRanking(
+  const ranking = await rankingCallFor(settings)(
     settings,
     buildRankingPrompt(
       'movie',

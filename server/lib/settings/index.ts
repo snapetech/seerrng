@@ -229,7 +229,7 @@ export const defaultSlskdnSettings = (): SlskdnSettings => ({
   searchFilter: '',
 });
 
-export type SwipeAiProvider = 'none' | 'anthropic';
+export type SwipeAiProvider = 'none' | 'anthropic' | 'openai';
 export type SwipeAiEffort = 'low' | 'medium' | 'high';
 
 /**
@@ -239,19 +239,26 @@ export type SwipeAiEffort = 'low' | 'medium' | 'high';
 export interface SwipeSettings {
   enabled: boolean;
   aiProvider: SwipeAiProvider;
-  /** Anthropic API key, used only when aiProvider is `anthropic`. */
+  /** API key for the selected provider (optional for local servers). */
   aiApiKey: string;
   aiModel: string;
+  /**
+   * OpenAI-compatible base URL, used only when aiProvider is `openai`
+   * (OpenAI, or a local server such as Ollama or LM Studio).
+   */
+  aiBaseUrl: string;
   aiEffort: SwipeAiEffort;
 }
 
 export const DEFAULT_SWIPE_AI_MODEL = 'claude-opus-5-5';
+export const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 export const defaultSwipeSettings = (): SwipeSettings => ({
   enabled: true,
   aiProvider: 'none',
   aiApiKey: '',
   aiModel: DEFAULT_SWIPE_AI_MODEL,
+  aiBaseUrl: DEFAULT_OPENAI_BASE_URL,
   aiEffort: 'low',
 });
 

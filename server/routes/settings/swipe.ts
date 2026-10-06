@@ -1,12 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Permission } from '@server/lib/permissions';
 import {
+  DEFAULT_OPENAI_BASE_URL,
   DEFAULT_SWIPE_AI_MODEL,
   getSettings,
   type SwipeSettings,
 } from '@server/lib/settings';
 import { clearSwipeDecks } from '@server/lib/swipe/deck';
-import { testClaudeConnection } from '@server/lib/swipe/ranking';
+import { AiProviderError, testAiConnection } from '@server/lib/swipe/ranking';
 import { authorizedMutation } from '@server/middleware/authorizedMutation';
 import { REDACTED_SECRET } from '@server/utils/security';
 import { Router } from 'express';
@@ -27,14 +28,18 @@ export const parseSwipeSettings = (
     return { error: 'Enabled must be true or false.' };
   }
   const aiProvider = value.aiProvider ?? current.aiProvider;
-  if (aiProvider !== 'none' && aiProvider !== 'anthropic') {
+  if (
+    aiProvider !== 'none' &&
+    aiProvider !== 'anthropic' &&
+    aiProvider !== 'openai'
+  ) {
     return { error: 'Choose a supported AI provider.' };
   }
   const aiModel = value.aiModel === undefined ? current.aiModel : value.aiModel;
   if (
     typeof aiModel !== 'string' ||
     aiModel.length > 100 ||
-    !/^[a-z0-9][a-z0-9.\-:@]*$/i.test(aiModel || DEFAULT_SWIPE_AI_MODEL)
+    !/^[a-z0-9][a-z0-9._\-:@/]*$/i.test(aiModel || DEFAULT_SWIPE_AI_MODEL)
   ) {
     return { error: 'AI model ID is invalid.' };
   }
@@ -65,12 +70,36 @@ export const parseSwipeSettings = (
     return { error: 'Enter an Anthropic API key to use AI ranking.' };
   }
 
+  const aiBaseUrlValue = value.aiBaseUrl ?? current.aiBaseUrl;
+  if (typeof aiBaseUrlValue !== 'string' || aiBaseUrlValue.length > 2048) {
+    return { error: 'AI base URL is invalid.' };
+  }
+  const aiBaseUrl = aiBaseUrlValue.trim() || DEFAULT_OPENAI_BASE_URL;
+  try {
+    const parsedUrl = new URL(aiBaseUrl);
+    if (
+      !['http:', 'https:'].includes(parsedUrl.protocol) ||
+      parsedUrl.username ||
+      parsedUrl.password
+    ) {
+      throw new Error();
+    }
+  } catch {
+    return { error: 'AI base URL must be an http or https address.' };
+  }
+  if (aiProvider === 'openai' && !aiModel.trim()) {
+    return { error: 'Enter the model name to use with this server.' };
+  }
+
   return {
     value: {
       enabled,
       aiProvider,
       aiApiKey,
-      aiModel: aiModel.trim() || DEFAULT_SWIPE_AI_MODEL,
+      aiModel:
+        aiModel.trim() ||
+        (aiProvider === 'anthropic' ? DEFAULT_SWIPE_AI_MODEL : ''),
+      aiBaseUrl,
       aiEffort,
     },
   };
@@ -114,12 +143,15 @@ swipeSettingsRoutes.post(
   '/test',
   authorizedMutation(Permission.ADMIN, async (req, res) => {
     const parsed = parseSwipeSettings(
-      { ...(isRecord(req.body) ? req.body : {}), aiProvider: 'anthropic' },
+      isRecord(req.body) ? req.body : {},
       getSettings().swipe
     );
     if ('error' in parsed) return res.status(400).json({ error: parsed.error });
+    if (parsed.value.aiProvider === 'none') {
+      return res.status(400).json({ error: 'Choose an AI provider to test.' });
+    }
     try {
-      await testClaudeConnection(parsed.value);
+      await testAiConnection(parsed.value);
       return res.status(200).json({ success: true });
     } catch (error) {
       const message =
@@ -131,9 +163,11 @@ swipeSettingsRoutes.post(
               ? 'Anthropic is rate limiting this key. Try again shortly.'
               : error instanceof Anthropic.APIError
                 ? `Anthropic returned HTTP ${error.status ?? 'error'}.`
-                : error instanceof Error
+                : error instanceof AiProviderError
                   ? error.message
-                  : 'The AI provider could not be reached.';
+                  : error instanceof Error
+                    ? error.message
+                    : 'The AI provider could not be reached.';
       return res.status(502).json({ success: false, error: message });
     }
   })

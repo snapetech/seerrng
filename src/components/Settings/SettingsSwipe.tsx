@@ -18,12 +18,20 @@ const messages = defineMessages('components.Settings.SettingsSwipe', {
   description:
     'Swipe shows people a stack of movies, series, and books picked from their requests and swipes. Swiping right makes a normal request with the usual approval rules.',
   aiNote:
-    'Optional: connect Claude to order each deck and explain why a title was picked. Decks still come only from SeerrNG’s catalogs, and swiping keeps working if the AI provider is unavailable. Titles, taste notes, and swipe history are sent to Anthropic when this is on.',
+    'Optional: connect an AI provider to order each deck and explain why a title was picked. Decks still come only from SeerrNG’s catalogs, and swiping keeps working if the AI provider is unavailable. Titles, taste notes, and swipe history are sent to the provider when this is on.',
   loadError: 'Swipe settings could not be loaded.',
   enabled: 'Enable Swipe',
   aiProvider: 'AI Ordering',
   aiNone: 'Off (catalog order)',
   aiAnthropic: 'Anthropic Claude',
+  aiOpenAi: 'OpenAI or compatible (Ollama, LM Studio)',
+  baseUrl: 'Base URL',
+  baseUrlHelp:
+    'OpenAI: https://api.openai.com/v1. Local servers: their OpenAI-compatible URL, for example http://ollama:11434/v1.',
+  openAiKey: 'API Key',
+  openAiKeyHelp: 'Optional for local servers that do not require a key.',
+  openAiModelHelp:
+    'The model name the server expects, for example a model you pulled into Ollama.',
   apiKey: 'Anthropic API Key',
   savedSecret: 'Saved — leave empty to keep it',
   clearSecret: 'Remove the saved API key',
@@ -36,6 +44,7 @@ const messages = defineMessages('components.Settings.SettingsSwipe', {
   medium: 'Medium',
   high: 'High',
   test: 'Test AI Ordering',
+  testOkGeneric: 'The AI provider answered the test request.',
   testing: 'Testing…',
   testOk: 'Claude answered the test request.',
   save: 'Save Changes',
@@ -122,7 +131,9 @@ const SettingsSwipe = () => {
     }
   };
 
-  const usesAi = draft?.aiProvider === 'anthropic';
+  const usesAi =
+    draft?.aiProvider === 'anthropic' || draft?.aiProvider === 'openai';
+  const usesOpenAi = draft?.aiProvider === 'openai';
 
   return (
     <section className="app-card-sub settings-group-card">
@@ -171,12 +182,21 @@ const SettingsSwipe = () => {
                     id="swipe-ai-provider"
                     value={draft.aiProvider}
                     disabled={isSaving}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const aiProvider = event.currentTarget
+                        .value as SwipeSettings['aiProvider'];
                       update({
-                        aiProvider: event.currentTarget
-                          .value as SwipeSettings['aiProvider'],
-                      })
-                    }
+                        aiProvider,
+                        // Each provider needs its own model name.
+                        aiModel:
+                          aiProvider === 'anthropic'
+                            ? DEFAULT_MODEL
+                            : aiProvider === 'openai' &&
+                                draft.aiModel === DEFAULT_MODEL
+                              ? ''
+                              : draft.aiModel,
+                      });
+                    }}
                   >
                     <option value="none">
                       {intl.formatMessage(messages.aiNone)}
@@ -184,15 +204,45 @@ const SettingsSwipe = () => {
                     <option value="anthropic">
                       {intl.formatMessage(messages.aiAnthropic)}
                     </option>
+                    <option value="openai">
+                      {intl.formatMessage(messages.aiOpenAi)}
+                    </option>
                   </select>
                 </div>
               </div>
             </div>
             {usesAi && (
               <>
+                {usesOpenAi && (
+                  <div className="form-row">
+                    <label htmlFor="swipe-ai-base-url">
+                      {intl.formatMessage(messages.baseUrl)}
+                    </label>
+                    <div className="form-input-area">
+                      <div className="form-input-field">
+                        <input
+                          id="swipe-ai-base-url"
+                          type="text"
+                          inputMode="url"
+                          maxLength={2048}
+                          disabled={isSaving}
+                          value={draft.aiBaseUrl}
+                          onChange={(event) =>
+                            update({ aiBaseUrl: event.currentTarget.value })
+                          }
+                        />
+                      </div>
+                      <p className="settings-form-row-description">
+                        {intl.formatMessage(messages.baseUrlHelp)}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="form-row">
                   <label htmlFor="swipe-ai-key">
-                    {intl.formatMessage(messages.apiKey)}
+                    {intl.formatMessage(
+                      usesOpenAi ? messages.openAiKey : messages.apiKey
+                    )}
                   </label>
                   <div className="form-input-area">
                     <div className="form-input-field">
@@ -219,6 +269,11 @@ const SettingsSwipe = () => {
                         }
                       />
                     </div>
+                    {usesOpenAi && (
+                      <p className="settings-form-row-description">
+                        {intl.formatMessage(messages.openAiKeyHelp)}
+                      </p>
+                    )}
                     {data.aiApiKey && (
                       <div className="form-input-field">
                         <SettingsField
@@ -249,56 +304,62 @@ const SettingsSwipe = () => {
                         maxLength={100}
                         disabled={isSaving}
                         value={draft.aiModel}
-                        placeholder={DEFAULT_MODEL}
+                        placeholder={usesOpenAi ? '' : DEFAULT_MODEL}
                         onChange={(event) =>
                           update({ aiModel: event.currentTarget.value })
                         }
                       />
                     </div>
                     <p className="settings-form-row-description">
-                      {intl.formatMessage(messages.modelHelp, {
-                        model: DEFAULT_MODEL,
-                      })}
+                      {usesOpenAi
+                        ? intl.formatMessage(messages.openAiModelHelp)
+                        : intl.formatMessage(messages.modelHelp, {
+                            model: DEFAULT_MODEL,
+                          })}
                     </p>
                   </div>
                 </div>
-                <div className="form-row">
-                  <label htmlFor="swipe-ai-effort">
-                    {intl.formatMessage(messages.effort)}
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <select
-                        id="swipe-ai-effort"
-                        value={draft.aiEffort}
-                        disabled={isSaving}
-                        onChange={(event) =>
-                          update({
-                            aiEffort: event.currentTarget
-                              .value as SwipeSettings['aiEffort'],
-                          })
-                        }
-                      >
-                        <option value="low">
-                          {intl.formatMessage(messages.low)}
-                        </option>
-                        <option value="medium">
-                          {intl.formatMessage(messages.medium)}
-                        </option>
-                        <option value="high">
-                          {intl.formatMessage(messages.high)}
-                        </option>
-                      </select>
+                {!usesOpenAi && (
+                  <div className="form-row">
+                    <label htmlFor="swipe-ai-effort">
+                      {intl.formatMessage(messages.effort)}
+                    </label>
+                    <div className="form-input-area">
+                      <div className="form-input-field">
+                        <select
+                          id="swipe-ai-effort"
+                          value={draft.aiEffort}
+                          disabled={isSaving}
+                          onChange={(event) =>
+                            update({
+                              aiEffort: event.currentTarget
+                                .value as SwipeSettings['aiEffort'],
+                            })
+                          }
+                        >
+                          <option value="low">
+                            {intl.formatMessage(messages.low)}
+                          </option>
+                          <option value="medium">
+                            {intl.formatMessage(messages.medium)}
+                          </option>
+                          <option value="high">
+                            {intl.formatMessage(messages.high)}
+                          </option>
+                        </select>
+                      </div>
+                      <p className="settings-form-row-description">
+                        {intl.formatMessage(messages.effortHelp)}
+                      </p>
                     </div>
-                    <p className="settings-form-row-description">
-                      {intl.formatMessage(messages.effortHelp)}
-                    </p>
                   </div>
-                </div>
+                )}
                 {testResult &&
                   (testResult.ok ? (
                     <Alert type="info">
-                      {intl.formatMessage(messages.testOk)}
+                      {intl.formatMessage(
+                        usesOpenAi ? messages.testOkGeneric : messages.testOk
+                      )}
                     </Alert>
                   ) : (
                     <Alert type="error" title={testResult.error} />

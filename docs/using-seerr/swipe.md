@@ -43,9 +43,18 @@ describe what you are in the mood for; the AI uses it to order your picks.
 Swipe is on by default for everyone who can make requests. Turn it off, or set
 up AI ordering, under **Settings → Services → Swipe Discovery**.
 
-AI ordering is optional and uses Anthropic Claude (default model
-`claude-opus-5-5`, effort Low). Claude only reorders the titles SeerrNG already
-picked and adds a short reason to each; it cannot add titles. If the AI is
-unavailable or declines, the deck keeps its normal order. When AI ordering is
-on, deck titles, the user's swipe history, and their mood notes are sent to
-Anthropic. Use **Test AI Ordering** to check the key and model.
+AI ordering is optional. Choose a provider:
+
+- **Anthropic Claude**: enter an Anthropic API key. The default model is
+  `claude-opus-5-5` at Low effort.
+- **OpenAI or compatible**: enter the base URL and model name. Use
+  `https://api.openai.com/v1` with an OpenAI key, or a local OpenAI-compatible
+  server such as Ollama (`http://ollama:11434/v1`) or LM Studio, which usually
+  need no key. SeerrNG asks for a JSON-schema reply and falls back to plain JSON
+  mode for servers that do not support schemas.
+
+The AI only reorders the titles SeerrNG already picked and adds a short reason
+to each; it cannot add titles. If the AI is unavailable, declines, or returns
+an invalid answer, the deck keeps its normal order. When AI ordering is on,
+deck titles, the user's swipe history, and their mood notes are sent to the
+provider (nothing leaves your network with a local server). Use **Test AI Ordering** to check the key and model.

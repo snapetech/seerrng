@@ -101,15 +101,19 @@ components:
           type: boolean
         aiProvider:
           type: string
-          enum: [none, anthropic]
+          enum: [none, anthropic, openai]
         aiApiKey:
           type: string
-          description: Anthropic API key. Omit or send the redacted value to keep the saved key.
+          description: API key for the selected AI provider (optional for local OpenAI-compatible servers). Omit or send the redacted value to keep the saved key.
         clearAiApiKey:
           type: boolean
         aiModel:
           type: string
           maxLength: 100
+        aiBaseUrl:
+          type: string
+          maxLength: 2048
+          description: OpenAI-compatible base URL for the `openai` provider, for example https://api.openai.com/v1 or http://ollama:11434/v1.
         aiEffort:
           type: string
           enum: [low, medium, high]
@@ -9160,7 +9164,7 @@ paths:
   /settings/swipe/test:
     post:
       summary: Test the swipe AI provider
-      description: Sends one small ranking request to Anthropic with the submitted or saved key and model. Settings are not saved.
+      description: Sends one small ranking request to the selected AI provider with the submitted or saved key and model. Settings are not saved.
       tags:
         - settings
       requestBody:
