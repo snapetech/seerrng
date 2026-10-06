@@ -7,6 +7,7 @@ import MediaServerPlayButton from '@app/components/Common/MediaServerPlayButton'
 import PageErrorMessage from '@app/components/Common/PageErrorMessage';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
+import LiveTvButton from '@app/components/LiveTv/LiveTvButton';
 import MediaServerCollectionButton from '@app/components/MediaDetails/MediaServerCollectionButton';
 import MediaServerWatchlistButton from '@app/components/MediaDetails/MediaServerWatchlistButton';
 import RequestButton from '@app/components/RequestButton';
@@ -538,6 +539,11 @@ const TvDetails = ({
 
   const secondaryActions = (
     <>
+      <LiveTvButton
+        titles={[data.name, data.originalName]}
+        mediaType="tv"
+        tmdbId={data.id}
+      />
       {data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
         user?.userType !== UserType.PLEX && (
           <Tooltip

@@ -13,6 +13,7 @@ import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadCl
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
+import SettingsTunerr from '@app/components/Settings/SettingsTunerr';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { getSafeHref } from '@app/utils/safeUrl';
@@ -1388,6 +1389,7 @@ const SettingsServices = () => {
       </div>
       <SettingsProwlarr />
       <SettingsDownloadClients />
+      <SettingsTunerr />
       <SettingsSoftwareAcquisition />
       {overrideRuleModal.open &&
         radarrData &&

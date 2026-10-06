@@ -7,6 +7,7 @@ import MediaServerPlayButton from '@app/components/Common/MediaServerPlayButton'
 import PageTitle from '@app/components/Common/PageTitle';
 import PlayOnDeviceButton from '@app/components/Common/PlayOnDeviceButton';
 import Tooltip from '@app/components/Common/Tooltip';
+import LiveTvButton from '@app/components/LiveTv/LiveTvButton';
 import MovieDetailsLayout from '@app/components/MovieDetails/MovieDetailsLayout';
 import RequestButton from '@app/components/RequestButton';
 import usePlaybackCatalog from '@app/hooks/usePlaybackCatalog';
@@ -455,6 +456,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
 
   const secondaryActions = (
     <>
+      <LiveTvButton
+        titles={[data.title, data.originalTitle]}
+        mediaType="movie"
+        tmdbId={data.id}
+      />
       {data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
         user?.userType !== UserType.PLEX && (
           <Tooltip

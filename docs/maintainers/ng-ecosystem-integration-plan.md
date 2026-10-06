@@ -51,6 +51,16 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 1 Stall signal for Download Recovery | pending | |
 | 1 Pre-approval free-space check | pending | Needs TorrentNG `/api/v1/storage`; other clients do not expose per-root free space the same way. |
 | 1 Per-category tags / ratio groups | pending | Would be the first write to a client; needs a maintainer decision. |
+| 2 Worktree | done | Phase 2 is on branch `feat/ng-phase2-tunerr` in worktree `~/Code/seerrng-phase2` because another editor is changing Phase 1 in `~/Code/seerrng`. Merge back to main when both are done. |
+| 2 Tunerr auth | done (no fork change) | The deck accepts HTTP Basic auth and proxies `/api/*` to the tuner from localhost. Requires `IPTV_TUNERR_WEBUI_ALLOW_LAN=1`. Resolves open question 1. |
+| 2 Guide index | done | Streaming XMLTV parser + title index over the tuner's `/guide.xml` (`server/lib/liveTv/`). The capsules API caps at 250 rows, so it is not used. 13 unit tests. |
+| 2 RecordingRequest entity + migrations | done | SQLite and Postgres migrations `1791040000000`; SQLite migration test. Postgres migration not run locally. |
+| 2 Live TV API + sync job | done | `/api/v1/live-tv/*`, `/api/v1/settings/tunerr`, `live-tv-sync` job. Integration test against a fake deck and guide (4 tests), OpenAPI validator test (5), settings parser (5). |
+| 2 UI | built | On Live TV button + dialog on movie/series pages, `/recordings` page, Settings → Services section. Component test (4). Needs human visual review. No sidebar entry yet (sidebar links cannot be conditional on settings today). |
+| 2 Tunerr fork: rule-driven recorder | pending | Required for recording to work at all: Tunerr's recorder ignores rules today. Add `title_equals`, `start_after`/`start_before`, a rules-only recorder mode, and `features` in the rules response. |
+| 2 Sports "follow my team" | pending | |
+| 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
+| 2 Recording notifications | pending | Requests do not notify yet. |
 
 Local test note: on macOS, run server tests with a non-symlinked `TMPDIR`
 (the logger rejects `/var` symlinks), for example
