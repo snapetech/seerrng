@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { issueLiveDownloadToken } from '@server/lib/liveDownloadTokens';
 import type { LiveDownloadSettings } from '@server/lib/settings';
 import { parseLiveDownloadIds } from '@server/routes/live';
 import {
@@ -103,20 +104,30 @@ describe('parseLiveDownloadSettings', () => {
 });
 
 describe('parseLiveDownloadIds', () => {
-  it('keeps unique torrent hashes and drops other IDs', () => {
+  it('accepts only IDs issued for the requesting user', () => {
     const hash = 'A'.repeat(40);
+    const token = issueLiveDownloadToken(hash, 7);
+    assert.ok(token);
     assert.deepEqual(
-      parseLiveDownloadIds(`${hash},${hash.toLowerCase()},SABnzbd_nzo_1,,zz`),
-      [hash.toLowerCase()]
+      parseLiveDownloadIds(`${token},${token},SABnzbd_nzo_1,,zz`, 7),
+      [{ id: token, hash: hash.toLowerCase() }]
     );
-    assert.deepEqual(parseLiveDownloadIds(undefined), []);
-    assert.deepEqual(parseLiveDownloadIds(['a']), []);
+    assert.deepEqual(parseLiveDownloadIds(`${token}`, 8), []);
+    assert.deepEqual(parseLiveDownloadIds(hash, 7), []);
+    assert.deepEqual(parseLiveDownloadIds(hash, 7, true), [
+      { id: hash.toLowerCase(), hash: hash.toLowerCase() },
+    ]);
+    assert.deepEqual(parseLiveDownloadIds(undefined, 7), []);
+    assert.deepEqual(parseLiveDownloadIds(['a'], 7), []);
   });
 
-  it('caps the number of hashes per stream', () => {
-    const ids = Array.from({ length: 150 }, (_, index) =>
-      index.toString(16).padStart(40, '0')
-    ).join(',');
-    assert.equal(parseLiveDownloadIds(ids).length, 100);
+  it('caps the number of IDs per stream', () => {
+    const tokens = Array.from({ length: 150 }, (_, index) => {
+      const hash = index.toString(16).padStart(40, '0');
+      const token = issueLiveDownloadToken(hash, 7);
+      assert.ok(token);
+      return token;
+    }).join(',');
+    assert.equal(parseLiveDownloadIds(tokens, 7).length, 100);
   });
 });

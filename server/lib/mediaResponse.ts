@@ -3,6 +3,7 @@ import type { MediaRequest } from '@server/entity/MediaRequest';
 import type SeasonRequest from '@server/entity/SeasonRequest';
 import type { User } from '@server/entity/User';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
+import { issueLiveDownloadToken } from '@server/lib/liveDownloadTokens';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { createHmac } from 'node:crypto';
@@ -89,8 +90,16 @@ export const aliasDownloadId = (
   secret = getSettings().sessionSecret
 ): string => createHmac('sha256', secret).update(downloadId).digest('hex');
 
-const projectDownloadForNonAdmin = (item: DownloadingItem): DownloadingItem =>
-  ({
+const projectDownloadForNonAdmin = (
+  item: DownloadingItem,
+  userId: number | undefined
+): DownloadingItem => {
+  const liveDownloadToken =
+    userId === undefined
+      ? undefined
+      : issueLiveDownloadToken(item.downloadId, userId);
+
+  return {
     mediaType: item.mediaType,
     externalId: 0,
     size: item.size,
@@ -103,13 +112,15 @@ const projectDownloadForNonAdmin = (item: DownloadingItem): DownloadingItem =>
     // download. A one-way alias preserves that behavior without exposing the
     // downloader's queue or torrent identifier.
     downloadId: item.downloadId ? aliasDownloadId(item.downloadId) : '',
+    ...(liveDownloadToken ? { liveDownloadToken } : {}),
     episode: item.episode
       ? ({
           seasonNumber: item.episode.seasonNumber,
           episodeNumber: item.episode.episodeNumber,
         } as DownloadingItem['episode'])
       : undefined,
-  }) as DownloadingItem;
+  } as DownloadingItem;
+};
 
 /**
  * Removes backend routing identifiers and release details that the UI does
@@ -125,14 +136,14 @@ export const restrictMediaOperationalFieldsForUser = (
 
   const isAdmin = user?.hasPermission(Permission.ADMIN) ?? false;
   if (!isAdmin) {
-    media.downloadStatus = (media.downloadStatus ?? []).map(
-      projectDownloadForNonAdmin
+    media.downloadStatus = (media.downloadStatus ?? []).map((item) =>
+      projectDownloadForNonAdmin(item, user?.id)
     );
-    media.downloadStatus4k = (media.downloadStatus4k ?? []).map(
-      projectDownloadForNonAdmin
+    media.downloadStatus4k = (media.downloadStatus4k ?? []).map((item) =>
+      projectDownloadForNonAdmin(item, user?.id)
     );
     media.audiobookDownloadStatus = (media.audiobookDownloadStatus ?? []).map(
-      projectDownloadForNonAdmin
+      (item) => projectDownloadForNonAdmin(item, user?.id)
     );
   }
 

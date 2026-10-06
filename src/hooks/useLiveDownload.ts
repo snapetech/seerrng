@@ -1,5 +1,6 @@
 import {
   type LiveDownload,
+  isLiveDownloadToken,
   liveDownloadStore,
   toInfoHash,
 } from '@app/utils/liveDownloadStore';
@@ -13,25 +14,40 @@ const subscribeNone = () => noop;
 const getNone = () => undefined;
 
 /**
- * Live torrent progress for one download ID, or undefined when the ID is not
- * a torrent, no download client reports it, or live progress is not set up.
+ * Selects a safe browser subscription ID. Non-admin responses carry an
+ * opaque user-scoped token; only administrators may subscribe by raw hash.
+ */
+export const getLiveDownloadSubscriptionId = (
+  item: DownloadingItem | undefined,
+  allowRawHash = false
+): string | undefined => {
+  if (isLiveDownloadToken(item?.liveDownloadToken)) {
+    return item.liveDownloadToken;
+  }
+  return allowRawHash ? toInfoHash(item?.downloadId) : undefined;
+};
+
+/**
+ * Live torrent progress for one visible download, or undefined when no
+ * download client reports it or live progress is not set up.
  */
 export const useLiveDownload = (
-  downloadId: string | undefined
+  item: DownloadingItem | undefined,
+  allowRawHash = false
 ): LiveDownload | undefined => {
-  const hash = toInfoHash(downloadId);
+  const id = getLiveDownloadSubscriptionId(item, allowRawHash);
   const subscribe = useCallback(
     (listener: () => void) =>
-      hash ? liveDownloadStore.subscribe(hash, listener) : noop,
-    [hash]
+      id ? liveDownloadStore.subscribe(id, listener) : noop,
+    [id]
   );
   const getSnapshot = useCallback(
-    () => (hash ? liveDownloadStore.get(hash) : undefined),
-    [hash]
+    () => (id ? liveDownloadStore.get(id) : undefined),
+    [id]
   );
   return useSyncExternalStore(
-    hash ? subscribe : subscribeNone,
-    hash ? getSnapshot : getNone,
+    id ? subscribe : subscribeNone,
+    id ? getSnapshot : getNone,
     getNone
   );
 };
@@ -62,6 +78,7 @@ export const applyLiveDownload = (
 };
 
 export const useLiveDownloadingItem = (
-  item: DownloadingItem
+  item: DownloadingItem,
+  allowRawHash = false
 ): LiveDownloadingItem =>
-  applyLiveDownload(item, useLiveDownload(item.downloadId));
+  applyLiveDownload(item, useLiveDownload(item, allowRawHash));

@@ -56,6 +56,8 @@ export interface DownloadingItem {
   estimatedCompletionTime: Date;
   title: string;
   downloadId: string;
+  /** Opaque, user-scoped ID for live torrent progress. */
+  liveDownloadToken?: string;
   percent?: number;
   trackedDownloadStatus?: string;
   trackedDownloadState?: string;

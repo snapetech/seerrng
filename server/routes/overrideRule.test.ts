@@ -87,7 +87,11 @@ async function login() {
     const res = await agent
       .post('/auth/local')
       .send({ email: 'admin@seerr.dev', password: 'test1234' });
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      res.status,
+      200,
+      `Local login failed with NODE_ENV=${process.env.NODE_ENV}: ${JSON.stringify(res.body)}`
+    );
     return agent;
   } finally {
     settings.main.localLogin = priorLocalLogin;

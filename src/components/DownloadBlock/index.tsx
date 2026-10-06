@@ -52,7 +52,10 @@ const DownloadBlock = ({
   const { addToast } = useToasts();
   const { mutate } = useSWRConfig();
   const [isFailing, setIsFailing] = useState(false);
-  const downloadItem = useLiveDownloadingItem(queueItem);
+  const downloadItem = useLiveDownloadingItem(
+    queueItem,
+    hasPermission(Permission.ADMIN)
+  );
   const live = downloadItem.live;
   const displayTitle = hasPermission(Permission.ADMIN)
     ? downloadItem.title

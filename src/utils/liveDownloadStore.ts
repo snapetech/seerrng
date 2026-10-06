@@ -1,7 +1,7 @@
 /**
  * Browser-side store for live torrent progress. One EventSource per tab
- * carries every info hash currently rendered; components read individual
- * hashes through `useLiveDownload`.
+ * carries every live download ID currently rendered; components read values
+ * through `useLiveDownload`.
  */
 
 export type LiveDownloadState =
@@ -17,7 +17,7 @@ export type LiveDownloadState =
   | 'unknown';
 
 export interface LiveDownload {
-  hash: string;
+  id: string;
   state: LiveDownloadState;
   size: number;
   sizeLeft: number;
@@ -33,6 +33,7 @@ export interface LiveDownload {
 }
 
 const INFO_HASH_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const LIVE_DOWNLOAD_TOKEN_PATTERN = /^ld1_[A-Za-z0-9_-]{32}$/;
 const RECONNECT_DEBOUNCE_MS = 300;
 const STREAM_URL = '/api/v1/live/downloads';
 
@@ -42,13 +43,16 @@ export const toInfoHash = (downloadId: unknown): string | undefined => {
   return INFO_HASH_PATTERN.test(hash) ? hash : undefined;
 };
 
+export const isLiveDownloadToken = (value: unknown): value is string =>
+  typeof value === 'string' && LIVE_DOWNLOAD_TOKEN_PATTERN.test(value);
+
 type Listener = () => void;
 
 const isLiveDownload = (value: unknown): value is LiveDownload => {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
   return (
-    typeof item.hash === 'string' &&
+    typeof item.id === 'string' &&
     typeof item.state === 'string' &&
     typeof item.size === 'number' &&
     typeof item.sizeLeft === 'number' &&
@@ -70,25 +74,24 @@ export class LiveDownloadStore {
       new EventSource(url, { withCredentials: true })
   ) {}
 
-  public get = (hash: string): LiveDownload | undefined =>
-    this.values.get(hash);
+  public get = (id: string): LiveDownload | undefined => this.values.get(id);
 
-  public subscribe(hash: string, listener: Listener): () => void {
-    let set = this.listeners.get(hash);
+  public subscribe(id: string, listener: Listener): () => void {
+    let set = this.listeners.get(id);
     if (!set) {
       set = new Set();
-      this.listeners.set(hash, set);
+      this.listeners.set(id, set);
       this.scheduleReconnect();
     }
     set.add(listener);
 
     return () => {
-      const current = this.listeners.get(hash);
+      const current = this.listeners.get(id);
       if (!current) return;
       current.delete(listener);
       if (current.size === 0) {
-        this.listeners.delete(hash);
-        this.values.delete(hash);
+        this.listeners.delete(id);
+        this.values.delete(id);
         this.scheduleReconnect();
       }
     };
@@ -98,9 +101,18 @@ export class LiveDownloadStore {
   public receive(payload: unknown): void {
     if (!Array.isArray(payload)) return;
     for (const item of payload) {
-      if (!isLiveDownload(item) || !this.listeners.has(item.hash)) continue;
-      this.values.set(item.hash, item);
-      this.listeners.get(item.hash)?.forEach((listener) => listener());
+      if (!item || typeof item !== 'object') continue;
+      const event = item as Record<string, unknown>;
+      const id = event.id;
+      if (typeof id !== 'string' || !this.listeners.has(id)) continue;
+      if (event.unavailable === true) {
+        this.values.delete(id);
+        this.listeners.get(id)?.forEach((listener) => listener());
+        continue;
+      }
+      if (!isLiveDownload(item)) continue;
+      this.values.set(id, item);
+      this.listeners.get(id)?.forEach((listener) => listener());
     }
   }
 
@@ -114,8 +126,8 @@ export class LiveDownloadStore {
   }
 
   private connect(): void {
-    const hashes = [...this.listeners.keys()].sort();
-    const key = hashes.join(',');
+    const ids = [...this.listeners.keys()].sort();
+    const key = ids.join(',');
     if (key === this.sourceKey && this.source) return;
 
     this.source?.close();

@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { applyLiveDownload } from '@app/hooks/useLiveDownload';
+import {
+  applyLiveDownload,
+  getLiveDownloadSubscriptionId,
+} from '@app/hooks/useLiveDownload';
 import {
   type LiveDownload,
   LiveDownloadStore,
+  isLiveDownloadToken,
   toInfoHash,
 } from '@app/utils/liveDownloadStore';
 import { MediaType } from '@server/constants/media';
@@ -13,7 +17,7 @@ import type { DownloadingItem } from '@server/lib/downloadtracker';
 const HASH = 'a'.repeat(40);
 
 const live = (overrides: Partial<LiveDownload> = {}): LiveDownload => ({
-  hash: HASH,
+  id: HASH,
   state: 'downloading',
   size: 1000,
   sizeLeft: 250,
@@ -47,15 +51,39 @@ describe('toInfoHash', () => {
   });
 });
 
+describe('live download subscription IDs', () => {
+  it('uses the opaque token for users and raw hashes only for administrators', () => {
+    const token = 'ld1_0123456789abcdefghijklmnopqrstuv';
+    const userItem: DownloadingItem = {
+      ...queueItem,
+      downloadId: 'b'.repeat(64),
+      liveDownloadToken: token,
+    };
+    const aliasedItem: DownloadingItem = {
+      ...queueItem,
+      // Non-admin downloadId values are 64-character HMAC aliases.
+      downloadId: 'c'.repeat(64),
+    };
+
+    assert.equal(isLiveDownloadToken(token), true);
+    assert.equal(getLiveDownloadSubscriptionId(userItem), token);
+    assert.equal(getLiveDownloadSubscriptionId(aliasedItem), undefined);
+    assert.equal(
+      getLiveDownloadSubscriptionId(aliasedItem, true),
+      'c'.repeat(64)
+    );
+  });
+});
+
 describe('LiveDownloadStore', () => {
-  it('stores only subscribed hashes and notifies their listeners', () => {
+  it('stores only subscribed IDs and notifies their listeners', () => {
     const store = new LiveDownloadStore();
     let notified = 0;
     const unsubscribe = store.subscribe(HASH, () => {
       notified += 1;
     });
 
-    store.receive([live(), live({ hash: 'b'.repeat(40) }), { bad: true }]);
+    store.receive([live(), live({ id: 'b'.repeat(40) }), { bad: true }]);
     assert.equal(notified, 1);
     assert.equal(store.get(HASH)?.sizeLeft, 250);
     assert.equal(store.get('b'.repeat(40)), undefined);
@@ -69,6 +97,19 @@ describe('LiveDownloadStore', () => {
     store.subscribe(HASH, () => undefined);
     store.receive({ hash: HASH });
     assert.equal(store.get(HASH), undefined);
+  });
+
+  it('clears stale progress when the server marks an ID unavailable', () => {
+    const store = new LiveDownloadStore();
+    let notified = 0;
+    store.subscribe(HASH, () => {
+      notified += 1;
+    });
+    store.receive([live()]);
+    store.receive([{ id: HASH, unavailable: true }]);
+
+    assert.equal(store.get(HASH), undefined);
+    assert.equal(notified, 2);
   });
 });
 

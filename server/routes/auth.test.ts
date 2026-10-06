@@ -3525,7 +3525,11 @@ describe('OpenID Connect', () => {
           loginRequest.set('Cookie', cookieHeader);
         }
         const loginResponse = await loginRequest;
-        assert.strictEqual(loginResponse.status, 200);
+        assert.strictEqual(
+          loginResponse.status,
+          200,
+          `OIDC login attempt ${index} failed: ${JSON.stringify(loginResponse.body)}`
+        );
         authorizationUrls.push(new URL(loginResponse.body.redirectUrl));
         applySetCookies(loginResponse.get('Set-Cookie'));
       }
