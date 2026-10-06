@@ -229,6 +229,32 @@ export const defaultSlskdnSettings = (): SlskdnSettings => ({
   searchFilter: '',
 });
 
+export type SwipeAiProvider = 'none' | 'anthropic';
+export type SwipeAiEffort = 'low' | 'medium' | 'high';
+
+/**
+ * Swipe discovery. Decks come from SeerrNG's own catalogs; an optional AI
+ * provider only reorders them and explains each pick.
+ */
+export interface SwipeSettings {
+  enabled: boolean;
+  aiProvider: SwipeAiProvider;
+  /** Anthropic API key, used only when aiProvider is `anthropic`. */
+  aiApiKey: string;
+  aiModel: string;
+  aiEffort: SwipeAiEffort;
+}
+
+export const DEFAULT_SWIPE_AI_MODEL = 'claude-opus-5-5';
+
+export const defaultSwipeSettings = (): SwipeSettings => ({
+  enabled: true,
+  aiProvider: 'none',
+  aiApiKey: '',
+  aiModel: DEFAULT_SWIPE_AI_MODEL,
+  aiEffort: 'low',
+});
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -701,6 +727,7 @@ export interface AllSettings {
   liveDownloads: LiveDownloadSettings;
   tunerr: TunerrSettings;
   slskdn: SlskdnSettings;
+  swipe: SwipeSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
   readerDelivery: ReaderDeliverySettings;
   public: PublicSettings;
@@ -848,6 +875,7 @@ class Settings {
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
       slskdn: defaultSlskdnSettings(),
+      swipe: defaultSwipeSettings(),
       public: {
         initialized: false,
       },
@@ -1401,6 +1429,14 @@ class Settings {
     this.data.slskdn = data;
   }
 
+  get swipe(): SwipeSettings {
+    return this.data.swipe;
+  }
+
+  set swipe(data: SwipeSettings) {
+    this.data.swipe = data;
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -1772,6 +1808,7 @@ class Settings {
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
       slskdn: defaultSlskdnSettings(),
+      swipe: defaultSwipeSettings(),
       public: {
         initialized: false,
       },

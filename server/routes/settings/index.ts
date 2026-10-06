@@ -127,6 +127,7 @@ import readerDeliveryRoutes from './readerDelivery';
 import slskdnRoutes from './slskdn';
 import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
+import swipeSettingsRoutes from './swipe';
 import tunerrRoutes from './tunerr';
 
 const settingsRoutes = Router();
@@ -1437,6 +1438,7 @@ settingsRoutes.use('/prowlarr', prowlarrRoutes);
 settingsRoutes.use('/download-clients', downloadClientRoutes);
 settingsRoutes.use('/tunerr', tunerrRoutes);
 settingsRoutes.use('/slskdn', slskdnRoutes);
+settingsRoutes.use('/swipe', swipeSettingsRoutes);
 
 export const filteredMainSettings = (
   user: User,

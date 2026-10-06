@@ -18,6 +18,8 @@ tags:
     description: Live TV airings and recording requests through IPTV Tunerr.
   - name: soulseek
     description: Soulseek track requests, library-health fixes, and SongID through slskdN.
+  - name: swipe
+    description: Swipe discovery decks and swipe decisions.
   - name: auth
     description: Endpoints related to logging in or out, and the currently authenticated user.
   - name: users
@@ -64,6 +66,53 @@ servers:
 
 components:
   schemas:
+    SwipeCard:
+      type: object
+      properties:
+        mediaType:
+          type: string
+          enum: [movie, tv, book]
+        id:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        year:
+          type: integer
+        overview:
+          type: string
+        imageUrl:
+          type: string
+        rating:
+          type: number
+        authorId:
+          type: string
+        because:
+          type: string
+          description: Why the card is in the deck, for example a liked title.
+        reason:
+          type: string
+          description: AI explanation when an AI provider ranked the deck.
+    SwipeSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        aiProvider:
+          type: string
+          enum: [none, anthropic]
+        aiApiKey:
+          type: string
+          description: Anthropic API key. Omit or send the redacted value to keep the saved key.
+        clearAiApiKey:
+          type: boolean
+        aiModel:
+          type: string
+          maxLength: 100
+        aiEffort:
+          type: string
+          enum: [low, medium, high]
     TrackRequest:
       type: object
       properties:
@@ -8913,6 +8962,217 @@ paths:
           description: Unfollowed
         '404':
           description: Not following
+  /swipe/status:
+    get:
+      summary: Get swipe availability
+      description: Requires the Request permission. Returns 404 when an administrator has turned swipe off.
+      tags:
+        - swipe
+      responses:
+        '200':
+          description: Swipe is available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  aiRanking:
+                    type: boolean
+        '403':
+          description: The user cannot make requests
+        '404':
+          description: Swipe is turned off
+  /swipe/deck:
+    get:
+      summary: Get the user's swipe deck
+      description: >-
+        Returns up to 20 recommendations from SeerrNG's catalogs (TMDB
+        recommendations and trending titles, Open Library subjects and trending
+        books). Titles the user owns, requested, or already swiped are left
+        out. When an AI provider is configured it reorders the deck and adds a
+        reason to each pick.
+      tags:
+        - swipe
+      parameters:
+        - in: query
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv, book]
+        - in: query
+          name: refresh
+          schema:
+            type: string
+            enum: ['true', 'false']
+      responses:
+        '200':
+          description: Deck
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mediaType:
+                    type: string
+                  ranked:
+                    type: boolean
+                  remaining:
+                    type: integer
+                  cards:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SwipeCard'
+        '400':
+          description: Invalid media type
+        '502':
+          description: The catalogs could not be reached
+  /swipe/decisions:
+    post:
+      summary: Record a swipe
+      description: >-
+        `want` (swipe right) records interest; the client then submits the
+        request through `POST /request`. `pass` hides the title for good.
+        `seen` marks it as already watched or read and counts as a taste
+        signal.
+      tags:
+        - swipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mediaType, id, decision]
+              properties:
+                mediaType:
+                  type: string
+                  enum: [movie, tv, book]
+                id:
+                  type: string
+                  maxLength: 64
+                decision:
+                  type: string
+                  enum: [want, pass, seen]
+      responses:
+        '200':
+          description: Recorded
+        '400':
+          description: Invalid swipe
+        '404':
+          description: The card is not in the user's deck
+  /swipe/undo:
+    post:
+      summary: Undo the last pass or seen swipe
+      tags:
+        - swipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mediaType]
+              properties:
+                mediaType:
+                  type: string
+                  enum: [movie, tv, book]
+      responses:
+        '200':
+          description: The restored card
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card:
+                    $ref: '#/components/schemas/SwipeCard'
+        '404':
+          description: Nothing to undo
+        '409':
+          description: The last swipe was a request; cancel it from Requests instead
+  /swipe/profile:
+    get:
+      summary: Get the user's swipe preferences
+      tags:
+        - swipe
+      responses:
+        '200':
+          description: Preferences
+    put:
+      summary: Update the user's swipe preferences
+      tags:
+        - swipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tasteNotes:
+                  type: string
+                  maxLength: 1000
+                seriesRequest:
+                  type: string
+                  enum: [first-season, all-seasons]
+                bookFormat:
+                  type: string
+                  enum: [ebook, audiobook]
+      responses:
+        '200':
+          description: Saved
+        '400':
+          description: Invalid preferences
+  /settings/swipe:
+    get:
+      summary: Get swipe settings
+      description: The AI API key is always redacted.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Swipe settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwipeSettings'
+    put:
+      summary: Update swipe settings
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwipeSettings'
+      responses:
+        '200':
+          description: Saved
+        '400':
+          description: Invalid settings
+  /settings/swipe/test:
+    post:
+      summary: Test the swipe AI provider
+      description: Sends one small ranking request to Anthropic with the submitted or saved key and model. Settings are not saved.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwipeSettings'
+      responses:
+        '200':
+          description: The provider answered
+        '400':
+          description: Invalid settings
+        '502':
+          description: The provider rejected or failed the request
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings
