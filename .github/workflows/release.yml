@@ -752,17 +752,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  sync-yunohost-package:
-    name: Sync YunoHost package
-    needs: [publish-release]
-    uses: ./.github/workflows/sync-yunohost.yml
-    with:
-      release_tag: ${{ inputs.tag || github.ref_name }}
-    secrets:
-      YUNOHOST_PACKAGE_TOKEN: ${{ secrets.YUNOHOST_PACKAGE_TOKEN }}
-    permissions:
-      contents: write
-
   dispatch-chocolatey:
     name: Dispatch Chocolatey after publication
     needs: [publish-release]
@@ -995,7 +984,7 @@ jobs:
   announce-discord:
     name: Announce release to Discord
     needs:
-      [changelog, publish, publish-release, sync-yunohost-package, dispatch-package-channels]
+      [changelog, publish, publish-release, dispatch-package-channels]
     timeout-minutes: 10
     runs-on: [self-hosted, Linux, X64, seerrng]
     permissions:

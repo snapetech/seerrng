@@ -796,7 +796,6 @@ test('release notes flow into the draft release and Discord announcement', () =>
     'changelog',
     'publish',
     'publish-release',
-    'sync-yunohost-package',
     'dispatch-package-channels',
   ]);
   assert.equal(
@@ -816,6 +815,11 @@ test('release notes flow into the draft release and Discord announcement', () =>
     /3797|3800/u,
     'Discord announcements must not silently truncate later release-note sections'
   );
+});
+
+test('release automation does not publish YunoHost packages', () => {
+  const release = readWorkflow('release.yml');
+  assert.equal(release.jobs['sync-yunohost-package'], undefined);
 });
 
 test('Discord release-note chunks preserve all text and stay within the limit', () => {

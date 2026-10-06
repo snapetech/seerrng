@@ -17,7 +17,7 @@ connects to.
 - [Docker installation](/getting-started/docker/)
 - [Kubernetes installation](/getting-started/kubernetes/)
 - [Unraid installation](/getting-started/third-parties/unraid)
-- [YunoHost installation](/getting-started/third-parties/yunohost)
+- [Legacy YunoHost deployment](/getting-started/third-parties/yunohost)
 - [Troubleshooting](/troubleshooting/)
 
 ## Use SeerrNG
