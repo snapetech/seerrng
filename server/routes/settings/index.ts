@@ -126,6 +126,7 @@ import readarrRoutes from './readarr';
 import readerDeliveryRoutes from './readerDelivery';
 import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
+import tunerrRoutes from './tunerr';
 
 const settingsRoutes = Router();
 settingsRoutes.use(authorizedRouteAccess(Permission.ADMIN));
@@ -1433,6 +1434,7 @@ settingsRoutes.use('/metadatas', metadataRoutes);
 settingsRoutes.use('/software-acquisition', softwareAcquisitionRoutes);
 settingsRoutes.use('/prowlarr', prowlarrRoutes);
 settingsRoutes.use('/download-clients', downloadClientRoutes);
+settingsRoutes.use('/tunerr', tunerrRoutes);
 
 export const filteredMainSettings = (
   user: User,

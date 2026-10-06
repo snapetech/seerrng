@@ -14,6 +14,8 @@ tags:
     description: Public API endpoints requiring no authentication.
   - name: settings
     description: Endpoints related to Seerr's settings and configuration.
+  - name: live-tv
+    description: Live TV airings and recording requests through IPTV Tunerr.
   - name: auth
     description: Endpoints related to logging in or out, and the currently authenticated user.
   - name: users
@@ -60,6 +62,122 @@ servers:
 
 components:
   schemas:
+    RecordingRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [airing, series]
+        status:
+          type: string
+          enum:
+            [
+              pending,
+              scheduled,
+              recording,
+              completed,
+              failed,
+              declined,
+              cancelled,
+            ]
+        title:
+          type: string
+        subTitle:
+          type: string
+        mediaType:
+          type: string
+          enum: [movie, tv]
+        tmdbId:
+          type: integer
+        channel:
+          type: string
+          description: Tunerr guide number
+        channelName:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        completedCount:
+          type: integer
+        failedCount:
+          type: integer
+        lastError:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: object
+          properties:
+            id:
+              type: integer
+            displayName:
+              type: string
+    LiveTvAiring:
+      type: object
+      properties:
+        channel:
+          type: string
+        channelName:
+          type: string
+        start:
+          type: string
+          format: date-time
+        stop:
+          type: string
+          format: date-time
+        title:
+          type: string
+        subTitle:
+          type: string
+        season:
+          type: integer
+        episode:
+          type: integer
+        categories:
+          type: array
+          items:
+            type: string
+    TunerrSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        hostname:
+          type: string
+        useSsl:
+          type: boolean
+        baseUrl:
+          type: string
+        deckPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        tunerPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        guideUrl:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          description: Tunerr deck password. Omit or send the redacted value to keep the saved password.
+        clearPassword:
+          type: boolean
+        guideHours:
+          type: integer
+          minimum: 6
+          maximum: 336
     DownloadClientSettings:
       type: object
       required: [name, type, hostname]
@@ -7910,6 +8028,303 @@ paths:
                           type: string
                         error:
                           type: string
+  /live-tv/status:
+    get:
+      summary: Get Live TV availability
+      description: Reports whether IPTV Tunerr is configured and its guide is loaded. Administrators also receive guide statistics.
+      tags:
+        - live-tv
+      responses:
+        '200':
+          description: Live TV status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  guideReady:
+                    type: boolean
+                  canRequest:
+                    type: boolean
+  /live-tv/airings:
+    get:
+      summary: Find upcoming Live TV airings of a title
+      description: Searches the indexed Tunerr guide for upcoming programmes whose title matches one of the given titles. Matching ignores case, accents, punctuation, a leading "The", and a trailing year.
+      tags:
+        - live-tv
+      parameters:
+        - in: query
+          name: title
+          required: true
+          description: Title to match. Repeat for alternate titles (up to 4 are used).
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 8
+            items:
+              type: string
+              maxLength: 300
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: Upcoming airings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  guideReady:
+                    type: boolean
+                  airings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LiveTvAiring'
+        '400':
+          description: No title given
+  /live-tv/recordings:
+    get:
+      summary: List Live TV recording requests
+      description: Returns the caller's recording requests. Users who can manage or view all requests may pass `scope=all`.
+      tags:
+        - live-tv
+      parameters:
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [mine, all]
+        - in: query
+          name: filter
+          schema:
+            type: string
+            enum: [all, active]
+        - in: query
+          name: take
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: skip
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Recording requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pageInfo:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      take:
+                        type: integer
+                      skip:
+                        type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RecordingRequest'
+    post:
+      summary: Request a Live TV recording
+      description: >-
+        Requests one airing (`kind: airing`, with the airing's `channel` and
+        `start` from `/live-tv/airings`) or every airing of a title
+        (`kind: series`, optionally limited to one `channel`). Requests by
+        users who can manage or auto-approve requests are scheduled in Tunerr
+        immediately; others wait for approval.
+      tags:
+        - live-tv
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, title]
+              properties:
+                kind:
+                  type: string
+                  enum: [airing, series]
+                title:
+                  type: string
+                  maxLength: 300
+                channel:
+                  type: string
+                  maxLength: 255
+                start:
+                  type: string
+                  format: date-time
+                mediaType:
+                  type: string
+                  enum: [movie, tv]
+                tmdbId:
+                  type: integer
+      responses:
+        '201':
+          description: Recording requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingRequest'
+        '400':
+          description: Invalid request
+        '403':
+          description: The user cannot request recordings
+        '404':
+          description: Live TV is not set up, or the airing or title is not in the guide
+        '409':
+          description: Duplicate request or too many active recordings
+        '502':
+          description: Tunerr could not be reached
+        '503':
+          description: The guide is not loaded, or Tunerr does not support rule-based recording
+  /live-tv/recordings/{id}/approve:
+    post:
+      summary: Approve a recording request
+      description: Creates the Tunerr recording rule for a pending request. Requires the Manage Requests permission.
+      tags:
+        - live-tv
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recording scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Recording not found
+        '409':
+          description: Not pending, or the airing already ended
+        '502':
+          description: Tunerr could not be reached
+        '503':
+          description: Tunerr does not support rule-based recording
+  /live-tv/recordings/{id}/decline:
+    post:
+      summary: Decline a recording request
+      tags:
+        - live-tv
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recording declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Recording not found
+        '409':
+          description: Not pending
+  /live-tv/recordings/{id}:
+    delete:
+      summary: Cancel a recording request
+      description: Cancels an active recording request and removes its Tunerr rule. The requester or a user with Manage Requests can cancel.
+      tags:
+        - live-tv
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recording cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Recording not found
+        '409':
+          description: The recording is no longer active
+        '502':
+          description: Tunerr could not be reached
+  /settings/tunerr:
+    get:
+      summary: Get IPTV Tunerr settings
+      description: The deck password is always redacted.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Tunerr settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunerrSettings'
+    put:
+      summary: Update IPTV Tunerr settings
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TunerrSettings'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunerrSettings'
+        '400':
+          description: Invalid settings
+  /settings/tunerr/test:
+    post:
+      summary: Test the IPTV Tunerr connection
+      description: Reads recording rules through the deck and opens the guide. Reports Tunerr recording features SeerrNG needs that are missing. Settings are not saved.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TunerrSettings'
+      responses:
+        '200':
+          description: Deck and guide reachable
+        '400':
+          description: Invalid settings
+        '502':
+          description: The deck or guide could not be reached
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings

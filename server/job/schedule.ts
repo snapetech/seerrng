@@ -8,6 +8,11 @@ import downloadTracker from '@server/lib/downloadtracker';
 import episodeWatchAhead from '@server/lib/episodeWatchAhead';
 import { syncAllExternalRequestLists } from '@server/lib/externalRequestLists';
 import ImageProxy from '@server/lib/imageproxy';
+import { guideIndex } from '@server/lib/liveTv/guideIndex';
+import {
+  isTunerrConfigured,
+  syncRecordings,
+} from '@server/lib/liveTv/recordings';
 import refreshToken from '@server/lib/refreshToken';
 import { captureReleaseCalendarHistory } from '@server/lib/releaseCalendar/history';
 import { reconcileActiveRequests } from '@server/lib/requestStatus';
@@ -557,6 +562,26 @@ export const startJobs = (): void => {
         );
       }
     ),
+  });
+
+  scheduledJobs.push({
+    id: 'live-tv-sync',
+    name: 'Live TV Sync',
+    type: 'process',
+    interval: 'minutes',
+    cronSchedule: jobs['live-tv-sync'].schedule,
+    job: schedule.scheduleJob(jobs['live-tv-sync'].schedule, () => {
+      if (!isTunerrConfigured()) {
+        return;
+      }
+      logger.debug('Starting scheduled job: Live TV Sync', {
+        label: 'Jobs',
+      });
+      return runTrackedJob('Live TV Sync', async () => {
+        await guideIndex.get();
+        await syncRecordings();
+      });
+    }),
   });
 
   scheduledJobs.push({

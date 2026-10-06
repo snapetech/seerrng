@@ -170,6 +170,39 @@ export const defaultLiveDownloadSettings = (): LiveDownloadSettings => ({
   clients: [],
 });
 
+/**
+ * IPTV Tunerr connection for Live TV airings and recording requests. Rule
+ * calls go through the authenticated Tunerr deck (`deckPort`, `/api/...`);
+ * the guide is read from the tuner's public XMLTV endpoint.
+ */
+export interface TunerrSettings {
+  enabled: boolean;
+  hostname: string;
+  useSsl: boolean;
+  baseUrl: string;
+  deckPort: number;
+  tunerPort: number;
+  /** Optional full XMLTV URL; defaults to the tuner's /guide.xml. */
+  guideUrl: string;
+  username: string;
+  password: string;
+  /** How far ahead to index the guide, in hours. */
+  guideHours: number;
+}
+
+export const defaultTunerrSettings = (): TunerrSettings => ({
+  enabled: false,
+  hostname: '',
+  useSsl: false,
+  baseUrl: '',
+  deckPort: 48879,
+  tunerPort: 5004,
+  guideUrl: '',
+  username: '',
+  password: '',
+  guideHours: 72,
+});
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -568,6 +601,7 @@ export type JobId =
   | 'magazine-scan'
   | 'download-sync'
   | 'software-request-reconciliation'
+  | 'live-tv-sync'
   | 'download-recovery'
   | 'download-sync-reset'
   | 'jellyfin-recently-added-scan'
@@ -638,6 +672,7 @@ export interface AllSettings {
   softwareAcquisition: SoftwareAcquisitionSettings;
   prowlarr: ProwlarrSettings;
   liveDownloads: LiveDownloadSettings;
+  tunerr: TunerrSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
   readerDelivery: ReaderDeliverySettings;
   public: PublicSettings;
@@ -783,6 +818,7 @@ class Settings {
         categoryMappings: defaultProwlarrCategoryMappings(),
       },
       liveDownloads: defaultLiveDownloadSettings(),
+      tunerr: defaultTunerrSettings(),
       public: {
         initialized: false,
       },
@@ -945,6 +981,9 @@ class Settings {
         },
         'software-request-reconciliation': {
           schedule: '0 * * * * *',
+        },
+        'live-tv-sync': {
+          schedule: '30 * * * * *',
         },
         'download-recovery': {
           schedule: '0 */5 * * * *',
@@ -1312,6 +1351,14 @@ class Settings {
 
   set liveDownloads(data: LiveDownloadSettings) {
     this.data.liveDownloads = data;
+  }
+
+  get tunerr(): TunerrSettings {
+    return this.data.tunerr;
+  }
+
+  set tunerr(data: TunerrSettings) {
+    this.data.tunerr = data;
   }
 
   get public(): PublicSettings {
@@ -1683,6 +1730,7 @@ class Settings {
         categoryMappings: defaultProwlarrCategoryMappings(),
       },
       liveDownloads: defaultLiveDownloadSettings(),
+      tunerr: defaultTunerrSettings(),
       public: {
         initialized: false,
       },
@@ -1844,6 +1892,9 @@ class Settings {
         },
         'software-request-reconciliation': {
           schedule: '0 * * * * *',
+        },
+        'live-tv-sync': {
+          schedule: '30 * * * * *',
         },
         'download-recovery': {
           schedule: '0 */5 * * * *',

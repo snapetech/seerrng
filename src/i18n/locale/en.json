@@ -3188,6 +3188,7 @@
   "components.Settings.SettingsJobsCache.jobtype": "Type",
   "components.Settings.SettingsJobsCache.kapowarr-scan": "Kapowarr Comics Scan",
   "components.Settings.SettingsJobsCache.lidarr-scan": "Lidarr Scan",
+  "components.Settings.SettingsJobsCache.live-tv-sync": "Live TV Sync",
   "components.Settings.SettingsJobsCache.magazine-scan": "LazyLibrarian Magazine Scan",
   "components.Settings.SettingsJobsCache.misses": "Misses",
   "components.Settings.SettingsJobsCache.mylar-scan": "Mylar Comics Scan",
