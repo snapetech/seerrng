@@ -9,6 +9,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
 import IssueBlock from '@app/components/IssueBlock';
 import MusicDetailsLayout from '@app/components/MusicDetails/MusicDetailsLayout';
+import AlbumLibraryHealthButton from '@app/components/Soulseek/AlbumLibraryHealthButton';
 import useTitleBlocklist from '@app/hooks/useTitleBlocklist';
 import useToasts from '@app/hooks/useToasts';
 import { getQueryParamString } from '@app/hooks/useUpdateQueryParams';
@@ -508,6 +509,7 @@ const MusicDetails = () => {
 
   const secondaryActions = (
     <>
+      {albumId && <AlbumLibraryHealthButton releaseGroupId={albumId} />}
       {canWatchlist && (
         <Tooltip
           content={intl.formatMessage(

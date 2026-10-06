@@ -12,6 +12,7 @@ import ReaderDeliverySettings from '@app/components/Settings/ReaderDeliverySetti
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
+import SettingsSlskdn from '@app/components/Settings/SettingsSlskdn';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
 import SettingsTunerr from '@app/components/Settings/SettingsTunerr';
 import globalMessages from '@app/i18n/globalMessages';
@@ -1390,6 +1391,7 @@ const SettingsServices = () => {
       <SettingsProwlarr />
       <SettingsDownloadClients />
       <SettingsTunerr />
+      <SettingsSlskdn />
       <SettingsSoftwareAcquisition />
       {overrideRuleModal.open &&
         radarrData &&

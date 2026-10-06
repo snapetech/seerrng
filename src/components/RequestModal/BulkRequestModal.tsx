@@ -30,6 +30,7 @@ import AdvancedRequester, {
 } from '@app/components/RequestModal/AdvancedRequester';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestMediaCard from '@app/components/RequestModal/RequestMediaCard';
+import SoulseekUnmatchedTracks from '@app/components/Soulseek/SoulseekUnmatchedTracks';
 import useAdvancedOptionsDisclosure from '@app/hooks/useAdvancedOptionsDisclosure';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -1002,6 +1003,13 @@ const BulkRequestModal = ({
 
   const modalContent = (
     <>
+      {mediaType === 'music' && !summary && (
+        <SoulseekUnmatchedTracks
+          tracks={initialItems
+            .filter((item) => item.matchStatus === 'unmatched')
+            .map((item) => ({ title: item.title, artist: item.artist }))}
+        />
+      )}
       {summary ? (
         <div className="mt-6 text-gray-200">
           <Alert

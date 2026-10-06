@@ -59,6 +59,13 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 2 UI | built | On Live TV button + dialog on movie/series pages, `/recordings` page, Settings → Services section. Component test (4). Needs human visual review. No sidebar entry yet (sidebar links cannot be conditional on settings today). |
 | 2 Tunerr fork: rule-driven recorder | done (local branch) | `~/Code/iptvtunerr` branch `feat/seerrng-recording-rules` (commit `0440d64`, not pushed): `title_equals`, `start_after`/`start_before`, response-only `features`, `catchup-daemon -rules-only`. 6 new Go tests; `go test ./...` passed. Tunerr `scripts/verify` not run (local Go 1.27 `gofmt` flags vendored files). Operators must run the recorder with `-rules-only`. |
 | 2 Live check: deck proxy + Basic auth from another host | pending | Verified from Tunerr source only; needs a local Tunerr run. |
+| 3 slskdN client + settings | done | `server/api/slskdn.ts` (X-API-Key), per-feature probes (wishlist, library health, SongID); `/api/v1/settings/slskdn`. Endpoints read from `~/slskdn-current` source. |
+| 3 Track requests | done | `TrackRequest` entity + migrations `1791050000000`, wishlist-backed search with approval, `soulseek-sync` job, `/api/v1/soulseek/track-requests*`. Integration test against a fake slskdN. |
+| 3 Album fixes (library health) | done | Release group → releases via MusicBrainz, then slskdN issues per release; remediation only for that album's auto-fixable issues. Manager-only. |
+| 3 SongID | done | `/api/v1/soulseek/songid`; results readable only by the requester or a manager (in-memory owner map, lost on restart). Album candidates resolved to release groups. |
+| 3 UI | built | Bulk dialog Soulseek card for unmatched playlist tracks, `/track-requests`, `/identify`, album Library Health button, Settings section. Component test for the bulk-dialog card. Needs human visual review. |
+| 3 Peer previews | not started | Open question 3 (legal/permission decision) still applies. |
+| 3 slskdN download progress in live progress | pending | slskdN transfers are not torrents; needs a separate adapter. |
 | 2 Sports "follow my team" | pending | |
 | 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
 | 2 Recording notifications | pending | Requests do not notify yet. |
