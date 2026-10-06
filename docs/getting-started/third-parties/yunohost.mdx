@@ -7,10 +7,10 @@ sidebar_position: 3
 # YunoHost
 
 :::warning
-The package's catalog entry is awaiting review by YunoHost maintainers. Until it
-is listed in the official catalog, install it from the `testing` branch of the
-dedicated package repository below. That branch receives each published
-SeerrNG release.
+SeerrNG no longer publishes or updates its YunoHost package. New installations
+and future package updates are not supported by the SeerrNG project. Existing
+installations remain on their last published package; operators should move to
+a supported deployment or arrange independent package maintenance.
 :::
 
 ## Requirements
@@ -26,34 +26,15 @@ directory, and configures YunoHost's Nginx reverse proxy and HTTPS certificate.
 YunoHost's LDAP login and single sign-on are not used. Sign-in and user access
 are managed by SeerrNG and the media server you connect during setup.
 
-## Install the package
+## Existing installations
 
-The package is available for manual installation from the
-[`seerrng_ynh` testing branch](https://github.com/YunoHost-Apps/seerrng_ynh/tree/testing):
-
-```bash
-sudo yunohost app install https://github.com/YunoHost-Apps/seerrng_ynh/tree/testing --debug
-```
-
-Choose the dedicated domain and `/` as the installation path. After installation,
-open the app URL and complete SeerrNG's first-run setup.
-
-## Upgrade and backups
-
-Use YunoHost's normal app upgrade and backup/restore tools. The package pins
-each upstream release archive by SHA-256 and supports YunoHost's app backup and
-restore lifecycle. Its source metadata tracks stable SeerrNG releases, and
-YunoHost's updater periodically proposes archive URL and checksum changes for
-administrators to apply with the normal app upgrade flow. The Node.js 24 runtime
-is managed by YunoHost.
+The package source remains in the SeerrNG repository for reference. The project
+does not maintain its compatibility with future SeerrNG releases or publish
+package updates. Operators who continue using it must manage package updates
+and compatibility independently. The package previously ran SeerrNG as an
+unprivileged service and used YunoHost's backup and restore lifecycle.
 
 Application logs are available from YunoHost's service page and in
 `/home/yunohost.app/seerrng/logs/seerr.log` (the data directory uses a different
 instance name for additional installations). To inspect service output over
 SSH, run `sudo journalctl -u seerrng`.
-
-## Catalog status
-
-The package has been submitted to YunoHost's official app catalog and is
-awaiting maintainer review. The [catalog submission guide](https://doc.yunohost.org/dev/packaging/publish/)
-describes how catalog inclusion and maintenance work.

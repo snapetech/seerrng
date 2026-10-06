@@ -77,7 +77,10 @@ const StatusBadge = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
   const settings = useSettings();
-  const firstLiveDownload = useLiveDownload(downloadItem[0]?.downloadId);
+  const firstLiveDownload = useLiveDownload(
+    downloadItem[0],
+    hasPermission(Permission.ADMIN)
+  );
   const formatStatusLabel = (statusText: string) =>
     showQuality
       ? intl.formatMessage(is4k ? messages.status4k : messages.status, {

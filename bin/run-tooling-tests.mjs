@@ -16,7 +16,6 @@ const portableTests = [
   'scripts/backissue-service.test.mjs',
   'scripts/check-helm-security.test.mjs',
   'scripts/check-workflow-boundaries.test.mjs',
-  'scripts/sync-yunohost-package.test.mjs',
   'scripts/release-notes.test.mjs',
   'scripts/latest-published-release-tag.test.mjs',
   'scripts/release-workflow.test.mjs',

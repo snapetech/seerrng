@@ -7,6 +7,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import { resolveLiveDownloadToken } from './liveDownloadTokens';
 import {
   aliasDownloadId,
   restrictMediaIssuesForUser,
@@ -167,6 +168,30 @@ const createOperationalMedia = () =>
   });
 
 describe('restrictMediaOperationalFieldsForUser', () => {
+  it('adds a user-scoped live ID while keeping the torrent hash redacted', () => {
+    const hash = 'a'.repeat(40);
+    const source = createOperationalMedia();
+    source.downloadStatus![0].downloadId = hash;
+
+    const media = restrictMediaOperationalFieldsForUser(
+      source,
+      new User({ id: 10, permissions: Permission.REQUEST })
+    );
+    const download = media?.downloadStatus?.[0];
+
+    assert.equal(download?.downloadId, aliasDownloadId(hash));
+    assert.notEqual(download?.downloadId, hash);
+    assert.ok(download?.liveDownloadToken);
+    assert.equal(
+      resolveLiveDownloadToken(download?.liveDownloadToken, 10),
+      hash
+    );
+    assert.equal(
+      resolveLiveDownloadToken(download?.liveDownloadToken, 20),
+      undefined
+    );
+  });
+
   it('removes backend routes and release identifiers for ordinary users', () => {
     const media = restrictMediaOperationalFieldsForUser(
       createOperationalMedia(),

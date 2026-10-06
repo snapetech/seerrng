@@ -3,6 +3,7 @@ import liveDownloadMonitor, {
   LIVE_DOWNLOAD_MAX_HASHES_PER_SUBSCRIPTION,
   type LiveDownloadUpdate,
 } from '@server/lib/liveDownloads';
+import { resolveLiveDownloadToken } from '@server/lib/liveDownloadTokens';
 import { Permission } from '@server/lib/permissions';
 import { Router } from 'express';
 
@@ -16,19 +17,36 @@ const MAX_IDS_QUERY_LENGTH = 16_384;
 const streamsByUser = new Map<number, number>();
 let totalStreams = 0;
 
-export const parseLiveDownloadIds = (value: unknown): string[] => {
-  if (typeof value !== 'string' || value.length > MAX_IDS_QUERY_LENGTH) {
+export interface LiveDownloadSubscriptionId {
+  id: string;
+  hash: string;
+}
+
+export const parseLiveDownloadIds = (
+  value: unknown,
+  userId: number,
+  allowRawHashes = false
+): LiveDownloadSubscriptionId[] => {
+  if (
+    typeof value !== 'string' ||
+    value.length > MAX_IDS_QUERY_LENGTH ||
+    !Number.isSafeInteger(userId) ||
+    userId < 0
+  ) {
     return [];
   }
-  const hashes = new Set<string>();
+
+  const ids = new Map<string, string>();
   for (const part of value.split(',')) {
-    const hash = normalizeInfoHash(part);
+    const tokenHash = resolveLiveDownloadToken(part, userId);
+    const hash =
+      tokenHash ?? (allowRawHashes ? normalizeInfoHash(part) : undefined);
     if (hash) {
-      hashes.add(hash);
-      if (hashes.size >= LIVE_DOWNLOAD_MAX_HASHES_PER_SUBSCRIPTION) break;
+      ids.set(tokenHash ? part : hash, hash);
+      if (ids.size >= LIVE_DOWNLOAD_MAX_HASHES_PER_SUBSCRIPTION) break;
     }
   }
-  return [...hashes];
+  return [...ids].map(([id, hash]) => ({ id, hash }));
 };
 
 /**
@@ -37,9 +55,10 @@ export const parseLiveDownloadIds = (value: unknown): string[] => {
  */
 export const toBrowserUpdate = (
   update: LiveDownloadUpdate,
+  id: string,
   isAdmin: boolean
 ) => ({
-  hash: update.hash,
+  id,
   state: update.state,
   size: update.size,
   sizeLeft: update.sizeLeft,
@@ -58,21 +77,24 @@ export const toBrowserUpdate = (
 const liveRoutes = Router();
 
 /**
- * Server-sent live progress for the info hashes the browser already received
- * from authorized request or media responses. Unknown or non-torrent IDs are
- * ignored, so only torrents the caller can name are reported.
+ * Server-sent live progress for the opaque IDs the browser received with
+ * authorized media responses. Administrators may also supply raw info hashes.
+ * Unknown IDs are ignored, so callers can only subscribe to visible torrents.
  */
 liveRoutes.get('/downloads', (req, res) => {
-  const hashes = parseLiveDownloadIds(req.query.ids);
-  if (hashes.length === 0) {
-    return res.status(400).json({ message: 'No torrent download IDs given.' });
+  const userId = req.user?.id ?? -1;
+  const isAdmin = req.user?.hasPermission(Permission.ADMIN) ?? false;
+  const ids = parseLiveDownloadIds(req.query.ids, userId, isAdmin);
+  if (ids.length === 0) {
+    return res
+      .status(400)
+      .json({ message: 'No valid live download IDs given.' });
   }
   if (!liveDownloadMonitor.hasEnabledClients()) {
     // 204 tells EventSource not to reconnect.
     return res.status(204).end();
   }
 
-  const userId = req.user?.id ?? -1;
   const userStreams = streamsByUser.get(userId) ?? 0;
   if (
     userStreams >= MAX_STREAMS_PER_USER ||
@@ -82,7 +104,6 @@ liveRoutes.get('/downloads', (req, res) => {
     return res.status(429).json({ message: 'Too many live progress streams.' });
   }
 
-  const isAdmin = req.user?.hasPermission(Permission.ADMIN) ?? false;
   streamsByUser.set(userId, userStreams + 1);
   totalStreams += 1;
 
@@ -95,13 +116,31 @@ liveRoutes.get('/downloads', (req, res) => {
   res.flushHeaders();
   res.write('retry: 5000\n\n');
 
-  const unsubscribe = liveDownloadMonitor.subscribe(hashes, (updates) => {
-    res.write(
-      `event: downloads\ndata: ${JSON.stringify(
-        updates.map((update) => toBrowserUpdate(update, isAdmin))
-      )}\n\n`
-    );
-  });
+  const idsByHash = new Map<string, string[]>();
+  for (const { id, hash } of ids) {
+    const hashIds = idsByHash.get(hash) ?? [];
+    hashIds.push(id);
+    idsByHash.set(hash, hashIds);
+  }
+
+  const unsubscribe = liveDownloadMonitor.subscribe(
+    [...idsByHash.keys()],
+    (updates, missingHashes) => {
+      const payload: Record<string, unknown>[] = updates.flatMap((update) =>
+        (idsByHash.get(update.hash) ?? []).map((id) =>
+          toBrowserUpdate(update, id, isAdmin)
+        )
+      );
+      for (const hash of missingHashes) {
+        for (const id of idsByHash.get(hash) ?? []) {
+          payload.push({ id, unavailable: true });
+        }
+      }
+      if (payload.length > 0) {
+        res.write(`event: downloads\ndata: ${JSON.stringify(payload)}\n\n`);
+      }
+    }
+  );
 
   const heartbeat = setInterval(() => res.write(': ping\n\n'), HEARTBEAT_MS);
   const lifetime = setTimeout(() => res.end(), MAX_STREAM_MS);

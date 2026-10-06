@@ -8063,18 +8063,21 @@ paths:
       summary: Stream live torrent download progress
       description: >-
         Server-sent events (`event: downloads`) with live progress for the
-        given torrent info hashes, read from the configured download clients.
-        Pass the `downloadId` values already returned for requests or media
-        the user can see. Non-torrent IDs are ignored. Returns 204 when no
-        download client is configured. The stream sends nothing for hashes
-        no configured client reports.
+        authorized torrents, read from the configured download clients. Pass
+        the opaque `liveDownloadToken` values returned with visible media
+        download items. Administrators may pass raw torrent info hashes.
+        Non-torrent or unauthorized IDs are ignored. Events identify the item
+        with the submitted ID and never return the raw hash. When a client
+        stops reporting a previously visible torrent, an `unavailable` event
+        clears the browser's stale progress. Returns 204 when no download
+        client is configured.
       tags:
         - request
       parameters:
         - in: query
           name: ids
           required: true
-          description: Comma-separated 40- or 64-character hexadecimal info hashes (at most 100 are used).
+          description: Comma-separated opaque liveDownloadToken values for this user; administrators may use 40- or 64-character hexadecimal info hashes. At most 100 IDs are used.
           schema:
             type: string
             maxLength: 16384
@@ -8088,7 +8091,7 @@ paths:
         '204':
           description: No download client is configured
         '400':
-          description: No valid torrent IDs were given
+          description: No valid authorized live download IDs were given
         '429':
           description: Too many concurrent streams
   /settings/download-clients:

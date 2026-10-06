@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-set -eu
-
-repo_root=$(git rev-parse --show-toplevel)
-if ! node "$repo_root/scripts/sync-yunohost-package.mjs"; then
-  echo 'YunoHost sync will retry in GitHub Actions after this commit reaches main.' >&2
-fi

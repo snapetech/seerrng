@@ -26,7 +26,10 @@ export interface LiveDownloadClientHealth {
   error?: string;
 }
 
-type Listener = (updates: LiveDownloadUpdate[]) => void;
+type Listener = (
+  updates: LiveDownloadUpdate[],
+  missingHashes: string[]
+) => void;
 
 interface Subscription {
   hashes: Set<string>;
@@ -95,7 +98,7 @@ export class LiveDownloadMonitor {
       .map((hash) => this.latest.get(hash))
       .filter((update): update is LiveDownloadUpdate => !!update);
     if (cached.length > 0) {
-      this.deliver(subscription, cached);
+      this.deliver(subscription, cached, []);
     }
 
     if (!this.timer && !this.polling) {
@@ -122,7 +125,19 @@ export class LiveDownloadMonitor {
   public async pollOnce(): Promise<void> {
     const hashes = this.subscribedHashes();
     const clients = this.enabledClients();
-    if (hashes.length === 0 || clients.length === 0) {
+    if (hashes.length === 0) return;
+
+    const previouslyAvailable = new Set(this.latest.keys());
+    if (clients.length === 0) {
+      this.latest.clear();
+      for (const subscription of this.subscriptions) {
+        const missing = [...subscription.hashes].filter((hash) =>
+          previouslyAvailable.has(hash)
+        );
+        if (missing.length > 0) {
+          this.deliver(subscription, [], missing);
+        }
+      }
       return;
     }
 
@@ -184,15 +199,22 @@ export class LiveDownloadMonitor {
       const updates = [...subscription.hashes]
         .map((hash) => merged.get(hash))
         .filter((update): update is LiveDownloadUpdate => !!update);
-      if (updates.length > 0) {
-        this.deliver(subscription, updates);
+      const missing = [...subscription.hashes].filter(
+        (hash) => previouslyAvailable.has(hash) && !merged.has(hash)
+      );
+      if (updates.length > 0 || missing.length > 0) {
+        this.deliver(subscription, updates, missing);
       }
     }
   }
 
-  private deliver(subscription: Subscription, updates: LiveDownloadUpdate[]) {
+  private deliver(
+    subscription: Subscription,
+    updates: LiveDownloadUpdate[],
+    missingHashes: string[]
+  ) {
     try {
-      subscription.listener(updates);
+      subscription.listener(updates, missingHashes);
     } catch (error) {
       logger.debug('Live download subscriber failed', {
         label: 'Live Downloads',

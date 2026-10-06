@@ -168,4 +168,29 @@ describe('LiveDownloadMonitor', () => {
     assert.equal(created, 2);
     stop();
   });
+
+  it('clears live values when a subscribed torrent stops being reported', async () => {
+    let isAvailable = true;
+    const missing: string[] = [];
+    const monitor = new LiveDownloadMonitor(
+      () => ({ pollIntervalSeconds: 3, clients: [client(1)] }),
+      () => ({
+        testConnection: async () => ({}),
+        getTorrents: async (hashes) =>
+          isAvailable ? hashes.map((hash) => status(hash)) : [],
+      })
+    );
+    const stop = monitor.subscribe([HASH_A], (_updates, missingHashes) => {
+      missing.push(...missingHashes);
+    });
+    monitor.stop();
+
+    await monitor.pollOnce();
+    assert.deepEqual(missing, []);
+    isAvailable = false;
+    await monitor.pollOnce();
+
+    assert.deepEqual(missing, [HASH_A]);
+    stop();
+  });
 });
