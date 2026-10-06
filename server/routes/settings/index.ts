@@ -124,6 +124,7 @@ import prowlarrRoutes from './prowlarr';
 import radarrRoutes from './radarr';
 import readarrRoutes from './readarr';
 import readerDeliveryRoutes from './readerDelivery';
+import slskdnRoutes from './slskdn';
 import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
 import tunerrRoutes from './tunerr';
@@ -1435,6 +1436,7 @@ settingsRoutes.use('/software-acquisition', softwareAcquisitionRoutes);
 settingsRoutes.use('/prowlarr', prowlarrRoutes);
 settingsRoutes.use('/download-clients', downloadClientRoutes);
 settingsRoutes.use('/tunerr', tunerrRoutes);
+settingsRoutes.use('/slskdn', slskdnRoutes);
 
 export const filteredMainSettings = (
   user: User,

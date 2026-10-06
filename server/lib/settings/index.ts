@@ -203,6 +203,32 @@ export const defaultTunerrSettings = (): TunerrSettings => ({
   guideHours: 72,
 });
 
+/**
+ * slskdN (or a compatible slskd/slskr) connection for Soulseek track
+ * requests, library-health fixes, and SongID. Uses an API key with the
+ * read-write role; SongID runs need the administrator role.
+ */
+export interface SlskdnSettings {
+  enabled: boolean;
+  hostname: string;
+  port: number;
+  useSsl: boolean;
+  baseUrl: string;
+  apiKey: string;
+  /** Optional slskdN wishlist filter applied to track requests. */
+  searchFilter: string;
+}
+
+export const defaultSlskdnSettings = (): SlskdnSettings => ({
+  enabled: false,
+  hostname: '',
+  port: 5030,
+  useSsl: false,
+  baseUrl: '',
+  apiKey: '',
+  searchFilter: '',
+});
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -602,6 +628,7 @@ export type JobId =
   | 'download-sync'
   | 'software-request-reconciliation'
   | 'live-tv-sync'
+  | 'soulseek-sync'
   | 'download-recovery'
   | 'download-sync-reset'
   | 'jellyfin-recently-added-scan'
@@ -673,6 +700,7 @@ export interface AllSettings {
   prowlarr: ProwlarrSettings;
   liveDownloads: LiveDownloadSettings;
   tunerr: TunerrSettings;
+  slskdn: SlskdnSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
   readerDelivery: ReaderDeliverySettings;
   public: PublicSettings;
@@ -819,6 +847,7 @@ class Settings {
       },
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
+      slskdn: defaultSlskdnSettings(),
       public: {
         initialized: false,
       },
@@ -984,6 +1013,9 @@ class Settings {
         },
         'live-tv-sync': {
           schedule: '30 * * * * *',
+        },
+        'soulseek-sync': {
+          schedule: '45 */2 * * * *',
         },
         'download-recovery': {
           schedule: '0 */5 * * * *',
@@ -1361,6 +1393,14 @@ class Settings {
     this.data.tunerr = data;
   }
 
+  get slskdn(): SlskdnSettings {
+    return this.data.slskdn;
+  }
+
+  set slskdn(data: SlskdnSettings) {
+    this.data.slskdn = data;
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -1731,6 +1771,7 @@ class Settings {
       },
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
+      slskdn: defaultSlskdnSettings(),
       public: {
         initialized: false,
       },
@@ -1895,6 +1936,9 @@ class Settings {
         },
         'live-tv-sync': {
           schedule: '30 * * * * *',
+        },
+        'soulseek-sync': {
+          schedule: '45 */2 * * * *',
         },
         'download-recovery': {
           schedule: '0 */5 * * * *',

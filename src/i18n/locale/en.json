@@ -3253,6 +3253,7 @@
   "components.Settings.SettingsJobsCache.size": "Size",
   "components.Settings.SettingsJobsCache.software-request-reconciliation": "Software Request Reconciliation",
   "components.Settings.SettingsJobsCache.sonarr-scan": "Sonarr Scan",
+  "components.Settings.SettingsJobsCache.soulseek-sync": "Soulseek Sync",
   "components.Settings.SettingsJobsCache.unknownJob": "Unknown Job",
   "components.Settings.SettingsJobsCache.usersavatars": "Users' Avatars",
   "components.Settings.SettingsLogs.copiedLogMessage": "Copied log message to clipboard.",

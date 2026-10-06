@@ -33,6 +33,10 @@ import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { refreshTrackedSoftwareRequests } from '@server/lib/softwareRequests';
+import {
+  isSlskdnConfigured,
+  syncTrackRequests,
+} from '@server/lib/soulseek/trackRequests';
 import { isWatchAheadMediaServer } from '@server/lib/watchAheadEligibility';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
@@ -581,6 +585,20 @@ export const startJobs = (): void => {
         await guideIndex.get();
         await syncRecordings();
       });
+    }),
+  });
+
+  scheduledJobs.push({
+    id: 'soulseek-sync',
+    name: 'Soulseek Sync',
+    type: 'process',
+    interval: 'minutes',
+    cronSchedule: jobs['soulseek-sync'].schedule,
+    job: schedule.scheduleJob(jobs['soulseek-sync'].schedule, () => {
+      if (!isSlskdnConfigured()) {
+        return;
+      }
+      return runTrackedJob('Soulseek Sync', syncTrackRequests);
     }),
   });
 

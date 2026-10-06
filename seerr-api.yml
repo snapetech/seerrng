@@ -16,6 +16,8 @@ tags:
     description: Endpoints related to Seerr's settings and configuration.
   - name: live-tv
     description: Live TV airings and recording requests through IPTV Tunerr.
+  - name: soulseek
+    description: Soulseek track requests, library-health fixes, and SongID through slskdN.
   - name: auth
     description: Endpoints related to logging in or out, and the currently authenticated user.
   - name: users
@@ -62,6 +64,108 @@ servers:
 
 components:
   schemas:
+    TrackRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, searching, completed, failed, declined, cancelled]
+        artist:
+          type: string
+        title:
+          type: string
+        recordingMbid:
+          type: string
+        source:
+          type: string
+          enum: [manual, playlist, songid]
+        searchCount:
+          type: integer
+        lastMatchCount:
+          type: integer
+        lastError:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: object
+          properties:
+            id:
+              type: integer
+            displayName:
+              type: string
+    SlskdnSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        hostname:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        useSsl:
+          type: boolean
+        baseUrl:
+          type: string
+        apiKey:
+          type: string
+          description: slskdN API key (read-write role; administrator for SongID). Omit or send the redacted value to keep the saved key.
+        clearApiKey:
+          type: boolean
+        searchFilter:
+          type: string
+          maxLength: 512
+    SongIdResult:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        summary:
+          type: string
+        stage:
+          type: string
+        percentComplete:
+          type: number
+        queuePosition:
+          type: integer
+        albums:
+          type: array
+          items:
+            type: object
+            properties:
+              releaseId:
+                type: string
+              releaseGroupId:
+                type: string
+              title:
+                type: string
+              artist:
+                type: string
+              isExact:
+                type: boolean
+        tracks:
+          type: array
+          items:
+            type: object
+            properties:
+              recordingId:
+                type: string
+              title:
+                type: string
+              artist:
+                type: string
+              isExact:
+                type: boolean
     RecordingRequest:
       type: object
       properties:
@@ -8325,6 +8429,405 @@ paths:
           description: Invalid settings
         '502':
           description: The deck or guide could not be reached
+  /soulseek/status:
+    get:
+      summary: Get Soulseek request availability
+      tags:
+        - soulseek
+      responses:
+        '200':
+          description: Whether slskdN is configured and the user can request tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  canRequest:
+                    type: boolean
+  /soulseek/track-requests:
+    get:
+      summary: List Soulseek track requests
+      description: Returns the caller's track requests. Users who can manage or view all requests may pass `scope=all`.
+      tags:
+        - soulseek
+      parameters:
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [mine, all]
+        - in: query
+          name: filter
+          schema:
+            type: string
+            enum: [all, active]
+        - in: query
+          name: take
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: skip
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Track requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pageInfo:
+                    type: object
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrackRequest'
+    post:
+      summary: Request tracks from Soulseek
+      description: >-
+        Requests individual tracks through the slskdN wishlist, for example
+        singles or playlist tracks without an album match. Requests by users
+        who can manage requests or auto-approve music start searching
+        immediately; others wait for approval. An identical active request is
+        returned instead of a duplicate.
+      tags:
+        - soulseek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tracks]
+              properties:
+                tracks:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [artist, title]
+                    properties:
+                      artist:
+                        type: string
+                        maxLength: 255
+                      title:
+                        type: string
+                        maxLength: 255
+                      recordingMbid:
+                        type: string
+                      source:
+                        type: string
+                        enum: [manual, playlist, songid]
+      responses:
+        '201':
+          description: Track requests created or reused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrackRequest'
+        '400':
+          description: Invalid tracks
+        '403':
+          description: The user cannot request music
+        '404':
+          description: slskdN is not set up
+        '409':
+          description: Too many active track requests
+        '502':
+          description: slskdN could not be reached
+  /soulseek/track-requests/{id}/approve:
+    post:
+      summary: Approve a track request
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Search started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Request not found
+        '409':
+          description: Not pending
+        '502':
+          description: slskdN could not be reached
+  /soulseek/track-requests/{id}/decline:
+    post:
+      summary: Decline a track request
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Request not found
+        '409':
+          description: Not pending
+  /soulseek/track-requests/{id}:
+    delete:
+      summary: Cancel a track request
+      description: Removes the slskdN wishlist entry. The requester or a manager can cancel.
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackRequest'
+        '403':
+          description: Access denied
+        '404':
+          description: Request not found
+        '409':
+          description: No longer active
+        '502':
+          description: slskdN could not be reached
+  /soulseek/albums/{releaseGroupId}/issues:
+    get:
+      summary: List slskdN library-health issues for an album
+      description: Looks up open slskdN issues (transcodes, missing tracks, and similar) for each release of the MusicBrainz release group. Requires Manage Requests.
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: releaseGroupId
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F-]{36}$'
+      responses:
+        '200':
+          description: Album issues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        issueId:
+                          type: string
+                        type:
+                          type: string
+                        severity:
+                          type: string
+                        status:
+                          type: string
+                        title:
+                          type: string
+                        reason:
+                          type: string
+                        canAutoFix:
+                          type: boolean
+                        remediationJobId:
+                          type: string
+        '400':
+          description: Invalid album ID
+        '403':
+          description: Access denied
+        '502':
+          description: slskdN could not be reached
+  /soulseek/albums/{releaseGroupId}/remediate:
+    post:
+      summary: Fix album issues with slskdN
+      description: Starts slskdN remediation for the given issues. Only issues that belong to this album and that slskdN can fix automatically are sent. Requires Manage Requests.
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: releaseGroupId
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F-]{36}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issueIds]
+              properties:
+                issueIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: string
+                    maxLength: 128
+      responses:
+        '202':
+          description: Remediation started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  issueCount:
+                    type: integer
+        '400':
+          description: Invalid request
+        '403':
+          description: Access denied
+        '409':
+          description: None of the issues can be fixed automatically
+        '502':
+          description: slskdN could not be reached
+  /soulseek/songid:
+    post:
+      summary: Identify a song with slskdN SongID
+      description: Starts a SongID analysis of a link or text. Poll the result with GET `/soulseek/songid/{id}`; only the requester (or a manager) can read it. The slskdN API key needs the administrator role.
+      tags:
+        - soulseek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                source:
+                  type: string
+                  maxLength: 2048
+      responses:
+        '202':
+          description: Analysis started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongIdResult'
+        '400':
+          description: No source given
+        '403':
+          description: Access denied
+        '404':
+          description: slskdN is not set up
+        '502':
+          description: slskdN could not run SongID
+        '503':
+          description: This slskdN does not support SongID
+  /soulseek/songid/{id}:
+    get:
+      summary: Get a SongID result
+      tags:
+        - soulseek
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: SongID result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongIdResult'
+        '404':
+          description: Not found
+  /settings/slskdn:
+    get:
+      summary: Get slskdN settings
+      description: The API key is always redacted.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: slskdN settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlskdnSettings'
+    put:
+      summary: Update slskdN settings
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlskdnSettings'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlskdnSettings'
+        '400':
+          description: Invalid settings
+  /settings/slskdn/test:
+    post:
+      summary: Test the slskdN connection
+      description: Reads the slskdN version and reports which optional features (wishlist, library health, SongID) the API key can use. Settings are not saved.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlskdnSettings'
+      responses:
+        '200':
+          description: Connected
+        '400':
+          description: Invalid settings
+        '502':
+          description: slskdN could not be reached
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings

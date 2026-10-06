@@ -85,6 +85,7 @@ import searchRoutes from './search';
 import seriesRoutes from './series';
 import serviceRoutes from './service';
 import softwareRoutes from './software';
+import soulseekRoutes from './soulseek';
 import tvRoutes from './tv';
 import user from './user';
 
@@ -361,6 +362,7 @@ router.get(
 router.use('/user', isAuthenticated(), user);
 router.use('/live', isAuthenticated(), liveRoutes);
 router.use('/live-tv', isAuthenticated(), liveTvRoutes);
+router.use('/soulseek', isAuthenticated(), soulseekRoutes);
 router.get('/settings/public', async (req, res) => {
   const settings = getSettings();
 
