@@ -132,6 +132,32 @@ export const findProgrammeInSnapshot = (
   return undefined;
 };
 
+/**
+ * Finds the guide programme on a channel whose title matches and whose start
+ * is closest to `around`, within `windowMs`. Used to turn a sports schedule
+ * time into the exact guide airing.
+ */
+export const findProgrammeNear = (
+  snapshot: GuideSnapshot,
+  channel: string,
+  title: string,
+  around: Date,
+  windowMs: number
+): GuideProgramme | undefined => {
+  let best: GuideProgramme | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const programme of snapshot.byTitle.get(normalizeGuideTitle(title)) ??
+    []) {
+    if (programme.channel !== channel) continue;
+    const distance = Math.abs(programme.start.getTime() - around.getTime());
+    if (distance <= windowMs && distance < bestDistance) {
+      best = programme;
+      bestDistance = distance;
+    }
+  }
+  return best;
+};
+
 export const readGuideStream = async (
   stream: Readable,
   now: Date,

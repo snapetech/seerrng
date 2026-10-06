@@ -72,7 +72,7 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 4 ROMarrNG collections / 1G1R full-set requests | pending | Needs new ROMarrNG contract endpoints for collections; not started. |
 | 4 BookshelfNG series-pack search, M4B option | pending | Needs BookshelfNG contract exposure; not started. |
 | 4 QuestarrNG RomM/Playnite state into My Games | pending | Needs QuestarrNG contract exposure; not started. |
-| 2 Sports "follow my team" | pending | |
+| 2 Sports "follow my team" | done | `SportsFollow` entity + migrations `1791060000000`; Live TV Sync maps Tunerr `/v1/sports/events` matches to the nearest guide airing and creates normal recording requests; cancelled games are not re-requested. Integration test against the fake Tunerr. UI: Followed Teams on Recordings. |
 | 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
 | 2 Recording notifications | pending | Requests do not notify yet. |
 

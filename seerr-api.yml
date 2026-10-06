@@ -8828,6 +8828,91 @@ paths:
           description: Invalid settings
         '502':
           description: slskdN could not be reached
+  /live-tv/sports/teams:
+    get:
+      summary: List teams in Tunerr's sports schedule
+      description: Teams from IPTV Tunerr's API-Sports schedules, for following. Requires Tunerr sports automation.
+      tags:
+        - live-tv
+      responses:
+        '200':
+          description: Teams
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                  enabled:
+                    type: boolean
+                  teams:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        dataset:
+                          type: string
+                        league:
+                          type: string
+                        team:
+                          type: string
+        '502':
+          description: Tunerr could not be reached
+  /live-tv/sports/follows:
+    get:
+      summary: List the teams the user follows
+      tags:
+        - live-tv
+      responses:
+        '200':
+          description: Followed teams
+    post:
+      summary: Follow a team
+      description: Live TV Sync requests a recording of each upcoming game Tunerr matches to a guide airing, using the usual approval rules. Up to 20 teams per user.
+      tags:
+        - live-tv
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dataset, team]
+              properties:
+                dataset:
+                  type: string
+                  maxLength: 32
+                team:
+                  type: string
+                  maxLength: 128
+      responses:
+        '200':
+          description: Already following
+        '201':
+          description: Following
+        '400':
+          description: Invalid team
+        '403':
+          description: The user cannot request recordings
+        '409':
+          description: Too many followed teams
+  /live-tv/sports/follows/{id}:
+    delete:
+      summary: Stop following a team
+      tags:
+        - live-tv
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Unfollowed
+        '404':
+          description: Not following
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings

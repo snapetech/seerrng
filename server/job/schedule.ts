@@ -13,6 +13,7 @@ import {
   isTunerrConfigured,
   syncRecordings,
 } from '@server/lib/liveTv/recordings';
+import { syncSportsFollows } from '@server/lib/liveTv/sports';
 import refreshToken from '@server/lib/refreshToken';
 import { captureReleaseCalendarHistory } from '@server/lib/releaseCalendar/history';
 import { reconcileActiveRequests } from '@server/lib/requestStatus';
@@ -583,6 +584,7 @@ export const startJobs = (): void => {
       });
       return runTrackedJob('Live TV Sync', async () => {
         await guideIndex.get();
+        await syncSportsFollows();
         await syncRecordings();
       });
     }),

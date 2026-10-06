@@ -1,7 +1,9 @@
+import TunerrAPI, { TunerrError } from '@server/api/tunerr';
 import { getRepository } from '@server/datasource';
 import RecordingRequest, {
   ACTIVE_RECORDING_STATUSES,
 } from '@server/entity/RecordingRequest';
+import SportsFollow from '@server/entity/SportsFollow';
 import {
   findAiringsInSnapshot,
   guideIndex,
@@ -15,7 +17,9 @@ import {
   RecordingRequestError,
   scheduleRecording,
 } from '@server/lib/liveTv/recordings';
+import { listSportsTeams } from '@server/lib/liveTv/sports';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import { parseNonNegativeRouteId } from '@server/utils/routeId';
 import type { Response } from 'express';
 import { Router } from 'express';
@@ -263,6 +267,83 @@ liveTvRoutes.delete('/recordings/:id', async (req, res) => {
   } catch (error) {
     return sendError(res, error);
   }
+});
+
+liveTvRoutes.get('/sports/teams', async (_req, res) => {
+  if (!isTunerrConfigured()) {
+    return res.status(200).json({ configured: false, teams: [] });
+  }
+  try {
+    const report = await new TunerrAPI(getSettings().tunerr).getSportsReport();
+    return res.status(200).json({
+      configured: true,
+      enabled: report.enabled !== false,
+      teams: listSportsTeams(report),
+    });
+  } catch (error) {
+    return res.status(502).json({
+      message:
+        error instanceof TunerrError
+          ? error.message
+          : 'Tunerr sports schedules could not be loaded.',
+    });
+  }
+});
+
+const followView = (follow: SportsFollow) => ({
+  id: follow.id,
+  dataset: follow.dataset,
+  team: follow.team,
+  createdAt: follow.createdAt,
+});
+
+liveTvRoutes.get('/sports/follows', async (req, res) => {
+  const follows = await getRepository(SportsFollow).find({
+    where: { userId: req.user!.id },
+    order: { dataset: 'ASC', team: 'ASC' },
+  });
+  return res.status(200).json({ results: follows.map(followView) });
+});
+
+liveTvRoutes.post('/sports/follows', async (req, res) => {
+  const user = req.user!;
+  if (!user.hasPermission(Permission.REQUEST)) {
+    return res
+      .status(403)
+      .json({ message: 'You do not have permission to request recordings.' });
+  }
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const dataset =
+    typeof body.dataset === 'string' ? body.dataset.trim().toLowerCase() : '';
+  const team = typeof body.team === 'string' ? body.team.trim() : '';
+  if (!/^[a-z0-9_-]{1,32}$/.test(dataset) || !team || team.length > 128) {
+    return res.status(400).json({ message: 'Choose a team to follow.' });
+  }
+  const repository = getRepository(SportsFollow);
+  const count = await repository.count({ where: { userId: user.id } });
+  if (count >= 20) {
+    return res.status(409).json({ message: 'You can follow up to 20 teams.' });
+  }
+  const existing = await repository.findOne({
+    where: { userId: user.id, dataset, team },
+  });
+  if (existing) return res.status(200).json(followView(existing));
+  const saved = await repository.save(
+    new SportsFollow({ userId: user.id, dataset, team })
+  );
+  return res.status(201).json(followView(saved));
+});
+
+liveTvRoutes.delete('/sports/follows/:id', async (req, res) => {
+  const id = parseNonNegativeRouteId(req.params.id);
+  const repository = getRepository(SportsFollow);
+  const follow =
+    id === undefined
+      ? null
+      : await repository.findOne({ where: { id, userId: req.user!.id } });
+  if (!follow) return res.status(404).json({ message: 'Not following.' });
+  await repository.remove(follow);
+  return res.status(204).end();
 });
 
 export default liveTvRoutes;

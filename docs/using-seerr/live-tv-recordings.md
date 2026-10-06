@@ -66,3 +66,16 @@ the next sync re-creates it. Cancelling the request in SeerrNG removes it.
 
 Recorded files are published by Tunerr into your media server's catch-up
 libraries according to Tunerr's own publish settings.
+
+## Follow a team
+
+When IPTV Tunerr's sports automation is set up (API-Sports schedules for NFL,
+NCAA Football, MLB, or NBA), **Recordings** shows **Followed Teams**. Choose a
+team and select **Follow**. Every minute, Live TV Sync looks for that team's
+upcoming games that Tunerr matched to a channel, finds the guide airing closest
+to the scheduled start (within three hours), and requests a recording of it on
+your behalf, with the usual approval rules.
+
+A game you already requested is not requested again, even if you cancelled it.
+Each person can follow up to 20 teams. Unfollowing a team does not cancel
+recordings already requested.

@@ -49,6 +49,33 @@ export interface TunerrRuleHistory {
   matches: TunerrRuleHistoryMatch[];
 }
 
+export interface TunerrSportsEvent {
+  id: string;
+  dataset: string;
+  league?: string;
+  home_team: string;
+  away_team: string;
+  starts_at: string;
+  status?: string;
+}
+
+export interface TunerrSportsEventChannel {
+  source_guide_number?: string;
+  source_channel_name?: string;
+  source_programme?: string;
+  starts_at?: string;
+  match_confidence?: string;
+}
+
+export interface TunerrSportsReport {
+  enabled?: boolean;
+  events: {
+    event: TunerrSportsEvent;
+    matched: boolean;
+    channels?: TunerrSportsEventChannel[];
+  }[];
+}
+
 export class TunerrError extends Error {
   constructor(
     message: string,
@@ -187,6 +214,21 @@ export default class TunerrAPI {
     if (!data || !Array.isArray(data.matches)) {
       throw new TunerrError(
         'Tunerr returned invalid recording history.',
+        'protocol'
+      );
+    }
+    return data;
+  }
+
+  /** Tunerr's API-Sports schedule matched against its guide. */
+  public async getSportsReport(): Promise<TunerrSportsReport> {
+    const data = await this.get<TunerrSportsReport>(
+      '/v1/sports/events',
+      'sports events'
+    );
+    if (!data || !Array.isArray(data.events)) {
+      throw new TunerrError(
+        'Tunerr returned an invalid sports report.',
         'protocol'
       );
     }

@@ -2,6 +2,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import FollowedTeams from '@app/components/LiveTv/FollowedTeams';
 import type {
   RecordingRequestView,
   RecordingStatus,
@@ -245,6 +246,7 @@ const RecordingList = () => {
         </section>
       ) : (
         <>
+          <FollowedTeams canRequest={status?.canRequest ?? false} />
           <div className="app-action-row">
             {canViewAll && (
               <Button

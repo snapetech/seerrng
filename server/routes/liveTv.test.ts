@@ -6,9 +6,11 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 import { getRepository } from '@server/datasource';
 import RecordingRequest from '@server/entity/RecordingRequest';
+import SportsFollow from '@server/entity/SportsFollow';
 import { User } from '@server/entity/User';
 import { guideIndex } from '@server/lib/liveTv/guideIndex';
 import { syncRecordings } from '@server/lib/liveTv/recordings';
+import { syncSportsFollows } from '@server/lib/liveTv/sports';
 import { getSettings, type TunerrSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
@@ -26,6 +28,7 @@ interface FakeTunerr {
   features: string[];
   history: Record<string, unknown>[];
   authHeaders: (string | undefined)[];
+  sports: Record<string, unknown>;
 }
 
 const startFakeTunerr = async (start: Date): Promise<FakeTunerr> => {
@@ -44,6 +47,7 @@ const startFakeTunerr = async (start: Date): Promise<FakeTunerr> => {
     features: ['title_equals', 'start_window', 'rules_only_recorder'],
     history: [],
     authHeaders: [],
+    sports: { events: [] },
   };
   fake.server.on('request', (req, res) => {
     if (req.url === '/guide.xml') {
@@ -73,6 +77,10 @@ const startFakeTunerr = async (start: Date): Promise<FakeTunerr> => {
         }
         res.end(JSON.stringify({ rules: fake.rules }));
       });
+      return;
+    }
+    if (req.url === '/api/v1/sports/events') {
+      res.end(JSON.stringify(fake.sports));
       return;
     }
     if (req.url === '/api/recordings/history.json') {
@@ -275,5 +283,72 @@ describe('Live TV recording requests', () => {
       start: airingStart.toISOString(),
     });
     assert.equal(response.status, 404);
+  });
+
+  it('records followed teams through matched guide airings', async () => {
+    fake.sports = {
+      enabled: true,
+      events: [
+        {
+          event: {
+            id: 'nfl-1',
+            dataset: 'nfl',
+            home_team: 'Denver Broncos',
+            away_team: 'Kansas City Chiefs',
+            // Schedule time differs slightly from the guide airing.
+            starts_at: new Date(
+              airingStart.getTime() + 10 * 60_000
+            ).toISOString(),
+          },
+          matched: true,
+          channels: [
+            { source_guide_number: '101', source_programme: 'Evening News' },
+          ],
+        },
+      ],
+    };
+
+    const teams = await as(friend).get('/live-tv/sports/teams');
+    assert.equal(teams.status, 200);
+    assert.deepEqual(
+      teams.body.teams.map((team: { team: string }) => team.team),
+      ['Denver Broncos', 'Kansas City Chiefs']
+    );
+
+    const followed = await as(friend).post('/live-tv/sports/follows', {
+      dataset: 'NFL',
+      team: 'Denver Broncos',
+    });
+    assert.equal(followed.status, 201);
+    assert.equal(followed.body.dataset, 'nfl');
+
+    await syncSportsFollows();
+    const [recording] = await getRepository(RecordingRequest).find({
+      where: { requestedById: friend.id },
+    });
+    assert.equal(recording.kind, 'airing');
+    assert.equal(recording.channelId, '101');
+    assert.equal(recording.status, 'pending');
+    assert.equal(
+      new Date(recording.startsAt as Date).toISOString(),
+      airingStart.toISOString()
+    );
+
+    // A cancelled game is not requested again.
+    recording.status = 'cancelled';
+    await getRepository(RecordingRequest).save(recording);
+    await syncSportsFollows();
+    assert.equal(
+      await getRepository(RecordingRequest).count({
+        where: { requestedById: friend.id },
+      }),
+      1
+    );
+
+    const unfollow = await as(friend).delete(
+      `/live-tv/sports/follows/${followed.body.id}`
+    );
+    assert.equal(unfollow.status, 204);
+    assert.equal(await getRepository(SportsFollow).count(), 0);
   });
 });
