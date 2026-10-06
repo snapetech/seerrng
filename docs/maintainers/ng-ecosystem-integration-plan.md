@@ -57,7 +57,8 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 2 RecordingRequest entity + migrations | done | SQLite and Postgres migrations `1791040000000`; SQLite migration test. Postgres migration not run locally. |
 | 2 Live TV API + sync job | done | `/api/v1/live-tv/*`, `/api/v1/settings/tunerr`, `live-tv-sync` job. Integration test against a fake deck and guide (4 tests), OpenAPI validator test (5), settings parser (5). |
 | 2 UI | built | On Live TV button + dialog on movie/series pages, `/recordings` page, Settings → Services section. Component test (4). Needs human visual review. No sidebar entry yet (sidebar links cannot be conditional on settings today). |
-| 2 Tunerr fork: rule-driven recorder | pending | Required for recording to work at all: Tunerr's recorder ignores rules today. Add `title_equals`, `start_after`/`start_before`, a rules-only recorder mode, and `features` in the rules response. |
+| 2 Tunerr fork: rule-driven recorder | done (local branch) | `~/Code/iptvtunerr` branch `feat/seerrng-recording-rules` (commit `0440d64`, not pushed): `title_equals`, `start_after`/`start_before`, response-only `features`, `catchup-daemon -rules-only`. 6 new Go tests; `go test ./...` passed. Tunerr `scripts/verify` not run (local Go 1.27 `gofmt` flags vendored files). Operators must run the recorder with `-rules-only`. |
+| 2 Live check: deck proxy + Basic auth from another host | pending | Verified from Tunerr source only; needs a local Tunerr run. |
 | 2 Sports "follow my team" | pending | |
 | 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
 | 2 Recording notifications | pending | Requests do not notify yet. |
