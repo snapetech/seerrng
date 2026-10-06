@@ -114,6 +114,12 @@ const DownloadBlock = ({
             </Badge>
           )}
           <Badge className="capitalize">{downloadItem.status}</Badge>
+          {downloadItem.downloadClient && (
+            <>
+              {' '}
+              <Badge>{downloadItem.downloadClient}</Badge>
+            </>
+          )}
           {live && (
             <>
               {' '}

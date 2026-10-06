@@ -154,6 +154,8 @@ const createOperationalMedia = () =>
         estimatedCompletionTime: new Date('2026-03-01T00:00:00Z'),
         title: 'Private.Release.Name-GROUP',
         downloadId: 'private-downloader-id',
+        protocol: 'torrent',
+        downloadClient: 'Private qBittorrent',
         episode: {
           seasonNumber: 2,
           episodeNumber: 3,
@@ -186,6 +188,24 @@ describe('restrictMediaOperationalFieldsForUser', () => {
       seasonNumber: 2,
       episodeNumber: 3,
     });
+  });
+
+  it('keeps the download client name for administrators only', () => {
+    const user = restrictMediaOperationalFieldsForUser(
+      createOperationalMedia(),
+      new User({ id: 10, permissions: Permission.REQUEST })
+    );
+    assert.strictEqual(user?.downloadStatus?.[0].downloadClient, undefined);
+    assert.strictEqual(user?.downloadStatus?.[0].protocol, undefined);
+
+    const admin = restrictMediaOperationalFieldsForUser(
+      createOperationalMedia(),
+      new User({ id: 1, permissions: Permission.ADMIN })
+    );
+    assert.strictEqual(
+      admin?.downloadStatus?.[0].downloadClient,
+      'Private qBittorrent'
+    );
   });
 
   it('keeps service routes for request managers but still redacts releases', () => {
