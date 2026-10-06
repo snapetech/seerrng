@@ -14,6 +14,7 @@ import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
 import SettingsSlskdn from '@app/components/Settings/SettingsSlskdn';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
+import SettingsSwipe from '@app/components/Settings/SettingsSwipe';
 import SettingsTunerr from '@app/components/Settings/SettingsTunerr';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -1392,6 +1393,7 @@ const SettingsServices = () => {
       <SettingsDownloadClients />
       <SettingsTunerr />
       <SettingsSlskdn />
+      <SettingsSwipe />
       <SettingsSoftwareAcquisition />
       {overrideRuleModal.open &&
         radarrData &&

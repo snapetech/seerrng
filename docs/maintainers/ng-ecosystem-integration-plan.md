@@ -73,6 +73,7 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 4 BookshelfNG series-pack search, M4B option | pending | Needs BookshelfNG contract exposure; not started. |
 | 4 QuestarrNG RomM/Playnite state into My Games | pending | Needs QuestarrNG contract exposure; not started. |
 | 5 Fastest-source routing design | done (awaiting approval) | [fastest-source-routing-design.md](./fastest-source-routing-design.md). Recommends offer-then-race for Live TV; no code until approved. |
+| 6 Swipe discovery (ReadMeABook-inspired) | built | `/swipe` for movies, series, and books; `SwipeDecision`/`SwipeProfile` + migrations `1791070000000`; optional Claude ordering via `@anthropic-ai/sdk` 0.131.0 (structured output, server-side refusal fallback). Server tests (14) + client tests (5). Needs human visual review, especially drag feel on touch devices. |
 | 2 Sports "follow my team" | done | `SportsFollow` entity + migrations `1791060000000`; Live TV Sync maps Tunerr `/v1/sports/events` matches to the nearest guide airing and creates normal recording requests; cancelled games are not re-requested. Integration test against the fake Tunerr. UI: Followed Teams on Recordings. |
 | 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
 | 2 Recording notifications | pending | Requests do not notify yet. |
@@ -392,3 +393,14 @@ fastest one that is available:
 4. Should the single-airing recording support be built in Tunerr first (single
    airings in the fork) or worked around in SeerrNG with narrow title and
    channel rules?
+
+## Provenance: ideas borrowed from ReadMeABook
+
+ReadMeABook (`kikootwo/ReadMeABook`) is AGPL-3.0; SeerrNG is MIT. Phase 6 took
+only feature-level ideas from ReadMeABook's public README and documentation
+(a swipe stack for recommendations, right-to-request, left/up with undo,
+per-user preferences, optional AI ordering). No ReadMeABook source code, CSS,
+copy, assets, or the "BookDate" name were used; every SeerrNG file was written
+independently. Design differences: SeerrNG decks come from its own catalogs
+(so cards are always requestable), AI is optional and only reorders, and the
+feature covers movies, series, and books.

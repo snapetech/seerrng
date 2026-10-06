@@ -8911,6 +8911,143 @@
     outline: 1px solid var(--palette-blue, #0051d4);
     outline-offset: 1px;
   }
+
+  /* Swipe discovery deck. A stack of up to three cards; only the top card
+     takes input. Drag geometry is runtime data: the component sets
+     --swipe-offset-x / --swipe-offset-y (px) and --swipe-tilt (deg) on the top
+     card while it is dragged. Colours come from the shared card and Badge
+     owners; this family owns only stacking, geometry and motion. */
+  .swipe-deck {
+    --swipe-card-width: min(100%, 24rem);
+    --swipe-card-height: min(70vh, 38rem);
+    --swipe-stack-step: 0.75rem;
+    --swipe-exit-duration: 320ms;
+    position: relative;
+    display: grid;
+    justify-items: center;
+    width: 100%;
+    min-height: calc(var(--swipe-card-height) + 2 * var(--swipe-stack-step));
+    touch-action: pan-y;
+  }
+
+  .swipe-card {
+    --swipe-offset-x: 0px;
+    --swipe-offset-y: 0px;
+    --swipe-tilt: 0deg;
+    --swipe-scale: 1;
+    --swipe-lift: 0px;
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    width: var(--swipe-card-width);
+    height: var(--swipe-card-height);
+    overflow: hidden;
+    transform: translate(
+        var(--swipe-offset-x),
+        calc(var(--swipe-offset-y) + var(--swipe-lift))
+      )
+      rotate(var(--swipe-tilt)) scale(var(--swipe-scale));
+    transition:
+      transform var(--swipe-exit-duration) ease-out,
+      opacity var(--swipe-exit-duration) ease-out;
+    user-select: none;
+  }
+
+  .swipe-card[data-stack-position='0'] {
+    z-index: 3;
+    cursor: grab;
+  }
+
+  .swipe-card[data-stack-position='1'] {
+    --swipe-scale: 0.95;
+    --swipe-lift: var(--swipe-stack-step);
+    z-index: 2;
+    opacity: 0.85;
+  }
+
+  .swipe-card[data-stack-position='2'] {
+    --swipe-scale: 0.9;
+    --swipe-lift: calc(2 * var(--swipe-stack-step));
+    z-index: 1;
+    opacity: 0.65;
+  }
+
+  .swipe-card[data-dragging='true'] {
+    cursor: grabbing;
+    transition: none;
+  }
+
+  .swipe-card[data-swipe-exit='right'] {
+    --swipe-offset-x: 140%;
+    --swipe-tilt: 18deg;
+    opacity: 0;
+  }
+
+  .swipe-card[data-swipe-exit='left'] {
+    --swipe-offset-x: -140%;
+    --swipe-tilt: -18deg;
+    opacity: 0;
+  }
+
+  .swipe-card[data-swipe-exit='up'] {
+    --swipe-offset-y: -120%;
+    --swipe-scale: 0.85;
+    opacity: 0;
+  }
+
+  .swipe-card-artwork {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .swipe-card-artwork img {
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  .swipe-card-body {
+    display: grid;
+    gap: var(--card-spacing);
+    max-height: 45%;
+    overflow-y: auto;
+    padding: var(--card-spacing);
+    scrollbar-width: thin;
+  }
+
+  .swipe-card-stamp {
+    position: absolute;
+    top: 1rem;
+    opacity: var(--swipe-stamp-opacity, 0);
+    pointer-events: none;
+  }
+
+  .swipe-card-stamp[data-stamp='want'] {
+    left: 1rem;
+  }
+
+  .swipe-card-stamp[data-stamp='pass'] {
+    right: 1rem;
+  }
+
+  .swipe-card-stamp[data-stamp='seen'] {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .swipe-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--card-spacing);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .swipe-card {
+      --swipe-exit-duration: 1ms;
+      transition: none;
+    }
+  }
 }
 
 @layer utilities {
