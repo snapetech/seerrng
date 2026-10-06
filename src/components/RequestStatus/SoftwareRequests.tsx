@@ -1,3 +1,4 @@
+import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
@@ -24,6 +25,8 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.RequestStatus.SoftwareRequests', {
+  datVerified: 'DAT Verified',
+  datPartlyVerified: '{verified} of {total} DAT Verified',
   title: 'Software Requests',
   requestedBy: 'Requested by {user}',
   pending: 'Pending Approval',
@@ -117,7 +120,13 @@ interface SoftwareRequestResult {
   request: SoftwareRequestRow;
   status: SoftwareStatus;
   message: string | null;
-  assets: { id: string; name: string; size: number; url: string }[];
+  assets: {
+    id: string;
+    name: string;
+    size: number;
+    url: string;
+    datVerified?: boolean;
+  }[];
   bundle?: { name: string; url: string } | null;
 }
 
@@ -135,6 +144,38 @@ interface SoftwareRequestHistoryResponse {
     createdAt: string;
   }[];
 }
+
+/**
+ * ROMarrNG DAT verification for delivered files. Shown only when ROMarrNG
+ * reported a verdict for at least one file.
+ */
+const DatVerificationBadge = ({
+  assets,
+}: {
+  assets: SoftwareRequestResult['assets'];
+}) => {
+  const intl = useIntl();
+  const reported = assets.filter(
+    (asset) => typeof asset.datVerified === 'boolean'
+  );
+  if (reported.length === 0) return null;
+  const verified = reported.filter((asset) => asset.datVerified).length;
+  if (verified === assets.length) {
+    return (
+      <Badge badgeType="success">
+        {intl.formatMessage(messages.datVerified)}
+      </Badge>
+    );
+  }
+  return (
+    <Badge badgeType="warning">
+      {intl.formatMessage(messages.datPartlyVerified, {
+        verified,
+        total: assets.length,
+      })}
+    </Badge>
+  );
+};
 
 const DownloadCopies = ({
   requestId,
@@ -602,6 +643,9 @@ const SoftwareRequests = ({
                         disabled={workingId === request.id}
                         onClick={() => setClearSelection(request.id)}
                       />
+                    )}
+                    {status === 'available' && (
+                      <DatVerificationBadge assets={assets} />
                     )}
                     {status === 'available' && (
                       <DownloadCopies

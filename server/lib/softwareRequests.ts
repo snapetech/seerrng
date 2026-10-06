@@ -140,6 +140,9 @@ const sanitizeSoftwareAssets = (value: unknown): SoftwareAsset[] => {
       // The upstream URL is deliberately discarded. Users receive only a
       // same-origin SeerrNG request-scoped download route.
       url: '',
+      ...(typeof asset.datVerified === 'boolean'
+        ? { datVerified: asset.datVerified }
+        : {}),
     }));
 };
 

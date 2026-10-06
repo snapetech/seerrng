@@ -1379,6 +1379,7 @@ softwareRoutes.get('/status', async (req, res) => {
           name: asset.name,
           size: asset.size,
           url: `/api/v1/request/software/status/${request.id}/downloads/${encodeURIComponent(asset.id)}`,
+          datVerified: asset.datVerified,
         })),
         bundle: bundleName
           ? {
@@ -1419,6 +1420,7 @@ softwareRoutes.get('/status/:id', async (req, res) => {
       name: asset.name,
       size: asset.size,
       url: `/api/v1/request/software/status/${request.id}/downloads/${encodeURIComponent(asset.id)}`,
+      datVerified: asset.datVerified,
     })),
     bundle: view.bundleName
       ? {
@@ -1678,6 +1680,7 @@ softwareRoutes.get('/status/:id/downloads', async (req, res) => {
       name: asset.name,
       size: asset.size,
       url: `/api/v1/request/software/status/${request.id}/downloads/${encodeURIComponent(asset.id)}`,
+      datVerified: asset.datVerified,
     })),
     bundle: view.bundleName
       ? {

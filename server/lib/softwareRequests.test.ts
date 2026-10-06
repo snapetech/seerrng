@@ -87,3 +87,44 @@ describe('refreshTrackedSoftwareRequests', () => {
     }
   });
 });
+
+describe('listSoftwareRequestAssets DAT verification', () => {
+  afterEach(() => mock.restoreAll());
+
+  it('keeps only boolean DAT verdicts from ROMarrNG', async () => {
+    const { listSoftwareRequestAssets } = await import('./softwareRequests');
+    const settings = getSettings().softwareAcquisition.romarr;
+    const originalSettings = { ...settings };
+    Object.assign(settings, { hostname: '127.0.0.1', apiKey: 'test-key' });
+    try {
+      mock.method(ROMarrNGAPI.prototype, 'getAssets', async () => ({
+        assets: [
+          { id: 'a', name: 'Good.sfc', size: 1, url: 'x', datVerified: true },
+          { id: 'b', name: 'Hack.sfc', size: 1, datVerified: false },
+          { id: 'c', name: 'Bundle.tar', size: 1, datVerified: null },
+          { id: 'd', name: 'Odd.sfc', size: 1, datVerified: 'yes' },
+        ],
+        bundleSupported: false,
+      }));
+      const assets = await listSoftwareRequestAssets(
+        Object.assign(new SoftwareRequest(), {
+          id: 1,
+          provider: 'romarr' as const,
+          status: 'available' as const,
+          externalRequestId: 'seerrng:software:1',
+        })
+      );
+      assert.deepEqual(
+        assets.map((asset) => [asset.name, asset.datVerified, asset.url]),
+        [
+          ['Good.sfc', true, ''],
+          ['Hack.sfc', false, ''],
+          ['Bundle.tar', undefined, ''],
+          ['Odd.sfc', undefined, ''],
+        ]
+      );
+    } finally {
+      Object.assign(settings, originalSettings);
+    }
+  });
+});

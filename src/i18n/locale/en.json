@@ -2203,6 +2203,8 @@
   "components.RequestStatus.SoftwareRequests.clearFailed": "Unable to clear this cancelled request.",
   "components.RequestStatus.SoftwareRequests.clearSuccess": "Cancelled request cleared.",
   "components.RequestStatus.SoftwareRequests.confirmAfterCheck": "I checked; continue",
+  "components.RequestStatus.SoftwareRequests.datPartlyVerified": "{verified} of {total} DAT Verified",
+  "components.RequestStatus.SoftwareRequests.datVerified": "DAT Verified",
   "components.RequestStatus.SoftwareRequests.decline": "Decline",
   "components.RequestStatus.SoftwareRequests.declined": "Declined",
   "components.RequestStatus.SoftwareRequests.downloadAllCopies": "Download all files",

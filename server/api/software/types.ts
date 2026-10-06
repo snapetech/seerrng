@@ -61,6 +61,11 @@ export interface SoftwareAsset {
   name: string;
   size: number;
   url: string;
+  /**
+   * ROMarrNG DAT verdict: true matches the loaded DAT, false is hashed but
+   * not in it, undefined when unknown or not reported.
+   */
+  datVerified?: boolean;
 }
 
 export interface SoftwareAssetsResponse {

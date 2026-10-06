@@ -66,6 +66,12 @@ human visual acceptance yet; testing is planned after the full build-out.
 | 3 UI | built | Bulk dialog Soulseek card for unmatched playlist tracks, `/track-requests`, `/identify`, album Library Health button, Settings section. Component test for the bulk-dialog card. Needs human visual review. |
 | 3 Peer previews | not started | Open question 3 (legal/permission decision) still applies. |
 | 3 slskdN download progress in live progress | pending | slskdN transfers are not torrents; needs a separate adapter. |
+| 4 Goodreads lists in External Request List Sync | already present | SeerrNG already supports Goodreads lists (`ExternalRequestListProvider = 'imdb' \| 'goodreads'`). Hardcover want-to-read is not supported (needs a per-user Hardcover token). |
+| 4 ChaptarrNG direct download shown | done | Generalized: admins see the *arr queue's download client name (and protocol is carried) for every download. Non-admin projection drops it (test). |
+| 4 ROMarrNG DAT verification | done | ROMarrNG local branch `feat/seerrng-dat-verification` (commit `06a6a67`, not pushed): `datVerified` per asset + `assetDatVerification` capability; 2 new pytest tests; ROMarrNG suite 2206 passed, 1 pre-existing failure (`test_json_request_bodies_are_bounded_before_parsing`, also fails on clean HEAD here). SeerrNG shows a DAT Verified badge on available ROM requests. |
+| 4 ROMarrNG collections / 1G1R full-set requests | pending | Needs new ROMarrNG contract endpoints for collections; not started. |
+| 4 BookshelfNG series-pack search, M4B option | pending | Needs BookshelfNG contract exposure; not started. |
+| 4 QuestarrNG RomM/Playnite state into My Games | pending | Needs QuestarrNG contract exposure; not started. |
 | 2 Sports "follow my team" | pending | |
 | 2 Recently aired shelf, channel requests, Plex→Jellyfin users | pending | |
 | 2 Recording notifications | pending | Requests do not notify yet. |
