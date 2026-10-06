@@ -70,6 +70,7 @@ import { imageCacheWarmRateLimit, warmImageCache } from './imageproxy';
 import indexerSearchRoutes from './indexerSearch';
 import issueRoutes from './issue';
 import issueCommentRoutes from './issueComment';
+import liveRoutes from './live';
 import magazineRoutes from './magazine';
 import mediaRoutes from './media';
 import movieRoutes from './movie';
@@ -357,6 +358,7 @@ router.get(
 );
 
 router.use('/user', isAuthenticated(), user);
+router.use('/live', isAuthenticated(), liveRoutes);
 router.get('/settings/public', async (req, res) => {
   const settings = getSettings();
 

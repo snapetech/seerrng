@@ -113,6 +113,7 @@ import semver from 'semver';
 import { URL } from 'url';
 import audiobookshelfRoutes from './audiobookshelf';
 import backissueRoutes from './backissue';
+import downloadClientRoutes from './downloadClients';
 import kapowarrRoutes from './kapowarr';
 import lazyLibrarianRoutes from './lazylibrarian';
 import lidarrRoutes from './lidarr';
@@ -1431,6 +1432,7 @@ settingsRoutes.use('/discover', discoverSettingRoutes);
 settingsRoutes.use('/metadatas', metadataRoutes);
 settingsRoutes.use('/software-acquisition', softwareAcquisitionRoutes);
 settingsRoutes.use('/prowlarr', prowlarrRoutes);
+settingsRoutes.use('/download-clients', downloadClientRoutes);
 
 export const filteredMainSettings = (
   user: User,

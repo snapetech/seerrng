@@ -6,6 +6,7 @@ import {
 } from '@app/components/Common/BookFormatBadge';
 import Tooltip from '@app/components/Common/Tooltip';
 import DownloadBlock from '@app/components/DownloadBlock';
+import { applyLiveDownload, useLiveDownload } from '@app/hooks/useLiveDownload';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -76,6 +77,7 @@ const StatusBadge = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
   const settings = useSettings();
+  const firstLiveDownload = useLiveDownload(downloadItem[0]?.downloadId);
   const formatStatusLabel = (statusText: string) =>
     showQuality
       ? intl.formatMessage(is4k ? messages.status4k : messages.status, {
@@ -280,7 +282,11 @@ const StatusBadge = ({
       } transition-all duration-200 ease-in-out`}
       style={{
         width: `${
-          downloadItem ? calculateDownloadProgress(downloadItem[0]) : 0
+          downloadItem[0]
+            ? calculateDownloadProgress(
+                applyLiveDownload(downloadItem[0], firstLiveDownload)
+              )
+            : 0
         }%`,
       }}
     />

@@ -60,6 +60,49 @@ servers:
 
 components:
   schemas:
+    DownloadClientSettings:
+      type: object
+      required: [name, type, hostname]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          maxLength: 80
+        type:
+          type: string
+          enum: [qbittorrent, transmission, deluge, torrentng]
+        enabled:
+          type: boolean
+        hostname:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        useSsl:
+          type: boolean
+        baseUrl:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          description: Client password, Deluge Web UI password, or TorrentNG API token. Omit or send the redacted value to keep the saved secret.
+        clearPassword:
+          type: boolean
+    LiveDownloadSettings:
+      type: object
+      properties:
+        pollIntervalSeconds:
+          type: integer
+          minimum: 1
+          maximum: 60
+        clients:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/DownloadClientSettings'
     ReaderDeliverySettings:
       type: object
       required:
@@ -7744,6 +7787,129 @@ paths:
           description: Managed shelf not found
         '502':
           description: Reader service could not delete the managed shelf
+  /live/downloads:
+    get:
+      summary: Stream live torrent download progress
+      description: >-
+        Server-sent events (`event: downloads`) with live progress for the
+        given torrent info hashes, read from the configured download clients.
+        Pass the `downloadId` values already returned for requests or media
+        the user can see. Non-torrent IDs are ignored. Returns 204 when no
+        download client is configured. The stream sends nothing for hashes
+        no configured client reports.
+      tags:
+        - request
+      parameters:
+        - in: query
+          name: ids
+          required: true
+          description: Comma-separated 40- or 64-character hexadecimal info hashes (at most 100 are used).
+          schema:
+            type: string
+            maxLength: 16384
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '204':
+          description: No download client is configured
+        '400':
+          description: No valid torrent IDs were given
+        '429':
+          description: Too many concurrent streams
+  /settings/download-clients:
+    get:
+      summary: Get live download progress settings
+      description: Returns the torrent clients SeerrNG reads for live download progress. Passwords and tokens are always redacted.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Live download settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveDownloadSettings'
+    put:
+      summary: Update live download progress settings
+      description: Replaces the list of torrent clients and the refresh interval. SeerrNG only reads these clients; it never adds, changes, or removes torrents.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LiveDownloadSettings'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveDownloadSettings'
+        '400':
+          description: Invalid settings
+  /settings/download-clients/test:
+    post:
+      summary: Test a download client connection
+      description: Signs in to the client and reads its version. The submitted settings are not saved. Omit the password to use the saved one for the same client ID.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadClientSettings'
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  version:
+                    type: string
+        '400':
+          description: Invalid settings
+        '502':
+          description: The client could not be reached or rejected the credentials
+  /settings/download-clients/status:
+    get:
+      summary: Get live download client health
+      description: Reports the result of the most recent poll of each enabled client. Clients are polled only while a browser is viewing a download.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Client health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscribers:
+                    type: integer
+                  clients:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        clientId:
+                          type: integer
+                        ok:
+                          type: boolean
+                        checkedAt:
+                          type: string
+                        error:
+                          type: string
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings

@@ -9,6 +9,7 @@ import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import OverrideRuleTiles from '@app/components/Settings/OverrideRule/OverrideRuleTiles';
 import ReaderDeliverySettings from '@app/components/Settings/ReaderDeliverySettings';
+import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
@@ -1386,6 +1387,7 @@ const SettingsServices = () => {
         </ul>
       </div>
       <SettingsProwlarr />
+      <SettingsDownloadClients />
       <SettingsSoftwareAcquisition />
       {overrideRuleModal.open &&
         radarrData &&

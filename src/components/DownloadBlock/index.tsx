@@ -4,9 +4,11 @@ import BookFormatBadge, {
 } from '@app/components/Common/BookFormatBadge';
 import Button from '@app/components/Common/Button';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
+import { useLiveDownloadingItem } from '@app/hooks/useLiveDownload';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { formatBytes } from '@app/utils/numberHelpers';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import axios from 'axios';
 import { useState } from 'react';
@@ -22,6 +24,10 @@ const messages = defineMessages('components.DownloadBlock', {
   failAndSearchSuccess: 'The release was failed and a new search was started.',
   failAndSearchError:
     'Could not fail this download. Refresh the request and try again.',
+  liveRate: '{rate}/s',
+  liveSeeds: '{count, plural, one {# Seed} other {# Seeds}}',
+  liveStalled: 'Stalled',
+  liveError: 'Client Error',
 });
 
 interface DownloadBlockProps {
@@ -34,7 +40,7 @@ interface DownloadBlockProps {
 }
 
 const DownloadBlock = ({
-  downloadItem,
+  downloadItem: queueItem,
   is4k = false,
   title,
   bookFormat,
@@ -46,6 +52,8 @@ const DownloadBlock = ({
   const { addToast } = useToasts();
   const { mutate } = useSWRConfig();
   const [isFailing, setIsFailing] = useState(false);
+  const downloadItem = useLiveDownloadingItem(queueItem);
+  const live = downloadItem.live;
   const displayTitle = hasPermission(Permission.ADMIN)
     ? downloadItem.title
     : downloadItem.episode
@@ -106,6 +114,32 @@ const DownloadBlock = ({
             </Badge>
           )}
           <Badge className="capitalize">{downloadItem.status}</Badge>
+          {live && (
+            <>
+              {' '}
+              <Badge
+                badgeType={
+                  live.state === 'error'
+                    ? 'danger'
+                    : live.state === 'stalled'
+                      ? 'warning'
+                      : 'default'
+                }
+              >
+                {live.state === 'error'
+                  ? intl.formatMessage(messages.liveError)
+                  : live.state === 'stalled'
+                    ? intl.formatMessage(messages.liveStalled)
+                    : intl.formatMessage(messages.liveRate, {
+                        rate: formatBytes(live.downloadRate, 1),
+                      })}
+                {live.seeds !== null &&
+                  ` · ${intl.formatMessage(messages.liveSeeds, {
+                    count: live.seeds,
+                  })}`}
+              </Badge>
+            </>
+          )}
         </span>
         <span>
           {downloadItem.estimatedCompletionTime

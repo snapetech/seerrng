@@ -132,6 +132,44 @@ export interface ProwlarrSettings extends SoftwareProviderSettings {
   categoryMappings: ProwlarrCategoryMappings;
 }
 
+export const DOWNLOAD_CLIENT_TYPES = [
+  'qbittorrent',
+  'transmission',
+  'deluge',
+  'torrentng',
+] as const;
+
+export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
+
+/**
+ * A torrent client SeerrNG reads for live download progress. SeerrNG never
+ * adds, changes, or removes torrents through this connection.
+ */
+export interface DownloadClientSettings {
+  id: number;
+  name: string;
+  type: DownloadClientType;
+  enabled: boolean;
+  hostname: string;
+  port: number;
+  useSsl: boolean;
+  baseUrl: string;
+  /** qBittorrent and Transmission only. */
+  username: string;
+  /** Client password, Deluge Web UI password, or TorrentNG API token. */
+  password: string;
+}
+
+export interface LiveDownloadSettings {
+  pollIntervalSeconds: number;
+  clients: DownloadClientSettings[];
+}
+
+export const defaultLiveDownloadSettings = (): LiveDownloadSettings => ({
+  pollIntervalSeconds: 3,
+  clients: [],
+});
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -599,6 +637,7 @@ export interface AllSettings {
   lazylibrarian: LazyLibrarianSettings[];
   softwareAcquisition: SoftwareAcquisitionSettings;
   prowlarr: ProwlarrSettings;
+  liveDownloads: LiveDownloadSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
   readerDelivery: ReaderDeliverySettings;
   public: PublicSettings;
@@ -743,6 +782,7 @@ class Settings {
         apiKey: '',
         categoryMappings: defaultProwlarrCategoryMappings(),
       },
+      liveDownloads: defaultLiveDownloadSettings(),
       public: {
         initialized: false,
       },
@@ -1266,6 +1306,14 @@ class Settings {
     this.data.prowlarr = mergeSettings(this.data.prowlarr, data);
   }
 
+  get liveDownloads(): LiveDownloadSettings {
+    return this.data.liveDownloads;
+  }
+
+  set liveDownloads(data: LiveDownloadSettings) {
+    this.data.liveDownloads = data;
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -1634,6 +1682,7 @@ class Settings {
         apiKey: '',
         categoryMappings: defaultProwlarrCategoryMappings(),
       },
+      liveDownloads: defaultLiveDownloadSettings(),
       public: {
         initialized: false,
       },
