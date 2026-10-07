@@ -125,7 +125,7 @@
     "reflect-metadata": "^0.2.2",
     "selfsigned": "5.5.0",
     "semver": "7.8.5",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "swagger-ui-express": "5.0.1",
     "swr": "2.5.1",
     "tailwind-merge": "^3.7.0",
