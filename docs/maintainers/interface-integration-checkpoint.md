@@ -5,6 +5,15 @@ approval or a complete site-audit claim. Read `AGENTS.md`, UI Style Standard and
 UI Fix-It first. Preserve earlier accepted work while reviewing small batches.
 Never infer human acceptance from test success or a journal's implementation note.
 
+## Current maintainer direction — October 7, 2026
+
+The project owner removed human review and acceptance as merge or release
+gates. This direction applies to all repository instructions and historical
+checkpoint entries below: a recorded pending review describes the state at that
+time and is not a current blocker. Record available visual inspection evidence
+separately from automated results, and proceed with an explicitly authorized
+merge or release once its applicable automated and functional checks pass.
+
 ## Preservation and coverage map
 
 | Work to preserve                                                       | Established owners and existing checks                                                                                                                                                                            | Review boundary                                                                                                                                                      |
@@ -37,7 +46,8 @@ successor changes must not be resurrected because an older log mentions them.
   remains saved. This is live evidence, separate from mocks.
 - Jellyfin/Emby native actions: mocked tests only; no live write pass claimed.
 - Previous focused passes do not establish a full cumulative suite/build pass.
-  Human visual acceptance and physical drag/touch review remain pending.
+  Human visual acceptance and physical drag/touch review were pending in this
+  historical checkpoint; neither is a merge or release gate under current direction.
 
 ## Current bounded batch
 
@@ -70,7 +80,8 @@ Formatting and discovery plan passed. All 12 explicit files matched the mounted
 source readback. Desktop/narrow menu inspection confirmed the shared black surface,
 open content above its parent frame, keyboard access to the last option, and Escape
 restoring normal clipping/layers/focus. Narrow tree headings still crowd; physical
-drag/touch and final human visual acceptance remain pending.
+drag/touch and final human visual acceptance were pending in this historical
+checkpoint and do not block an explicitly authorized merge or release.
 
 The one full `pnpm build` attempt passed translations, current-batch and shared-
 style validators, formatting, lint, server/client types and all 85 Vitest files
@@ -91,9 +102,10 @@ the test now mocks the actual retained TMDB client with typed season fixtures an
 per-test restoration. Unexpected fixture IDs fail outside the production catch.
 A new unavailable-enrichment case checks the exact lookup and preserved status.
 All 18 focused tests pass, with no skips/cancellations/todos. This test-only repair
-is not a production backend fix or a complete cumulative gate/build pass. The
-final gate and human acceptance remain pending; unrelated failures still require
-scoped direction before further repair.
+is not a production backend fix or a complete cumulative gate/build pass. At
+that historical attempt the final gate and visual inspection were pending. The
+owner's current direction removes human acceptance as a blocker, and the user
+has authorized repairs required to complete the requested gate.
 
 The visual/client fixtures were also tightened: negative CSS/role fixtures must
 fail with their intended diagnostics, wrong icon padding is checked without a
@@ -157,7 +169,8 @@ Current-batch/shared-style validators and changed-component lint pass;
 formatting passes. The actual PostCSS configuration compiles the shared CSS
 with zero warnings. Palette/theme, Book-order and other unreconciled failures
 remain recorded. The earlier frozen full/native-JS receipts are retained;
-this follow-up has only focused evidence and still needs rendered/human review.
+this follow-up had only focused evidence and still needed rendered inspection at
+that time; the pending evidence is not a human approval gate.
 Repository/toolchain prerequisites and full gate/build remain blocked.
 
 ## Latest bounded preview checkpoint — October 2, 2026
@@ -237,8 +250,8 @@ Earlier review gaps above remain recorded; this approval does not silently
 certify physical drag/touch or other untested interactions.
 
 The complete strict gate/build, GitHub checks and publication authorization
-remain pending. Visual acceptance does not waive deferred required test failures
-or authorize a PR. CI success must be matched to the actual shared-gate inventory,
+remain pending. Visual inspection does not waive deferred required test failures
+or substitute for explicit publication authorization. CI success must be matched to the actual shared-gate inventory,
 not assumed to cover every local check.
 
 ## Finalization authority and latest accepted scope — October 3, 2026
@@ -286,9 +299,10 @@ Fill these fields with observed facts; unknown means pending, never assumed.
    skips/todos, platform exclusions, lint/type/static/style results and build result.
    `pnpm test` is test partitions only; `test:ci` is Vitest-only. Browser/Cypress
    suites are separate. Linux is required for complete POSIX tooling coverage.
-5. Desktop/narrow reference locations and human visual review evidence per
+5. Desktop/narrow reference locations and available visual inspection evidence per
    page/state, including loading/error/empty, keyboard/focus/disabled, open menus and reorder.
-   An automated screenshot or computed-style result is not human acceptance.
+   An automated screenshot or computed-style result does not establish human
+   acceptance, and separate human acceptance is not a gate.
 6. Live Plex evidence separately from mocked native coverage; safe prerequisites
    for unverified providers. Never copy credentials, runtime DBs or live config.
 7. Explicit deferrals, unresolved failures and next gate. A failed required gate
@@ -308,7 +322,8 @@ the accepted preview and authorized integration with Keith's current main,
 scoped Fix-it repairs, source-specific engine validation, separate guarded
 compilation, and a laptop preview on port 5071 with an independent copy of the
 5070 configuration/database. The final preview is shown only after those checks
-complete. John's visual review remains required before any PR.
+completed. At that time John's visual review was recorded as pending; the
+October 7 maintainer direction supersedes it as a PR prerequisite.
 
 The pinned upstream base is `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`
 (3.48.3). The exact accepted working-byte checkpoint is
@@ -406,13 +421,13 @@ older records remain historical evidence for their original source trees.
   and the selected deployment test fixtures. The frozen lockfile install already
   completed successfully in this isolated candidate.
 - The exact final `pnpm validate:development` run, one production build, browser
-  run, screenshots, release-note preview, commits and remote push are pending.
-  human visual review of the new game and reader surfaces remains a release
-  gate; previous visual acceptance applies only to its recorded older scope.
-  A screenshot or passing build does not fulfill that human review.
+  run, screenshots, release-note preview, commits and remote push were pending
+  at that checkpoint. Human visual review was recorded as pending then; it is
+  evidence status, not a release gate under current direction. A screenshot or
+  passing build does not replace applicable automated and functional checks.
 - No task commit, push, tag, draft/published release, merge, or deployment has
   occurred. The user authorized pushing this work and cutting a release after
-  its required verification/review gates.
+  its required automated and functional checks.
 
 ## Complete dirty-worktree inclusion — October 4, 2026
 
@@ -438,7 +453,8 @@ and discover contract **12/12 Node tests**; RequestBlock edit identity
 **2/2 Vitest tests**; server/client TypeScript, focused ESLint, i18n and
 formatting also pass. Full cumulative validation and a production build remain
 pending on this expanded candidate. Rendered desktop/narrow review and John's
-visual acceptance remain release gates.
+visual acceptance were recorded as pending at that time; they are evidence
+status, not release gates under the current maintainer direction.
 
 ## Current main integration and gate follow-up — October 4, 2026
 
@@ -465,8 +481,9 @@ changelog section. This receipt is invalidated by the forward integration; the
 complete gate must be rerun against this exact merged tree. The production build
 has not run. The in-app browser control and isolated workspace controls are not
 available in this session; rendered review is pending on an available local
-browser path. Human visual review of the new game and reader surfaces
-remains pending and is still required before release.
+browser path. Human visual review of the new game and reader surfaces was
+recorded as pending at that time; it is not a release gate under current
+direction.
 
 ## UI correction and verification record — October 5, 2026
 
@@ -523,7 +540,7 @@ element diagnostics on failure.
 - Desktop and mobile review captures are at
   `/tmp/seerrng-game-library-final-review-20261005/` and
   `/tmp/seerrng-reader-settings-final-review-20261005/`. These are iteration
-  captures, not a substitute for human review. The first exact-tree gate attempt
+  captures, not a substitute for automated checks. The first exact-tree gate attempt
   stopped during formatting before any test lane, reporting ENOENT for
   temporary locale `.bak` paths. A subsequent isolated sequential
   `pnpm i18n:check` and `pnpm format:check` passed. The first output is preserved
@@ -533,7 +550,8 @@ element diagnostics on failure.
   `/tmp/seerrng-game-library-validation-final-candidate-20261005.log`.
 - Tests used a fresh disposable SQLite configuration and local providers only.
   No live Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was
-  contacted. Human visual review remains a release gate.
+  contacted. Human visual review was recorded as pending at that time; it is not
+  a release gate under the current maintainer direction.
 
 ## Rebuilt candidate and rendered review — October 4, 2026 (Regina local)
 
@@ -572,8 +590,9 @@ rebuilt after this correction.
   Log: `/tmp/seerrng-validate-development-final-20261005.log`.
 - The Chromium exploratory Cypress attempt timed out waiting for a page load and
   is not counted. The final built-app workflows passed separately under the
-  repository's Cypress Electron runner. Human visual review remains a
-  release gate.
+  repository's Cypress Electron runner. Human visual review was recorded as
+  pending in this historical entry; it is not a release gate under current
+  direction.
 - Release-note preview, commits, push, and release remain pending. Live Grimmory,
   BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain unverified.
 
@@ -617,7 +636,8 @@ the game source-level lint fixes and new main target; it is historical only.
 The final integrated gate, production build, and rebuilt disposable browser
 flows remain pending. No branch push, tag, or release has occurred. Live
 Grimmory, BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain
-unverified; human visual review remains a release gate.
+unverified; human visual review was recorded as pending then and is not a release
+gate under the current maintainer direction.
 
 ## Reader settings readability follow-up — October 5, 2026
 
@@ -640,8 +660,8 @@ Vitest, 385 native TypeScript, 56 native JavaScript, and 32 tooling files, with
 zero declared platform exclusions. The final gate, clean production build,
 and rebuilt desktop/narrow browser flows remain pending on this follow-up.
 Earlier build and screenshot evidence predates the reader layout change.
-Provider round trips remain unverified, and human visual review is
-still required before release.
+Provider round trips remain unverified. Human visual review was recorded as
+pending at this time; it is not a release gate under current direction.
 
 ## Final verification receipt — October 5, 2026
 
@@ -669,7 +689,7 @@ The game and reader workflows each passed **1/1** in their separate Chromium
 153 headless runs, checking desktop and narrow layouts. Captures are in
 `/tmp/seerrng-game-library-final-review-20261005/` and
 `/tmp/seerrng-reader-settings-final-review-20261005/`; their rendered content
-was inspected. The screenshots are iteration evidence, not a substitute for human review. Tests used disposable SQLite and local app endpoints only; no live
+was inspected. The screenshots record visual inspection and are not a substitute for automated checks. Tests used disposable SQLite and local app endpoints only; no live
 Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was contacted.
 Release-note preview and branch push remained pending at that checkpoint.
 Human visual review status was pending; these entries are superseded by the
@@ -732,7 +752,8 @@ alignment. The Cypress repair is not yet integrated on that new main tip. Before
 finalizing a follow-up candidate, preserve its source checkpoint, forward
 integrate the latest main and any completed bundle repair, then rerun the exact
 full development gate, production build, and affected browser flows. The
-Chocolatey 403 and human visual review remain explicit release limitations.
+Chocolatey 403 remains an explicit release limitation. Human visual review was
+recorded as pending in this historical checkpoint and is not a release gate.
 
 ## Post-release CI repairs — October 5, 2026
 
@@ -756,16 +777,17 @@ verification on this combined exact source tree. A preserved source bundle is
 integrated candidate's final validation, build, bundle budget and complete
 Cypress results will be appended here when available.
 
-The Chocolatey publish 403 and human visual review remain
-outstanding. No provider round trips against live services were attempted.
+The Chocolatey publish 403 remained outstanding in this historical record.
+Visual inspection status was also recorded as pending, but does not block
+authorized work under the current maintainer direction. No provider round trips
+against live services were attempted.
 
 ## Project-owner release authorization and v3.52.1 verification — October 5, 2026
 
-The project owner directed removal of the individual-specific visual acceptance
-gate. Human review remains required under CONTRIBUTING.md, but acceptance is not
-assigned to any named reviewer. The project owner authorized the release
-without a named person’s separate visual sign-off. This supersedes the earlier
-pending release-gate statuses above.
+The project owner removed human review and visual acceptance as merge or release
+gates. This supersedes all earlier pending review-gate statuses above. Visual
+inspection remains separate evidence when available; authorized merges and
+releases proceed after applicable automated and functional checks pass.
 
 SeerrNG v3.52.1 was published from tag `v3.52.1` at commit
 `76632411a3f73d0ad4ea31cb10405496d7db474f`. Release workflow run
