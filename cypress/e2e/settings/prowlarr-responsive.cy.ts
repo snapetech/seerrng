@@ -50,6 +50,7 @@ describe('Prowlarr settings on a short mobile screen', () => {
           },
         });
       } else if (pathname === '/api/v1/settings/prowlarr') {
+        request.alias = 'prowlarrSettings';
         request.reply({
           hostname: 'prowlarr.test',
           port: 9696,
@@ -113,6 +114,8 @@ describe('Prowlarr settings on a short mobile screen', () => {
 
   it('keeps save reachable after scrolling the long indexer report', () => {
     cy.visit('/settings/services');
+    cy.wait('@prowlarrSettings').its('response.statusCode').should('eq', 200);
+    cy.get('#prowlarr').should('be.visible');
     cy.contains('#prowlarr h3', 'Prowlarr indexers').scrollIntoView();
     cy.get('#prowlarr')
       .contains('button', 'Test connection and inspect coverage')
