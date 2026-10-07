@@ -97,7 +97,7 @@ describe('Plex relink maintenance script', () => {
     await fs.writeFile(settingsPath, '{"plex":{"name":"Old"}}\n', {
       mode: 0o640,
     });
-    await execFileAsync('python', [
+    await execFileAsync('python3', [
       '-c',
       'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute("create table user (id integer primary key, plexToken text, plexId integer)"); c.execute("insert into user values (1, ?, null)", ("old-token",)); c.commit()',
       databasePath,
@@ -119,7 +119,7 @@ describe('Plex relink maintenance script', () => {
     } finally {
       await settingsHandle.close();
     }
-    const { stdout } = await execFileAsync('python', [
+    const { stdout } = await execFileAsync('python3', [
       '-c',
       'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select plexToken from user where id=1").fetchone()[0])',
       databasePath,

@@ -19,7 +19,7 @@ ssh_dir="${HOME:?HOME is required}/.ssh"
   exit 1
 }
 mkdir -p -- "$ssh_dir"
-chmod 700 -- "$ssh_dir"
+chmod 700 "$ssh_dir"
 
 key_destination="$ssh_dir/aur"
 config_destination="$ssh_dir/aur_config"
@@ -40,7 +40,7 @@ cleanup() {
 trap cleanup EXIT
 
 cp -- "$key_file" "$key_temporary"
-chmod 600 -- "$key_temporary"
+chmod 600 "$key_temporary"
 
 cat >"$known_hosts_temporary" <<'EOF'
 aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN
@@ -66,7 +66,7 @@ Host aur.archlinux.org
   KbdInteractiveAuthentication no
 EOF
 
-chmod 600 -- "$config_temporary" "$known_hosts_temporary"
+chmod 600 "$config_temporary" "$known_hosts_temporary"
 mv -- "$key_temporary" "$key_destination"
 mv -- "$config_temporary" "$config_destination"
 mv -- "$known_hosts_temporary" "$known_hosts_destination"

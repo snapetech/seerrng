@@ -66,14 +66,14 @@ describe('package smoke evidence boundaries', () => {
     const fixture = await createFixture();
     const artifacts = path.join(fixture.root, 'artifacts');
 
-    const result = await runSmoke(fixture, artifacts);
+    const result = await runSmoke(fixture, artifacts, ['--arch', 'x86_64']);
 
     assert.equal(result.code, 0, result.output);
     const evidence = JSON.parse(
       await fs.readFile(path.join(artifacts, 'evidence.json'), 'utf8')
     );
     assert.equal(evidence.status, 'passed');
-    assert.equal(evidence.arch, os.machine());
+    assert.equal(evidence.arch, 'x86_64');
     assert.equal(
       (await fs.stat(path.join(artifacts, 'evidence.json'))).mode & 0o777,
       0o600
@@ -111,7 +111,7 @@ describe('package smoke evidence boundaries', () => {
     const artifacts = path.join(fixture.root, 'artifacts');
     const countFile = path.join(fixture.root, 'flatpak-builder.count');
 
-    const result = await runSmoke(fixture, artifacts, [], {
+    const result = await runSmoke(fixture, artifacts, ['--arch', 'x86_64'], {
       FLATPAK_BUILDER_COUNT: countFile,
     });
 
@@ -126,7 +126,10 @@ describe('package smoke evidence boundaries', () => {
     await fs.mkdir(target);
     await fs.symlink(target, link);
 
-    const result = await runSmoke(fixture, path.join(link, 'nested'));
+    const result = await runSmoke(fixture, path.join(link, 'nested'), [
+      '--arch',
+      'x86_64',
+    ]);
 
     assert.notEqual(result.code, 0);
     assert.match(result.output, /artifact directory contains a symlink/);
@@ -143,7 +146,7 @@ describe('package smoke evidence boundaries', () => {
     await fs.writeFile(sentinel, 'unchanged');
     await fs.symlink(sentinel, path.join(artifacts, 'evidence.json'));
 
-    const result = await runSmoke(fixture, artifacts);
+    const result = await runSmoke(fixture, artifacts, ['--arch', 'x86_64']);
 
     assert.notEqual(result.code, 0);
     assert.match(result.output, /refusing symlink evidence file/);

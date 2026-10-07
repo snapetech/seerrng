@@ -47,6 +47,14 @@ jobs:
           set -euo pipefail
           umask 077
 
+          file_link_count() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              stat -f '%l' "$1"
+            else
+              stat -c '%h' -- "$1"
+            fi
+          }
+
           if [[ ! "$TARGET_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] ||
              [[ "$TARGET_BRANCH" == *..* ]]; then
             echo 'Invalid default branch name.' >&2
@@ -55,7 +63,13 @@ jobs:
 
           charts_file="$RUNNER_TEMP/renovate-helm-charts"
           : > "$charts_file"
-          mapfile -t charts < <(ct list-changed --target-branch "$TARGET_BRANCH")
+          charts_output="$(ct list-changed --target-branch "$TARGET_BRANCH")"
+          charts=()
+          if [[ -n "$charts_output" ]]; then
+            while IFS= read -r chart; do
+              charts+=("$chart")
+            done <<< "$charts_output"
+          fi
           if (( ${#charts[@]} == 0 )); then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
             exit 0
@@ -73,7 +87,7 @@ jobs:
 
             chart_file="$chart/Chart.yaml"
             if [[ ! -f "$chart_file" || -L "$chart_file" ]] ||
-               [[ "$(stat -c '%h' "$chart_file")" != 1 ]]; then
+               [[ "$(file_link_count "$chart_file")" != 1 ]]; then
               echo "Chart metadata is not a private regular file: $chart_file" >&2
               exit 1
             fi
@@ -117,7 +131,11 @@ jobs:
             fi
 
             chart_new_version="${chart_major}.${chart_minor}.${chart_patch}"
-            sed -i "s/^version:.*/version: ${chart_new_version}/" "$chart_file"
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              sed -i '' "s/^version:.*/version: ${chart_new_version}/" "$chart_file"
+            else
+              sed -i "s/^version:.*/version: ${chart_new_version}/" "$chart_file"
+            fi
           done
 
           echo 'changed=true' >> "$GITHUB_OUTPUT"
@@ -136,6 +154,21 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+
+          file_link_count() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              stat -f '%l' "$1"
+            else
+              stat -c '%h' -- "$1"
+            fi
+          }
+          file_size() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              stat -f '%z' "$1"
+            else
+              stat -c '%s' -- "$1"
+            fi
+          }
 
           charts_file="$RUNNER_TEMP/renovate-helm-charts"
           if [[ ! -s "$charts_file" || -L "$charts_file" ]]; then
@@ -179,18 +212,18 @@ jobs:
               exit 1
             fi
             if [[ ! -f "$file" || -L "$file" ]] ||
-               [[ "$(stat -c '%h' "$file")" != 1 ]]; then
+               [[ "$(file_link_count "$file")" != 1 ]]; then
               echo "Generated path is not a private regular file: $file" >&2
               exit 1
             fi
-            size="$(stat -c '%s' "$file")"
+            size="$(file_size "$file")"
             if (( size < 1 || size > 1048576 )); then
               echo "Generated file exceeds its size boundary: $file" >&2
               exit 1
             fi
 
             encoded_file="$(mktemp "$RUNNER_TEMP/renovate-helm-base64.XXXXXX")"
-            base64 -w 0 -- "$file" > "$encoded_file"
+            base64 < "$file" | tr -d '\r\n' > "$encoded_file"
             jq --arg path "$file" --rawfile contents "$encoded_file" \
               '.fileChanges.additions += [{path: $path, contents: $contents}]' \
               "$changes_file" > "$changes_file.next"
@@ -238,20 +271,44 @@ jobs:
           set -euo pipefail
           umask 077
 
+          file_link_count() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              stat -f '%l' "$1"
+            else
+              stat -c '%h' -- "$1"
+            fi
+          }
+          file_size() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              stat -f '%z' "$1"
+            else
+              stat -c '%s' -- "$1"
+            fi
+          }
+          decode_base64() {
+            if [[ "$(uname -s)" == 'Darwin' ]]; then
+              base64 -D -i "$1" > "$2"
+            else
+              base64 --decode "$1" > "$2"
+            fi
+          }
+
           manifest_directory="$RUNNER_TEMP/renovate-helm-changes"
           manifest="$manifest_directory/changes.json"
           if [[ ! -d "$manifest_directory" || -L "$manifest_directory" ]]; then
             echo 'Change artifact directory is missing or unsafe.' >&2
             exit 1
           fi
-          artifact_entries="$(find "$manifest_directory" -mindepth 1 -maxdepth 1 -printf '.' | wc -c)"
-          if [[ "$artifact_entries" != 1 ]] ||
+          shopt -s dotglob nullglob
+          artifact_paths=("$manifest_directory"/*)
+          shopt -u dotglob nullglob
+          if (( ${#artifact_paths[@]} != 1 )) ||
              [[ ! -f "$manifest" || -L "$manifest" ]] ||
-             [[ "$(stat -c '%h' "$manifest")" != 1 ]]; then
+             [[ "$(file_link_count "$manifest")" != 1 ]]; then
             echo 'Change artifact must contain exactly one regular manifest.' >&2
             exit 1
           fi
-          manifest_size="$(stat -c '%s' "$manifest")"
+          manifest_size="$(file_size "$manifest")"
           if (( manifest_size < 1 || manifest_size > 3145728 )); then
             echo 'Change manifest exceeds its size boundary.' >&2
             exit 1
@@ -305,8 +362,8 @@ jobs:
             jq -r --arg path "$path" \
               '.fileChanges.additions[] | select(.path == $path) | .contents' \
               "$manifest" > "$encoded_file"
-            base64 --decode "$encoded_file" > "$decoded_file"
-            decoded_size="$(stat -c '%s' "$decoded_file")"
+            decode_base64 "$encoded_file" "$decoded_file"
+            decoded_size="$(file_size "$decoded_file")"
             rm -f "$encoded_file" "$decoded_file"
             if (( decoded_size < 1 || decoded_size > 1048576 )); then
               echo "Decoded generated file exceeds its size boundary: $path" >&2
