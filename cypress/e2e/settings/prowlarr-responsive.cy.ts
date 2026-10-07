@@ -113,7 +113,11 @@ describe('Prowlarr settings on a short mobile screen', () => {
 
   it('keeps save reachable after scrolling the long indexer report', () => {
     cy.visit('/settings/services');
-    cy.contains('#prowlarr h3', 'Prowlarr indexers').scrollIntoView();
+    // Give the initial settings fetch and render extra room under CI load
+    // instead of racing the default 4s command timeout.
+    cy.contains('#prowlarr h3', 'Prowlarr indexers', {
+      timeout: 10000,
+    }).scrollIntoView();
     cy.get('#prowlarr')
       .contains('button', 'Test connection and inspect coverage')
       .click();
