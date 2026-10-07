@@ -469,7 +469,13 @@ describe('GET /music/:id', () => {
     assertEnrichment();
   });
 
-  it('falls back to MusicBrainz when ListenBrainz has no album detail page', async () => {
+  it('falls back to MusicBrainz when ListenBrainz has no album detail page', async (t) => {
+    const settings = getSettings();
+    const originalLidarr = settings.lidarr;
+    settings.lidarr = [];
+    t.after(() => {
+      settings.lidarr = originalLidarr;
+    });
     const assertEnrichment = mockAlbumEnrichment('release-group-id', {
       taxonomy: false,
     });
