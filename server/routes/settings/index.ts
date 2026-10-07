@@ -74,6 +74,7 @@ import {
   authorizedRouteAccess,
 } from '@server/middleware/authorizedMutation';
 import discoverSettingRoutes from '@server/routes/settings/discover';
+import loginLinkRoutes from '@server/routes/settings/loginLinks';
 import { ApiError } from '@server/types/error';
 import { isAvailableLocale } from '@server/types/languages';
 import { appDataPath } from '@server/utils/appDataVolume';
@@ -124,6 +125,7 @@ import prowlarrRoutes from './prowlarr';
 import radarrRoutes from './radarr';
 import readarrRoutes from './readarr';
 import readerDeliveryRoutes from './readerDelivery';
+import readMeABookRoutes from './readmeabook';
 import slskdnRoutes from './slskdn';
 import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
@@ -1438,6 +1440,8 @@ settingsRoutes.use('/prowlarr', prowlarrRoutes);
 settingsRoutes.use('/download-clients', downloadClientRoutes);
 settingsRoutes.use('/tunerr', tunerrRoutes);
 settingsRoutes.use('/slskdn', slskdnRoutes);
+settingsRoutes.use('/readmeabook', readMeABookRoutes);
+settingsRoutes.use('/login-links', loginLinkRoutes);
 settingsRoutes.use('/swipe', swipeSettingsRoutes);
 
 export const filteredMainSettings = (

@@ -3,10 +3,18 @@ import type {
   SwipeDecisionKind,
   SwipeMediaType,
 } from '@server/entity/SwipeDecision';
+import type {
+  SwipeFavoriteSeed,
+  SwipeSeedScope,
+} from '@server/entity/SwipeProfile';
 import SwipeProfile from '@server/entity/SwipeProfile';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
-import type { SwipeCard } from '@server/lib/swipe/candidates';
+import {
+  getSwipeFavoriteOptions,
+  MAX_SWIPE_FAVORITE_SEEDS,
+  type SwipeCard,
+} from '@server/lib/swipe/candidates';
 import {
   clearSwipeDecks,
   getSwipeDeck,
@@ -155,6 +163,26 @@ const profileView = (profile: SwipeProfile) => ({
   tasteNotes: profile.tasteNotes,
   seriesRequest: profile.seriesRequest,
   bookFormat: profile.bookFormat,
+  seedScope: profile.seedScope ?? 'full',
+  favoriteSeeds: profile.favoriteSeeds ?? [],
+});
+
+swipeRoutes.get('/favorites', async (req, res) => {
+  const mediaType = parseMediaType(req.query.mediaType);
+  if (!mediaType) {
+    return res
+      .status(400)
+      .json({ message: 'Choose movies, series, or books.' });
+  }
+  try {
+    return res
+      .status(200)
+      .json(await getSwipeFavoriteOptions(req.user!.id, mediaType));
+  } catch {
+    return res
+      .status(502)
+      .json({ message: 'Your favorites could not be loaded.' });
+  }
 });
 
 swipeRoutes.get('/profile', async (req, res) => {
@@ -167,25 +195,101 @@ swipeRoutes.put('/profile', async (req, res) => {
   const tasteNotes = body.tasteNotes ?? current.tasteNotes;
   const seriesRequest = body.seriesRequest ?? current.seriesRequest;
   const bookFormat = body.bookFormat ?? current.bookFormat;
+  const seedScope = body.seedScope ?? current.seedScope ?? 'full';
+  const favoriteSeeds = body.favoriteSeeds ?? current.favoriteSeeds ?? [];
   if (
     typeof tasteNotes !== 'string' ||
     tasteNotes.length > 1000 ||
     (seriesRequest !== 'first-season' && seriesRequest !== 'all-seasons') ||
-    (bookFormat !== 'ebook' && bookFormat !== 'audiobook')
+    (bookFormat !== 'ebook' && bookFormat !== 'audiobook') ||
+    !(['full', 'rated', 'favorites'] as unknown[]).includes(seedScope) ||
+    !Array.isArray(favoriteSeeds) ||
+    favoriteSeeds.length > MAX_SWIPE_FAVORITE_SEEDS
   ) {
     return res.status(400).json({ message: 'Invalid swipe preferences.' });
   }
-  const notesChanged = tasteNotes.trim() !== current.tasteNotes;
+  const normalizedFavorites: SwipeFavoriteSeed[] = [];
+  const favoriteKeys = new Set<string>();
+  for (const seed of favoriteSeeds) {
+    if (
+      !seed ||
+      typeof seed !== 'object' ||
+      Array.isArray(seed) ||
+      !(['movie', 'tv', 'book'] as unknown[]).includes(seed.mediaType) ||
+      typeof seed.id !== 'string' ||
+      typeof seed.title !== 'string' ||
+      seed.title.trim().length === 0 ||
+      seed.title.length > 512 ||
+      (seed.mediaType === 'book'
+        ? !/^OL\d+W$/.test(seed.id)
+        : !/^\d{1,10}$/.test(seed.id))
+    ) {
+      return res.status(400).json({ message: 'Choose valid favorite seeds.' });
+    }
+    const key = `${seed.mediaType}:${seed.id}`;
+    if (favoriteKeys.has(key)) {
+      return res.status(400).json({ message: 'Choose each favorite once.' });
+    }
+    favoriteKeys.add(key);
+    normalizedFavorites.push({
+      mediaType: seed.mediaType,
+      id: seed.id,
+      title: seed.title.trim(),
+    });
+  }
+  const existingFavoriteKeys = new Set(
+    (current.favoriteSeeds ?? []).map((seed) => `${seed.mediaType}:${seed.id}`)
+  );
+  const addedFavorites = normalizedFavorites.filter(
+    (seed) => !existingFavoriteKeys.has(`${seed.mediaType}:${seed.id}`)
+  );
+  if (addedFavorites.length) {
+    const mediaTypes = [
+      ...new Set(addedFavorites.map((seed) => seed.mediaType)),
+    ];
+    let availableFavorites: SwipeFavoriteSeed[];
+    try {
+      availableFavorites = (
+        await Promise.all(
+          mediaTypes.map((mediaType) =>
+            getSwipeFavoriteOptions(req.user!.id, mediaType)
+          )
+        )
+      ).flat();
+    } catch {
+      return res
+        .status(502)
+        .json({ message: 'Your favorite seeds could not be verified.' });
+    }
+    const availableByKey = new Map(
+      availableFavorites.map((seed) => [`${seed.mediaType}:${seed.id}`, seed])
+    );
+    for (const seed of addedFavorites) {
+      const available = availableByKey.get(`${seed.mediaType}:${seed.id}`);
+      if (!available) {
+        return res
+          .status(400)
+          .json({ message: 'Choose favorites from your library or requests.' });
+      }
+      seed.title = available.title;
+    }
+  }
+  const preferencesChanged =
+    tasteNotes.trim() !== current.tasteNotes ||
+    seedScope !== current.seedScope ||
+    JSON.stringify(normalizedFavorites) !==
+      JSON.stringify(current.favoriteSeeds ?? []);
   const saved = await getRepository(SwipeProfile).save(
     Object.assign(current, {
       tasteNotes: tasteNotes.trim(),
       seriesRequest,
       bookFormat,
+      seedScope: seedScope as SwipeSeedScope,
+      favoriteSeeds: normalizedFavorites,
       updatedAt: new Date(),
     })
   );
-  // New taste notes should reshape the next deck.
-  if (notesChanged) clearSwipeDecks(req.user!.id);
+  if (preferencesChanged) clearSwipeDecks(req.user!.id);
   return res.status(200).json(profileView(saved));
 });
 

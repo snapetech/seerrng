@@ -2,6 +2,13 @@ import { DbAwareColumn } from '@server/utils/DbColumnHelper';
 import { Column, Entity, JoinColumn, OneToOne, PrimaryColumn } from 'typeorm';
 import { User } from './User';
 
+export type SwipeSeedScope = 'full' | 'rated' | 'favorites';
+export type SwipeFavoriteSeed = {
+  mediaType: 'movie' | 'tv' | 'book';
+  id: string;
+  title: string;
+};
+
 /** Per-user swipe preferences. */
 @Entity('swipe_profile')
 export class SwipeProfile {
@@ -26,6 +33,12 @@ export class SwipeProfile {
 
   @Column({ type: 'varchar', length: 16, default: 'audiobook' })
   public bookFormat: 'ebook' | 'audiobook';
+
+  @Column({ type: 'varchar', length: 16, default: 'full' })
+  public seedScope: SwipeSeedScope;
+
+  @Column({ type: 'simple-json', nullable: true })
+  public favoriteSeeds?: SwipeFavoriteSeed[];
 
   @DbAwareColumn({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   public updatedAt: Date;

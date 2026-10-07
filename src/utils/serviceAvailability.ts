@@ -5,6 +5,7 @@ export interface OptionalServiceAvailability {
   booksEnabled: boolean;
   ebookServiceEnabled?: boolean;
   audiobookServiceEnabled?: boolean;
+  readmeabookEnabled?: boolean;
   comicsEnabled: boolean;
   magazinesEnabled?: boolean;
   softwareEnabled?: boolean;
@@ -45,7 +46,7 @@ export const isBookFormatEnabled = (
   const serviceEnabled =
     format === 'ebook'
       ? availability.ebookServiceEnabled
-      : availability.audiobookServiceEnabled;
+      : availability.readmeabookEnabled || availability.audiobookServiceEnabled;
 
   return (
     (serviceEnabled ?? availability.booksEnabled) &&

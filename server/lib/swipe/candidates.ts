@@ -9,10 +9,20 @@ import type {
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import MediaIdentifier, {
+  MediaIdentifierProvider,
+} from '@server/entity/MediaIdentifier';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SwipeDecision, {
   type SwipeMediaType,
 } from '@server/entity/SwipeDecision';
+import SwipeProfile, {
+  type SwipeFavoriteSeed,
+} from '@server/entity/SwipeProfile';
+import {
+  getNativeLibraryConnection,
+  personalMediaServerLibrary,
+} from '@server/lib/discoveryIntegrations/mediaServerLibrary';
 import { mapWithConcurrency } from '@server/utils/concurrency';
 import { In } from 'typeorm';
 
@@ -69,6 +79,7 @@ export const setSwipeCatalogClients = (override?: Partial<CatalogClients>) => {
 
 const MAX_SEEDS = 6;
 const MAX_CANDIDATES = 60;
+export const MAX_SWIPE_FAVORITE_SEEDS = 25;
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
 const yearOf = (date: string | undefined) => {
@@ -218,10 +229,69 @@ export const loadTasteSignals = async (
   };
 };
 
-const tmdbSeeds = async (
+const ratedMediaServerSeeds = async (
   userId: number,
   mediaType: 'movie' | 'tv'
+): Promise<{ id: number; title: string }[]> => {
+  const connection = await getNativeLibraryConnection(userId);
+  if (!connection?.connected) return [];
+  const summary = await personalMediaServerLibrary(
+    userId,
+    connection.provider,
+    'all',
+    1
+  );
+  const seeds = new Map<number, string>();
+  for (const library of summary.libraries.filter(
+    (item) => item.type === (mediaType === 'movie' ? 'movie' : 'show')
+  )) {
+    for (let page = 1; page <= 5 && seeds.size < MAX_SEEDS; page += 1) {
+      const result = await personalMediaServerLibrary(
+        userId,
+        connection.provider,
+        'rated',
+        page,
+        library.id
+      );
+      for (const item of result.items) {
+        if (
+          item.mediaType === mediaType &&
+          item.tmdbId &&
+          (item.rating ?? 0) > 0
+        ) {
+          seeds.set(item.tmdbId, item.title);
+        }
+        if (seeds.size >= MAX_SEEDS) break;
+      }
+      if (!result.hasMore) break;
+    }
+  }
+  return [...seeds].map(([id, title]) => ({ id, title }));
+};
+
+const tmdbSeeds = async (
+  userId: number,
+  mediaType: 'movie' | 'tv',
+  profile: SwipeProfile
 ): Promise<{ id: number; title?: string }[]> => {
+  if (profile.seedScope === 'favorites') {
+    return (profile.favoriteSeeds ?? [])
+      .filter((seed) => seed.mediaType === mediaType)
+      .flatMap((seed) => {
+        const id = Number(seed.id);
+        return Number.isSafeInteger(id) && id > 0
+          ? [{ id, title: seed.title }]
+          : [];
+      })
+      .slice(0, MAX_SWIPE_FAVORITE_SEEDS);
+  }
+  if (profile.seedScope === 'rated') {
+    try {
+      return await ratedMediaServerSeeds(userId, mediaType);
+    } catch {
+      return [];
+    }
+  }
   const [decisions, requests] = await Promise.all([
     getRepository(SwipeDecision).find({
       where: { userId, mediaType, decision: In(['want', 'seen']) },
@@ -233,7 +303,7 @@ const tmdbSeeds = async (
         requestedBy: { id: userId },
         type: mediaType === 'movie' ? MediaType.MOVIE : MediaType.TV,
       },
-      relations: { media: true },
+      relations: { media: { searchMetadata: true } },
       order: { createdAt: 'DESC' },
       take: MAX_SEEDS,
     }),
@@ -253,10 +323,11 @@ const tmdbSeeds = async (
 
 const buildTmdbCandidates = async (
   userId: number,
-  mediaType: 'movie' | 'tv'
+  mediaType: 'movie' | 'tv',
+  profile: SwipeProfile
 ): Promise<SwipeCard[]> => {
   const tmdb = clients.tmdb();
-  const seeds = await tmdbSeeds(userId, mediaType);
+  const seeds = await tmdbSeeds(userId, mediaType, profile);
   const lists = await mapWithConcurrency(seeds, 3, async (seed) => {
     try {
       const title =
@@ -284,7 +355,7 @@ const buildTmdbCandidates = async (
   });
 
   // New users, or too few recommendations: fill from this week's trending.
-  if (lists.flat().length < 20) {
+  if (profile.seedScope === 'full' && lists.flat().length < 20) {
     const trending =
       mediaType === 'movie'
         ? await tmdb.getMovieTrending({ timeWindow: 'week' })
@@ -300,7 +371,10 @@ const buildTmdbCandidates = async (
   return mergeCandidates(lists);
 };
 
-const buildBookCandidates = async (userId: number): Promise<SwipeCard[]> => {
+const buildBookCandidates = async (
+  userId: number,
+  profile: SwipeProfile
+): Promise<SwipeCard[]> => {
   const openLibrary = clients.openLibrary();
   const signals = await loadTasteSignals(userId, 'book');
   const subjectCounts = new Map<string, number>();
@@ -330,7 +404,34 @@ const buildBookCandidates = async (userId: number): Promise<SwipeCard[]> => {
     }
   });
 
-  if (lists.flat().length < 20) {
+  if (profile.seedScope === 'favorites') {
+    const favorites = (profile.favoriteSeeds ?? [])
+      .filter((seed) => seed.mediaType === 'book')
+      .slice(0, MAX_SWIPE_FAVORITE_SEEDS);
+    const favoriteLists = await mapWithConcurrency(
+      favorites,
+      2,
+      async (seed) => {
+        try {
+          const response = await openLibrary.searchBooks({
+            query: `key:${seed.id}`,
+            limit: 20,
+          });
+          return response.docs
+            .filter((doc) => doc.key?.replace(/^\/works\//, '') === seed.id)
+            .map((doc, rank) =>
+              bookCard(doc, `Because you like ${seed.title}`, rank)
+            )
+            .filter((card): card is SwipeCard => !!card);
+        } catch {
+          return [];
+        }
+      }
+    );
+    lists.push(...favoriteLists);
+  }
+
+  if (profile.seedScope !== 'favorites' && lists.flat().length < 20) {
     const trending = await openLibrary.searchBooks({
       query: 'trending_score_hourly_sum:[1 TO *]',
       sort: 'trending',
@@ -350,10 +451,13 @@ export const buildCandidates = async (
   userId: number,
   mediaType: SwipeMediaType
 ): Promise<SwipeCard[]> => {
+  const profile =
+    (await getRepository(SwipeProfile).findOne({ where: { userId } })) ??
+    new SwipeProfile({ seedScope: 'full', favoriteSeeds: [] });
   const candidates =
     mediaType === 'book'
-      ? await buildBookCandidates(userId)
-      : await buildTmdbCandidates(userId, mediaType);
+      ? await buildBookCandidates(userId, profile)
+      : await buildTmdbCandidates(userId, mediaType, profile);
   const excluded = await excludedIds(
     userId,
     mediaType,
@@ -362,4 +466,130 @@ export const buildCandidates = async (
   return candidates
     .filter((card) => !excluded.has(card.id))
     .slice(0, MAX_CANDIDATES);
+};
+
+/** Favorites available to the signed-in user: their own library, requests, and prior likes. */
+export const getSwipeFavoriteOptions = async (
+  userId: number,
+  mediaType: SwipeMediaType
+): Promise<SwipeFavoriteSeed[]> => {
+  const options = new Map<string, SwipeFavoriteSeed>();
+  const decisions = await getRepository(SwipeDecision).find({
+    where: {
+      userId,
+      mediaType,
+      decision: In(['want', 'seen']),
+    },
+    order: { createdAt: 'DESC' },
+    take: 100,
+  });
+  for (const decision of decisions) {
+    if (mediaType === 'book' && !/^OL\d+W$/.test(decision.itemId)) continue;
+    if (mediaType !== 'book' && !/^\d{1,10}$/.test(decision.itemId)) continue;
+    options.set(decision.itemId, {
+      mediaType,
+      id: decision.itemId,
+      title: decision.title.slice(0, 512),
+    });
+  }
+
+  if (mediaType === 'book') {
+    const requests = await getRepository(MediaRequest).find({
+      where: { requestedBy: { id: userId }, type: MediaType.BOOK },
+      relations: { media: { searchMetadata: true } },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    const availableBooks = await getRepository(Media).find({
+      where: { mediaType: MediaType.BOOK, status: MediaStatus.AVAILABLE },
+      order: { updatedAt: 'DESC' },
+      take: 100,
+    });
+    const mediaIds = [
+      ...new Set([
+        ...requests.flatMap((request) =>
+          request.media?.id ? [request.media.id] : []
+        ),
+        ...availableBooks.map((book) => book.id),
+      ]),
+    ];
+    if (mediaIds.length) {
+      const identifiers = await getRepository(MediaIdentifier).find({
+        where: {
+          media: { id: In(mediaIds) },
+          provider: MediaIdentifierProvider.OPENLIBRARY,
+        },
+        relations: { media: { searchMetadata: true } },
+      });
+      for (const identifier of identifiers) {
+        const title = identifier.media?.searchMetadata?.title;
+        if (/^OL\d+W$/.test(identifier.value) && title) {
+          options.set(identifier.value, {
+            mediaType: 'book',
+            id: identifier.value,
+            title: title.slice(0, 512),
+          });
+        }
+      }
+    }
+  }
+
+  if (mediaType !== 'book') {
+    const requests = await getRepository(MediaRequest).find({
+      where: {
+        requestedBy: { id: userId },
+        type: mediaType === 'movie' ? MediaType.MOVIE : MediaType.TV,
+      },
+      relations: { media: true },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    for (const request of requests) {
+      const id = request.media?.tmdbId;
+      const title = request.media?.searchMetadata?.title;
+      if (id && title)
+        options.set(String(id), {
+          mediaType,
+          id: String(id),
+          title: title.slice(0, 512),
+        });
+    }
+
+    try {
+      const connection = await getNativeLibraryConnection(userId);
+      if (connection?.connected) {
+        const summary = await personalMediaServerLibrary(
+          userId,
+          connection.provider,
+          'all',
+          1
+        );
+        for (const library of summary.libraries.filter(
+          (item) => item.type === (mediaType === 'movie' ? 'movie' : 'show')
+        )) {
+          for (let page = 1; page <= 5 && options.size < 100; page += 1) {
+            const result = await personalMediaServerLibrary(
+              userId,
+              connection.provider,
+              'all',
+              page,
+              library.id
+            );
+            for (const item of result.items) {
+              if (item.mediaType !== mediaType || !item.tmdbId) continue;
+              options.set(String(item.tmdbId), {
+                mediaType,
+                id: String(item.tmdbId),
+                title: item.title.slice(0, 512),
+              });
+            }
+            if (!result.hasMore) break;
+          }
+        }
+      }
+    } catch {
+      // Requests and swipe history remain available if the personal library is temporarily offline.
+    }
+  }
+  return [...options.values()].slice(0, 100);
 };

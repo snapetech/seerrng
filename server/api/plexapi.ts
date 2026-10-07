@@ -24,6 +24,7 @@ export interface PlexLibraryItem {
   title: string;
   year?: number;
   viewOffset?: number;
+  userRating?: number;
   parentTitle?: string;
   guid: string;
   parentGuid?: string;
@@ -300,6 +301,13 @@ export const sanitizePlexLibraryItem = (
     title: boundedPlexText(value.title, 512),
     year: plexInteger(value.year) || undefined,
     viewOffset: plexInteger(value.viewOffset),
+    userRating:
+      typeof value.userRating === 'number' &&
+      Number.isFinite(value.userRating) &&
+      value.userRating >= 0 &&
+      value.userRating <= 10
+        ? value.userRating
+        : undefined,
     parentTitle: boundedPlexText(value.parentTitle, 512) || undefined,
     guid: boundedPlexText(value.guid, 512),
     parentGuid: boundedPlexText(value.parentGuid, 512) || undefined,
@@ -925,7 +933,10 @@ class PlexAPI extends ExternalAPI {
     // from /all unless we explicitly ask for album-type items (9). Movie
     // and show sections only ever contain their one leaf type, so no
     // filter is needed there.
-    const params: Record<string, number> = { includeGuids: 1 };
+    const params: Record<string, number> = {
+      includeGuids: 1,
+      includeUserRating: 1,
+    };
     if (libraryType === 'music' || libraryType === 'book') {
       params.type = 9;
     }

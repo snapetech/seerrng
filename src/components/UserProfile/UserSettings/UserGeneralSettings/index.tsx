@@ -5,6 +5,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import LanguageSelector from '@app/components/LanguageSelector';
 import QuotaSelector from '@app/components/QuotaSelector';
 import RegionSelector from '@app/components/RegionSelector';
+import BookHomeSections from '@app/components/UserProfile/UserSettings/UserGeneralSettings/BookHomeSections';
 import ExternalRequestLists from '@app/components/UserProfile/UserSettings/UserGeneralSettings/ExternalRequestLists';
 import RequestRootFolderSettings from '@app/components/UserProfile/UserSettings/UserGeneralSettings/RequestRootFolderSettings';
 import { availableLanguages } from '@app/context/LanguageContext';
@@ -1262,6 +1263,7 @@ const UserGeneralSettings = () => {
         }}
       </Formik>
       {user?.id === currentUser?.id && <ExternalRequestLists />}
+      {user?.id === currentUser?.id && <BookHomeSections />}
     </>
   );
 };

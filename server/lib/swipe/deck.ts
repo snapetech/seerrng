@@ -48,6 +48,8 @@ export const getSwipeProfile = async (userId: number) =>
     tasteNotes: '',
     seriesRequest: 'first-season',
     bookFormat: 'audiobook',
+    seedScope: 'full',
+    favoriteSeeds: [],
   });
 
 const buildDeck = async (

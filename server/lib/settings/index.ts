@@ -229,6 +229,25 @@ export const defaultSlskdnSettings = (): SlskdnSettings => ({
   searchFilter: '',
 });
 
+/** Token-authenticated audiobook request and acquisition service. */
+export interface ReadMeABookSettings {
+  enabled: boolean;
+  hostname: string;
+  port: number;
+  useSsl: boolean;
+  baseUrl: string;
+  apiKey: string;
+}
+
+export const defaultReadMeABookSettings = (): ReadMeABookSettings => ({
+  enabled: false,
+  hostname: '',
+  port: 3000,
+  useSsl: false,
+  baseUrl: '',
+  apiKey: '',
+});
+
 export type SwipeAiProvider = 'none' | 'anthropic' | 'openai';
 export type SwipeAiEffort = 'low' | 'medium' | 'high';
 
@@ -478,6 +497,7 @@ interface FullPublicSettings extends PublicSettings {
   booksEnabled: boolean;
   ebookServiceEnabled: boolean;
   audiobookServiceEnabled: boolean;
+  readmeabookEnabled: boolean;
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
   softwareEnabled: boolean;
@@ -734,6 +754,7 @@ export interface AllSettings {
   liveDownloads: LiveDownloadSettings;
   tunerr: TunerrSettings;
   slskdn: SlskdnSettings;
+  readmeabook: ReadMeABookSettings;
   swipe: SwipeSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
   readerDelivery: ReaderDeliverySettings;
@@ -882,6 +903,7 @@ class Settings {
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
       slskdn: defaultSlskdnSettings(),
+      readmeabook: defaultReadMeABookSettings(),
       swipe: defaultSwipeSettings(),
       public: {
         initialized: false,
@@ -1436,6 +1458,14 @@ class Settings {
     this.data.slskdn = data;
   }
 
+  get readmeabook(): ReadMeABookSettings {
+    return this.data.readmeabook;
+  }
+
+  set readmeabook(data: ReadMeABookSettings) {
+    this.data.readmeabook = data;
+  }
+
   get swipe(): SwipeSettings {
     return this.data.swipe;
   }
@@ -1478,6 +1508,7 @@ class Settings {
       audiobookServiceEnabled: this.data.readarr.some(
         (service) => service.serviceType === 'audiobook'
       ),
+      readmeabookEnabled: this.data.readmeabook.enabled,
       comicsEnabled:
         this.data.mylar.length > 0 ||
         this.data.kapowarr.length > 0 ||
@@ -1815,6 +1846,7 @@ class Settings {
       liveDownloads: defaultLiveDownloadSettings(),
       tunerr: defaultTunerrSettings(),
       slskdn: defaultSlskdnSettings(),
+      readmeabook: defaultReadMeABookSettings(),
       swipe: defaultSwipeSettings(),
       public: {
         initialized: false,

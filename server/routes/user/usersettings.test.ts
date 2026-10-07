@@ -360,4 +360,39 @@ describe('request root folder settings', () => {
 
     assert.strictEqual(response.status, 403);
   });
+
+  it("saves the current user's ordered book and audiobook home sections", async () => {
+    const { sessionCookie, userId } = await loginAs(
+      'friend@seerr.dev',
+      'test1234'
+    );
+    const route = `/user/${userId}/settings/discover-book-sections`;
+    const sections = [
+      { key: 'subject:fantasy:audiobook', enabled: true },
+      { key: 'popular:ebook', enabled: false },
+      { key: 'new:ebook', enabled: true },
+    ];
+
+    const saved = await request(app)
+      .post(route)
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', sessionCookie)
+      .send({ sections });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.deepEqual(saved.body.sections, sections);
+
+    const loaded = await request(app)
+      .get(route)
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', sessionCookie);
+    assert.equal(loaded.status, 200);
+    assert.deepEqual(loaded.body.sections, sections);
+
+    const invalid = await request(app)
+      .post(route)
+      .set('X-Forwarded-Proto', 'https')
+      .set('Cookie', sessionCookie)
+      .send({ sections: [{ key: 'javascript:bad', enabled: true }] });
+    assert.equal(invalid.status, 400);
+  });
 });

@@ -24,13 +24,17 @@ export class ExternalRequestList {
   public user: User;
 
   @Column({ type: 'varchar', length: 16 })
-  public provider: 'imdb' | 'goodreads';
+  public provider: 'imdb' | 'goodreads' | 'hardcover';
 
   @Column({ type: 'varchar', length: 64 })
   public sourceId: string;
 
   @Column({ type: 'varchar', length: 2048 })
   public sourceUrl: string;
+
+  /** Hardcover API tokens are never selected by default or returned by list routes. */
+  @Column({ type: 'text', nullable: true, select: false })
+  public apiToken?: string | null;
 
   @Column({ type: 'simple-json', nullable: true })
   public processedItemIds?: string[];

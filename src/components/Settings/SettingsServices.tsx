@@ -12,6 +12,7 @@ import ReaderDeliverySettings from '@app/components/Settings/ReaderDeliverySetti
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import { useSettingsPageAction } from '@app/components/Settings/SettingsLayout';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
+import SettingsReadMeABook from '@app/components/Settings/SettingsReadMeABook';
 import SettingsSlskdn from '@app/components/Settings/SettingsSlskdn';
 import SettingsSoftwareAcquisition from '@app/components/Settings/SettingsSoftwareAcquisition';
 import SettingsSwipe from '@app/components/Settings/SettingsSwipe';
@@ -1393,6 +1394,7 @@ const SettingsServices = () => {
       <SettingsDownloadClients />
       <SettingsTunerr />
       <SettingsSlskdn />
+      <SettingsReadMeABook />
       <SettingsSwipe />
       <SettingsSoftwareAcquisition />
       {overrideRuleModal.open &&

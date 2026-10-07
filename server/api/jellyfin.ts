@@ -142,6 +142,7 @@ export interface JellyfinLibraryItemExtended extends JellyfinLibraryItem {
   RunTimeTicks?: number;
   UserData?: {
     Played: boolean;
+    Rating?: number;
     PlayCount?: number;
     PlaybackPositionTicks?: number;
     PlayedPercentage?: number;
@@ -369,6 +370,13 @@ export const sanitizeJellyfinLibraryItem = (
     UserData: isRecord(value.UserData)
       ? {
           Played: value.UserData.Played === true,
+          Rating:
+            typeof value.UserData.Rating === 'number' &&
+            Number.isFinite(value.UserData.Rating) &&
+            value.UserData.Rating >= 0 &&
+            value.UserData.Rating <= 10
+              ? value.UserData.Rating
+              : undefined,
           PlayCount: optionalJellyfinInteger(value.UserData.PlayCount),
           PlaybackPositionTicks: optionalJellyfinTicks(
             value.UserData.PlaybackPositionTicks

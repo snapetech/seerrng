@@ -80,6 +80,7 @@ import personRoutes from './person';
 import playbackRoutes from './playback';
 import playlistRoutes from './playlist';
 import queueInterventionRoutes from './queueInterventions';
+import readMeABookRoutes from './readmeabook';
 import requestRoutes from './request';
 import searchRoutes from './search';
 import seriesRoutes from './series';
@@ -365,6 +366,7 @@ router.use('/live', isAuthenticated(), liveRoutes);
 router.use('/live-tv', isAuthenticated(), liveTvRoutes);
 router.use('/soulseek', isAuthenticated(), soulseekRoutes);
 router.use('/swipe', isAuthenticated(), swipeRoutes);
+router.use('/readmeabook', isAuthenticated(), readMeABookRoutes);
 router.get('/settings/public', async (req, res) => {
   const settings = getSettings();
 

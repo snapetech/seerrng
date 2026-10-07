@@ -14,6 +14,7 @@ import {
   EyeIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import type { SwipeFavoriteSeed } from '@server/entity/SwipeProfile';
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -32,6 +33,8 @@ interface SwipeProfile {
   tasteNotes: string;
   seriesRequest: 'first-season' | 'all-seasons';
   bookFormat: 'ebook' | 'audiobook';
+  seedScope: 'full' | 'rated' | 'favorites';
+  favoriteSeeds: SwipeFavoriteSeed[];
 }
 
 const messages = defineMessages('components.Swipe', {
@@ -67,6 +70,15 @@ const messages = defineMessages('components.Swipe', {
   firstSeason: 'Request the first season',
   allSeasons: 'Request every season',
   bookFormat: 'When I Request a Book',
+  seedScope: 'Recommendation seeds',
+  fullScope: 'Full catalog',
+  ratedScope: 'Rated only',
+  favoritesScope: 'Pick my favorites',
+  seedScopeHelp:
+    'Rated only uses items you rated in your linked Plex, Jellyfin, or Emby library for movies and series. Favorites uses the items selected below; choose Favorites to seed book suggestions from selected books.',
+  favoriteItems: 'Choose up to 25 favorites',
+  noFavoriteItems:
+    'No library items, requests, or past liked titles are available to choose yet.',
   audiobook: 'Request the audiobook',
   ebook: 'Request the ebook',
   save: 'Save',
@@ -137,6 +149,9 @@ const Swipe = () => {
   const { data: profile, mutate: mutateProfile } = useSWR<SwipeProfile>(
     '/api/v1/swipe/profile'
   );
+  const { data: favoriteOptions } = useSWR<SwipeFavoriteSeed[]>(
+    showPreferences ? `/api/v1/swipe/favorites?mediaType=${mediaType}` : null
+  );
   const {
     data: deck,
     error,
@@ -166,6 +181,21 @@ const Swipe = () => {
   }, [mediaType]);
 
   const top = cards[0];
+  const favoriteOptionsForType = [
+    ...(favoriteOptions ?? []),
+    ...(draftProfile?.favoriteSeeds ?? []).filter(
+      (seed) => seed.mediaType === mediaType
+    ),
+  ].reduce<SwipeFavoriteSeed[]>((items, seed) => {
+    if (
+      !items.some(
+        (item) => item.mediaType === seed.mediaType && item.id === seed.id
+      )
+    ) {
+      items.push(seed);
+    }
+    return items;
+  }, []);
 
   const swipe = useCallback(
     async (direction: SwipeDirection) => {
@@ -292,7 +322,12 @@ const Swipe = () => {
       );
       await mutateProfile(response.data, { revalidate: false });
       setShowPreferences(false);
-      if (response.data.tasteNotes !== profile?.tasteNotes) {
+      if (
+        response.data.tasteNotes !== profile?.tasteNotes ||
+        response.data.seedScope !== profile?.seedScope ||
+        JSON.stringify(response.data.favoriteSeeds) !==
+          JSON.stringify(profile?.favoriteSeeds)
+      ) {
         setCards([]);
         lastLoaded.current = undefined;
         void reloadDeck();
@@ -489,6 +524,97 @@ const Swipe = () => {
               <p className="settings-form-row-description">
                 {intl.formatMessage(messages.tasteNotesHelp)}
               </p>
+            </div>
+          </div>
+          <div className="form-row">
+            <label htmlFor="swipe-seed-scope">
+              {intl.formatMessage(messages.seedScope)}
+            </label>
+            <div className="form-input-area">
+              <div className="form-input-field">
+                <select
+                  id="swipe-seed-scope"
+                  value={draftProfile.seedScope}
+                  onChange={(event) =>
+                    setDraftProfile({
+                      ...draftProfile,
+                      seedScope: event.currentTarget
+                        .value as SwipeProfile['seedScope'],
+                    })
+                  }
+                >
+                  <option value="full">
+                    {intl.formatMessage(messages.fullScope)}
+                  </option>
+                  <option value="rated">
+                    {intl.formatMessage(messages.ratedScope)}
+                  </option>
+                  <option value="favorites">
+                    {intl.formatMessage(messages.favoritesScope)}
+                  </option>
+                </select>
+              </div>
+              <p className="settings-form-row-description">
+                {intl.formatMessage(messages.seedScopeHelp)}
+              </p>
+            </div>
+          </div>
+          <div className="form-row">
+            <label>{intl.formatMessage(messages.favoriteItems)}</label>
+            <div className="form-input-area">
+              <p className="settings-form-row-description">
+                {draftProfile.favoriteSeeds.length}/25 selected
+              </p>
+              {favoriteOptionsForType.length === 0 ? (
+                <p className="settings-form-row-description">
+                  {intl.formatMessage(messages.noFavoriteItems)}
+                </p>
+              ) : (
+                <div
+                  className="app-list"
+                  role="group"
+                  aria-label={intl.formatMessage(messages.favoriteItems)}
+                >
+                  {favoriteOptionsForType.map((seed) => {
+                    const checked = draftProfile.favoriteSeeds.some(
+                      (item) =>
+                        item.mediaType === seed.mediaType && item.id === seed.id
+                    );
+                    return (
+                      <label
+                        className="app-list-row"
+                        key={`${seed.mediaType}:${seed.id}`}
+                      >
+                        <span className="app-list-value">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={
+                              !checked &&
+                              draftProfile.favoriteSeeds.length >= 25
+                            }
+                            onChange={(event) =>
+                              setDraftProfile({
+                                ...draftProfile,
+                                favoriteSeeds: event.currentTarget.checked
+                                  ? [...draftProfile.favoriteSeeds, seed]
+                                  : draftProfile.favoriteSeeds.filter(
+                                      (item) =>
+                                        !(
+                                          item.mediaType === seed.mediaType &&
+                                          item.id === seed.id
+                                        )
+                                    ),
+                              })
+                            }
+                          />{' '}
+                          {seed.title}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
           <div className="form-row">

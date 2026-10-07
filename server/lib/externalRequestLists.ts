@@ -14,12 +14,13 @@ import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces'
 import { normalizeOpenLibraryWorkId } from '@server/lib/externalIds';
 import { normalizeValidIsbn } from '@server/lib/isbn';
 import logger from '@server/logger';
+import axios from 'axios';
 import xml2js from 'xml2js';
 
 export const MAX_EXTERNAL_REQUEST_LISTS_PER_USER = 10;
 export const MAX_EXTERNAL_REQUEST_LIST_ITEMS = 100;
 
-export type ExternalRequestListProvider = 'imdb' | 'goodreads';
+export type ExternalRequestListProvider = 'imdb' | 'goodreads' | 'hardcover';
 
 export type ParsedExternalRequestListUrl = {
   provider: ExternalRequestListProvider;
@@ -53,6 +54,9 @@ export type ExternalRequestListSyncResult = {
 export type ExternalRequestListSyncAdapters = {
   fetchImdbWatchlist: (userId: string) => Promise<ExternalRequestListItem[]>;
   fetchGoodreadsToRead: (userId: string) => Promise<ExternalRequestListItem[]>;
+  fetchHardcoverToRead?: (
+    apiToken: string
+  ) => Promise<ExternalRequestListItem[]>;
   resolveImdbItem: (
     imdbId: string
   ) => Promise<ResolvedExternalRequestListItem | undefined>;
@@ -62,6 +66,86 @@ export type ExternalRequestListSyncAdapters = {
   requestMedia: (body: MediaRequestBody, user: User) => Promise<unknown>;
   saveList: (list: ExternalRequestList) => Promise<ExternalRequestList>;
   now: () => Date;
+};
+
+const HARDCOVER_GRAPHQL_URL = 'https://api.hardcover.app/v1/graphql';
+const HARDCOVER_WANT_TO_READ_QUERY = `query SeerrNGWantToRead {
+  me {
+    user_books(where: { status_id: { _eq: 1 } }, limit: 100) {
+      book {
+        id
+        title
+        contributions { author { name } }
+        editions { isbn_13 }
+      }
+    }
+  }
+}`;
+
+export const fetchHardcoverToRead = async (
+  apiToken: string
+): Promise<ExternalRequestListItem[]> => {
+  const response = await axios.post<unknown>(
+    HARDCOVER_GRAPHQL_URL,
+    { query: HARDCOVER_WANT_TO_READ_QUERY },
+    {
+      timeout: 12_000,
+      maxRedirects: 0,
+      maxContentLength: 2 * 1024 * 1024,
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      validateStatus: () => true,
+    }
+  );
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Hardcover returned HTTP ${response.status}.`);
+  }
+  const root = isRecord(response.data) ? response.data : undefined;
+  if (Array.isArray(root?.errors)) {
+    throw new Error('Hardcover rejected the bookshelf query or API token.');
+  }
+  const data = isRecord(root?.data) ? root.data : undefined;
+  const me = Array.isArray(data?.me) ? data.me[0] : data?.me;
+  const entries =
+    isRecord(me) && Array.isArray(me.user_books) ? me.user_books : [];
+  const seen = new Set<string>();
+  return entries.slice(0, MAX_EXTERNAL_REQUEST_LIST_ITEMS).flatMap((entry) => {
+    const book =
+      isRecord(entry) && isRecord(entry.book) ? entry.book : undefined;
+    if (!book || (typeof book.id !== 'string' && typeof book.id !== 'number'))
+      return [];
+    const id = String(book.id);
+    const title = boundedText(book.title);
+    if (!title || seen.has(id)) return [];
+    seen.add(id);
+    const contributions = Array.isArray(book.contributions)
+      ? book.contributions
+      : [];
+    const author = contributions
+      .flatMap((contribution) => {
+        const authorRecord =
+          isRecord(contribution) && isRecord(contribution.author)
+            ? contribution.author
+            : undefined;
+        return typeof authorRecord?.name === 'string'
+          ? [authorRecord.name]
+          : [];
+      })
+      .slice(0, 10)
+      .join(', ');
+    const editions = Array.isArray(book.editions) ? book.editions : [];
+    const isbn13 = editions
+      .map((edition) =>
+        isRecord(edition) && typeof edition.isbn_13 === 'string'
+          ? normalizeValidIsbn(edition.isbn_13)
+          : undefined
+      )
+      .find((isbn) => isbn?.length === 13);
+    return [{ id, title, author: author || undefined, isbn13 }];
+  });
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -328,6 +412,7 @@ export const resolveGoodreadsItem = async (
 const defaultAdapters: ExternalRequestListSyncAdapters = {
   fetchImdbWatchlist,
   fetchGoodreadsToRead,
+  fetchHardcoverToRead,
   resolveImdbItem,
   resolveGoodreadsItem,
   requestMedia: (body, user) => MediaRequest.request(body, user),
@@ -363,13 +448,25 @@ export const syncExternalRequestList = async (
     const userId =
       list.provider === 'imdb'
         ? list.sourceId
-        : list.sourceId.match(/^goodreads:([0-9]{1,20}):to-read$/)?.[1];
+        : list.provider === 'goodreads'
+          ? list.sourceId.match(/^goodreads:([0-9]{1,20}):to-read$/)?.[1]
+          : list.sourceId === 'hardcover:me:want-to-read' && list.apiToken
+            ? list.apiToken
+            : undefined;
     if (!userId) throw new Error('The saved list source is invalid.');
 
     const items =
       list.provider === 'imdb'
         ? await adapters.fetchImdbWatchlist(userId)
-        : await adapters.fetchGoodreadsToRead(userId);
+        : list.provider === 'goodreads'
+          ? await adapters.fetchGoodreadsToRead(userId)
+          : adapters.fetchHardcoverToRead
+            ? await adapters.fetchHardcoverToRead(userId)
+            : (() => {
+                throw new Error(
+                  'Hardcover list synchronization is unavailable.'
+                );
+              })();
     result.sourceItems = items.length;
 
     for (const item of items.slice(0, MAX_EXTERNAL_REQUEST_LIST_ITEMS)) {
@@ -424,10 +521,12 @@ export const syncExternalRequestList = async (
 };
 
 export const syncAllExternalRequestLists = async (): Promise<void> => {
-  const lists = await getRepository(ExternalRequestList).find({
-    relations: { user: true },
-    order: { id: 'ASC' },
-  });
+  const lists = await getRepository(ExternalRequestList)
+    .createQueryBuilder('list')
+    .leftJoinAndSelect('list.user', 'user')
+    .addSelect('list.apiToken')
+    .orderBy('list.id', 'ASC')
+    .getMany();
 
   for (const list of lists) {
     if (!list.user) continue;

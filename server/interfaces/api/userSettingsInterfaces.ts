@@ -1,3 +1,4 @@
+import type { BookHomeSectionPreference } from '@server/constants/bookHomeSections';
 import type {
   NotificationAgentKey,
   PublicOidcProvider,
@@ -53,6 +54,8 @@ export interface UserSettingsCardTextResponse {
 }
 
 export type UserRequestRootFolders = Record<string, string>;
+
+export type { BookHomeSectionPreference };
 
 export type DetailDisclosurePin =
   | 'overview'

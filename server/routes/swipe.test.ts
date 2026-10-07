@@ -201,6 +201,34 @@ describe('Swipe routes', () => {
     assert.equal(invalid.status, 400);
   });
 
+  it('offers owned seed options and accepts only selected library or request items', async () => {
+    await as(friend).get('/swipe/deck?mediaType=movie');
+    const liked = await as(friend).post('/swipe/decisions', {
+      mediaType: 'movie',
+      id: '101',
+      decision: 'seen',
+    });
+    assert.equal(liked.status, 200);
+
+    const options = await as(friend).get('/swipe/favorites?mediaType=movie');
+    assert.equal(options.status, 200);
+    assert.ok(options.body.some((item: { id: string }) => item.id === '101'));
+
+    const saved = await as(friend).put('/swipe/profile', {
+      seedScope: 'favorites',
+      favoriteSeeds: [
+        { mediaType: 'movie', id: '101', title: 'Spoofed title' },
+      ],
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.favoriteSeeds[0].title, 'Arrival');
+
+    const forged = await as(friend).put('/swipe/profile', {
+      favoriteSeeds: [{ mediaType: 'movie', id: '999999', title: 'Not yours' }],
+    });
+    assert.equal(forged.status, 400);
+  });
+
   it('is unavailable when turned off or without request permission', async () => {
     getSettings().swipe = { ...getSettings().swipe, enabled: false };
     assert.equal((await as(friend).get('/swipe/status')).status, 404);

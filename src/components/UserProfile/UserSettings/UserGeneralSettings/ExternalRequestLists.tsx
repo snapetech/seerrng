@@ -10,7 +10,7 @@ import useSWR from 'swr';
 
 interface ExternalRequestList {
   id: number;
-  provider: 'imdb' | 'goodreads';
+  provider: 'imdb' | 'goodreads' | 'hardcover';
   sourceUrl: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
@@ -29,7 +29,7 @@ const messages = defineMessages(
   {
     title: 'External request lists',
     description:
-      'Connect a public IMDb watchlist or Goodreads to-read shelf. New items are checked daily and requested through your normal permissions and approval settings.',
+      'Connect a public IMDb watchlist, Goodreads to-read shelf, or your Hardcover Want to Read shelf. New items are checked daily and requested through your normal permissions and approval settings.',
     urlLabel: 'Public list URL',
     urlPlaceholder: 'https://www.imdb.com/user/ur12345678/watchlist/',
     add: 'Add list',
@@ -37,6 +37,9 @@ const messages = defineMessages(
     empty: 'No external lists are connected.',
     imdb: 'IMDb watchlist',
     goodreads: 'Goodreads to-read shelf',
+    hardcover: 'Hardcover Want to Read',
+    hardcoverToken: 'Hardcover API token',
+    addHardcover: 'Connect Hardcover',
     sync: 'Sync now',
     syncing: 'Syncing…',
     remove: 'Remove',
@@ -53,6 +56,7 @@ const ExternalRequestLists = () => {
   const intl = useIntl();
   const { locale } = useLocale();
   const [sourceUrl, setSourceUrl] = useState('');
+  const [hardcoverToken, setHardcoverToken] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyListId, setBusyListId] = useState<number | null>(null);
   const [message, setMessage] = useState<string>();
@@ -79,6 +83,28 @@ const ExternalRequestLists = () => {
       await axios.post('/api/v1/request/lists', { url: sourceUrl.trim() });
       setSourceUrl('');
       setMessage(intl.formatMessage(messages.saved));
+      await mutate();
+    } catch (error) {
+      setErrorMessage(formatError(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addHardcover = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage(undefined);
+    setErrorMessage(undefined);
+    setSaving(true);
+    try {
+      const { data } = await axios.post<{ validatedBooks: number }>(
+        '/api/v1/request/lists/hardcover',
+        { apiToken: hardcoverToken.trim() }
+      );
+      setHardcoverToken('');
+      setMessage(
+        `Hardcover connected. ${data.validatedBooks} books found on your shelf.`
+      );
       await mutate();
     } catch (error) {
       setErrorMessage(formatError(error));
@@ -159,6 +185,31 @@ const ExternalRequestLists = () => {
         </div>
       </form>
 
+      <form className="form-row" onSubmit={addHardcover}>
+        <label htmlFor="hardcover-api-token">
+          {intl.formatMessage(messages.hardcoverToken)}
+        </label>
+        <div className="form-input-area">
+          <input
+            id="hardcover-api-token"
+            type="password"
+            autoComplete="off"
+            maxLength={4096}
+            value={hardcoverToken}
+            onChange={(event) => setHardcoverToken(event.target.value)}
+          />
+          <div className="settings-page-actions">
+            <Button
+              buttonType="primary"
+              type="submit"
+              disabled={saving || hardcoverToken.trim().length < 16}
+            >
+              {intl.formatMessage(messages.addHardcover)}
+            </Button>
+          </div>
+        </div>
+      </form>
+
       {message && <p className="description">{message}</p>}
       {errorMessage && <p className="error">{errorMessage}</p>}
       {error && <p className="error">{intl.formatMessage(messages.error)}</p>}
@@ -175,7 +226,9 @@ const ExternalRequestLists = () => {
                   {intl.formatMessage(
                     list.provider === 'imdb'
                       ? messages.imdb
-                      : messages.goodreads
+                      : list.provider === 'goodreads'
+                        ? messages.goodreads
+                        : messages.hardcover
                   )}
                 </span>
                 <a

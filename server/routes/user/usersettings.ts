@@ -1,5 +1,9 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import {
+  BOOK_HOME_SECTION_OPTIONS,
+  DEFAULT_BOOK_HOME_SECTIONS,
+} from '@server/constants/bookHomeSections';
 import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
@@ -2877,6 +2881,119 @@ userSettingsRoutes.post<
         });
       }
       next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.get<{ id: string }>(
+  '/discover-book-sections',
+  isOwnProfile(),
+  async (req, res, next) => {
+    const userId = parseUserSettingsRouteId(req.params.id);
+    if (!userId) return res.status(404).json({ message: 'User not found.' });
+    try {
+      const user = await getRepository(User).findOne({ where: { id: userId } });
+      if (!user) return res.status(404).json({ message: 'User not found.' });
+      return res.status(200).json({
+        sections:
+          user.settings?.discoverBookSections ?? DEFAULT_BOOK_HOME_SECTIONS,
+      });
+    } catch {
+      return next({
+        status: 500,
+        message: 'Book home sections could not be loaded.',
+      });
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }, unknown, Record<string, unknown>>(
+  '/discover-book-sections',
+  isOwnProfile(),
+  async (req, res, next) => {
+    const userId = parseUserSettingsRouteId(req.params.id);
+    if (!userId) return res.status(404).json({ message: 'User not found.' });
+    const body = req.body;
+    const sections =
+      body && typeof body === 'object' && !Array.isArray(body)
+        ? (body as Record<string, unknown>).sections
+        : undefined;
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 1 ||
+      !Array.isArray(sections) ||
+      sections.length > 20
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Choose a valid book home layout.' });
+    }
+    const validKeys = new Set<string>(
+      BOOK_HOME_SECTION_OPTIONS.map((item) => item.key)
+    );
+    const seen = new Set<string>();
+    const normalized: {
+      key: (typeof BOOK_HOME_SECTION_OPTIONS)[number]['key'];
+      enabled: boolean;
+    }[] = [];
+    for (const section of sections) {
+      if (
+        !section ||
+        typeof section !== 'object' ||
+        Array.isArray(section) ||
+        Object.keys(section).length !== 2
+      ) {
+        return res
+          .status(400)
+          .json({ message: 'Choose a valid book home layout.' });
+      }
+      const entry = section as Record<string, unknown>;
+      if (
+        typeof entry.key !== 'string' ||
+        !validKeys.has(entry.key) ||
+        typeof entry.enabled !== 'boolean' ||
+        seen.has(entry.key)
+      ) {
+        return res
+          .status(400)
+          .json({ message: 'Choose a valid book home layout.' });
+      }
+      seen.add(entry.key);
+      normalized.push({
+        key: entry.key as (typeof BOOK_HOME_SECTION_OPTIONS)[number]['key'],
+        enabled: entry.enabled,
+      });
+    }
+    try {
+      return await runUserSecurityMutationWithActor(
+        req.user!.id,
+        userId,
+        Permission.MANAGE_USERS,
+        async (actor) => {
+          if (actor.id !== userId)
+            return res.status(403).json({ message: 'Access denied.' });
+          const userRepository = getRepository(User);
+          const user = await userRepository.findOne({ where: { id: userId } });
+          if (!user)
+            return res.status(404).json({ message: 'User not found.' });
+          if (!user.settings) user.settings = new UserSettings({ user });
+          user.settings.discoverBookSections = normalized;
+          const saved = await userRepository.save(user);
+          return res.status(200).json({
+            sections: saved.settings?.discoverBookSections ?? normalized,
+          });
+        }
+      );
+    } catch (error) {
+      const unauthorized = error instanceof UserMutationActorUnauthorizedError;
+      return next({
+        status: unauthorized ? 403 : 500,
+        message: unauthorized
+          ? 'Access denied.'
+          : 'Book home sections could not be saved.',
+      });
     }
   }
 );

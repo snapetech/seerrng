@@ -1,6 +1,7 @@
 import EmbyLogo from '@app/assets/services/emby-icon-only.svg';
 import JellyfinLogo from '@app/assets/services/jellyfin-icon.svg';
 import PlexLogo from '@app/assets/services/plex.svg';
+import Button from '@app/components/Common/Button';
 import ButtonWithLoader from '@app/components/Common/ButtonWithLoader';
 import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
@@ -31,6 +32,11 @@ const messages = defineMessages('components.Login', {
   signinwithplex: 'Use your Plex account',
   signinwithjellyfin: 'Use your {mediaServerName} account',
   signinwithoverseerr: 'Use your {applicationTitle} account',
+  loginLinkTitle: 'Sign in with a one-time link',
+  loginLinkHelp:
+    'Use this only if you expected a link from your administrator.',
+  loginLinkContinue: 'Continue with sign-in link',
+  loginLinkUsing: 'Signing in…',
   orsigninwith: 'Or sign in with',
   movie: 'Movie',
   series: 'Series',
@@ -57,9 +63,57 @@ const Login = ({
   const [isProcessing, setProcessing] = useState(false);
   const [authToken, setAuthToken] = useState<string | undefined>(undefined);
   const [transportReady, setTransportReady] = useState(false);
+  const [loginLinkToken, setLoginLinkToken] = useState<string>();
+  const [loginLinkProcessing, setLoginLinkProcessing] = useState(false);
   const [mediaServerLogin, setMediaServerLogin] = useState(
     settings.currentSettings.mediaServerLogin
   );
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const token = params.get('loginToken');
+    if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
+      setLoginLinkToken(token);
+    }
+    if (params.has('loginToken')) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${window.location.search}`
+      );
+    }
+  }, [router.isReady]);
+
+  const handleGeneratedLoginLink = async () => {
+    if (!loginLinkToken) return;
+    setLoginLinkProcessing(true);
+    setError('');
+    try {
+      const response = await axios.post('/api/v1/auth/login-link', {
+        token: loginLinkToken,
+      });
+      if (!response.data?.id) throw new Error('Unable to complete sign-in.');
+      const authenticatedUser = await revalidate();
+      if (!authenticatedUser) {
+        throw new Error(
+          'Sign-in succeeded, but the browser session could not be established.'
+        );
+      }
+    } catch (caught) {
+      setError(
+        axios.isAxiosError(caught) &&
+          typeof caught.response?.data?.message === 'string'
+          ? caught.response.data.message
+          : caught instanceof Error
+            ? caught.message
+            : 'Unable to use this sign-in link.'
+      );
+      setLoginLinkToken(undefined);
+    } finally {
+      setLoginLinkProcessing(false);
+    }
+  };
 
   // Effect that is triggered when the `authToken` comes back from the Plex OAuth
   // We take the token and attempt to sign in. If we get a success message, we will
@@ -272,6 +326,29 @@ const Login = ({
               </div>
             </Transition>
             <div className="px-10 py-8">
+              {transportReady && loginLinkToken && (
+                <div className="mb-6">
+                  <h2 className="refreshed-detail-text mb-2 text-center text-lg font-bold">
+                    {intl.formatMessage(messages.loginLinkTitle)}
+                  </h2>
+                  <p className="refreshed-detail-text-muted mb-4 text-center text-sm">
+                    {intl.formatMessage(messages.loginLinkHelp)}
+                  </p>
+                  <Button
+                    buttonType="primary"
+                    type="button"
+                    className="w-full"
+                    disabled={loginLinkProcessing}
+                    onClick={() => void handleGeneratedLoginLink()}
+                  >
+                    {intl.formatMessage(
+                      loginLinkProcessing
+                        ? messages.loginLinkUsing
+                        : messages.loginLinkContinue
+                    )}
+                  </Button>
+                </div>
+              )}
               {transportReady && loginFormVisible && (
                 <SwitchTransition mode="out-in">
                   <CSSTransition

@@ -6,6 +6,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import BookFormatTabs, {
   type BookDiscoveryFormat,
 } from '@app/components/Discover/BookFormatTabs';
+import ReadMeABookSearch from '@app/components/Discover/DiscoverBooks/ReadMeABookSearch';
 import {
   FilterResetButton,
   getFilterToggleButtonClass,
@@ -281,6 +282,7 @@ const DiscoverBooks = ({
       <PageTitle title={title} />
       <div className="app-filter-section-gap">
         <Header>{title}</Header>
+        {activeFormat === 'audiobook' && <ReadMeABookSearch />}
         {mediaFilters}
         {showFormatTabs && (
           <PinnedFilterSection

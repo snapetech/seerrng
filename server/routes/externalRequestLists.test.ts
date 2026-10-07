@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { before, beforeEach, describe, it } from 'node:test';
+import { before, beforeEach, describe, it, mock } from 'node:test';
 
+import { getRepository } from '@server/datasource';
+import { ExternalRequestList } from '@server/entity/ExternalRequestList';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
+import axios from 'axios';
 import type { Express } from 'express';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
@@ -90,6 +93,64 @@ describe('external request list routes', () => {
       .send({ url: 'http://127.0.0.1/admin' });
 
     assert.equal(response.status, 400);
+  });
+
+  it('validates and stores a private Hardcover token without exposing it', async () => {
+    let calledAuthorization = '';
+    mock.method(
+      axios,
+      'post',
+      async (
+        _url: string,
+        body: unknown,
+        config: { headers: Record<string, string> }
+      ) => {
+        assert.match(String((body as { query?: string }).query), /status_id/);
+        calledAuthorization = config.headers.Authorization;
+        return {
+          status: 200,
+          data: {
+            data: {
+              me: [
+                {
+                  user_books: [
+                    {
+                      book: {
+                        id: 91,
+                        title: 'The Dispossessed',
+                        contributions: [
+                          { author: { name: 'Ursula K. Le Guin' } },
+                        ],
+                        editions: [{ isbn_13: '9780061054884' }],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        };
+      }
+    );
+
+    const agent = await loginAs('friend@seerr.dev');
+    const connected = await agent
+      .post('/api/v1/request/lists/hardcover')
+      .send({ apiToken: 'Bearer hardcover_test_token_123456' });
+    assert.equal(connected.status, 201, JSON.stringify(connected.body));
+    assert.equal(connected.body.validatedBooks, 1);
+    assert.equal(calledAuthorization, 'Bearer hardcover_test_token_123456');
+
+    const lists = await agent.get('/api/v1/request/lists');
+    assert.equal(lists.status, 200);
+    assert.equal(lists.body[0].provider, 'hardcover');
+    assert.equal(lists.body[0].apiToken, undefined);
+
+    const stored = await getRepository(ExternalRequestList)
+      .createQueryBuilder('list')
+      .addSelect('list.apiToken')
+      .getOneOrFail();
+    assert.equal(stored.apiToken, 'hardcover_test_token_123456');
   });
 
   it('does not expose another user’s configured sources', async () => {

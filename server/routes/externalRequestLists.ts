@@ -3,6 +3,7 @@ import { ExternalRequestList } from '@server/entity/ExternalRequestList';
 import { User } from '@server/entity/User';
 import {
   MAX_EXTERNAL_REQUEST_LISTS_PER_USER,
+  fetchHardcoverToRead,
   parseExternalRequestListUrl,
   syncExternalRequestList,
 } from '@server/lib/externalRequestLists';
@@ -98,6 +99,70 @@ externalRequestListRoutes.post('/', async (req, res, next) => {
   }
 });
 
+externalRequestListRoutes.post('/hardcover', async (req, res, next) => {
+  const tokenValue = req.body?.apiToken;
+  if (
+    !req.body ||
+    typeof req.body !== 'object' ||
+    Array.isArray(req.body) ||
+    Object.keys(req.body).length !== 1 ||
+    typeof tokenValue !== 'string' ||
+    tokenValue.trim().length < 16 ||
+    tokenValue.length > 4096 ||
+    /[\r\n\0]/.test(tokenValue)
+  ) {
+    return next({
+      status: 400,
+      message: 'Provide a valid Hardcover API token.',
+    });
+  }
+  const token = tokenValue.trim().replace(/^Bearer\s+/i, '');
+
+  try {
+    const items = await fetchHardcoverToRead(token.trim());
+    const repository = getRepository(ExternalRequestList);
+    const existing = await repository.findOne({
+      where: {
+        user: { id: req.user!.id },
+        sourceId: 'hardcover:me:want-to-read',
+      },
+    });
+    if (!existing) {
+      const count = await repository.count({
+        where: { user: { id: req.user!.id } },
+      });
+      if (count >= MAX_EXTERNAL_REQUEST_LISTS_PER_USER) {
+        return next({
+          status: 400,
+          message: `You can add up to ${MAX_EXTERNAL_REQUEST_LISTS_PER_USER} external lists.`,
+        });
+      }
+    }
+    const list = await repository.save(
+      Object.assign(existing ?? new ExternalRequestList(), {
+        user: req.user!,
+        provider: 'hardcover' as const,
+        sourceId: 'hardcover:me:want-to-read',
+        sourceUrl: 'https://hardcover.app/books/want-to-read',
+        apiToken: token.trim(),
+        processedItemIds: existing?.processedItemIds ?? [],
+      })
+    );
+    return res.status(existing ? 200 : 201).json({
+      ...filterExternalRequestList(list),
+      validatedBooks: items.length,
+    });
+  } catch (error) {
+    return next({
+      status: 400,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Hardcover could not validate this token.',
+    });
+  }
+});
+
 externalRequestListRoutes.post<{ listId: string }>(
   '/:listId/sync',
   async (req, res, next) => {
@@ -105,10 +170,13 @@ externalRequestListRoutes.post<{ listId: string }>(
     if (!listId) return next({ status: 404, message: 'List not found.' });
 
     try {
-      const list = await getRepository(ExternalRequestList).findOne({
-        where: { id: listId, user: { id: req.user!.id } },
-        relations: { user: true },
-      });
+      const list = await getRepository(ExternalRequestList)
+        .createQueryBuilder('list')
+        .leftJoinAndSelect('list.user', 'user')
+        .addSelect('list.apiToken')
+        .where('list.id = :listId', { listId })
+        .andWhere('user.id = :userId', { userId: req.user!.id })
+        .getOne();
       if (!list) return next({ status: 404, message: 'List not found.' });
 
       const user = await getRepository(User).findOne({

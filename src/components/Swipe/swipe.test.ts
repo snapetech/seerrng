@@ -26,6 +26,12 @@ describe('requestBodyFor', () => {
     tasteNotes: '',
     seriesRequest: 'first-season' as const,
     bookFormat: 'audiobook' as const,
+    seedScope: 'full' as const,
+    favoriteSeeds: [] as {
+      mediaType: 'movie' | 'tv' | 'book';
+      id: string;
+      title: string;
+    }[],
   };
 
   it('requests movies by TMDB ID', () => {

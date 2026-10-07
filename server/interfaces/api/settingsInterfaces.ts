@@ -42,6 +42,7 @@ export interface PublicSettingsResponse {
   booksEnabled: boolean;
   ebookServiceEnabled: boolean;
   audiobookServiceEnabled: boolean;
+  readmeabookEnabled?: boolean;
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
   softwareEnabled: boolean;

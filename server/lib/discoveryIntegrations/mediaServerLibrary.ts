@@ -137,6 +137,7 @@ const plexItem = (item: PlexLibraryItem): PersonalLibraryItem | undefined => {
     tmdbId: plexTmdbId(item),
     ...plexExternalIds(item),
     year: item.year,
+    rating: item.userRating,
     status,
     ...(item.type === 'show' ? { progress, totalEpisodes: total } : {}),
   };
@@ -168,6 +169,7 @@ const jellyfinItem = (
       ? { tvdbId: boundedPositive(item.ProviderIds.Tvdb) }
       : {}),
     year: item.ProductionYear,
+    rating: userData?.Rating,
     status: userData?.Played
       ? 'completed'
       : isPartiallyPlayed
@@ -186,6 +188,8 @@ const statusMatchesShelf = (item: PersonalLibraryItem, shelf: LibraryShelf) => {
       return item.status !== 'completed' && item.status !== 'watched';
     case 'in-progress':
       return item.status === 'watching';
+    case 'rated':
+      return item.rating !== undefined && item.rating > 0;
     default:
       return false;
   }
@@ -233,7 +237,7 @@ const validateShelfAndPage = (
   cursor?: number
 ) => {
   if (
-    !['all', 'watched', 'unwatched', 'in-progress'].includes(shelf) ||
+    !['all', 'watched', 'unwatched', 'in-progress', 'rated'].includes(shelf) ||
     !Number.isSafeInteger(page) ||
     page < 1 ||
     page > MAX_PAGE ||
@@ -255,7 +259,9 @@ const collectInProgressPage = async <T>(
     offset: number,
     size: number
   ) => Promise<{ items: T[]; total: number }>,
-  normalize: (item: T) => PersonalLibraryItem | undefined
+  normalize: (item: T) => PersonalLibraryItem | undefined,
+  matches: (item: PersonalLibraryItem) => boolean = (item) =>
+    item.status === 'watching'
 ) => {
   const items: PersonalLibraryItem[] = [];
   const stopOffset = Math.min(
@@ -281,7 +287,7 @@ const collectInProgressPage = async <T>(
     const inspectedItems = batch.items.slice(0, size);
     for (let index = 0; index < inspectedItems.length; index += 1) {
       const item = normalize(inspectedItems[index]);
-      if (item?.status !== 'watching') continue;
+      if (!item || !matches(item)) continue;
       if (items.length === PAGE_SIZE) {
         foundLookahead = true;
         break;
@@ -452,7 +458,7 @@ export async function personalMediaServerLibrary(
           if (!library) {
             throw new DiscoveryIntegrationError(404, 'Library not found.');
           }
-          if (shelf === 'in-progress') {
+          if (shelf === 'in-progress' || shelf === 'rated') {
             const result = await collectInProgressPage(
               offset,
               async (batchOffset, size) => {
@@ -463,7 +469,8 @@ export async function personalMediaServerLibrary(
                 });
                 return { items: batch.items, total: batch.totalSize };
               },
-              plexItem
+              plexItem,
+              shelf === 'rated' ? (item) => (item.rating ?? 0) > 0 : undefined
             );
             ({ items, total, hasMore, nextCursor, truncated } = result);
           } else {
@@ -508,7 +515,7 @@ export async function personalMediaServerLibrary(
           if (!library) {
             throw new DiscoveryIntegrationError(404, 'Library not found.');
           }
-          if (shelf === 'in-progress') {
+          if (shelf === 'in-progress' || shelf === 'rated') {
             const result = await collectInProgressPage(
               offset,
               async (batchOffset, size) => {
@@ -526,7 +533,8 @@ export async function personalMediaServerLibrary(
                   total: batch.TotalRecordCount,
                 };
               },
-              (entry) => jellyfinItem(entry, source)
+              (entry) => jellyfinItem(entry, source),
+              shelf === 'rated' ? (item) => (item.rating ?? 0) > 0 : undefined
             );
             ({ items, total, hasMore, nextCursor, truncated } = result);
           } else {

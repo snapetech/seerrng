@@ -7,6 +7,7 @@ import { USER_SETTINGS_LIMITS } from '@server/constants/userSettings';
 import { getRepository } from '@server/datasource';
 import { LinkedAccount } from '@server/entity/LinkedAccount';
 import { User } from '@server/entity/User';
+import UserLoginLink from '@server/entity/UserLoginLink';
 import { startJobs } from '@server/job/schedule';
 import {
   getAuthAccountAdmissionResource,
@@ -1881,6 +1882,66 @@ authRoutes.post(
     }
   }
 );
+
+authRoutes.post('/login-link', authRateLimit, async (req, res, next) => {
+  const invalid = () =>
+    next({
+      status: 403,
+      message: 'This sign-in link is invalid, expired, or already used.',
+    });
+  if (req.session?.userId) {
+    return next({
+      status: 409,
+      message: 'Sign out before using a sign-in link.',
+    });
+  }
+  const parsedBody = parseRequestBodyObject(req.body);
+  if ('error' in parsedBody || Object.keys(parsedBody.value).length !== 1) {
+    return invalid();
+  }
+  const token = parsedBody.value.token;
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return invalid();
+  }
+
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const now = new Date();
+  try {
+    const result = await getRepository(UserLoginLink)
+      .createQueryBuilder()
+      .update(UserLoginLink)
+      .set({ usedAt: now })
+      .where('"tokenHash" = :tokenHash', { tokenHash })
+      .andWhere('"usedAt" IS NULL')
+      .andWhere('"revokedAt" IS NULL')
+      .andWhere('"expiresAt" > :now', { now })
+      .execute();
+    if (result.affected !== 1) return invalid();
+
+    const link = await getRepository(UserLoginLink)
+      .createQueryBuilder('loginLink')
+      .leftJoinAndSelect('loginLink.user', 'user')
+      .addSelect('loginLink.tokenHash')
+      .where('loginLink.tokenHash = :tokenHash', { tokenHash })
+      .getOne();
+    if (!link?.user) return invalid();
+
+    await establishAuthenticatedSession(
+      req,
+      link.user.id,
+      link.user.passwordChangedAt?.getTime() ?? 0
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(link.user.filter());
+  } catch (error) {
+    logger.warn('Sign-in link authentication failed', {
+      label: 'Auth',
+      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      ip: req.ip,
+    });
+    return next({ status: 500, message: 'Unable to use this sign-in link.' });
+  }
+});
 
 authRoutes.post('/local', authRateLimit, async (req, res, next) => {
   const settings = getSettings();

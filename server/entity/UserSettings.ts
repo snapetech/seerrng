@@ -1,4 +1,5 @@
 import type {
+  BookHomeSectionPreference,
   CardTextVisibility,
   NotificationAgentTypes,
   UserMediaFilterPins,
@@ -232,6 +233,10 @@ export class UserSettings {
   @Column({ type: 'simple-json', nullable: true })
   public mediaFilterPins?: UserMediaFilterPins;
 
+  /** Ordered per-user book and audiobook home row keys. */
+  @Column({ type: 'simple-json', nullable: true })
+  public discoverBookSections?: BookHomeSectionPreference[];
+
   @Column({ type: 'simple-json', nullable: true })
   public advancedThemeOverrides?: AdvancedThemeOverrides | null;
 
@@ -292,6 +297,7 @@ export class UserSettings {
       detailDisclosurePins: this.detailDisclosurePins,
       detailDisclosureOrder: this.detailDisclosureOrder,
       mediaFilterPins: this.mediaFilterPins,
+      discoverBookSections: this.discoverBookSections,
       advancedThemeOverrides: this.advancedThemeOverrides,
       themePalette: this.themePalette,
     };

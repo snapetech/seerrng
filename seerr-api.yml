@@ -117,6 +117,87 @@ components:
         aiEffort:
           type: string
           enum: [low, medium, high]
+    SwipeFavoriteSeed:
+      type: object
+      required: [mediaType, id, title]
+      properties:
+        mediaType:
+          type: string
+          enum: [movie, tv, book]
+        id:
+          type: string
+          maxLength: 64
+        title:
+          type: string
+          maxLength: 512
+    BookHomeSectionPreference:
+      type: object
+      required: [key, enabled]
+      properties:
+        key:
+          type: string
+          maxLength: 64
+        enabled:
+          type: boolean
+    ReadMeABookSettings:
+      type: object
+      required: [enabled, hostname, port, useSsl, baseUrl, apiKey]
+      properties:
+        enabled:
+          type: boolean
+        hostname:
+          type: string
+          maxLength: 255
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        useSsl:
+          type: boolean
+        baseUrl:
+          type: string
+          maxLength: 512
+        apiKey:
+          type: string
+          description: API token. The saved value is redacted in responses.
+        apiKeyConfigured:
+          type: boolean
+        clearApiKey:
+          type: boolean
+    ReadMeABookRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        asin:
+          type: string
+        title:
+          type: string
+        author:
+          type: string
+        narrator:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        coverArtUrl:
+          type: string
+          nullable: true
+        durationMinutes:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        statusMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     TrackRequest:
       type: object
       properties:
@@ -875,7 +956,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads]
+          enum: [imdb, goodreads, hardcover]
         sourceUrl:
           type: string
           format: uri
@@ -902,7 +983,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads]
+          enum: [imdb, goodreads, hardcover]
         sourceItems:
           type: integer
         requested:
@@ -9128,11 +9209,42 @@ paths:
                 bookFormat:
                   type: string
                   enum: [ebook, audiobook]
+                seedScope:
+                  type: string
+                  enum: [full, rated, favorites]
+                favoriteSeeds:
+                  type: array
+                  maxItems: 25
+                  items:
+                    $ref: '#/components/schemas/SwipeFavoriteSeed'
       responses:
         '200':
           description: Saved
         '400':
           description: Invalid preferences
+  /swipe/favorites:
+    get:
+      summary: List the user's favorite seed options
+      description: Returns the user's prior likes, requests, and linked personal library items for the selected media type.
+      tags: [swipe]
+      parameters:
+        - in: query
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv, book]
+      responses:
+        '200':
+          description: Favorite seeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SwipeFavoriteSeed'
+        '400':
+          description: Invalid media type
   /settings/swipe:
     get:
       summary: Get swipe settings
@@ -9180,6 +9292,100 @@ paths:
           description: Invalid settings
         '502':
           description: The provider rejected or failed the request
+  /settings/readmeabook:
+    get:
+      summary: Get ReadMeABook connection settings
+      tags: [settings]
+      responses:
+        '200':
+          description: Connection settings with the API token redacted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadMeABookSettings'
+    put:
+      summary: Save ReadMeABook connection settings
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadMeABookSettings'
+      responses:
+        '200':
+          description: Saved settings with the API token redacted
+        '400':
+          description: Invalid settings
+  /settings/readmeabook/test:
+    post:
+      summary: Test ReadMeABook connection settings
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadMeABookSettings'
+      responses:
+        '200':
+          description: ReadMeABook accepted the configured token
+        '400':
+          description: Invalid settings
+        '502':
+          description: ReadMeABook could not be reached
+  /settings/login-links:
+    get:
+      summary: List sign-in link metadata for a user
+      tags: [settings]
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Sign-in link metadata; raw tokens are never returned
+    post:
+      summary: Create an expiring, single-use sign-in link
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [userId]
+              properties:
+                userId:
+                  type: integer
+                  minimum: 1
+      responses:
+        '201':
+          description: Created; the raw token is returned once
+        '400':
+          description: Invalid target user
+  /settings/login-links/{id}/revoke:
+    post:
+      summary: Revoke an active sign-in link
+      tags: [settings]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Link revoked
+        '404':
+          description: Link not found
+        '409':
+          description: Link is no longer active
   /settings/prowlarr:
     get:
       summary: Get Prowlarr connection settings
@@ -10633,6 +10839,35 @@ paths:
               required:
                 - email
                 - password
+  /auth/login-link:
+    post:
+      summary: Sign in with an admin-generated one-time link
+      description: The token is accepted only in the request body. A successful sign-in consumes it atomically.
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{43}$'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          description: The link is invalid, expired, revoked, or already used
+        '409':
+          description: Sign out before using a sign-in link
   /auth/oidc/login/{slug}:
     get:
       summary: Initiate OpenID Connect login
@@ -12033,6 +12268,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DetailDisclosurePinSettings'
+  /user/{id}/settings/discover-book-sections:
+    get:
+      summary: Get the current user's ordered book and audiobook home sections
+      tags: [users]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Section order and visibility
+    post:
+      summary: Save the current user's ordered book and audiobook home sections
+      tags: [users]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sections]
+              properties:
+                sections:
+                  type: array
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/BookHomeSectionPreference'
+      responses:
+        '200':
+          description: Saved section order and visibility
+        '400':
+          description: Invalid section selection
+        '403':
+          description: The profile does not belong to the signed-in user
   /user/{id}/settings/detail-disclosure-order/{mediaType}:
     parameters:
       - in: path
@@ -15663,6 +15943,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExternalRequestList'
+  /request/lists/hardcover:
+    post:
+      summary: Connect a Hardcover Want to Read shelf
+      description: Validates and stores the signed-in user's Hardcover token. The token is not returned by list routes.
+      tags: [request]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [apiToken]
+              properties:
+                apiToken:
+                  type: string
+                  minLength: 16
+                  maxLength: 4096
+      responses:
+        '201':
+          description: Hardcover shelf connected
+        '200':
+          description: Existing Hardcover shelf updated
+        '400':
+          description: Hardcover rejected the token or query
   /request/lists/{listId}/sync:
     post:
       summary: Sync a configured public list now
@@ -15697,6 +16002,190 @@ paths:
       responses:
         '204':
           description: External request list removed
+  /readmeabook/status:
+    get:
+      summary: Get ReadMeABook availability
+      tags: [books]
+      responses:
+        '200':
+          description: Whether ReadMeABook is enabled
+  /readmeabook/search:
+    get:
+      summary: Search audiobooks through ReadMeABook
+      tags: [books]
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 160
+      responses:
+        '200':
+          description: Audiobook search results
+        '400':
+          description: Invalid search query
+        '502':
+          description: ReadMeABook could not be reached
+  /readmeabook/discover:
+    get:
+      summary: Get a ReadMeABook home section
+      tags: [books]
+      parameters:
+        - in: query
+          name: section
+          required: true
+          schema:
+            type: string
+            enum: [popular, new, subject]
+        - in: query
+          name: subject
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: Audiobook section results
+        '400':
+          description: Invalid section
+        '502':
+          description: ReadMeABook could not be reached
+  /readmeabook/requests:
+    get:
+      summary: Get the signed-in user's ReadMeABook requests
+      tags: [books]
+      responses:
+        '200':
+          description: Audiobook requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReadMeABookRequest'
+    post:
+      summary: Request an audiobook through ReadMeABook
+      tags: [books]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [asin, title, author]
+              properties:
+                asin:
+                  type: string
+                  pattern: '^[A-Za-z0-9]{10}$'
+                title:
+                  type: string
+                  maxLength: 512
+                author:
+                  type: string
+                  maxLength: 512
+                narrator:
+                  type: string
+                  maxLength: 512
+                description:
+                  type: string
+                  maxLength: 8000
+                coverArtUrl:
+                  type: string
+                  format: uri
+                durationMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 100000
+      responses:
+        '201':
+          description: Audiobook request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadMeABookRequest'
+        '400':
+          description: Invalid audiobook
+        '403':
+          description: The user cannot request books
+        '409':
+          description: The audiobook is already requested
+        '429':
+          description: Book quota reached
+  /readmeabook/requests/{id}:
+    get:
+      summary: Refresh the status of a ReadMeABook request
+      tags: [books]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Updated audiobook request status
+        '404':
+          description: Request not found
+        '409':
+          description: Request is waiting for approval
+        '502':
+          description: ReadMeABook could not be reached
+  /readmeabook/admin/dashboard:
+    get:
+      summary: Get the ReadMeABook acquisition dashboard
+      tags: [admin]
+      responses:
+        '200':
+          description: Metrics, active downloads, and recent requests
+        '403':
+          description: Admin permission required
+  /readmeabook/admin/requests:
+    get:
+      summary: Get audiobook requests awaiting SeerrNG approval
+      tags: [admin]
+      responses:
+        '200':
+          description: Requests awaiting approval
+  /readmeabook/admin/requests/{id}/approve:
+    post:
+      summary: Approve and submit a ReadMeABook request
+      tags: [admin]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Request approved
+        '404':
+          description: Request not found
+        '409':
+          description: Request is no longer awaiting approval
+        '502':
+          description: ReadMeABook could not process the request
+  /readmeabook/admin/requests/{id}/deny:
+    post:
+      summary: Deny a ReadMeABook request
+      tags: [admin]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Request denied
+        '404':
+          description: Request not found
+        '409':
+          description: Request is no longer awaiting approval
   /request:
     get:
       summary: Get all requests

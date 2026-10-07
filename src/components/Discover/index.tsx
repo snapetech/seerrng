@@ -5,6 +5,7 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
 import { sliderTitles } from '@app/components/Discover/constants';
+import ReadMeABookHomeSection from '@app/components/Discover/ReadMeABookHomeSection';
 import discoveryMessages from '@app/components/DiscoveryIntegrations/messages';
 import MediaSlider from '@app/components/MediaSlider';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
@@ -25,6 +26,10 @@ import {
   PencilIcon,
   PlusIcon,
 } from '@heroicons/react/24/solid';
+import {
+  DEFAULT_BOOK_HOME_SECTIONS,
+  getBookHomeSection,
+} from '@server/constants/bookHomeSections';
 import { DiscoverSliderType } from '@server/constants/discover';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import axios from 'axios';
@@ -132,7 +137,7 @@ type DiscoverProps = {
 
 const Discover = ({ initialSliders }: DiscoverProps) => {
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { hasPermission, user } = useUser();
   const { currentSettings } = useSettings();
   const { addToast } = useToasts();
   const {
@@ -149,6 +154,12 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
     initialSliders ?? []
   );
   const [isEditing, setIsEditing] = useState(false);
+  const { data: bookHomeSections } = useSWR<{
+    sections: { key: string; enabled: boolean }[];
+  }>(
+    user?.id ? `/api/v1/user/${user.id}/settings/discover-book-sections` : null,
+    { fallbackData: { sections: DEFAULT_BOOK_HOME_SECTIONS } }
+  );
   const visibleSliders = (isEditing ? sliders : discoverData)?.filter(
     (slider) =>
       slider.type === undefined ||
@@ -673,6 +684,46 @@ const Discover = ({ initialSliders }: DiscoverProps) => {
           <div key={`discover-slider-${slider.id}`}>{sliderComponent}</div>
         );
       })}
+      {!isEditing &&
+        bookHomeSections?.sections
+          .filter((section) => section.enabled)
+          .map((section) => {
+            const option = getBookHomeSection(section.key);
+            if (!option) return null;
+            const format = option.format;
+            if (format === 'audiobook') {
+              const kind = section.key.startsWith('popular:')
+                ? 'popular'
+                : section.key.startsWith('new:')
+                  ? 'new'
+                  : 'subject';
+              return (
+                <ReadMeABookHomeSection
+                  key={`user-book-home-${section.key}`}
+                  title={option.label}
+                  section={kind}
+                  subject={option.subject}
+                />
+              );
+            }
+            const params = new URLSearchParams({
+              format,
+              sortBy: option.sortBy ?? 'trending',
+            });
+            if (option.subject) params.set('subject', option.subject);
+            return (
+              <MediaSlider
+                key={`user-book-home-${section.key}`}
+                hideWhenEmpty
+                sliderKey={`user-book-home-${section.key}`}
+                title={option.label}
+                url="/api/v1/discover/books"
+                linkUrl={`/discover/books?${params.toString()}`}
+                extraParams={params.toString()}
+                randomizeOrder={option.sortBy === 'ranked'}
+              />
+            );
+          })}
     </div>
   );
 };

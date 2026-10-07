@@ -32,7 +32,8 @@ not override their verification or UI rules.
 
 ## Progress log
 
-Branch: `feat/ng-ecosystem-integration`. Status values: `done` (code and
+Branch: `feat/ng-phase2-tunerr` (Phase 7 work; forward rebase onto the latest
+`main` is pending). Status values: `done` (code and
 automated checks written and run), `built` (code written, not yet run against a
 real service), `pending`, `blocked`. Targeted local checks and cumulative-gate
 results are recorded in the progress table. A failed required gate blocks
@@ -412,20 +413,35 @@ independently. Design differences: SeerrNG decks come from its own catalogs
 (so cards are always requestable), AI is optional and only reorders, and the
 feature covers movies, series, and books.
 
-## Phase 7: remaining ReadMeABook features (next)
+## Phase 7: ReadMeABook and per-user book integration
 
-Status: researched, not built. Approach per feature:
+Status: implemented on `feat/ng-phase2-tunerr`; the branch still needs
+forward-integration with current `main` and a passing cumulative gate before it
+can be finalized. SeerrNG remains the request layer. ReadMeABook owns the
+download and processing pipeline; SeerrNG uses its token-authenticated API and
+does not duplicate its indexer search/ranking, download clients, organization,
+M4B chapter merging, release blocklist, import, or ebook sidecar.
 
-| ReadMeABook feature | SeerrNG approach |
-| --- | --- |
-| Acquisition pipeline (Prowlarr search + ranking, qBittorrent/Transmission/SABnzbd/NZBGet, organization, M4B chapter merging, release blocklist, bulk/manual import, ebook sidecar) | **ReadMeABook backend**: new audiobook service type. Token API (`Authorization: Bearer rmab_…`, allowlisted): `POST /api/requests` with `{audiobook:{asin,title,author,narrator?,description?,coverArtUrl?}}` → `201 {request}` or named errors (`AlreadyAvailable`, `BeingProcessed`, `DuplicateRequest`, …); `GET /api/requests/:id` (status + `downloadHistory` + jobs); `GET /api/requests`. Request statuses: pending, searching, downloading, processing, downloaded, available, failed, cancelled, awaiting_search, awaiting_import, awaiting_release, warn, awaiting_approval, denied. The RMAB token owner should have auto-approve on, since SeerrNG approves first. |
-| Audible-backed search | Proxy `GET /api/audiobooks/search` from the RMAB backend into SeerrNG audiobook search (do not scrape Audible ourselves). |
-| Admin dashboard | Proxy `GET /api/admin/metrics`, `/api/admin/downloads/active`, `/api/admin/requests/recent` (admin token) into a SeerrNG admin panel. |
-| BookDate library scopes (full / rated / pick favourites ≤25) | Extend Swipe seeds: favourites picker from the user's library and requests; "rated only" from media-server ratings. |
-| Hardcover shelf sync | Add `hardcover` provider to External Request List Sync (per-user Hardcover token, GraphQL). Goodreads already supported. |
-| Per-user home sections | Per-user configurable book/audiobook discover sections (popular, new, subject categories), reorder/hide. |
-| Admin-generated per-user login links | Expiring, single-use, hashed tokens; revoke; admin-only. Security review required. |
-| Notifications, approval, OIDC, setup wizard, request deletion, thumbnail cache | Already present in SeerrNG. |
-| Credential recovery | Not applicable (SeerrNG has no CONFIG_ENCRYPTION_KEY). |
+| Feature | Implementation | Automated evidence |
+| --- | --- | --- |
+| ReadMeABook audiobook search and requests | Admin-configured backend URL and token; authenticated search, request creation, request status/history, and admin request/download metrics. User ownership and admin access are enforced in SeerrNG. | Route tests use mocked backend responses; no real ReadMeABook service was contacted. |
+| Hardcover want-to-read sync | `hardcover` provider for per-user External Request List Sync using a user-owned GraphQL token; Goodreads remains supported. | Sync and credential-redaction tests. |
+| Book and audiobook home sections | Per-user ordered, hideable popular, new, and subject rows on Discover. | User-settings route and component tests. |
+| Swipe seed scopes | Full library, rated items, or a user-selected set of up to 25 favorites; media-server library ratings seed the rated scope. | Server and client route/component tests. |
+| Admin-generated sign-in links | Admin-only creation/list/revoke; random single-use token is stored only as a hash, expires after 30 minutes, and is consumed atomically. | Security-focused route tests cover expiry, revocation, reuse, and unauthorized access. |
+| Acquisition pipeline, notifications, approval, OIDC, setup wizard, request deletion, thumbnail cache | Existing SeerrNG notifications, approval, OIDC, setup, deletion, and thumbnail behavior remain in place. The acquisition pipeline stays in ReadMeABook. | No new SeerrNG implementation required for these items. |
 
-Done in Phase 6/7 so far: Swipe (BookDate equivalent) with Claude and OpenAI-compatible (OpenAI, Ollama, LM Studio) ordering.
+SQLite and PostgreSQL migrations are included: `1791080000000` through
+`1791110000000`. The SQLite migration suite passes; PostgreSQL migrations were
+not run locally. The exact new feature tests pass in focused reruns. The full
+native TypeScript lane currently has intermittent login-helper failures in
+unrelated discovery/request/user tests; those cases pass alone and the affected
+discovery/request slice passed 315/315 on a subsequent run. A complete required
+validation/build pass is still pending. No live ReadMeABook or Hardcover
+round-trip, desktop/narrow visual review, or physical Swipe interaction review
+has been performed; see the current evidence entry in
+`interface-integration-checkpoint.md`.
+
+ReadMeABook (`kikootwo/ReadMeABook`) is AGPL-3.0 and SeerrNG is MIT. The
+integration uses its documented HTTP contract only; no ReadMeABook source,
+CSS, copy, or assets were copied into SeerrNG.
