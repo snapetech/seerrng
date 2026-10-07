@@ -89,9 +89,10 @@ workflows or waive required checks. Retain the source manifest and tool versions
    previous build verifies code added afterward. Record the final exact target,
    contributor, integration, and tested commit IDs.
 5. Summarize preserved features, resolutions, commands/results, unverified native
-   paths, visual acceptance, and remaining scope. Obtain the required human review,
-   use the project PR template and AI disclosure, add/preview release notes, and
-   finalize only under the maintainer's publication/merge authority.
+   paths, visual inspection evidence, and remaining scope. Use the project PR
+   template and AI disclosure, add/preview release notes, and finalize only
+   under the maintainer's publication/merge authority. Do not require separate
+   human acceptance when the maintainer explicitly directs merge or release.
 
 ## Evidence and recovery
 
@@ -105,5 +106,7 @@ rules and live service behavior remain explicitly reviewable boundaries.
 
 Complete the checkpoint's commit/runtime/conflict/evidence fields during the
 real integration. Do not invent PR IDs, ancestry, acceptance or passing results.
-Report unrelated failures before attempting an out-of-scope backend repair;
-retain newer target fixes and defer the integration if a required gate fails.
+Report unrelated failures before attempting an out-of-scope backend repair. If
+the user explicitly authorized repository-wide remediation or completion of the
+required gate, repair those failures and verify them without asking again. Retain
+newer target fixes and defer integration only when a required gate still fails.

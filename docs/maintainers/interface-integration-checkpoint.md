@@ -5,6 +5,15 @@ approval or a complete site-audit claim. Read `AGENTS.md`, UI Style Standard and
 UI Fix-It first. Preserve earlier accepted work while reviewing small batches.
 Never infer human acceptance from test success or a journal's implementation note.
 
+## Current maintainer direction — October 6, 2026
+
+The project owner explicitly removed human review/acceptance as a merge or
+release gate. Record visual inspection separately from automated evidence, but
+do not block authorized merges or releases waiting for owner sign-off. Earlier
+checkpoint entries preserve the status at the time they were written and do not
+override this current direction. Continue to require the applicable automated
+checks and report their actual results.
+
 ## Preservation and coverage map
 
 | Work to preserve                                                       | Established owners and existing checks                                                                                                                                                                            | Review boundary                                                                                                                                                      |
@@ -92,8 +101,10 @@ per-test restoration. Unexpected fixture IDs fail outside the production catch.
 A new unavailable-enrichment case checks the exact lookup and preserved status.
 All 18 focused tests pass, with no skips/cancellations/todos. This test-only repair
 is not a production backend fix or a complete cumulative gate/build pass. The
-final gate and human acceptance remain pending; unrelated failures still require
-scoped direction before further repair.
+final gate and human acceptance remain pending; unrelated failures required
+scoped direction for that attempt. On 2026-10-06, explicit user authorization
+covered fixing failures that block the requested software-acquisition
+validation and release, superseding that pause for this work.
 
 The visual/client fixtures were also tightened: negative CSS/role fixtures must
 fail with their intended diagnostics, wrong icon padding is checked without a
@@ -292,7 +303,9 @@ Fill these fields with observed facts; unknown means pending, never assumed.
 6. Live Plex evidence separately from mocked native coverage; safe prerequisites
    for unverified providers. Never copy credentials, runtime DBs or live config.
 7. Explicit deferrals, unresolved failures and next gate. A failed required gate
-   blocks finalization; report unrelated backend failures before expanding scope.
+   blocks finalization. Keep a narrow visual task from expanding into unrelated
+   backend work unless the user explicitly authorized broader remediation or a
+   complete gate; that authorization covers the repairs needed to pass it.
 8. Recoverable refs/archive identity and checksums, final source readback, and
    applicable publication authority. Local preview publication is not PR approval.
 

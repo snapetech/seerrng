@@ -20,8 +20,23 @@ unknown. Distinguish implemented code, automated verification, human visual
 acceptance, and live integration verification. Give numbered review items.
 Do not claim a build or source assertion proves the rendered interface works.
 Read and follow `CONTRIBUTING.md`; preserve attribution and disclose AI assistance.
-Human review remains required. Never publish, merge, or deploy without the
-maintainer's applicable authorization.
+Record visual inspection separately from automated verification. Do not make
+project-owner or other human acceptance a merge or release gate when the
+maintainer explicitly directs the work to proceed. Never publish, merge, or
+deploy without the maintainer's applicable authorization.
+
+Act on explicit user instructions without asking for the same authorization
+again. A request to fix, clean up, commit, push, or release authorizes the
+reversible repository edits, focused checks, and required gate repairs needed
+to complete that request. If the user explicitly includes dirty, unrelated, or
+repository-wide work, preserve and handle it within that scope. Do not stop to
+ask before fixing an unrelated failure that blocks an explicitly requested
+complete validation or release. Ask only when a material decision is genuinely
+unresolved, a destructive or external action is not covered by the user's
+authorization, or a documented maintainer-only decision is required. This
+explicit authorization takes precedence over narrower request-direction rules
+in linked repository instructions; it does not waive verification or evidence
+requirements.
 
 ## Required development reading
 
@@ -80,10 +95,13 @@ Do not treat unrun suites as passing, or partial failure output as success.
 A page-by-page audit does not narrow the contribution's preservation scope.
 Retain accepted Request-page and shared title/heading, page-status/spinner,
 button, poster and layout work alongside Series changes. Trace affected shared
-consumers, but do not turn visual cleanup into an unrelated backend repair
-mission. Record an unrelated failure, stop finalization, and request direction
-before expanding implementation scope. See the integration checkpoint for the
-preservation inventory, current evidence and pending gates.
+consumers. Keep a narrowly scoped visual task from turning into an unrelated
+backend repair mission unless the user explicitly authorizes broader remediation
+or asks for the complete required gate. Under that authorization, repair every
+failure that blocks the requested gate and verify the resulting candidate
+without asking again. Otherwise record out-of-scope failures and keep them out
+of the change. See the integration checkpoint for the preservation inventory,
+current evidence and pending gates.
 
 Checkpoint: `docs/maintainers/interface-integration-checkpoint.md`.
 
@@ -99,9 +117,10 @@ Build and check the exact final source, using the pinned repository runtime and
 lockfile. Run affected integration/e2e checks in disposable environments where
 available. Never aim tests at live configuration, accounts, queues, playlists,
 collections, watchlists, or databases. A mocked provider pass is not a live
-round-trip pass. Perform desktop/narrow and interaction review of changed
-roles. Record human review evidence separately from automated checks;
-acceptance may be provided by the project owner or an authorized reviewer.
+round-trip pass. When visual inspection is available, perform desktop/narrow
+and interaction review of changed roles and record that evidence separately
+from automated checks. Visual acceptance is evidence, not a merge or release
+gate when the maintainer explicitly directs the work to proceed.
 
 ## Safe collaboration and records
 
