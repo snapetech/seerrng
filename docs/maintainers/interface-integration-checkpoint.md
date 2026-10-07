@@ -912,3 +912,21 @@ desktop/narrow visual review, or physical Swipe interaction review was done.
 Those boundaries are not presented as automated passes. Finalization requires
 a passing gate and build on the integrated candidate, then fresh GitHub checks
 after its branch is pushed.
+
+## Final native validation checkpoint — October 7, 2026
+
+On integration candidate `14578084e17df5eaeb5b794c2de68109fdb088ba`, the
+validator-controlled native TypeScript retry completed with 3,035 tests: 3,030
+passed, one failed, and four were skipped. The failure was
+`server/routes/auth.test.ts` / “sets a resetPasswordGuid on the user,” which
+ended with `ECONNRESET` (`socket hang up`). This is a failing receipt; the
+native lane and full validation are not claimed as passing. Earlier preliminary
+validators, formatting, lint, server/client route types, client types, and the
+103-file Vitest lane (469 tests) passed in the full validation attempt, whose
+native lane also reported two failures. The single failure in this retry was
+not investigated further.
+
+Per the maintainer's instruction, no build was run; another agent will handle
+it. The integration branch is being committed and pushed for that handoff.
+Merging into `main` remains deferred until the build and required checks are
+handled.
