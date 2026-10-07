@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddHardcoverAndBookHomeSections1791090000000 implements MigrationInterface {
-  name = 'AddHardcoverAndBookHomeSections1791090000000';
+export class AddHardcoverAndBookHomeSections1791100000000 implements MigrationInterface {
+  name = 'AddHardcoverAndBookHomeSections1791100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

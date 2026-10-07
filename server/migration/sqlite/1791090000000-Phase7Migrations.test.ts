@@ -1,10 +1,45 @@
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
 import test from 'node:test';
 import { DataSource } from 'typeorm';
-import { CreateReadMeABookRequests1791080000000 } from './1791080000000-CreateReadMeABookRequests';
-import { AddHardcoverAndBookHomeSections1791090000000 } from './1791090000000-AddHardcoverAndBookHomeSections';
-import { AddSwipeSeedScopes1791100000000 } from './1791100000000-AddSwipeSeedScopes';
-import { CreateUserLoginLinks1791110000000 } from './1791110000000-CreateUserLoginLinks';
+import { CreateReadMeABookRequests1791090000000 } from './1791090000000-CreateReadMeABookRequests';
+import { AddHardcoverAndBookHomeSections1791100000000 } from './1791100000000-AddHardcoverAndBookHomeSections';
+import { AddSwipeSeedScopes1791110000000 } from './1791110000000-AddSwipeSeedScopes';
+import { CreateUserLoginLinks1791120000000 } from './1791120000000-CreateUserLoginLinks';
+
+test('Phase 7 migration timestamps do not collide with either migration history', async () => {
+  const phase7Files = [
+    '1791090000000-CreateReadMeABookRequests.ts',
+    '1791100000000-AddHardcoverAndBookHomeSections.ts',
+    '1791110000000-AddSwipeSeedScopes.ts',
+    '1791120000000-CreateUserLoginLinks.ts',
+  ];
+  const phase7Timestamps = phase7Files.map((file) => file.match(/^(\d+)-/)![1]);
+  assert.equal(new Set(phase7Timestamps).size, phase7Timestamps.length);
+
+  for (const provider of ['sqlite', 'postgres']) {
+    const files = await readdir(`server/migration/${provider}`);
+    const existingTimestamps = new Set(
+      files
+        .filter(
+          (file) =>
+            /^\d+-.*\.ts$/.test(file) &&
+            !file.endsWith('.test.ts') &&
+            !phase7Files.includes(file)
+        )
+        .map((file) => file.match(/^(\d+)-/)?.[1])
+        .filter((timestamp): timestamp is string => !!timestamp)
+    );
+
+    for (const timestamp of phase7Timestamps) {
+      assert.equal(
+        existingTimestamps.has(timestamp),
+        false,
+        `${provider} migration timestamp ${timestamp} is already used`
+      );
+    }
+  }
+});
 
 test('Phase 7 SQLite migrations add reversible book, swipe, and login-link storage', async () => {
   const dataSource = await new DataSource({
@@ -13,10 +48,10 @@ test('Phase 7 SQLite migrations add reversible book, swipe, and login-link stora
   }).initialize();
   const runner = dataSource.createQueryRunner();
   const migrations = [
-    new CreateReadMeABookRequests1791080000000(),
-    new AddHardcoverAndBookHomeSections1791090000000(),
-    new AddSwipeSeedScopes1791100000000(),
-    new CreateUserLoginLinks1791110000000(),
+    new CreateReadMeABookRequests1791090000000(),
+    new AddHardcoverAndBookHomeSections1791100000000(),
+    new AddSwipeSeedScopes1791110000000(),
+    new CreateUserLoginLinks1791120000000(),
   ];
 
   try {

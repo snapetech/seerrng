@@ -32,8 +32,9 @@ not override their verification or UI rules.
 
 ## Progress log
 
-Branch: `feat/ng-phase2-tunerr` (Phase 7 work; forward rebase onto the latest
-`main` is pending). Status values: `done` (code and
+Branch: `integration/ng-phase2-main-20261006`, rebased from
+`feat/ng-phase2-tunerr` onto `origin/main` at `116e3a447364`. Status values:
+`done` (code and
 automated checks written and run), `built` (code written, not yet run against a
 real service), `pending`, `blocked`. Targeted local checks and cumulative-gate
 results are recorded in the progress table. A failed required gate blocks
@@ -415,9 +416,9 @@ feature covers movies, series, and books.
 
 ## Phase 7: ReadMeABook and per-user book integration
 
-Status: implemented on `feat/ng-phase2-tunerr`; the branch still needs
-forward-integration with current `main` and a passing cumulative gate before it
-can be finalized. SeerrNG remains the request layer. ReadMeABook owns the
+Status: implemented on `feat/ng-phase2-tunerr` and rebased on current `main` in
+`integration/ng-phase2-main-20261006`; a passing cumulative gate is still
+required before finalization. SeerrNG remains the request layer. ReadMeABook owns the
 download and processing pipeline; SeerrNG uses its token-authenticated API and
 does not duplicate its indexer search/ranking, download clients, organization,
 M4B chapter merging, release blocklist, import, or ebook sidecar.
@@ -431,9 +432,11 @@ M4B chapter merging, release blocklist, import, or ebook sidecar.
 | Admin-generated sign-in links | Admin-only creation/list/revoke; random single-use token is stored only as a hash, expires after 30 minutes, and is consumed atomically. | Security-focused route tests cover expiry, revocation, reuse, and unauthorized access. |
 | Acquisition pipeline, notifications, approval, OIDC, setup wizard, request deletion, thumbnail cache | Existing SeerrNG notifications, approval, OIDC, setup, deletion, and thumbnail behavior remain in place. The acquisition pipeline stays in ReadMeABook. | No new SeerrNG implementation required for these items. |
 
-SQLite and PostgreSQL migrations are included: `1791080000000` through
-`1791110000000`. The SQLite migration suite passes; PostgreSQL migrations were
-not run locally. The exact new feature tests pass in focused reruns. The full
+SQLite and PostgreSQL migrations are included: `1791090000000` through
+`1791120000000`; these follow main's theme-adoption migration at `1791080000000`.
+A collision check covers both migration histories, and the SQLite migration
+suite passes; PostgreSQL migrations were not run locally. The exact new feature
+tests pass in focused reruns. The full
 native TypeScript lane currently has intermittent login-helper failures in
 unrelated discovery/request/user tests; those cases pass alone and the affected
 discovery/request slice passed 315/315 on a subsequent run. A complete required
