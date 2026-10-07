@@ -847,3 +847,68 @@ production build passed, including all 68 shared-style tests and all 113
 generated pages. The exact `cypress/e2e/public-smoke.cy.ts` file then passed
 all four cases locally, including desktop and mobile login. GitHub checks must
 rerun against this repair before merge.
+
+## ReadMeABook Phase 7 forward integration — October 6, 2026
+
+The requested source branch is `feat/ng-phase2-tunerr`. Its pre-Phase-7
+checkpoint is `03d8d34cbcea3f1d50d239fcbd407d51e0301258`; the Phase 7 feature
+commit is `92caf7ed56adcf209d55d536f0e17bf4a51a65a3`. The original common base
+was `b46ebfdc6c5e7d7f483f863523f179c1cb27735e`. Before integration, current
+`origin/main` had advanced to
+`116e3a447364a2b528cad10d99391cb6ee19cb8c`. The original remote feature ref
+still points to the pre-Phase-7 checkpoint; the local source branch includes
+the Phase 7 commit.
+
+Recovery refs are `recovery/ng-phase2-before-phase7-20261006` at the original
+checkpoint and `recovery/ng-phase2-before-main-rebase-20261006` at the Phase 7
+source commit. The rebased code candidate reached
+`c7f2261dbe43711ba2b37d272afde5e3da19391a` on branch
+`integration/ng-phase2-main-20261006`; this evidence is recorded in the next
+documentation commit. The integration branch was created separately so
+the published feature ref was not rewritten. `git rebase --rebase-merges
+origin/main` replayed 23 commits without textual conflicts. The candidate
+contains 183 changed files relative to current main (25,342 insertions and
+3,099 deletions), including the earlier phases already present on the requested
+branch as well as Phase 7. At the time of this checkpoint, no PR had been
+opened and no merge had occurred.
+
+The six file overlaps with current main were reviewed: `seerr-api.yml`,
+`UserSettings.ts`, both user-settings route/test files, `en.json`, and
+`globals.css`. The theme preference and theme-adoption route/tests from main are
+preserved beside Phase 7's book-home preferences and routes. The English theme
+save message and main's reduced-motion/title-overflow rules are retained. Main
+already uses migration timestamp `1791080000000` for theme adoption, which
+collided with Phase 7's original ReadMeABook migration timestamp. Phase 7's four
+migrations were moved to `1791090000000` through `1791120000000` in both
+providers. A regression test checks that these Phase 7 timestamps are unused in
+both migration histories; the focused SQLite migration suite passes 2/2.
+PostgreSQL migrations were not executed against a database.
+
+The Phase 7 implementation adds the ReadMeABook audiobook search/request and
+admin dashboard client, per-user Hardcover sync, configurable per-user
+book/audiobook Discover sections, Swipe `full`/`rated`/`favorites` seed scopes,
+and admin-created hashed, expiring, single-use login links. ReadMeABook keeps
+its download and processing pipeline. The release-note preview passed with
+`pnpm release-notes:preview --base origin/main --head HEAD`; it includes the
+Phase 7 Bookshelf note and the other user-facing notes already on the branch.
+
+Validation evidence before rebasing is mixed. The complete native TypeScript
+rerun reported 3,021 tests: 3,013 passed, four were skipped, and four failed.
+Each failure was an auth helper receiving 401 or 404 in discovery, request,
+user, or the new book-home settings test. Every exact case passed when selected
+alone. The full discovery file passed 124/124, the full user-route file passed
+104/104, and a subsequent discovery/request sequence passed 315/315. A separate
+four-file sequence had one different request-helper 401, so the cumulative
+login instability has not been resolved or waived. The new ReadMeABook,
+Hardcover, login-link, Swipe, and migration-focused tests passed in the full
+native run or focused reruns. The latest
+`pnpm validate:development --plan` selects 103 Vitest files, 409 native
+TypeScript files, 58 native JavaScript files, and 31 tooling files, with zero
+platform exclusions.
+
+The complete required validation and one production build on the rebased
+candidate remain pending. No ReadMeABook or Hardcover live-service round trip,
+desktop/narrow visual review, or physical Swipe interaction review was done.
+Those boundaries are not presented as automated passes. Finalization requires
+a passing gate and build on the integrated candidate, then fresh GitHub checks
+after its branch is pushed.
