@@ -195,6 +195,11 @@ const mockIntegrationData = () => {
   cy.intercept('GET', '/api/v1/settings/download-clients', {
     body: { pollIntervalSeconds: 3, clients: [] },
   }).as('downloadClientsSettings');
+  cy.intercept('GET', '/api/v1/overrideRule', { body: [] }).as(
+    'overrideRuleSettings'
+  );
+  cy.intercept('GET', '/api/v1/languages', { body: [] });
+  cy.intercept('GET', '/api/v1/genres/movie', { body: [] });
 
   cy.intercept('GET', '/api/v1/request/software/catalog/systems', {
     body: {
@@ -273,6 +278,9 @@ describe('ROMarrNG software acquisition integration', () => {
   it('previews platform matches and saves a manual override', () => {
     cy.viewport(1280, 720);
     cy.visit('/settings/services');
+    cy.wait('@overrideRuleSettings')
+      .its('response.statusCode')
+      .should('eq', 200);
     cy.wait('@downloadClientsSettings')
       .its('response.body.clients')
       .should('deep.equal', []);
