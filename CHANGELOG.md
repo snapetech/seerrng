@@ -184,6 +184,33 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.55.0](https://github.com/snapetech/seerrng/compare/v3.54.0..v3.55.0) - 2026-10-08
+
+### User-facing changes
+
+#### Changed
+
+- **Contributing:** Maintainer and contributor instructions now avoid duplicate approval gates, scope UI Fix-It to actual interface changes, route final checks through the validation engine, point contributors at SeerrNG's current repository, and keep distributed Mode 3 dormant unless explicitly authorized.
+- **Development Validation:** Development validation now stages repository checks, security scans, production builds, and browser tests in one engine. It selects worker limits from available CPUs and execution context, preserves native GitHub jobs, never reuses test results, and limits reuse to a successful same-run build consumed by its dependent browser stage.
+- **Development Validation:** Mode 3 distributed validation remains dormant while its controller/node code and regression tests are retained for continued development. It is not connected to application runtime, package scripts, hooks, or GitHub workflows and is not a supported validation path.
+
+#### Fixed
+
+- **Software Acquisition:** ROMarrNG installations using request contract v2 now pass SeerrNG's connection check and use the supported integration API. Legacy ROMarrNG installations remain supported.
+- **Maintenance:** Deployment, packaging, and Plex maintenance scripts now use portable macOS and Linux commands, reducing setup and recovery failures on developer systems.
+
+### 🚀 Features
+- *(validation)* Add staged orchestration engine - ([3532635](https://github.com/snapetech/seerrng/commit/35326358b8c28200ef19d1f433c2848ceec1da5d))
+
+### 🐛 Bug Fixes
+- *(release)* Support Next.js 16.3.8 in AppImage - ([2d1b9cd](https://github.com/snapetech/seerrng/commit/2d1b9cd56dcffee5814a87454f3833a5590cd7a3))
+- *(software)* Accept ROMarrNG request contract v2 (#176) - ([636a70c](https://github.com/snapetech/seerrng/commit/636a70c7ced1675489e6d31addbcefceedaf4881))
+- Harden validation test shell fixtures - ([1a9b998](https://github.com/snapetech/seerrng/commit/1a9b998687bf5f10c21549c362ca90137c6f46e4))
+- Update workflow boundary marker - ([9216992](https://github.com/snapetech/seerrng/commit/92169929aa00b1901e9dfd3b5877d107edcaa7e9))
+- Make maintenance scripts portable across macOS - ([13c47c1](https://github.com/snapetech/seerrng/commit/13c47c1d9549031df4723f213d9f7003807ee746))
+
 ## [3.54.0](https://github.com/snapetech/seerrng/compare/v3.53.0..v3.54.0) - 2026-10-07
 
 ### User-facing changes
