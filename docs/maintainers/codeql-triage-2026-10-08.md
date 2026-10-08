@@ -56,8 +56,8 @@ reaches `main` and CodeQL refreshes its analysis.
 
 - **#548 — `CVE-2026-94483`**. The workspace override had kept resolving Next.js
   to vulnerable `16.3.6` after the package manifest was changed. Both the
-  override and lockfile now resolve to `16.3.8`, the fixed version. A release
-  note records the update.
+  override and lockfile now resolve to `16.3.8`, the fixed version. The existing
+  `2026-10-08-security-hardening.md` fragment records the update.
 - **#541–#545 and #538–#540 — `js/file-system-race`**. Several Mode 3 paths
   checked file metadata and later reopened the path to read evidence, profiles,
   or configuration. A replacement between those operations could redirect the
