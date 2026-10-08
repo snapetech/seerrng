@@ -2728,11 +2728,10 @@ const validateCurrentBatchContract = (files) => {
   requireText(
     'package.json',
     '"validate:development": "node bin/run-local-validation.mjs"',
-    'the optional complete validation command must retain the discovered local validation runner'
+    'the complete validation command must retain the repository engine entry point'
   );
-  // The maintainer restored the upstream public workflow. Keep visual and
-  // translation checks on the ordinary build, without forcing the archived
-  // cumulative test runner into every build, development session or commit.
+  // Keep visual and translation checks on the ordinary build without forcing
+  // full staged validation into every build, development session or commit.
   let publicScripts = {};
   try {
     publicScripts = JSON.parse(requireFile('package.json')).scripts ?? {};

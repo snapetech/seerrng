@@ -361,5 +361,175 @@ test('checked-in changelog covers every SeerrNG tag', () => {
     encoding: 'utf8',
   });
 
-  assert.match(output, /Changelog covers all \d+ SeerrNG tag\(s\)/u);
+  const { version } = JSON.parse(
+    fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  );
+  assert.match(output, /Changelog covers all \d+ applicable SeerrNG tag\(s\)/u);
+  assert.ok(output.includes(`through candidate ${version}.`));
+});
+
+const checkChangelogFixture = ({
+  version,
+  tags,
+  headings,
+  unrelatedHistory = false,
+}) => {
+  const repository = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'seerrng-changelog-tags-')
+  );
+  const runGit = (...args) =>
+    execFileSync('git', args, { cwd: repository, encoding: 'utf8' });
+  try {
+    runGit('init', '--initial-branch=main', '--quiet');
+    runGit('config', 'user.name', 'Changelog Tags Test');
+    runGit('config', 'user.email', 'changelog-tags@example.invalid');
+    fs.writeFileSync(
+      path.join(repository, 'package.json'),
+      JSON.stringify({ version })
+    );
+    fs.writeFileSync(
+      path.join(repository, 'CHANGELOG.md'),
+      headings.map((heading) => `## [${heading}]\n`).join('\n')
+    );
+    runGit('add', '.');
+    runGit('commit', '--quiet', '-m', 'chore: initialize release fixture');
+    for (const tag of tags) runGit('tag', tag);
+    if (unrelatedHistory) {
+      runGit('checkout', '--orphan', 'adopted-tree', '--quiet');
+      runGit('add', '.');
+      runGit('commit', '--quiet', '-m', 'chore: adopt release tree');
+      for (const tag of tags) {
+        assert.throws(
+          () => runGit('merge-base', '--is-ancestor', tag, 'HEAD'),
+          (error) => error.status === 1
+        );
+      }
+    }
+    const script = new URL('./check-changelog-tags.mjs', import.meta.url);
+    try {
+      return {
+        status: 0,
+        stdout: execFileSync(process.execPath, [fileURLToPath(script)], {
+          cwd: repository,
+          encoding: 'utf8',
+          stdio: 'pipe',
+        }),
+        stderr: '',
+      };
+    } catch (error) {
+      return {
+        status: error.status,
+        stdout: error.stdout.toString(),
+        stderr: error.stderr.toString(),
+      };
+    }
+  } finally {
+    fs.rmSync(repository, { recursive: true, force: true });
+  }
+};
+
+test('changelog tag scope validates numeric release order without relying on ancestry', () => {
+  const result = checkChangelogFixture({
+    version: '3.10.0',
+    tags: ['v3.9.0', 'v3.10.0', 'v3.11.0'],
+    headings: ['3.9.0', '3.10.0'],
+    unrelatedHistory: true,
+  });
+  assert.equal(result.status, 0);
+  assert.match(
+    result.stdout,
+    /covers all 2 applicable SeerrNG tag\(s\) through candidate 3\.10\.0/u
+  );
+  assert.match(
+    result.stdout,
+    /Newer tags outside candidate 3\.10\.0 scope \(1\): v3\.11\.0/u
+  );
+});
+
+test('changelog tag scope rejects missing or duplicate applicable releases', () => {
+  for (const headings of [
+    ['3.10.0'],
+    ['3.9.0'],
+    ['3.9.0', '3.9.0', '3.10.0'],
+    ['3.9.0', '3.10.0', '3.10.0'],
+  ]) {
+    const result = checkChangelogFixture({
+      version: '3.10.0',
+      tags: ['v3.9.0', 'v3.10.0', 'v3.11.0'],
+      headings,
+    });
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /missing tagged releases: 3\.(?:9|10)\.0|duplicate release sections: 3\.(?:9|10)\.0/u
+    );
+  }
+});
+
+test('changelog tag scope requires the declared candidate heading even before tagging', () => {
+  for (const headings of [['3.9.0'], ['3.9.0', '3.10.0-beta.1']]) {
+    const result = checkChangelogFixture({
+      version: '3.10.0',
+      tags: ['v3.9.0'],
+      headings,
+    });
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /missing the declared candidate release: 3\.10\.0/u
+    );
+  }
+  const duplicate = checkChangelogFixture({
+    version: '3.10.0',
+    tags: ['v3.9.0'],
+    headings: ['3.9.0', '3.10.0', '3.10.0'],
+  });
+  assert.equal(duplicate.status, 1);
+  assert.match(duplicate.stderr, /duplicate release sections: 3\.10\.0/u);
+});
+
+test('changelog tag scope rejects invalid candidate or tag versions', () => {
+  for (const version of [
+    'v3.10.0',
+    '3.10',
+    '3.10.0-beta.1',
+    '3.010.0',
+    '4.0.0',
+    '3.9007199254740992.0',
+    null,
+  ]) {
+    const result = checkChangelogFixture({
+      version,
+      tags: ['v3.9.0'],
+      headings: ['3.9.0'],
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /valid stable SeerrNG 3\.x release version/u);
+  }
+  for (const tag of [
+    'v3.10.0-beta.1',
+    'v3.010.0',
+    'v3.invalid',
+    'v3.9007199254740992.0',
+  ]) {
+    const result = checkChangelogFixture({
+      version: '3.10.0',
+      tags: ['v3.9.0', tag],
+      headings: ['3.9.0', '3.10.0'],
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Unsupported SeerrNG release tag/u);
+  }
+});
+
+test('changelog tag scope rejects zero applicable tags rather than vacuous coverage', () => {
+  for (const tags of [[], ['v3.11.0']]) {
+    const result = checkChangelogFixture({
+      version: '3.10.0',
+      tags,
+      headings: ['3.10.0'],
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /No applicable SeerrNG release tags/u);
+  }
 });

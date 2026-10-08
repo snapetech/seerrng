@@ -496,12 +496,6 @@ discover_sources() {
 }
 
 prepare_lab() {
-  require_command docker
-  require_command rsync
-  require_command sqlite3
-  require_command curl
-  require_command node
-
   if [ -z "$SOURCE_EBOOK_CONFIG_DIR" ]; then
     echo "SOURCE_EBOOK_CONFIG_DIR is required for prepare/report/apply." >&2
     exit 2
@@ -515,6 +509,12 @@ prepare_lab() {
     echo "HARDCOVER_AUTH must start with 'Bearer '." >&2
     exit 2
   fi
+
+  require_command docker
+  require_command rsync
+  require_command sqlite3
+  require_command curl
+  require_command node
 
   initialize_lab_directory
   mkdir -p "$LAB_MEDIA_DIR" "$LAB_DOWNLOAD_DIR" "$LAB_PLEX_DIR"

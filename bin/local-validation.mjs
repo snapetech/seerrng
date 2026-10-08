@@ -1,13 +1,17 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -22,6 +26,13 @@ import {
 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
+// eslint-disable-next-line no-relative-import-paths/no-relative-import-paths -- Native Node tooling cannot resolve the application's TS aliases.
+import { detectWorkerCapacity } from '../tools/validation-engine/runtime/cpu-capacity.mjs';
+// eslint-disable-next-line no-relative-import-paths/no-relative-import-paths -- Native Node tooling cannot resolve the application's TS aliases.
+import {
+  createDistributedNativeCaseLedger,
+  isExplicitlySkippedDistributedNativeCaseLedger,
+} from '../tools/validation-engine/runtime/distributed-native-case-ledger.mjs';
 
 const roots = ['server', 'src', 'bin', 'scripts', 'deploy', 'packaging'];
 const candidate = /\.(?:test|spec)\.(?:[cm]?[jt]s|[jt]sx)$/;
@@ -91,7 +102,22 @@ export function validatePackageBindings(packageJson) {
   }
 }
 
-export function validateGovernanceSources(agents, hook) {
+function normalizedMarkdownSection(source, heading) {
+  const lines = source.replace(/\r/g, '').split('\n');
+  const start = lines.findIndex((line) => line.trim() === `## ${heading}`);
+  if (start === -1)
+    throw new Error(`Governance source is missing section: ${heading}`);
+  const next = lines.findIndex(
+    (line, index) => index > start && /^##\s+/.test(line)
+  );
+  return lines
+    .slice(start + 1, next === -1 ? undefined : next)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function validateGovernanceSources(agents, hook, contributing) {
   for (const route of [
     'docs/maintainers/ui-style-standard.md',
     'docs/maintainers/ui-fix-it.md',
@@ -102,6 +128,50 @@ export function validateGovernanceSources(agents, hook) {
       throw new Error(
         `AGENTS.md is missing the required development route: ${route}`
       );
+  }
+  const authority = normalizedMarkdownSection(
+    agents,
+    'Communication and authority'
+  );
+  const verification = normalizedMarkdownSection(
+    agents,
+    'Required verification'
+  );
+  const aiAssistance = normalizedMarkdownSection(contributing, 'AI Assistance');
+  for (const [name, source, rule] of [
+    [
+      'AGENTS.md Communication and authority',
+      authority,
+      'Do not make project-owner or other human acceptance a merge or release gate when the maintainer explicitly directs the work to proceed.',
+    ],
+    [
+      'AGENTS.md Communication and authority',
+      authority,
+      'Act on explicit user instructions without asking for the same authorization again.',
+    ],
+    [
+      'AGENTS.md Communication and authority',
+      authority,
+      "Ask only when a material decision is genuinely unresolved or an action falls outside the user's authorization.",
+    ],
+    [
+      'AGENTS.md Required verification',
+      verification,
+      'Visual inspection is evidence, not a merge or release gate when the maintainer explicitly directs the work to proceed.',
+    ],
+    [
+      'CONTRIBUTING.md AI Assistance',
+      aiAssistance,
+      'Maintainers may authorize and accept AI-assisted work without a separate human-review gate.',
+    ],
+    [
+      'CONTRIBUTING.md AI Assistance',
+      aiAssistance,
+      'An explicit maintainer direction to merge or release supplies that authorization; do not require a second confirmation that the same work was reviewed.',
+    ],
+  ]) {
+    if (!source.includes(rule))
+      throw new Error(`${name} must preserve: ${rule}`);
   }
   const commands = hook
     .replace(/\r/g, '')
@@ -183,6 +253,7 @@ export function preflight(
   if (!testsOnly) {
     for (const file of [
       'AGENTS.md',
+      'CONTRIBUTING.md',
       '.husky/pre-commit',
       'docs/maintainers/ui-style-standard.md',
       'docs/maintainers/ui-fix-it.md',
@@ -192,7 +263,8 @@ export function preflight(
       requireFile(root, file);
     validateGovernanceSources(
       readFileSync(join(root, 'AGENTS.md'), 'utf8'),
-      readFileSync(join(root, '.husky/pre-commit'), 'utf8')
+      readFileSync(join(root, '.husky/pre-commit'), 'utf8'),
+      readFileSync(join(root, 'CONTRIBUTING.md'), 'utf8')
     );
     validatePackageBindings(packageJson);
   }
@@ -239,6 +311,7 @@ export function toolingOwnership(source, ts) {
   const arrays = new Map();
   let selection;
   let invocation = false;
+  let invocations = 0;
   const visit = (node) => {
     if (
       ts.isVariableDeclaration(node) &&
@@ -255,14 +328,18 @@ export function toolingOwnership(source, ts) {
       ts.isIdentifier(node.expression) &&
       node.expression.text === 'spawnSync'
     ) {
+      invocations += 1;
       const argumentsText = node.arguments
         .slice(0, 2)
         .map((argument) =>
           argument.getText(tree).replace(/\s/g, '').replace(/"/g, "'")
         );
-      invocation ||=
+      invocation =
         argumentsText[0] === 'process.execPath' &&
-        argumentsText[1] === "['--test',...tests]";
+        new Set([
+          "['--test','--test-reporter=tap',`--test-concurrency=${workers}`,...tests]",
+          "['--test','--test-reporter=tap',`--test-concurrency=${workers}`,...tests,]",
+        ]).has(argumentsText[1]);
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -302,7 +379,8 @@ export function toolingOwnership(source, ts) {
   if (
     selection !==
       "process.platform==='win32'?portableTests:[...portableTests,...posixOnlyTests]" ||
-    !invocation
+    !invocation ||
+    invocations !== 1
   )
     throw new Error(
       'Unsupported tooling execution selection; review ownership before running'
@@ -310,14 +388,64 @@ export function toolingOwnership(source, ts) {
   return arrays;
 }
 
-function requireFile(root, file) {
+export function validateDependencyReference(
+  root,
+  reference,
+  {
+    platform = process.platform,
+    mountInfo = platform === 'linux'
+      ? readFileSync('/proc/self/mountinfo', 'utf8')
+      : '',
+  } = {}
+) {
+  if (
+    !reference ||
+    reference.readonlyProof?.verified !== true ||
+    platform !== 'linux'
+  )
+    throw new Error('An actual read-only dependency reference is required');
+  const dependencyRoot = realpathSync(reference.root);
+  if (realpathSync(join(root, 'node_modules')) !== dependencyRoot)
+    throw new Error(
+      'Dependency reference does not match the selected source link'
+    );
+  const mounts = mountInfo
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.split(' '))
+    .filter(
+      (parts) =>
+        parts[4] &&
+        (dependencyRoot === parts[4].replaceAll('\\040', ' ') ||
+          inside(parts[4].replaceAll('\\040', ' '), dependencyRoot))
+    )
+    .sort((a, b) => b[4].length - a[4].length);
+  if (!mounts[0]?.[5].split(',').includes('ro'))
+    throw new Error('Dependency reference is not actually mounted read-only');
+  const sourceLock = createHash('sha256')
+    .update(readFileSync(join(root, 'pnpm-lock.yaml')))
+    .digest('hex');
+  const installedLock = createHash('sha256')
+    .update(readFileSync(join(dependencyRoot, '.pnpm', 'lock.yaml')))
+    .digest('hex');
+  if (sourceLock !== reference.lockSha256 || installedLock !== sourceLock)
+    throw new Error('Read-only dependency reference lockfile mismatch');
+  return dependencyRoot;
+}
+
+function requireFile(root, file, dependencyRoot) {
   const absolute = resolve(root, file);
   if (
     !inside(root, absolute) ||
     !existsSync(absolute) ||
     !lstatSync(absolute).isFile() ||
     lstatSync(absolute).size === 0 ||
-    !inside(root, realpathSync(absolute))
+    !(
+      inside(root, realpathSync(absolute)) ||
+      (dependencyRoot &&
+        file.startsWith('node_modules/') &&
+        inside(dependencyRoot, realpathSync(absolute)))
+    )
   ) {
     throw new Error(`Missing, empty or unsafe required file: ${file}`);
   }
@@ -396,17 +524,47 @@ export function chunkArguments(files, maxCharacters = 20_000) {
 
 export function createPlan(
   root,
-  { testsOnly = false, platform = process.platform, ts } = {}
+  {
+    testsOnly = false,
+    platform = process.platform,
+    ts,
+    canonicalTypescript = false,
+    dependencyReference,
+  } = {}
 ) {
   root = realpathSync(root);
   const inventory = discoverTests(root, {
     platform,
     ts: ts || loadTypeScript(root),
   });
+  if (typeof canonicalTypescript !== 'boolean')
+    throw new Error('Explicit canonical TypeScript binding is required');
+  if (canonicalTypescript) {
+    const config = readFileSync(requireFile(root, 'vitest.config.mts'), 'utf8');
+    requireFile(root, 'server/test/vitestNodeTest.ts');
+    if (
+      !/['"]node:test['"]\s*:\s*resolve\(projectRoot,\s*['"]server\/test\/vitestNodeTest\.ts['"]\)/.test(
+        config
+      )
+    )
+      throw new Error(
+        'Canonical execution requires the repository native node:test adapter'
+      );
+    for (const entry of inventory) {
+      if (entry.owner === 'node-ts') {
+        entry.originalOwner = entry.owner;
+        entry.owner = 'vitest';
+        entry.executionBinding = 'repository-native-node-test-adapter';
+      }
+    }
+  }
   const steps = [];
   const add = (name, args, kind = 'check') =>
     steps.push({ name, command: process.execPath, args, kind });
-  const required = (file) => requireFile(root, file);
+  const dependencyRoot = dependencyReference
+    ? validateDependencyReference(root, dependencyReference)
+    : undefined;
+  const required = (file) => requireFile(root, file, dependencyRoot);
   if (!testsOnly) {
     for (const [name, file] of [
       ['Translations', 'bin/check-i18n.js'],
@@ -437,6 +595,7 @@ export function createPlan(
     add('Client types', [tsc, '--noEmit']);
   }
   for (const owner of ['vitest', 'node-ts', 'node-js', 'tooling']) {
+    if (canonicalTypescript && owner === 'node-ts') continue;
     const files = inventory
       .filter((entry) => entry.owner === owner && entry.selected)
       .map((entry) => entry.file);
@@ -499,7 +658,7 @@ export function createPlan(
       }
     }
   }
-  return { root, platform, testsOnly, inventory, steps };
+  return { root, platform, testsOnly, canonicalTypescript, inventory, steps };
 }
 
 export function isolatedEnvironment(directory, inherited = process.env) {
@@ -536,8 +695,30 @@ export function removeOwnedTemporaryDirectory(directory, parent = tmpdir()) {
   rmSync(absolute, { recursive: true, force: true });
 }
 
-export function vitestConfigSource(config, root, files) {
-  return `import original from ${JSON.stringify(pathToFileURL(config).href)};\nexport default async (environment) => {\n const base = await (typeof original === 'function' ? original(environment) : original);\n if (!base || typeof base !== 'object' || Array.isArray(base)) throw new Error('Unsupported Vitest config');\n if (base.test?.projects?.length) throw new Error('Vitest projects need explicit ownership');\n return {...base, root: ${JSON.stringify(root)}, test: {...base.test, include: ${JSON.stringify(files)}, passWithNoTests: false}};\n};\n`;
+export function vitestConfigSource(
+  config,
+  root,
+  files,
+  workers = detectWorkerCapacity({ sourceRoot: root }).configuredWorkers,
+  cacheDirectory
+) {
+  const binding = new URL(
+    '../tools/validation-engine/runtime/vitest-binding.mjs',
+    import.meta.url
+  ).href;
+  return `import original from ${JSON.stringify(pathToFileURL(config).href)};
+import { engineVitestProjects, isEngineVitestProjects } from ${JSON.stringify(binding)};
+export default async (environment) => {
+ const base = await (typeof original === 'function' ? original(environment) : original);
+ if (!base || typeof base !== 'object' || Array.isArray(base)) throw new Error('Unsupported Vitest config');
+ if (base.test?.projects?.length && !isEngineVitestProjects(base.test.projects)) throw new Error('Vitest projects need explicit ownership');
+ const test = {...base.test};
+ // Vite concatenates inherited arrays. Root includes would broaden both
+ // child projects and execute some files twice instead of partitioning them.
+ delete test.include; delete test.exclude; delete test.projects;
+ return {...base, root: ${JSON.stringify(root)}, ${cacheDirectory ? `cacheDir: ${JSON.stringify(cacheDirectory)},` : ''} test: {...test, maxWorkers: ${JSON.stringify(workers)}, projects: engineVitestProjects({ files: ${JSON.stringify(files)}, exclude: base.test?.exclude ?? ['node_modules/**', 'dist/**'], workers: ${JSON.stringify(workers)} }), passWithNoTests: false}};
+};
+`;
 }
 
 export function testCount(output) {
@@ -556,101 +737,350 @@ export function testCount(output) {
   };
 }
 
-export function runCommand(step, options) {
-  return new Promise((complete, reject) => {
-    let tail = '';
-    let termination = Promise.resolve();
-    let terminationError;
-    let forceTermination;
-    const child = spawn(step.command, step.args, {
-      cwd: options.root,
+function processError(receipt) {
+  const message = !receipt.lifecycle.cleanupVerified
+    ? `Validation interrupted; child cleanup uncertain: ${receipt.lifecycle.cleanupError}`
+    : receipt.aborted
+      ? 'Validation interrupted'
+      : receipt.timedOut
+        ? `${receipt.name} timed out`
+        : `${receipt.name} failed (${receipt.signal || receipt.exitCode || receipt.spawnError || 'incomplete'})`;
+  return Object.assign(new Error(message), {
+    receipt,
+    exitCode: receipt.exitCode || 1,
+    preserveTemporary: !receipt.lifecycle.cleanupVerified,
+  });
+}
+
+function commandLog(file, directory, sourceRoot) {
+  if (file === undefined) return null;
+  if (!directory || !isAbsolute(directory) || !isAbsolute(file))
+    throw new Error('Persistent native logs need absolute owned log paths');
+  const parent = realpathSync(directory),
+    absolute = resolve(file);
+  if (
+    parent === resolve(sourceRoot) ||
+    inside(resolve(sourceRoot), parent) ||
+    !inside(parent, absolute) ||
+    dirname(absolute) !== parent ||
+    lstatSync(directory).isSymbolicLink()
+  )
+    throw new Error('Refusing unsafe or source-owned native log path');
+  // Exclusive creation refuses an existing file or symlink; never overwrite logs.
+  return { path: absolute, fd: openSync(absolute, 'wx', 0o600) };
+}
+
+// Both short checks and long-lived disposable servers share this owned runner.
+export function startCommand(step, options = {}) {
+  const root = options.root ?? step.cwd ?? process.cwd();
+  const stdout = options.stdout ?? process.stdout,
+    stderr = options.stderr ?? process.stderr;
+  const maxCaptureBytes = options.maxCaptureBytes ?? 2_000_000;
+  const graceMs = options.terminationGraceMs ?? 5000;
+  for (const [name, value] of [
+    ['maxCaptureBytes', maxCaptureBytes],
+    ['terminationGraceMs', graceMs],
+    ...(options.timeoutMs === undefined
+      ? []
+      : [['timeoutMs', options.timeoutMs]]),
+  ])
+    if (!Number.isSafeInteger(value) || value < 1)
+      throw new Error(`Invalid process ${name}`);
+  if (options.signal?.aborted)
+    throw Object.assign(
+      new Error('Validation interrupted before child spawn'),
+      {
+        receipt: {
+          id: step.id ?? step.name,
+          aborted: true,
+          lifecycle: {
+            spawned: false,
+            completed: false,
+            cleanupVerified: true,
+          },
+        },
+      }
+    );
+  const logs = {};
+  try {
+    logs.stdout = commandLog(options.stdoutLog, options.logDirectory, root);
+    logs.stderr = commandLog(options.stderrLog, options.logDirectory, root);
+  } catch (error) {
+    for (const log of Object.values(logs)) if (log) closeSync(log.fd);
+    throw error;
+  }
+  const startedAt = new Date().toISOString(),
+    started = performance.now();
+  let child;
+  try {
+    child = spawn(step.command, step.args, {
+      cwd: root,
       env: options.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
       windowsHide: true,
       detached: process.platform !== 'win32',
     });
-    const capture = (target) => (data) => {
-      target.write(data);
-      tail = (tail + data.toString()).slice(-2_000_000);
-    };
-    child.stdout.on('data', capture(options.stdout));
-    child.stderr.on('data', capture(options.stderr));
-    const interrupt = () => {
+  } catch (error) {
+    for (const log of Object.values(logs)) if (log) closeSync(log.fd);
+    throw error;
+  }
+  const capture = {
+    stdout: Buffer.alloc(0),
+    stderr: Buffer.alloc(0),
+    stdoutBytes: 0,
+    stderrBytes: 0,
+  };
+  const hashes = { stdout: createHash('sha256'), stderr: createHash('sha256') };
+  let tail = '',
+    spawnError = null,
+    cleanupError = null,
+    aborted = false,
+    timedOut = false,
+    stopped = false,
+    settled = false;
+  let termination = null,
+    timeout,
+    receipt;
+  const delay = (milliseconds) =>
+    new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+  const groupExists = () => {
+    try {
+      process.kill(-child.pid, 0);
+      return true;
+    } catch (error) {
+      if (error.code === 'ESRCH') return false;
+      throw error;
+    }
+  };
+  const terminate = () => {
+    if (termination) return termination;
+    termination = (async () => {
       if (!child.pid) return;
-      if (process.platform === 'win32') {
-        termination = new Promise((finished) => {
-          const killer = spawn(
-            join(
-              process.env.SystemRoot || 'C:\\Windows',
-              'System32',
-              'taskkill.exe'
-            ),
-            ['/PID', String(child.pid), '/T', '/F'],
-            { shell: false, windowsHide: true, stdio: 'ignore' }
-          );
-          killer.on('error', (error) => {
-            terminationError = error;
-            child.kill();
-            finished();
+      try {
+        if (process.platform === 'win32') {
+          await new Promise((resolveKill, rejectKill) => {
+            const killer = spawn(
+              join(
+                process.env.SystemRoot || 'C:\\Windows',
+                'System32',
+                'taskkill.exe'
+              ),
+              ['/PID', String(child.pid), '/T', '/F'],
+              { shell: false, windowsHide: true, stdio: 'ignore' }
+            );
+            killer.once('error', rejectKill);
+            killer.once('close', (status) =>
+              status === 0
+                ? resolveKill()
+                : rejectKill(
+                    new Error('Unable to terminate the validation process tree')
+                  )
+            );
           });
-          killer.on('close', (status) => {
-            if (status !== 0) {
-              terminationError = new Error(
-                'Unable to terminate the validation process tree'
-              );
-              child.kill();
-            }
-            finished();
-          });
-        });
-      } else {
-        try {
+        } else {
+          if (!groupExists()) return;
           process.kill(-child.pid, 'SIGTERM');
-          forceTermination = setTimeout(() => {
-            try {
-              process.kill(-child.pid, 'SIGKILL');
-            } catch (error) {
-              if (error.code !== 'ESRCH') terminationError = error;
-            }
-          }, 5000);
-          forceTermination.unref();
-        } catch (error) {
-          if (error.code !== 'ESRCH') {
-            terminationError = error;
-            child.kill();
-          }
+          const deadline = performance.now() + graceMs;
+          while (groupExists() && performance.now() < deadline)
+            await delay(Math.min(25, graceMs));
+          if (groupExists()) process.kill(-child.pid, 'SIGKILL');
+          const killDeadline = performance.now() + 1000;
+          while (groupExists() && performance.now() < killDeadline)
+            await delay(25);
+          if (groupExists())
+            throw new Error(
+              'Owned process group still present after termination'
+            );
+        }
+      } catch (error) {
+        if (error.code !== 'ESRCH') {
+          cleanupError = error.message;
+          child.kill('SIGKILL');
         }
       }
-    };
-    options.signal?.addEventListener('abort', interrupt, { once: true });
-    if (options.signal?.aborted) interrupt();
-    child.on('error', reject);
-    child.on('close', async (status, signal) => {
-      clearTimeout(forceTermination);
+    })();
+    return termination;
+  };
+  const interrupt = () => {
+    aborted = true;
+    void terminate();
+  };
+  options.signal?.addEventListener('abort', interrupt, { once: true });
+  if (options.signal?.aborted) interrupt();
+  if (options.timeoutMs !== undefined)
+    timeout = setTimeout(() => {
+      timedOut = true;
+      void terminate();
+    }, options.timeoutMs);
+  const receive = (stream, target) => (data) => {
+    try {
+      target.write(data);
+      if (logs[stream]) {
+        let offset = 0;
+        while (offset < data.length)
+          offset += writeSync(
+            logs[stream].fd,
+            data,
+            offset,
+            data.length - offset
+          );
+      }
+      hashes[stream].update(data);
+      capture[`${stream}Bytes`] += data.length;
+      capture[stream] = Buffer.concat([capture[stream], data]).subarray(
+        -maxCaptureBytes
+      );
+      tail = (tail + data.toString()).slice(-maxCaptureBytes);
+    } catch (error) {
+      cleanupError = `Native output capture failed: ${error.message}`;
+      void terminate();
+    }
+  };
+  child.stdout.on('data', receive('stdout', stdout));
+  child.stderr.on('data', receive('stderr', stderr));
+  const exit = new Promise((complete) => {
+    child.once('error', (error) => {
+      spawnError = error.message;
+    });
+    // A leader exiting does not prove its same-group descendants have stopped.
+    child.once('exit', () => {
+      if (process.platform !== 'win32' && child.pid && !termination) {
+        try {
+          if (groupExists()) {
+            cleanupError =
+              'Native command left running process-group descendants';
+            void terminate();
+          }
+        } catch (error) {
+          cleanupError = error.message;
+          void terminate();
+        }
+      }
+    });
+    child.once('close', async (exitCode, signal) => {
+      clearTimeout(timeout);
       options.signal?.removeEventListener('abort', interrupt);
       await termination;
-      if (terminationError)
-        reject(
-          Object.assign(
-            new Error(
-              `Validation interrupted; child cleanup uncertain: ${terminationError.message}`
-            ),
-            { preserveTemporary: true }
-          )
-        );
-      else if (options.signal?.aborted)
-        reject(new Error('Validation interrupted'));
-      else if (status !== 0)
-        reject(
-          Object.assign(
-            new Error(`${step.name} failed (${signal || status})`),
-            { exitCode: status || 1 }
-          )
-        );
-      else complete(tail);
+      for (const log of Object.values(logs))
+        if (log) {
+          try {
+            closeSync(log.fd);
+          } catch (error) {
+            cleanupError ??= error.message;
+          }
+        }
+      receipt = {
+        id: step.id ?? step.name,
+        name: step.name ?? step.id,
+        pid: child.pid ?? null,
+        exitCode,
+        signal,
+        aborted,
+        timedOut,
+        stopped,
+        spawnError,
+        startedAt,
+        wallMs: performance.now() - started,
+        stdout: capture.stdout.toString(),
+        stderr: capture.stderr.toString(),
+        output: tail,
+        stdoutBytes: capture.stdoutBytes,
+        stderrBytes: capture.stderrBytes,
+        stdoutTruncated: capture.stdoutBytes > maxCaptureBytes,
+        stderrTruncated: capture.stderrBytes > maxCaptureBytes,
+        stdoutSha256: hashes.stdout.digest('hex'),
+        stderrSha256: hashes.stderr.digest('hex'),
+        stdoutLog: logs.stdout?.path ?? null,
+        stderrLog: logs.stderr?.path ?? null,
+        lifecycle: {
+          spawned: child.pid !== undefined,
+          completed: !spawnError,
+          cleanupVerified: !cleanupError,
+          cleanupError,
+        },
+      };
+      receipt.status =
+        cleanupError || spawnError
+          ? 'incomplete'
+          : aborted
+            ? 'aborted'
+            : timedOut
+              ? 'timed-out'
+              : stopped
+                ? 'stopped'
+                : exitCode === 0 && !signal
+                  ? 'passed'
+                  : 'failed';
+      settled = true;
+      complete(receipt);
     });
   });
+  const handle = {
+    pid: child.pid ?? null,
+    exit,
+    stop: async () => {
+      if (!settled) {
+        stopped = true;
+        await terminate();
+      }
+      const result = await exit;
+      if (!result.lifecycle.cleanupVerified) throw processError(result);
+      return result;
+    },
+    waitForReady: async (health, { timeoutMs = 60_000, pollMs = 100 } = {}) => {
+      if (
+        typeof health !== 'function' ||
+        !Number.isSafeInteger(timeoutMs) ||
+        timeoutMs < 1 ||
+        !Number.isSafeInteger(pollMs) ||
+        pollMs < 1
+      )
+        throw new Error('Invalid managed process readiness contract');
+      let readinessTimeout;
+      const unavailable = exit.then((result) => {
+        throw Object.assign(
+          new Error(
+            `Managed process exited before readiness (${result.status})`
+          ),
+          { receipt: result }
+        );
+      });
+      const expiration = new Promise((_, rejectReady) => {
+        readinessTimeout = setTimeout(
+          () => rejectReady(new Error('Managed process readiness timed out')),
+          timeoutMs
+        );
+      });
+      const poll = async () => {
+        while (!settled) {
+          if (await health({ pid: handle.pid, signal: options.signal }))
+            return {
+              pid: handle.pid,
+              ready: true,
+              wallMs: performance.now() - started,
+            };
+          await delay(pollMs);
+        }
+        return unavailable;
+      };
+      try {
+        return await Promise.race([poll(), unavailable, expiration]);
+      } catch (error) {
+        error.receipt = await handle.stop();
+        throw error;
+      } finally {
+        clearTimeout(readinessTimeout);
+      }
+    },
+  };
+  return handle;
+}
+
+export async function runCommand(step, options = {}) {
+  const receipt = await startCommand(step, options).exit;
+  if (receipt.status !== 'passed') throw processError(receipt);
+  return options.receipt === true ? receipt : receipt.output;
 }
 
 export async function executePlan(
@@ -661,22 +1091,47 @@ export async function executePlan(
     inherited = process.env,
     executor = runCommand,
     signal,
+    workers,
+    collectFailures = false,
+    caseLedgerObserver,
   } = {}
 ) {
+  if (typeof collectFailures !== 'boolean')
+    throw new Error('Internal failure collection must be explicit');
+  if (
+    caseLedgerObserver !== undefined &&
+    typeof caseLedgerObserver !== 'function'
+  )
+    throw new Error('Native case-ledger observer must be a function');
+  if (
+    workers !== undefined &&
+    (!Number.isSafeInteger(workers) || workers < 1 || workers > 256)
+  )
+    throw new Error('Invalid sealed native worker budget');
   const directory = mkdtempSync(join(tmpdir(), prefix));
   const env = isolatedEnvironment(directory, inherited);
   const totals = new Map();
+  const failures = [];
+  const caseCoverage = new Map();
   let preserveTemporary = false;
   try {
     for (const original of plan.steps) {
       if (signal?.aborted) throw new Error('Validation interrupted');
       const step = { ...original, args: [...original.args] };
+      if (step.kind === 'tooling' && workers !== undefined)
+        step.args.push(`--workers=${workers}`);
       const report = join(directory, 'vitest-report.json');
       if (step.kind === 'vitest') {
         const config = join(directory, 'vitest.config.mjs');
         writeFileSync(
           config,
-          vitestConfigSource(step.config, plan.root, step.files),
+          vitestConfigSource(
+            step.config,
+            plan.root,
+            step.files,
+            workers,
+            join(directory, 'vitest-cache')
+          ),
           { flag: 'wx' }
         );
         step.args = step.args.map((arg) =>
@@ -686,29 +1141,94 @@ export async function executePlan(
         );
       }
       stdout.write(`\n[${step.name}]\n`);
-      const output = await executor(step, {
+      const executionResult = await executor(step, {
         root: plan.root,
         env,
         stdout,
         stderr,
         signal,
       });
+      const output = collectFailures ? executionResult.output : executionResult;
+      let nativeCount;
+      if (collectFailures && step.kind !== 'check') {
+        const receipt = executionResult.nativeReceipt,
+          ledger = executionResult.caseLedger,
+          counts = ledger?.counts;
+        if (
+          !receipt ||
+          !['passed', 'failed'].includes(receipt.status) ||
+          receipt.lifecycle?.completed !== true ||
+          receipt.lifecycle?.cleanupVerified !== true ||
+          receipt.aborted !== false ||
+          receipt.timedOut !== false ||
+          receipt.signal !== null ||
+          receipt.spawnError ||
+          !Number.isSafeInteger(receipt.exitCode) ||
+          receipt.exitCode < 0 ||
+          !counts ||
+          !Object.values(counts).every(
+            (value) => Number.isSafeInteger(value) && value >= 0
+          ) ||
+          !Array.isArray(ledger.cases) ||
+          ledger.cases.length !==
+            counts.passed + counts.failed + counts.skipped ||
+          counts.passed + counts.failed < 1 ||
+          (receipt.status === 'passed'
+            ? receipt.exitCode !== 0 || counts.failed !== 0
+            : receipt.exitCode === 0 || counts.failed < 1)
+        )
+          throw new Error(
+            'Complete native case ledger required for internal failure collection'
+          );
+        nativeCount = {
+          total: ledger.cases.length,
+          active: counts.passed + counts.failed,
+        };
+        if (counts.failed)
+          failures.push({ name: step.name, kind: step.kind, receipt, counts });
+      }
       if (step.kind !== 'check') {
         let count;
+        let vitestReport;
+        let vitestReportBytes;
         if (step.kind === 'vitest') {
-          const result = JSON.parse(readFileSync(report, 'utf8'));
+          vitestReportBytes = readFileSync(report);
+          const result = JSON.parse(vitestReportBytes.toString('utf8'));
+          vitestReport = result;
           count = {
             total: result.numTotalTests,
             active: result.numPassedTests + result.numFailedTests,
           };
-          if (!Number.isInteger(count.total) || !Number.isInteger(count.active))
+          if (
+            !Number.isSafeInteger(count.total) ||
+            !Number.isSafeInteger(count.active) ||
+            count.total < 0 ||
+            count.active < 0 ||
+            count.active > count.total
+          )
             throw new Error('Invalid Vitest test summary');
+          if (
+            !collectFailures &&
+            (result.numFailedTests > 0 || result.success === false)
+          )
+            throw new Error('Vitest report contains failed tests');
+          if (
+            collectFailures &&
+            (result.success !==
+              (executionResult.caseLedger.counts.failed === 0) ||
+              count.total !== nativeCount.total ||
+              count.active !== nativeCount.active)
+          )
+            throw new Error(
+              'Vitest native failure/count closure is incomplete'
+            );
           const actual = new Set(
             (result.testResults || []).map((entry) =>
               slash(relative(plan.root, resolve(plan.root, entry.name)))
             )
           );
           if (
+            result.testResults?.length !== step.files.length ||
             actual.size !== step.files.length ||
             step.files.some((file) => !actual.has(file))
           )
@@ -716,6 +1236,38 @@ export async function executePlan(
               'Vitest excluded or added files outside its discovered ownership; refusing partial success'
             );
         } else count = testCount(output);
+        if (caseLedgerObserver) {
+          const ledger = createDistributedNativeCaseLedger({
+            adapterId: step.kind,
+            files: [...step.files].toSorted(),
+            root: plan.root,
+            stdout: output,
+            vitestReport,
+            vitestReportBytes,
+          });
+          if (
+            ledger.counts.total !== count.total ||
+            ledger.counts.active !== count.active
+          )
+            throw new Error(
+              'Distributed native case ledger differs from execution totals'
+            );
+          caseLedgerObserver(ledger);
+          const coverage = caseCoverage.get(step.kind) ?? {
+            steps: 0,
+            explicitlySkippedSteps: 0,
+          };
+          coverage.steps += 1;
+          if (isExplicitlySkippedDistributedNativeCaseLedger(ledger))
+            coverage.explicitlySkippedSteps += 1;
+          caseCoverage.set(step.kind, coverage);
+        }
+        if (
+          collectFailures &&
+          (count.total !== nativeCount.total ||
+            count.active !== nativeCount.active)
+        )
+          throw new Error('Native failure/count closure is incomplete');
         const previous = totals.get(step.kind) || { total: 0, active: 0 };
         totals.set(step.kind, {
           total: previous.total + count.total,
@@ -724,10 +1276,15 @@ export async function executePlan(
       }
     }
     for (const [kind, count] of totals) {
-      if (count.total <= 0 || count.active <= 0)
+      const coverage = caseCoverage.get(kind);
+      const allStepsExplicitlySkipped =
+        coverage?.steps > 0 &&
+        coverage.steps === coverage.explicitlySkippedSteps;
+      if (count.total <= 0 || (count.active <= 0 && !allStepsExplicitlySkipped))
         throw new Error(`Unexpected zero active tests: ${kind}`);
     }
     if (!totals.size) throw new Error('No test lanes executed');
+    if (collectFailures) totals.failures = failures;
     return totals;
   } catch (error) {
     preserveTemporary = error.preserveTemporary === true;

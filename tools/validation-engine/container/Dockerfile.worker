@@ -1,0 +1,155 @@
+FROM mirror.gcr.io/library/node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+
+ARG SOURCE_COMMIT
+ARG SOURCE_BUNDLE_SHA256
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=/pnpm:$PATH
+ENV npm_config_nodedir=/usr/local
+
+RUN apk add --no-cache \
+      bash \
+      coreutils \
+      findutils \
+      g++ \
+      gcc \
+      git \
+      helm \
+      jq \
+      libc6-compat \
+      make \
+      openssh-keygen=10.2_p1-r0 \
+      py3-setuptools \
+      python3 \
+      sqlite \
+      tar \
+      tini=0.19.0-r3 \
+      unzip \
+      zip \
+    && npm install --global node-gyp@13.0.2 pnpm@10.24.0 \
+    && test "$(pnpm --version)" = "10.24.0" \
+    && apk info -e tini=0.19.0-r3 >/dev/null \
+    && apk info -e openssh-keygen=10.2_p1-r0 >/dev/null \
+    && test "$(tini --version 2>&1)" = "tini version 0.19.0" \
+    && for required_command in helm jq sqlite3 zip unzip find tar python ssh-keygen tini; do \
+      command -v "$required_command" >/dev/null || exit 1; \
+    done \
+    && find --version | grep -F 'GNU findutils' >/dev/null \
+    && tar --version | grep -F 'GNU tar' >/dev/null \
+    && tar --help | grep -F -- '--transform' >/dev/null \
+    && sha256sum --version | grep -F 'GNU coreutils' >/dev/null \
+    && realpath --version | grep -F 'GNU coreutils' >/dev/null \
+    && timeout --version | grep -F 'GNU coreutils' >/dev/null \
+    && python --version >/dev/null
+
+COPY source.bundle /tmp/source.bundle
+
+RUN case "$SOURCE_COMMIT" in \
+      ''|*[!0-9a-f]*) exit 64 ;; \
+    esac \
+    && test "${#SOURCE_COMMIT}" -eq 40 \
+    && case "$SOURCE_BUNDLE_SHA256" in \
+      ''|*[!0-9a-f]*) exit 64 ;; \
+    esac \
+    && test "${#SOURCE_BUNDLE_SHA256}" -eq 64 \
+    && printf '%s  %s\n' "$SOURCE_BUNDLE_SHA256" /tmp/source.bundle \
+      | sha256sum -c - \
+    && mkdir /workspace \
+    && git -C /workspace init --quiet --object-format=sha1 \
+    && git -C /workspace bundle verify /tmp/source.bundle \
+    && git -C /workspace bundle list-heads /tmp/source.bundle \
+      > /tmp/source-bundle-heads \
+    && : > /tmp/source-bundle-tags \
+    && release_tag_count=0 \
+    && while IFS=' ' read -r object_id ref_name extra; do \
+      case "$object_id" in ''|*[!0-9a-f]*) exit 1 ;; esac; \
+      test "${#object_id}" -eq 40 || exit 1; \
+      test -z "$extra" || exit 1; \
+      case "$ref_name" in \
+        HEAD) test "$object_id" = "$SOURCE_COMMIT" || exit 1 ;; \
+        refs/tags/v3.*) \
+          git -C /workspace check-ref-format "$ref_name" || exit 1; \
+          printf '%s %s\n' "$object_id" "$ref_name" \
+            >> /tmp/source-bundle-tags || exit 1; \
+          release_tag_count=$((release_tag_count + 1)); \
+          ;; \
+        *) exit 1 ;; \
+      esac; \
+    done < /tmp/source-bundle-heads \
+    && test "$release_tag_count" -gt 0 \
+    && test "$(wc -l < /tmp/source-bundle-heads)" \
+      -eq "$((release_tag_count + 1))" \
+    && test "$(grep -Fxc "$SOURCE_COMMIT HEAD" /tmp/source-bundle-heads)" \
+      -eq 1 \
+    && cut -d ' ' -f 2 /tmp/source-bundle-heads \
+      > /tmp/source-bundle-refnames \
+    && sort /tmp/source-bundle-refnames -o /tmp/source-bundle-refnames \
+    && duplicate_refs="$(uniq -d /tmp/source-bundle-refnames)" \
+    && test -z "$duplicate_refs" \
+    && git -C /workspace bundle unbundle /tmp/source.bundle >/dev/null \
+    && git -C /workspace cat-file -e "$SOURCE_COMMIT^{commit}" \
+    && while IFS=' ' read -r object_id ref_name; do \
+      git -C /workspace cat-file -e "$object_id" || exit 1; \
+      git -C /workspace update-ref "$ref_name" "$object_id" || exit 1; \
+    done < /tmp/source-bundle-tags \
+    && printf '%s\n' "$SOURCE_COMMIT" > /tmp/source-shallow \
+    && while IFS=' ' read -r _object_id ref_name; do \
+      peeled_commit="$(git -C /workspace rev-parse \
+        --verify "${ref_name}^{commit}")" || exit 1; \
+      printf '%s\n' "$peeled_commit" >> /tmp/source-shallow || exit 1; \
+    done < /tmp/source-bundle-tags \
+    && sort -u /tmp/source-shallow -o /workspace/.git/shallow \
+    && git -C /workspace update-ref refs/heads/candidate "$SOURCE_COMMIT" \
+    && git -C /workspace checkout --detach "$SOURCE_COMMIT" \
+    && test "$(git -C /workspace rev-parse --verify 'HEAD^{commit}')" \
+      = "$SOURCE_COMMIT" \
+    && test "$(git -C /workspace rev-list --count HEAD)" = 1 \
+    && while IFS=' ' read -r _object_id ref_name; do \
+      commit_count="$(git -C /workspace rev-list --count "$ref_name")" \
+        || exit 1; \
+      test "$commit_count" = 1 || exit 1; \
+    done < /tmp/source-bundle-tags \
+    && sort -k2,2 /tmp/source-bundle-tags \
+      -o /tmp/source-bundle-tags \
+    && git -C /workspace for-each-ref --sort=refname \
+      --format='%(objectname) %(refname)' refs/tags \
+      > /tmp/source-installed-tags \
+    && test "$(cat /tmp/source-installed-tags)" \
+      = "$(cat /tmp/source-bundle-tags)" \
+    && test -z "$(git -C /workspace remote)" \
+    && unreachable_objects="$(git -C /workspace fsck --full \
+      --unreachable --no-reflogs 2>/dev/null)" \
+    && test -z "$unreachable_objects" \
+    && test -d /workspace/.git \
+    && test -z "$(git -C /workspace status --porcelain=v1 \
+      --untracked-files=all --ignore-submodules=none)" \
+    && rm -f /tmp/source.bundle /tmp/source-bundle-heads \
+      /tmp/source-bundle-refnames /tmp/source-bundle-tags \
+      /tmp/source-installed-tags /tmp/source-shallow
+
+WORKDIR /workspace
+
+RUN CYPRESS_INSTALL_BINARY=0 CI=true \
+      pnpm --config.engine-strict=true install --frozen-lockfile \
+    && test -z "$(git status --porcelain=v1 \
+      --untracked-files=all --ignore-submodules=none)" \
+    && chown -R node:node /workspace \
+    && rm -rf /root/.npm
+
+# Runtime orchestration must supply --read-only, a bounded --tmpfs /tmp,
+# --cap-drop=ALL, and --security-opt=no-new-privileges. The active node config
+# and application root are mounted read-only; run evidence uses a separate
+# bounded writable mount.
+ENV HOME=/tmp/home
+ENV XDG_CACHE_HOME=/tmp/cache
+ENV TMPDIR=/tmp
+ENV GIT_OPTIONAL_LOCKS=0
+
+USER node
+
+RUN test -d .git \
+    && test "$(git rev-parse --verify 'HEAD^{commit}')" = "$SOURCE_COMMIT" \
+    && test -z "$(git status --porcelain=v1 \
+      --untracked-files=all --ignore-submodules=none)"
+
+ENTRYPOINT ["/sbin/tini", "-g", "--", "node", "bin/run-local-validation.mjs"]

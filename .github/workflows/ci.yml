@@ -29,25 +29,111 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  jellyfin-plugin:
-    name: Build Jellyfin bridge plugin
-    timeout-minutes: 15
+  engine-plan:
+    name: Validation engine plan
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      planSha256: ${{ steps.plan.outputs.planSha256 }}
+      runId: ${{ steps.plan.outputs.runId }}
+      runAttempt: ${{ steps.plan.outputs.runAttempt }}
+      executionSha: ${{ steps.plan.outputs.executionSha }}
+      headSha: ${{ steps.plan.outputs.headSha }}
+      codeql: ${{ steps.plan.outputs.codeql }}
+      cypress: ${{ steps.plan.outputs.cypress }}
+      playwright: ${{ steps.plan.outputs.playwright }}
+      testDocs: ${{ steps.plan.outputs.testDocs }}
+      docsLinks: ${{ steps.plan.outputs.docsLinks }}
+      helm: ${{ steps.plan.outputs.helm }}
+      unitMatrix: ${{ steps.plan.outputs.unitMatrix }}
+      cypressMatrix: ${{ steps.plan.outputs.cypressMatrix }}
+    steps:
+      - name: Checkout complete candidate history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: 'package.json'
+          package-manager-cache: false
+
+      - name: Create current-run hosted validation plan
+        id: plan
+        run: |
+          mkdir -p "$RUNNER_TEMP/seerrng-engine-plan"
+          node bin/run-local-validation.mjs \
+            --github-plan \
+            --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json" \
+            --json
+
+      - name: Publish immutable current-attempt validation plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan/hosted-plan.json
+          if-no-files-found: error
+          retention-days: 1
+
+  jellyfin-plugin:
+    name: Build Jellyfin bridge plugin
+    needs: engine-plan
+    timeout-minutes: 15
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-jellyfin-plugin
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Set up Node.js for engine binding
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: 'package.json'
+          package-manager-cache: false
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
+
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 9.0.x
 
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
       - name: Build plugin
+        if: steps.engine-admission.outputs.execute == 'true'
         run: >-
           dotnet publish
           integrations/jellyfin-plugin/SeerrNG.JellyfinBridge.csproj
@@ -55,15 +141,50 @@ jobs:
           --output artifacts/seerrng-jellyfin-bridge
 
       - name: Smoke test plugin in Jellyfin 10.11.11
+        if: steps.engine-admission.outputs.execute == 'true'
         run: >-
           python3 integrations/jellyfin-plugin/smoke-test.py
           --plugin-output artifacts/seerrng-jellyfin-bridge
 
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-jellyfin-plugin
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
   release-notes:
     name: Release-note contract
+    needs: engine-plan
     timeout-minutes: 10
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot')
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.user.type != 'Bot'))
     runs-on: ubuntu-latest
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-release-notes
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,7 +198,25 @@ jobs:
           node-version-file: 'package.json'
           package-manager-cache: false
 
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
+
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
       - name: Validate release-note fragment or explicit opt-out
+        if: steps.engine-admission.outputs.execute == 'true'
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
@@ -100,21 +239,61 @@ jobs:
             "${validation_args[@]}"
           node scripts/check-changelog-tags.mjs
 
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-release-notes
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
   i18n:
     name: i18n Check
+    needs: engine-plan
     timeout-minutes: 30
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-i18n
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: 'package.json'
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
 
       - name: Pnpm Setup
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -136,18 +315,65 @@ jobs:
           CI: true
         run: pnpm install
 
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
       - name: i18n Check
+        if: steps.engine-admission.outputs.execute == 'true'
         run: node bin/check-i18n.js
 
       - name: Security council and tooling tests
+        if: steps.engine-admission.outputs.execute == 'true'
         run: pnpm security:council
+
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-i18n
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
   test:
     name: Lint & Test Build
+    needs: engine-plan
     timeout-minutes: 30
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     container:
       image: node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-test
     steps:
       - name: Install Git for complete checkout
         run: apk add --no-cache git
@@ -156,6 +382,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Trust checked-out workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
 
       - name: Install native build tools
         run: apk add --no-cache python3 py3-setuptools make g++ gcc libc6-compat
@@ -181,30 +416,102 @@ jobs:
           CI: true
         run: pnpm install
 
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
       - name: Lint
+        if: steps.engine-admission.outputs.execute == 'true'
         run: pnpm lint
 
       - name: Formatting
+        id: formatting
+        if: steps.engine-admission.outputs.execute == 'true'
         run: pnpm format:check
 
+      - name: Report exact formatter correction
+        if: failure() && steps.formatting.outcome == 'failure'
+        run: |
+          pnpm format
+          git diff --no-ext-diff -- .
+
       - name: Build
+        if: steps.engine-admission.outputs.execute == 'true'
         run: pnpm build
 
       - name: Bundle budget
+        if: steps.engine-admission.outputs.execute == 'true'
         run: pnpm bundle:check
 
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-test
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
   unit-test:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.case_id }})
+    needs: engine-plan
     timeout-minutes: 75
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.engine-plan.outputs.unitMatrix) }}
     runs-on: ubuntu-latest
     container:
       image: node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-unit-test
+      SEERRNG_ENGINE_CASE_ID: ${{ matrix.case_id }}
     steps:
+      - name: Install Git for complete checkout
+        run: apk add --no-cache git
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Trust checked-out workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
 
       - name: Install native build tools
         run: apk add --no-cache python3 py3-setuptools make g++ gcc libc6-compat
@@ -231,16 +538,352 @@ jobs:
           CI: true
         run: pnpm install
 
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --case "$SEERRNG_ENGINE_CASE_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
+      - name: Materialize planned Vitest shard
+        if: steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-materialize-test-lane
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --case "$SEERRNG_ENGINE_CASE_ID"
+          --lane vitest
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --output-file "$RUNNER_TEMP/seerrng-engine-vitest.config.mts"
+          --json
+
       - name: Run tests
+        if: steps.engine-admission.outputs.execute == 'true'
         env:
           CI: true
-        run: pnpm test:ci
+        run: >-
+          pnpm test:ci
+          --config "$RUNNER_TEMP/seerrng-engine-vitest.config.mts"
+
+      - name: Run engine-owned native Node tests
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        env:
+          CI: true
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-run-test-lane
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --case "$SEERRNG_ENGINE_CASE_ID"
+          --lane node-test-mjs
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --report-file "$RUNNER_TEMP/seerrng-engine-node-tests.json"
+          --json
 
       - name: Publish test report
         uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6.5.0
-        if: success() || failure() # always run even if the previous step fails
+        if: >-
+          (success() || failure()) &&
+          steps.engine-admission.outputs.execute == 'true'
         with:
           report_paths: 'report.xml'
+          annotate_only: true
+
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --case "$SEERRNG_ENGINE_CASE_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --evidence report.xml
+          --evidence "$RUNNER_TEMP/seerrng-engine-node-tests.json"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-unit-test-${{ matrix.case_id }}
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
+  codeql:
+    name: CodeQL
+    needs: engine-plan
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.codeql == 'true'
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+    with:
+      plan_sha256: ${{ needs.engine-plan.outputs.planSha256 }}
+      engine_run_id: ${{ needs.engine-plan.outputs.runId }}
+      engine_run_attempt: ${{ needs.engine-plan.outputs.runAttempt }}
+      execution_sha: ${{ needs.engine-plan.outputs.executionSha }}
+      unit_id: codeql-analyze
+
+  playwright:
+    name: Playwright Tests
+    needs: engine-plan
+    timeout-minutes: 45
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.playwright == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+      SEERRNG_ENGINE_UNIT_ID: ci-playwright
+      PORT: '5055'
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:5055
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      - name: Pnpm Setup
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
+
+      - name: Install dependencies
+        env:
+          CI: true
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Configure Playwright runtime
+        run: |
+          printf 'CONFIG_DIRECTORY=%s\n' "$RUNNER_TEMP/seerrng-playwright-runtime-config" >> "$GITHUB_ENV"
+          printf 'PLAYWRIGHT_JSON_OUTPUT_FILE=%s\n' "$RUNNER_TEMP/seerrng-engine-playwright-result.json" >> "$GITHUB_ENV"
+
+      - name: Prepare Playwright runtime configuration
+        run: pnpm cypress:prepare
+
+      - name: Admit engine unit
+        id: engine-admission
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
+      - name: Build Playwright application once on Ubuntu
+        if: steps.engine-admission.outputs.execute == 'true'
+        run: pnpm build
+
+      - name: Run native Playwright suite
+        if: steps.engine-admission.outputs.execute == 'true'
+        env:
+          CI: true
+        run: pnpm exec playwright test --reporter=json
+
+      - name: Seal engine unit receipt
+        if: always() && steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --evidence "$PLAYWRIGHT_JSON_OUTPUT_FILE"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-ci-playwright
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1
+
+  cypress:
+    name: Cypress Tests (${{ matrix.case_id }})
+    needs: engine-plan
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.cypress == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.engine-plan.outputs.cypressMatrix) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/cypress.yml
+    with:
+      plan_sha256: ${{ needs.engine-plan.outputs.planSha256 }}
+      engine_run_id: ${{ needs.engine-plan.outputs.runId }}
+      engine_run_attempt: ${{ needs.engine-plan.outputs.runAttempt }}
+      execution_sha: ${{ needs.engine-plan.outputs.executionSha }}
+      unit_id: cypress-run
+      case_id: ${{ matrix.case_id }}
+      specs: ${{ matrix.specs }}
+    secrets:
+      CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+
+  test-docs:
+    name: Test Docs
+    needs: engine-plan
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.testDocs == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test-docs.yml
+    with:
+      plan_sha256: ${{ needs.engine-plan.outputs.planSha256 }}
+      engine_run_id: ${{ needs.engine-plan.outputs.runId }}
+      engine_run_attempt: ${{ needs.engine-plan.outputs.runAttempt }}
+      execution_sha: ${{ needs.engine-plan.outputs.executionSha }}
+      unit_id: test-docs-build
+
+  docs-links:
+    name: Check Docs Links
+    needs: engine-plan
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.docsLinks == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/docs-link-check.yml
+    with:
+      plan_sha256: ${{ needs.engine-plan.outputs.planSha256 }}
+      engine_run_id: ${{ needs.engine-plan.outputs.runId }}
+      engine_run_attempt: ${{ needs.engine-plan.outputs.runAttempt }}
+      execution_sha: ${{ needs.engine-plan.outputs.executionSha }}
+      unit_id: docs-links
+
+  helm:
+    name: Lint and Test Charts
+    needs: engine-plan
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.engine-plan.result == 'success' &&
+      needs.engine-plan.outputs.helm == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/lint-helm-charts.yml
+    with:
+      plan_sha256: ${{ needs.engine-plan.outputs.planSha256 }}
+      engine_run_id: ${{ needs.engine-plan.outputs.runId }}
+      engine_run_attempt: ${{ needs.engine-plan.outputs.runAttempt }}
+      execution_sha: ${{ needs.engine-plan.outputs.executionSha }}
+      unit_id: helm-lint-test
+
+  engine-reconcile:
+    name: Native validation engine result
+    needs:
+      - engine-plan
+      - jellyfin-plugin
+      - release-notes
+      - i18n
+      - test
+      - unit-test
+      - codeql
+      - playwright
+      - cypress
+      - test-docs
+      - docs-links
+      - helm
+    if: >-
+      always() &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ needs.engine-plan.outputs.runId }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ needs.engine-plan.outputs.runAttempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ needs.engine-plan.outputs.executionSha }}
+    steps:
+      - name: Checkout complete candidate history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: 'package.json'
+          package-manager-cache: false
+
+      - name: Download immutable validation plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
+
+      - name: Download current-attempt engine receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          merge-multiple: true
+
+      - name: Reconcile current-run hosted validation results
+        env:
+          SEERRNG_ENGINE_NEEDS_JSON: ${{ toJSON(needs) }}
+          SEERRNG_ENGINE_EXPECTED_PLAN_SHA256: ${{ needs.engine-plan.outputs.planSha256 }}
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-reconcile
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
 
   preflight-deploy:
     name: Preflight deployment host

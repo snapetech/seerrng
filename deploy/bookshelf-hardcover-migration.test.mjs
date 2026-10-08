@@ -413,7 +413,10 @@ describe('bookshelf-hardcover-migration CLI pipeline', () => {
           HARDCOVER_API_TIMEOUT_MS: '500',
           HARDCOVER_EBOOK_API_KEY: 'key',
           HARDCOVER_EBOOK_BASE_URL: baseUrl,
+          HARDCOVER_GOOGLEBOOKS_RECOVERY: 'false',
+          HARDCOVER_LOC_RECOVERY: 'false',
           HARDCOVER_OPENLIBRARY_RECOVERY: 'false',
+          HARDCOVER_APIFY_GOODREADS_ACTOR: '',
         });
 
         assert.equal(result.code, 0, result.stderr);
@@ -445,7 +448,10 @@ describe('bookshelf-hardcover-migration CLI pipeline', () => {
           HARDCOVER_API_TIMEOUT_MS: '10000',
           HARDCOVER_EBOOK_API_KEY: 'key',
           HARDCOVER_EBOOK_BASE_URL: baseUrl,
+          HARDCOVER_GOOGLEBOOKS_RECOVERY: 'false',
+          HARDCOVER_LOC_RECOVERY: 'false',
           HARDCOVER_OPENLIBRARY_RECOVERY: 'false',
+          HARDCOVER_APIFY_GOODREADS_ACTOR: '',
         });
 
         assert.equal(result.code, 0, result.stderr);
