@@ -3,20 +3,23 @@
 name: Check Docs Links
 
 on:
-  pull_request:
-    branches:
-      - '*'
-    paths:
-      - 'docs/**'
-      - 'gen-docs/**'
-      - '.github/workflows/docs-link-check.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-      - 'gen-docs/**'
-      - '.github/workflows/docs-link-check.yml'
+  workflow_call:
+    inputs:
+      plan_sha256:
+        required: true
+        type: string
+      engine_run_id:
+        required: true
+        type: string
+      engine_run_attempt:
+        required: true
+        type: string
+      execution_sha:
+        required: true
+        type: string
+      unit_id:
+        required: true
+        type: string
   schedule:
     - cron: '50 7 * * 5'
   workflow_dispatch:
@@ -25,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: docs-links-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +37,12 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SEERRNG_ENGINE_PLAN_SHA256: ${{ inputs.plan_sha256 }}
+      SEERRNG_ENGINE_RUN_ID: ${{ inputs.engine_run_id }}
+      SEERRNG_ENGINE_RUN_ATTEMPT: ${{ inputs.engine_run_attempt }}
+      SEERRNG_ENGINE_EXECUTION_SHA: ${{ inputs.execution_sha }}
+      SEERRNG_ENGINE_UNIT_ID: ${{ inputs.unit_id }}
 
     steps:
       - name: Checkout
@@ -42,7 +51,36 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js for engine binding
+        if: inputs.plan_sha256 != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: 'package.json'
+          package-manager-cache: false
+
+      - name: Download immutable validation plan
+        if: inputs.plan_sha256 != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: seerrng-engine-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/seerrng-engine-plan
+
+      - name: Admit engine unit
+        id: engine-admission
+        if: inputs.plan_sha256 != ''
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-admit
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --json
+
       - name: Run Lychee link checker
+        if: >-
+          inputs.plan_sha256 == '' ||
+          steps.engine-admission.outputs.execute == 'true'
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           fail: false
@@ -61,6 +99,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.event_name != 'pull_request' && secrets.GITHUB_TOKEN || '' }}
 
       - name: Upload Lychee report
+        if: >-
+          inputs.plan_sha256 == '' ||
+          steps.engine-admission.outputs.execute == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lychee-report
@@ -68,3 +109,27 @@ jobs:
             lychee/out.md
             lychee/results.json
           if-no-files-found: ignore
+
+      - name: Seal engine unit receipt
+        if: >-
+          always() &&
+          inputs.plan_sha256 != '' &&
+          steps.engine-admission.outputs.execute == 'true'
+        run: >-
+          node bin/run-local-validation.mjs
+          --github-receipt
+          --unit "$SEERRNG_ENGINE_UNIT_ID"
+          --plan-file "$RUNNER_TEMP/seerrng-engine-plan/hosted-plan.json"
+          --expected-plan-sha256 "$SEERRNG_ENGINE_PLAN_SHA256"
+          --receipt-dir "$RUNNER_TEMP/seerrng-engine-receipts"
+          --job-status "${{ job.status }}"
+          --json
+
+      - name: Publish engine unit receipt
+        if: always() && inputs.plan_sha256 != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seerrng-engine-receipt-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.unit_id }}
+          path: ${{ runner.temp }}/seerrng-engine-receipts
+          if-no-files-found: error
+          retention-days: 1

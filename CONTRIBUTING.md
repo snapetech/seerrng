@@ -1,4 +1,4 @@
-# Contributing to Seerr
+# Contributing to SeerrNG
 
 All help is welcome and greatly appreciated! If you would like to contribute to the project, the following instructions should get you started...
 
@@ -9,6 +9,8 @@ responsible for the accuracy, security, tests, and documentation of their
 changes. Disclose AI assistance and its scope in the pull request description,
 follow the PR template, and report actual verification results. Maintainers
 may authorize and accept AI-assisted work without a separate human-review gate.
+An explicit maintainer direction to merge or release supplies that authorization;
+do not require a second confirmation that the same work was reviewed.
 
 ## Development
 
@@ -25,14 +27,14 @@ may authorize and accept AI-assisted work without a separate human-review gate.
 1. [Fork](https://help.github.com/articles/fork-a-repo/) the repository to your own GitHub account and [clone](https://help.github.com/articles/cloning-a-repository/) it to your local device:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/seerr.git
-   cd seerr/
+   git clone https://github.com/YOUR_USERNAME/seerrng.git
+   cd seerrng/
    ```
 
 2. Add the remote `upstream`:
 
    ```bash
-   git remote add upstream https://github.com/seerr-team/seerr.git
+   git remote add upstream https://github.com/snapetech/seerrng.git
    ```
 
 3. Create a new branch:
@@ -70,8 +72,13 @@ may authorize and accept AI-assisted work without a separate human-review gate.
      ```bash
      git fetch upstream
      git rebase upstream/main
-     git push origin BRANCH_NAME -f
+     git push origin BRANCH_NAME --force-with-lease
      ```
+
+   - For final-candidate verification, follow the authoritative
+     [validation-engine guide](./tools/validation-engine/README.md). `pnpm test`
+     and `pnpm test:ci` are Vitest-only and do not replace the complete
+     applicable engine gate.
 
 ### Helm Chart
 

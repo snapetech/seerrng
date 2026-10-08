@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = 'http://127.0.0.1:5055';
+const port = process.env.PORT ?? '5055';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const configDirectory =
+  process.env.CONFIG_DIRECTORY ?? `${process.cwd()}/cypress/runtime-config`;
 
 export default defineConfig({
   testDir: './playwright',
@@ -19,9 +22,8 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      ...process.env,
-      CONFIG_DIRECTORY: `${process.cwd()}/cypress/runtime-config`,
-      PORT: '5055',
+      CONFIG_DIRECTORY: configDirectory,
+      PORT: port,
     },
   },
 });

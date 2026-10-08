@@ -47,10 +47,46 @@ reject_control_characters() {
   local name="$1" value="$2"
   [[ "$value" != *[$'\x01'-$'\x1f'$'\x7f']* ]] || die "$name contains control characters"
 }
+normalize_absolute_path() {
+  local absolute="$1" component component_count
+  local IFS='/'
+  local -a path_components=() components=()
+
+  if [[ "$absolute" != /* ]]; then
+    absolute="$PWD/$absolute"
+  fi
+
+  read -r -a path_components <<<"$absolute"
+  for component in "${path_components[@]}"; do
+    case "$component" in
+      ''|.) ;;
+      ..)
+        component_count=${#components[@]}
+        if (( component_count > 0 )); then
+          components=("${components[@]:0:component_count-1}")
+        fi
+        ;;
+      *) components+=("$component") ;;
+    esac
+  done
+
+  if (( ${#components[@]} == 0 )); then
+    printf '/'
+  else
+    printf '/%s' "${components[@]}"
+  fi
+}
+file_link_count() {
+  if [[ "$(uname -s)" == 'Darwin' ]]; then
+    stat -f '%l' "$1"
+  else
+    stat -c '%h' -- "$1"
+  fi
+}
 prepare_private_directory() {
   local requested="$1" path parent
   reject_control_characters "artifact directory" "$requested"
-  path="$(realpath -ms -- "$requested")"
+  path="$(normalize_absolute_path "$requested")"
   parent="$path"
   while [[ "$parent" != "/" ]]; do
     [[ ! -L "$parent" ]] || die "artifact directory contains a symlink: $parent"
@@ -58,7 +94,7 @@ prepare_private_directory() {
     parent="$(dirname -- "$parent")"
   done
   mkdir -p -- "$path/logs"
-  chmod 700 -- "$path" "$path/logs"
+  chmod 700 "$path" "$path/logs"
   printf '%s' "$path"
 }
 atomic_write() {
@@ -68,11 +104,11 @@ atomic_write() {
   [[ ! -L "$destination" ]] || die "refusing symlink evidence file: $destination"
   [[ ! -e "$destination" || -f "$destination" ]] || die "evidence path is not a regular file: $destination"
   if [[ -e "$destination" ]]; then
-    [[ "$(stat -c %h -- "$destination" 2>/dev/null || stat -f %l -- "$destination")" == "1" ]] ||
+    [[ "$(file_link_count "$destination")" == "1" ]] ||
       die "refusing multiply linked evidence file: $destination"
   fi
   temporary="$(mktemp "$directory/.${base}.tmp.XXXXXX")"
-  chmod 600 -- "$temporary"
+  chmod 600 "$temporary"
   cat >"$temporary"
   mv -f -- "$temporary" "$destination"
 }
@@ -168,7 +204,7 @@ json_file="$evidence_root/evidence.json"
 [[ ! -L "$log_file" ]] || die "refusing symlink log file: $log_file"
 [[ ! -e "$log_file" || -f "$log_file" ]] || die "log path is not a regular file: $log_file"
 if [[ -e "$log_file" ]]; then
-  [[ "$(stat -c %h -- "$log_file" 2>/dev/null || stat -f %l -- "$log_file")" == "1" ]] || die "refusing multiply linked log file: $log_file"
+  [[ "$(file_link_count "$log_file")" == "1" ]] || die "refusing multiply linked log file: $log_file"
 fi
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/package-smoke.XXXXXX")"
 cleanup_cmds=()

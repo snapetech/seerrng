@@ -2,8 +2,18 @@ import { transform } from '@swc/core';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { detectWorkerCapacity } from './tools/validation-engine/runtime/cpu-capacity.mjs';
+import { engineVitestProjects } from './tools/validation-engine/runtime/vitest-binding.mjs';
 
 const projectRoot = resolve(fileURLToPath(new URL('.', import.meta.url)));
+const capacity = detectWorkerCapacity({ sourceRoot: projectRoot });
+const include = [
+  'server/**/*.test.ts',
+  'src/**/*.test.ts',
+  'src/**/*.test.tsx',
+  'src/**/*.vitest.test.ts',
+];
+const exclude = ['node_modules/**', 'dist/**'];
 
 const swcTypeScriptDecorators = {
   name: 'swc-typescript-decorators',
@@ -55,18 +65,19 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./server/test/vitest.setup.ts'],
-    include: [
-      'server/**/*.test.ts',
-      'src/**/*.test.ts',
-      'src/**/*.test.tsx',
-      'src/**/*.vitest.test.ts',
+    setupFiles: [
+      './server/test/engine-isolate-before.mjs',
+      './server/test/vitest.setup.ts',
     ],
-    exclude: ['node_modules/**', 'dist/**'],
     passWithNoTests: false,
     pool: 'forks',
-    maxWorkers: 1,
+    maxWorkers: capacity.configuredWorkers,
     minWorkers: 1,
+    projects: engineVitestProjects({
+      include,
+      exclude,
+      workers: capacity.configuredWorkers,
+    }),
     testTimeout: 30_000,
     hookTimeout: 30_000,
     coverage: {

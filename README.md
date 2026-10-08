@@ -631,14 +631,22 @@ pnpm dev
 Useful commands:
 
 ```bash
+pnpm validate:development
 pnpm typecheck
 pnpm typecheck:client
 pnpm typecheck:server
 pnpm lint
 pnpm test
+pnpm test:playwright
 pnpm build
 pnpm --dir gen-docs build
 ```
+
+`pnpm validate:development` is the complete active local validation path. Its
+current stages, prerequisites, worker policy, and evidence contract are defined
+in the [validation-engine guide](./tools/validation-engine/README.md). `pnpm test`
+is Vitest-only, and focused commands such as `pnpm test:playwright` do not replace
+the complete applicable engine gate.
 
 Migration-specific checks:
 

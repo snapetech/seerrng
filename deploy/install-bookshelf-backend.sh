@@ -229,6 +229,37 @@ require_command() {
   fi
 }
 
+file_owner_id() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    stat -f '%u' "$1"
+  else
+    stat -c '%u' -- "$1"
+  fi
+}
+
+move_path_exactly() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "python3 is required to move paths safely on macOS." >&2
+      return 1
+    fi
+    python3 -c 'import os,sys; os.replace(sys.argv[1], sys.argv[2])' "$1" "$2"
+  else
+    mv -Tf -- "$1" "$2"
+  fi
+}
+
+inplace_sed() {
+  local expression="$1"
+  local file="$2"
+
+  if [ "$(uname -s)" = "Darwin" ]; then
+    run sed -i '' "$expression" "$file"
+  else
+    run sed -i "$expression" "$file"
+  fi
+}
+
 run() {
   if [ "$DRY_RUN" = "true" ]; then
     printf 'DRY RUN:'
@@ -260,12 +291,12 @@ ensure_private_directory() {
     exit 1
   fi
 
-  owner_id="$(stat -c '%u' "$directory")"
+  owner_id="$(file_owner_id "$directory")"
   if [ "$owner_id" != "$(id -u)" ]; then
     echo "Private directory is owned by another user: ${directory}" >&2
     exit 1
   fi
-  if find "$directory" -maxdepth 0 -perm /022 -print -quit | grep -q .; then
+  if find "$directory" -prune \( -perm -020 -o -perm -002 \) -print -quit | grep -q .; then
     echo "Private directory is group- or world-writable: ${directory}" >&2
     exit 1
   fi
@@ -288,7 +319,7 @@ atomic_write_private_file() {
     rm -f -- "$temporary_file"
     return 1
   fi
-  if ! chmod "$output_mode" "$temporary_file" || ! mv -Tf -- "$temporary_file" "$output_file"; then
+  if ! chmod "$output_mode" "$temporary_file" || ! move_path_exactly "$temporary_file" "$output_file"; then
     rm -f -- "$temporary_file"
     return 1
   fi
@@ -779,6 +810,7 @@ restore_path() (
   local parent_dir
   local pre_restore_path
   local staging_dir=""
+  local -a tar_options=()
 
   # Invoked by the RETURN trap below.
   # shellcheck disable=SC2329
@@ -845,11 +877,11 @@ restore_path() (
   run mkdir -p "$parent_dir"
   staging_dir="$(mktemp -d "${parent_dir}/.seerr-restore.XXXXXX")"
   chmod 700 "$staging_dir"
-  tar -C "$staging_dir" \
-    --no-same-owner \
-    --no-same-permissions \
-    --delay-directory-restore \
-    -xzf "$archive"
+  tar_options=(--no-same-owner --no-same-permissions)
+  if tar --help 2>&1 | grep -q -- '--delay-directory-restore'; then
+    tar_options+=(--delay-directory-restore)
+  fi
+  tar -C "$staging_dir" "${tar_options[@]}" -xzf "$archive"
 
   if [ ! -d "${staging_dir}/${archive_root}" ] ||
     [ -L "${staging_dir}/${archive_root}" ] ||
@@ -866,12 +898,12 @@ restore_path() (
       echo "Pre-restore destination already exists: ${pre_restore_path}" >&2
       exit 1
     fi
-    mv -T -- "$target_path" "$pre_restore_path"
+    move_path_exactly "$target_path" "$pre_restore_path"
   fi
 
-  if ! mv -T -- "${staging_dir}/${archive_root}" "$target_path"; then
+  if ! move_path_exactly "${staging_dir}/${archive_root}" "$target_path"; then
     if [ -e "$pre_restore_path" ] || [ -L "$pre_restore_path" ]; then
-      mv -T -- "$pre_restore_path" "$target_path"
+      move_path_exactly "$pre_restore_path" "$target_path"
     fi
     echo "Failed to install restored ${label} at ${target_path}" >&2
     exit 1
@@ -985,14 +1017,14 @@ EOF
   fi
 
   if grep -q '<Port>.*</Port>' "$config_file"; then
-    run sed -i "s#<Port>.*</Port>#<Port>${port}</Port>#" "$config_file"
+    inplace_sed "s#<Port>.*</Port>#<Port>${port}</Port>#" "$config_file"
   else
-    run sed -i "s#</Config>#  <Port>${port}</Port>\\n</Config>#" "$config_file"
+    inplace_sed "s#</Config>#  <Port>${port}</Port>\\n</Config>#" "$config_file"
   fi
 
   if ! grep -q '<ApiKey>.*</ApiKey>' "$config_file"; then
     api_key="$(generate_password | cut -c 1-32)"
-    run sed -i "s#</Config>#  <ApiKey>${api_key}</ApiKey>\\n</Config>#" "$config_file"
+    inplace_sed "s#</Config>#  <ApiKey>${api_key}</ApiKey>\\n</Config>#" "$config_file"
   fi
 
   chmod 600 "$config_file"

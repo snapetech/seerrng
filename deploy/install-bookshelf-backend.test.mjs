@@ -77,6 +77,9 @@ const createDeploymentEnvironment = async (root) => {
   await writeFile(curlPath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   return {
     ...environment,
+    // Disposable fixtures keep their creator's ownership without privileged chown.
+    PUID: String(process.getuid()),
+    PGID: String(process.getgid()),
     BOOKSHELF_BACKEND: 'hardcover',
     HARDCOVER_AUTH: 'Bearer test-token',
     MEDIA_ROOT: root,
@@ -135,13 +138,14 @@ describe('Bookshelf backup restoration', () => {
       path.join(environment.BOOKSHELF_EBOOKS_CONFIG_DIR, 'keep'),
       'original'
     );
-    await execFileAsync('tar', [
-      '-C',
-      path.dirname(source),
-      '--transform=s#^payload#../escaped#',
-      '-czf',
+    await execFileAsync('python3', [
+      '-c',
+      `import sys, tarfile
+archive_path, payload_path = sys.argv[1:]
+with tarfile.open(archive_path, 'w:gz') as archive:
+    archive.add(payload_path, arcname='../escaped/payload')`,
       path.join(environment.BACKUP_DIR, 'bookshelf-ebooks-config.tgz'),
-      path.basename(source),
+      source,
     ]);
 
     const result = await runInstaller(environment, '--restore-backup');
@@ -619,6 +623,11 @@ describe('Bookshelf backup permissions', () => {
       0o644
     );
     assert.equal((await stat(environment.BACKUP_DIR)).mode & 0o777, 0o700);
+    const fixtureConfig = await stat(
+      path.join(environment.BOOKSHELF_EBOOKS_CONFIG_DIR, 'config.xml')
+    );
+    assert.equal(fixtureConfig.uid, process.getuid());
+    assert.equal(fixtureConfig.gid, process.getgid());
     for (const name of [
       'bookshelf-ebooks-config.tgz',
       'bookshelf-audiobooks-config.tgz',

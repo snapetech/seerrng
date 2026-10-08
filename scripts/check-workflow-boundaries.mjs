@@ -465,7 +465,7 @@ if (!renovate) {
 
     const validationScript = publishSteps[validationIndex]?.run ?? '';
     for (const requiredBoundary of [
-      'artifact_entries=',
+      'artifact_paths=',
       'keys == ["branch", "expectedHeadOid", "fileChanges", "repository"]',
       '(.fileChanges.deletions == [])',
       'length >= 1 and length <= 20',

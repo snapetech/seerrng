@@ -3,7 +3,14 @@
 This is the living evidence appendix for the forward-merge guide, not a release
 approval or a complete site-audit claim. Read `AGENTS.md`, UI Style Standard and
 UI Fix-It first. Preserve earlier accepted work while reviewing small batches.
-Never infer human acceptance from test success or a journal's implementation note.
+Never infer visual inspection or live-provider evidence from test success or a
+journal's implementation note. Historical statements below that a human or visual
+review was pending record the evidence state at that checkpoint; they do not create
+a second approval gate after the maintainer explicitly directs merge or release.
+This appendix is chronological evidence. Only the latest dated entry describes
+current status; no older imperative, command binding, or pending gate controls
+current work. Normative procedure lives in `AGENTS.md`, the UI guides, and
+`tools/validation-engine/README.md`.
 
 ## Preservation and coverage map
 
@@ -284,11 +291,13 @@ Fill these fields with observed facts; unknown means pending, never assumed.
    Do not wholesale restore an older backend, component or lockfile.
 4. Discovery plan versus executed logs: test file inventory, test totals, failures,
    skips/todos, platform exclusions, lint/type/static/style results and build result.
-   `pnpm test` is test partitions only; `test:ci` is Vitest-only. Browser/Cypress
-   suites are separate. Linux is required for complete POSIX tooling coverage.
-5. Desktop/narrow reference locations and human visual review evidence per
-   page/state, including loading/error/empty, keyboard/focus/disabled, open menus and reorder.
-   An automated screenshot or computed-style result is not human acceptance.
+   `pnpm test` and `pnpm test:ci` are Vitest-only; neither is the complete engine.
+   Browser suites belong to the applicable engine or workflow path. Linux is
+   required for complete POSIX tooling coverage.
+5. When UI changed or visual evidence is otherwise applicable, retain
+   desktop/narrow reference locations and observed evidence per page/state,
+   including loading/error/empty, keyboard/focus/disabled, open menus and reorder.
+   An automated screenshot or computed-style result is not visual inspection.
 6. Live Plex evidence separately from mocked native coverage; safe prerequisites
    for unverified providers. Never copy credentials, runtime DBs or live config.
 7. Explicit deferrals, unresolved failures and next gate. A failed required gate
@@ -971,5 +980,8 @@ so the cumulative gate is not green; the raw log is
 `/private/tmp/seerrng-phase2-validate-current-main-20261007.log`. No build was
 run, as the maintainer assigned that to another agent. No live
 ReadMeABook/Hardcover round-trip or new visual/physical Swipe review was done.
-Do not merge into `main` until compatible tooling verification, the assigned
-build, and review are complete.
+That pending instruction is superseded by the completed integration: PR #171 was
+merged as `800745e107b2d044045484e74d0f0686239a3e05`, and its result was released
+from `fe1ef9790369c4694cb6b7de4444e6c9330dcfc1` as `v3.54.0`. The historical
+failed macOS tooling receipt remains evidence of that attempt, not a current
+merge prohibition.

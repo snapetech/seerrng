@@ -42,6 +42,18 @@ const createFixture = async () => {
   };
 };
 
+const createStores = async (fixture, { mode = 0o640 } = {}) => {
+  const settingsPath = path.join(fixture.configDirectory, 'settings.json');
+  const databasePath = path.join(fixture.configDirectory, 'db', 'db.sqlite3');
+  await fs.writeFile(settingsPath, '{"plex":{"name":"Old"}}\n', { mode });
+  await execFileAsync('python3', [
+    '-c',
+    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute("create table user (id integer primary key, plexToken text, plexId integer)"); c.execute("insert into user values (1, ?, null)", ("old-token",)); c.commit()',
+    databasePath,
+  ]);
+  return { databasePath, settingsPath };
+};
+
 const runScript = (fixture) =>
   new Promise((resolve) => {
     const child = spawn(scriptPath, {
@@ -92,16 +104,7 @@ describe('Plex relink maintenance script', () => {
 
   it('atomically preserves settings permissions and updates both stores', async () => {
     const fixture = await createFixture();
-    const settingsPath = path.join(fixture.configDirectory, 'settings.json');
-    const databasePath = path.join(fixture.configDirectory, 'db', 'db.sqlite3');
-    await fs.writeFile(settingsPath, '{"plex":{"name":"Old"}}\n', {
-      mode: 0o640,
-    });
-    await execFileAsync('python', [
-      '-c',
-      'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute("create table user (id integer primary key, plexToken text, plexId integer)"); c.execute("insert into user values (1, ?, null)", ("old-token",)); c.commit()',
-      databasePath,
-    ]);
+    const { databasePath, settingsPath } = await createStores(fixture);
 
     const result = await runScript(fixture);
 
@@ -119,7 +122,7 @@ describe('Plex relink maintenance script', () => {
     } finally {
       await settingsHandle.close();
     }
-    const { stdout } = await execFileAsync('python', [
+    const { stdout } = await execFileAsync('python3', [
       '-c',
       'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select plexToken from user where id=1").fetchone()[0])',
       databasePath,
@@ -135,5 +138,42 @@ describe('Plex relink maintenance script', () => {
       await fs.readFile(fixture.curlInput, 'utf8'),
       'X-Plex-Token: secret-token\n'
     );
+  });
+
+  it('accepts a 512-character token on every supported libc', async () => {
+    const fixture = await createFixture();
+    const token = 'a'.repeat(512);
+    const { databasePath } = await createStores(fixture);
+    await fs.writeFile(
+      fixture.preferences,
+      `<Preferences PlexOnlineToken="${token}" ProcessedMachineIdentifier="machine-id" />`
+    );
+
+    const result = await runScript(fixture);
+
+    assert.equal(result.code, 0, result.stderr);
+    const { stdout } = await execFileAsync('python3', [
+      '-c',
+      'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select plexToken from user where id=1").fetchone()[0])',
+      databasePath,
+    ]);
+    assert.equal(stdout.trim(), token);
+  });
+
+  it('rejects oversized tokens and invalid characters before contacting Plex', async () => {
+    for (const token of ['a'.repeat(513), 'invalid!token']) {
+      const fixture = await createFixture();
+      await createStores(fixture);
+      await fs.writeFile(
+        fixture.preferences,
+        `<Preferences PlexOnlineToken="${token}" ProcessedMachineIdentifier="machine-id" />`
+      );
+
+      const result = await runScript(fixture);
+
+      assert.notEqual(result.code, 0);
+      assert.match(result.stderr, /invalid token/);
+      await assert.rejects(fs.stat(fixture.curlArguments), { code: 'ENOENT' });
+    }
   });
 });

@@ -13,10 +13,47 @@ PROJECT_NAME="${PROJECT_NAME:-seerrng-bookshelf-migration-lab}"
 DEFAULT_BOOKSHELF_HARDCOVER_IMAGE="ghcr.io/snapetech/bookshelfng:hardcover"
 DEFAULT_BOOKSHELF_SOFTCOVER_IMAGE="ghcr.io/snapetech/bookshelfng:softcover"
 
-LAB_DIR_RESOLVED="$(realpath -m "$LAB_DIR")"
-DEFAULT_LAB_DIR_RESOLVED="$(realpath -m "$DEFAULT_LAB_DIR")"
+resolve_path_with_missing_components() {
+  local requested="$1"
+  local resolved
+
+  if command -v realpath >/dev/null 2>&1 &&
+    resolved="$(realpath -m -- "$requested" 2>/dev/null)"; then
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "GNU realpath or python3 is required to resolve paths." >&2
+    return 1
+  fi
+  python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$requested"
+}
+
+file_owner_id() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    stat -f '%u' "$1"
+  else
+    stat -c '%u' -- "$1"
+  fi
+}
+
+move_path_exactly() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "python3 is required to move paths safely on macOS." >&2
+      return 1
+    fi
+    python3 -c 'import os,sys; os.replace(sys.argv[1], sys.argv[2])' "$1" "$2"
+  else
+    mv -Tf -- "$1" "$2"
+  fi
+}
+
+LAB_DIR_RESOLVED="$(resolve_path_with_missing_components "$LAB_DIR")"
+DEFAULT_LAB_DIR_RESOLVED="$(resolve_path_with_missing_components "$DEFAULT_LAB_DIR")"
 if [ "$LAB_DIR_RESOLVED" = "/" ] || [ "$LAB_DIR_RESOLVED" = "$REPO_DIR" ] ||
-  [ "$LAB_DIR_RESOLVED" = "$(realpath -m "${HOME:-/}")" ] || [ -L "$LAB_DIR" ]; then
+  [ "$LAB_DIR_RESOLVED" = "$(resolve_path_with_missing_components "${HOME:-/}")" ] || [ -L "$LAB_DIR" ]; then
   echo "Refusing unsafe LAB_DIR: ${LAB_DIR}" >&2
   exit 2
 fi
@@ -131,7 +168,7 @@ require_command() {
 assert_lab_marker() {
   if [ ! -f "$LAB_MARKER" ] || [ -L "$LAB_MARKER" ] ||
     [ "$(cat "$LAB_MARKER")" != "$LAB_MARKER_VALUE" ] ||
-    [ "$(stat -c '%u' "$LAB_DIR")" != "$(id -u)" ]; then
+    [ "$(file_owner_id "$LAB_DIR")" != "$(id -u)" ]; then
     echo "Refusing to use unowned or unmarked LAB_DIR: ${LAB_DIR}" >&2
     exit 1
   fi
@@ -171,9 +208,13 @@ atomic_write_lab_file() {
     echo "Refusing to overwrite a symlinked lab artifact: ${output_file}" >&2
     exit 1
   fi
+  if [ -d "$output_file" ]; then
+    echo "Refusing to overwrite a lab artifact directory: ${output_file}" >&2
+    exit 1
+  fi
   temporary_file="$(mktemp "${output_directory}/.${output_name}.XXXXXX.tmp")"
   if ! cat >"$temporary_file" || ! chmod 600 "$temporary_file" ||
-    ! mv -Tf -- "$temporary_file" "$output_file"; then
+    ! move_path_exactly "$temporary_file" "$output_file"; then
     rm -f -- "$temporary_file"
     return 1
   fi
@@ -217,7 +258,7 @@ copy_source_config() {
     exit 1
   fi
 
-  if [ "$(realpath "$source_dir")" = "$(realpath -m "$target_dir")" ]; then
+  if [ "$(resolve_path_with_missing_components "$source_dir")" = "$(resolve_path_with_missing_components "$target_dir")" ]; then
     echo "Using existing ${label} source config in lab: ${target_dir}"
     return
   fi
@@ -273,8 +314,8 @@ ensure_lab_path_for_container_path() {
     exit 1
   fi
 
-  base_path="$(realpath -m "$base_path")"
-  host_path="$(realpath -m "${base_path}/${relative_path}")"
+  base_path="$(resolve_path_with_missing_components "$base_path")"
+  host_path="$(resolve_path_with_missing_components "${base_path}/${relative_path}")"
   if [[ "$host_path" != "${base_path}/"* ]]; then
     echo "Source root folder escapes the lab: ${container_path}" >&2
     exit 1
@@ -455,12 +496,6 @@ discover_sources() {
 }
 
 prepare_lab() {
-  require_command docker
-  require_command rsync
-  require_command sqlite3
-  require_command curl
-  require_command node
-
   if [ -z "$SOURCE_EBOOK_CONFIG_DIR" ]; then
     echo "SOURCE_EBOOK_CONFIG_DIR is required for prepare/report/apply." >&2
     exit 2
@@ -474,6 +509,12 @@ prepare_lab() {
     echo "HARDCOVER_AUTH must start with 'Bearer '." >&2
     exit 2
   fi
+
+  require_command docker
+  require_command rsync
+  require_command sqlite3
+  require_command curl
+  require_command node
 
   initialize_lab_directory
   mkdir -p "$LAB_MEDIA_DIR" "$LAB_DOWNLOAD_DIR" "$LAB_PLEX_DIR"
