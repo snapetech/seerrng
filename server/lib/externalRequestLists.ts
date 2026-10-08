@@ -178,7 +178,9 @@ export const parseExternalRequestListUrl = (
     (url.hostname === 'www.imdb.com' || url.hostname === 'imdb.com') &&
     url.search === ''
   ) {
-    const match = url.pathname.match(/^\/user\/(ur[0-9]{1,20})\/watchlist\/?$/);
+    const match = url.pathname.match(
+      /^\/user\/(ur[0-9]{1,20}|p\.[A-Za-z0-9._-]{1,62})\/watchlist\/?$/
+    );
     if (!match) return undefined;
     return {
       provider: 'imdb',

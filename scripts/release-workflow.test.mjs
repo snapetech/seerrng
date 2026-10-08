@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ const rootDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 );
+const require = createRequire(import.meta.url);
 const workflowDirectory = path.join(rootDirectory, '.github', 'workflows');
 const readWorkflow = (name) =>
   yaml.load(fs.readFileSync(path.join(workflowDirectory, name), 'utf8'));
@@ -144,7 +146,7 @@ test('container workflows use the canonical lowercase GitHub Container Registry 
   assert.match(digestResolver.run, /image="\$\{GHCR_IMAGE\}:\$\{VERSION\}"/u);
 });
 
-test('AppImage pins its builder, uses the current launcher, and excludes binaries above its glibc baseline', () => {
+test('AppImage pins its builder, uses the current launcher, and loads its bundled WASM compiler', () => {
   const workflow = readWorkflow('release-linux-packages.yml');
   const job = workflow.jobs.appimage;
   const launcherCheckout = job.steps.find(
@@ -154,6 +156,10 @@ test('AppImage pins its builder, uses the current launcher, and excludes binarie
   const smoke = job.steps.find((step) => step.name === 'Smoke-test AppImage');
   const appRun = fs.readFileSync(
     path.join(rootDirectory, 'packaging', 'appimage', 'AppRun'),
+    'utf8'
+  );
+  const nextSwc = fs.readFileSync(
+    require.resolve('next/dist/build/swc'),
     'utf8'
   );
   const applicationPackage = JSON.parse(
@@ -223,6 +229,13 @@ test('AppImage pins its builder, uses the current launcher, and excludes binarie
   assert.match(smoke.run, /--appimage-extract-and-run/u);
   assert.match(smoke.run, /api\/v1\/settings\/public/u);
   assert.match(appRun, /xdg-open[\s\S]*127\.0\.0\.1/mu);
+  assert.match(appRun, /^export NEXT_TEST_WASM=1$/mu);
+  assert.match(
+    appRun,
+    /^export NEXT_TEST_WASM_DIR="\$APP_DIR\/node_modules\/next\/wasm\/@next\/swc-wasm-nodejs"$/mu
+  );
+  assert.match(nextSwc, /NEXT_TEST_WASM_DIR/u);
+  assert.match(nextSwc, /NEXT_TEST_WASM/u);
   assert.match(desktop, /^Exec=AppRun$/mu);
   assert.match(desktop, /^Terminal=false$/mu);
 });

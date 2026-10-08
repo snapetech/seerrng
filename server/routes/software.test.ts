@@ -985,6 +985,28 @@ describe('software request routes', () => {
     assert.match(response.body.error, /unsupported integration contract/i);
   });
 
+  it('rejects unsupported ROMarrNG request contract versions', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
+      service: 'ROMarrNG',
+      apiVersion: 1,
+      requestContractVersion: 3,
+    }));
+
+    const response = await request(app)
+      .post('/api/v1/settings/software-acquisition/test/romarr')
+      .send({
+        hostname: 'romarr.test',
+        port: 6868,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: 'romarr-test-key',
+      });
+
+    assert.strictEqual(response.status, 502);
+    assert.match(response.body.error, /unsupported integration contract/i);
+  });
+
   it('validates the ROMarr retry confirmation against the OpenAPI contract', async () => {
     const app = createOpenApiValidatedApp();
     const valid = await request(app)

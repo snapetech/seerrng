@@ -42,6 +42,18 @@ describe('external request list synchronization', () => {
         sourceUrl: 'https://www.imdb.com/user/ur12345678/watchlist/',
       }
     );
+    for (const profileId of ['p.mqcc26fvagqmqbomwbssqddwh4', 'p.colneedham']) {
+      assert.deepEqual(
+        parseExternalRequestListUrl(
+          `https://www.imdb.com/user/${profileId}/watchlist/`
+        ),
+        {
+          provider: 'imdb',
+          sourceId: profileId,
+          sourceUrl: `https://www.imdb.com/user/${profileId}/watchlist/`,
+        }
+      );
+    }
     assert.deepEqual(
       parseExternalRequestListUrl(
         'https://www.goodreads.com/user/show/1234567-example'
@@ -57,6 +69,9 @@ describe('external request list synchronization', () => {
       'http://www.imdb.com/user/ur12345678/watchlist/',
       'https://imdb.com.evil.example/user/ur12345678/watchlist/',
       'https://www.imdb.com/user/ur12345678/watchlist/?next=http://127.0.0.1',
+      'https://www.imdb.com/user/p./watchlist/',
+      `https://www.imdb.com/user/p.${'a'.repeat(63)}/watchlist/`,
+      'https://www.imdb.com/user/p.profile%2F..%2Fadmin/watchlist/',
       'https://www.goodreads.com/review/list_rss/1234567?shelf=read',
       'https://www.goodreads.com/review/list_rss/1234567?url=http://127.0.0.1',
     ]) {
@@ -145,6 +160,41 @@ describe('external request list synchronization', () => {
     assert.deepEqual(await resolveImdbItem('tt1234567'), {
       request: { mediaType: MediaType.MOVIE, mediaId: 123 },
     });
+  });
+
+  it('syncs IMDb watchlists using the new profile ID', async () => {
+    const user = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    const profileId = 'p.mqcc26fvagqmqbomwbssqddwh4';
+    const repository = getRepository(ExternalRequestList);
+    const list = await repository.save(
+      new ExternalRequestList({
+        user,
+        provider: 'imdb',
+        sourceId: profileId,
+        sourceUrl: `https://www.imdb.com/user/${profileId}/watchlist/`,
+        processedItemIds: [],
+      })
+    );
+    let fetchedProfileId: string | undefined;
+    const adapters: ExternalRequestListSyncAdapters = {
+      fetchImdbWatchlist: async (id) => {
+        fetchedProfileId = id;
+        return [];
+      },
+      fetchGoodreadsToRead: async () => [],
+      resolveImdbItem: async () => undefined,
+      resolveGoodreadsItem: async () => undefined,
+      requestMedia: async () => ({}),
+      saveList: (record) => repository.save(record),
+      now: () => new Date('2026-10-08T12:00:00.000Z'),
+    };
+
+    const result = await syncExternalRequestList(list, user, adapters);
+
+    assert.equal(result.failed, 0);
+    assert.equal(fetchedProfileId, profileId);
   });
 
   it('submits new IMDb entries as the list owner through MediaRequest.request', async () => {

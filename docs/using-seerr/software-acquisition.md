@@ -79,9 +79,11 @@ browser URLs or user-facing links.
 The selected catalog provider must be configured for its categories to load.
 QuestarrNG remains required for PC game requests, and ROMarrNG is required for
 emulation systems and ROM acquisition. Existing ROMarrNG installations keep
-using their documented v1 request and status routes. Each newer ROMarrNG
-catalog option is enabled only by a provider build that advertises the matching
-capability.
+using their documented v1 request and status routes. ROMarrNG v1 and v2
+contract handshakes use the stable `/api/integration/seerrng/v1` routes; older
+builds without a contract version continue using `/api/v1/integration`. The
+ROMarrNG IGDB or DAT catalog is enabled only when the provider advertises its
+matching capability.
 These connections are independent of Radarr, Sonarr, Bookshelf, and the other
 media automation services.
 
@@ -367,4 +369,3 @@ For ROM requests fulfilled by ROMarrNG, the request shows **In RomM Library**
 once ROMarrNG has placed the finished file in a library folder that RomM reads.
 This means the file is in place. RomM still has to scan its library before the
 game appears there, so the badge does not confirm that RomM has indexed it.
-

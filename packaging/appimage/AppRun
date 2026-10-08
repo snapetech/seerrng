@@ -5,6 +5,11 @@ APP_DIR="$HERE/usr/lib/seerrng"
 export NODE_ENV=production
 export CONFIG_DIRECTORY="${CONFIG_DIRECTORY:-${XDG_CONFIG_HOME:-$HOME/.config}/seerrng}"
 export PORT="${PORT:-5055}"
+# The GNU SWC binary is omitted to preserve the AppImage glibc baseline. Use
+# the checksum-pinned WASM package embedded by the release workflow instead of
+# letting Next.js try to download a native package at startup.
+export NEXT_TEST_WASM=1
+export NEXT_TEST_WASM_DIR="$APP_DIR/node_modules/next/wasm/@next/swc-wasm-nodejs"
 mkdir -p "$CONFIG_DIRECTORY"
 cd "$APP_DIR"
 
