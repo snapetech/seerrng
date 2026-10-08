@@ -19,6 +19,7 @@ const activeRequestStatuses = [
 const mediaTypeByService: Record<ServarrServiceType, MediaType> = {
   radarr: MediaType.MOVIE,
   sonarr: MediaType.TV,
+  sportarr: MediaType.SPORTS,
   lidarr: MediaType.MUSIC,
   readarr: MediaType.BOOK,
   // Mylar, Kapowarr, and BackIssue all fulfill comics, so they share one ID space keyed

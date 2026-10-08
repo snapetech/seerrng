@@ -11,6 +11,7 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 import {
   buildRequestTreeData,
+  firstSelectableRequestEpisodeId,
   hasCompleteRequestMetadata,
   requestSelectionToTreeIds,
   treeSelectionToRequests,
@@ -37,6 +38,7 @@ export interface RequestSeasonEpisodeTreeProps {
   disabledSeasons?: number[];
   disabledEpisodes?: Record<number, number[]>;
   availableEpisodesBySeason?: Record<number, number[]>;
+  selectionMode?: 'multiple' | 'single-episode';
   onLoadingChange?: (loading: boolean) => void;
   onReadyChange?: (ready: boolean) => void;
 }
@@ -49,6 +51,7 @@ const RequestSeasonEpisodeTree = ({
   disabledSeasons = [],
   disabledEpisodes = {},
   availableEpisodesBySeason = {},
+  selectionMode = 'multiple',
   onLoadingChange,
   onReadyChange,
 }: RequestSeasonEpisodeTreeProps) => {
@@ -140,6 +143,35 @@ const RequestSeasonEpisodeTree = ({
         severity="info"
       />
     ) : null;
+  const selectedIds = requestSelectionToTreeIds(treeData, selections);
+  const singleEpisodeId =
+    selectionMode === 'single-episode'
+      ? firstSelectableRequestEpisodeId(treeData, selectedIds)
+      : undefined;
+  const renderedSelectedIds =
+    singleEpisodeId === undefined ? selectedIds : [singleEpisodeId];
+  const singleEpisodeSelection =
+    singleEpisodeId === undefined
+      ? []
+      : treeSelectionToRequests(treeData, [singleEpisodeId], [], true);
+  const selectionKey = JSON.stringify(selections);
+  const singleEpisodeSelectionKey = JSON.stringify(singleEpisodeSelection);
+  useEffect(() => {
+    if (
+      selectionMode === 'single-episode' &&
+      ready &&
+      selectionKey !== singleEpisodeSelectionKey
+    ) {
+      onSelectionsChange(singleEpisodeSelection);
+    }
+  }, [
+    onSelectionsChange,
+    ready,
+    selectionKey,
+    selectionMode,
+    singleEpisodeSelection,
+    singleEpisodeSelectionKey,
+  ]);
 
   return (
     <div
@@ -154,11 +186,17 @@ const RequestSeasonEpisodeTree = ({
         selectionPurpose="request"
         disabled={!ready}
         seasons={treeData}
-        selectedIds={requestSelectionToTreeIds(treeData, selections)}
+        selectedIds={renderedSelectedIds}
+        selectionMode={selectionMode}
         onSelectionChange={(ids) => {
           if (ready) {
             onSelectionsChange(
-              treeSelectionToRequests(treeData, ids, selections)
+              treeSelectionToRequests(
+                treeData,
+                ids,
+                selections,
+                selectionMode === 'single-episode'
+              )
             );
           }
         }}

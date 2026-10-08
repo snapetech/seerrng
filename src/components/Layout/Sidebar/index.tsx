@@ -23,6 +23,7 @@ import {
   SparklesIcon,
   SpeakerWaveIcon,
   Square3Stack3DIcon,
+  TrophyIcon,
   TvIcon,
   UsersIcon,
   XMarkIcon,
@@ -48,6 +49,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   browsesoftware: 'Software',
   browsecomics: 'Comics',
   browsemagazines: 'Magazines',
+  browsesports: 'Sports',
   browsetv: 'Series',
   requests: 'Requests',
   blocklist: 'Blocklist',
@@ -163,6 +165,12 @@ const SidebarLinks: SidebarLinkProps[] = [
     messagesKey: 'browsemagazines',
     svgIcon: <NewspaperIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/(?:discover\/magazines(?:\/.*)?|magazine\/)/,
+  },
+  {
+    href: '/discover/sports',
+    messagesKey: 'browsesports',
+    svgIcon: <TrophyIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/(?:discover\/sports(?:\/.*)?|sportarr\/)/,
   },
   {
     href: '/software',

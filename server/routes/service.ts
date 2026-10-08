@@ -460,6 +460,25 @@ serviceRoutes.get('/magazine', async (req, res, next) => {
   }
 });
 
+serviceRoutes.get('/sportarr', async (req, res, next) => {
+  try {
+    return await runServiceSummaryRead(req, () => {
+      const sportarrServices = getExternalRuntimeConfig().sportarr.map(
+        (service) => ({
+          id: service.id,
+          name: service.name,
+          isDefault: service.isDefault,
+          profileName: service.activeProfileName,
+        })
+      );
+
+      return res.status(200).json(sportarrServices);
+    });
+  } catch (error) {
+    return reportServiceSummaryReadError(error, next);
+  }
+});
+
 serviceRoutes.get('/readarr', async (req, res, next) => {
   try {
     return await runServiceSummaryRead(req, (includeOperationalDetails) => {

@@ -10,8 +10,8 @@ import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import {
   hasSameServarrServiceAuthority,
   runWithServarrServiceAdmission,
+  type ServarrDownloadServiceType,
   type ServarrServiceAuthority,
-  type ServarrServiceType,
 } from '@server/lib/serviceAdmission';
 import type { DVRSettings, ReadarrSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -122,7 +122,7 @@ export class DownloadTracker {
     Server extends ServarrServiceAuthority,
     Result,
   >(
-    serviceType: ServarrServiceType,
+    serviceType: ServarrDownloadServiceType,
     server: Server,
     operation: () => Promise<Result>
   ): Promise<Result | undefined> {
@@ -147,7 +147,7 @@ export class DownloadTracker {
 
   private refreshMonitoredDownloads(
     key: string,
-    serviceType: ServarrServiceType,
+    serviceType: ServarrDownloadServiceType,
     server: DownloadTrackerServerSettings,
     refresh: () => Promise<void>,
     serverName: string
@@ -189,7 +189,7 @@ export class DownloadTracker {
   }
 
   private async loadHistory(
-    serviceType: ServarrServiceType,
+    serviceType: ServarrDownloadServiceType,
     server: DownloadTrackerServerSettings,
     api: { getHistory: () => Promise<ServarrHistoryItem[]> },
     serverName: string

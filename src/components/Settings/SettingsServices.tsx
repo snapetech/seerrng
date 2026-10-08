@@ -30,6 +30,7 @@ import {
   PlusIcon,
   Square3Stack3DIcon,
   TrashIcon,
+  TrophyIcon,
 } from '@heroicons/react/24/solid';
 import type OverrideRule from '@server/entity/OverrideRule';
 import type { OverrideRuleResultsResponse } from '@server/interfaces/api/overrideRuleInterfaces';
@@ -45,6 +46,7 @@ import type {
   RadarrSettings,
   ReadarrSettings,
   SonarrSettings,
+  SportarrSettings,
 } from '@server/lib/settings';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
@@ -86,6 +88,9 @@ const ReadarrModal = dynamic(
 const SonarrModal = dynamic(
   () => import('@app/components/Settings/SonarrModal')
 );
+const SportarrModal = dynamic(
+  () => import('@app/components/Settings/SportarrModal')
+);
 
 const messages = defineMessages('components.Settings', {
   services: 'Services',
@@ -95,6 +100,7 @@ const messages = defineMessages('components.Settings', {
   setupAssistantGuide: 'Open the setup guide',
   radarrsettings: 'Radarr Settings',
   sonarrsettings: 'Sonarr Settings',
+  sportarrsettings: 'Sportarr Settings',
   lidarrsettings: 'Lidarr Settings',
   readarrsettings: 'Bookshelf Settings',
   audiobookshelfsettings: 'Audiobookshelf Availability',
@@ -136,6 +142,11 @@ const messages = defineMessages('components.Settings', {
   activeProfile: 'Active Profile',
   addradarr: 'Add Radarr Server',
   addsonarr: 'Add Sonarr Server',
+  addSportarr: 'Connect Sportarr Server',
+  sportarrDescription:
+    'Search and request sports leagues in Sportarr. Sportarr uses its own root folder and monitoring defaults when SeerrNG adds a league.',
+  noDefaultSportarr:
+    'Choose one Sportarr server as the default destination for sports requests.',
   addlidarr: 'Add Lidarr Server',
   addreadarr: 'Add Bookshelf Server',
   addmylar: 'Add Mylar Server',
@@ -181,6 +192,7 @@ interface ServerInstanceProps {
   externalUrl?: string;
   profileName?: string;
   isSonarr?: boolean;
+  isSportarr?: boolean;
   isLidarr?: boolean;
   isReadarr?: boolean;
   isAudiobookshelf?: boolean;
@@ -227,6 +239,7 @@ const ServerInstance = ({
   isDefault = false,
   isSSL = false,
   isSonarr = false,
+  isSportarr = false,
   isLidarr = false,
   isReadarr = false,
   isAudiobookshelf = false,
@@ -255,6 +268,8 @@ const ServerInstance = ({
         >
           {isSonarr ? (
             <SonarrLogo className="h-10 w-10 flex-shrink-0" />
+          ) : isSportarr ? (
+            <TrophyIcon className="settings-service-sportarr-icon" />
           ) : isLidarr ? (
             <LidarrLogo className="h-10 w-10 flex-shrink-0" />
           ) : isReadarr ? (
@@ -373,6 +388,11 @@ const SettingsServices = () => {
     mutate: revalidateSonarr,
   } = useSWR<SonarrSettings[]>('/api/v1/settings/sonarr');
   const {
+    data: sportarrData,
+    error: sportarrError,
+    mutate: revalidateSportarr,
+  } = useSWR<SportarrSettings[]>('/api/v1/settings/sportarr');
+  const {
     data: lidarrData,
     error: lidarrError,
     mutate: revalidateLidarr,
@@ -424,6 +444,10 @@ const SettingsServices = () => {
     open: false,
     sonarr: null,
   });
+  const [editSportarrModal, setEditSportarrModal] = useState<{
+    open: boolean;
+    sportarr: SportarrSettings | null;
+  }>({ open: false, sportarr: null });
   const [editLidarrModal, setEditLidarrModal] = useState<{
     open: boolean;
     lidarr: LidarrSettings | null;
@@ -473,6 +497,7 @@ const SettingsServices = () => {
     type:
       | 'radarr'
       | 'sonarr'
+      | 'sportarr'
       | 'lidarr'
       | 'readarr'
       | 'audiobookshelf'
@@ -563,6 +588,7 @@ const SettingsServices = () => {
     setDeleteServerModal({ open: false, serverId: null, type: 'radarr' });
     revalidateRadarr();
     revalidateSonarr();
+    revalidateSportarr();
     revalidateLidarr();
     revalidateReadarr();
     revalidateMylar();
@@ -637,6 +663,17 @@ const SettingsServices = () => {
             revalidateSonarr();
             mutate('/api/v1/settings/public');
             setEditSonarrModal({ open: false, sonarr: null });
+          }}
+        />
+      )}
+      {editSportarrModal.open && (
+        <SportarrModal
+          settings={editSportarrModal.sportarr}
+          onClose={() => setEditSportarrModal({ open: false, sportarr: null })}
+          onSave={() => {
+            revalidateSportarr();
+            mutate('/api/v1/settings/public');
+            setEditSportarrModal({ open: false, sportarr: null });
           }}
         />
       )}
@@ -768,17 +805,19 @@ const SettingsServices = () => {
                 ? 'Radarr'
                 : deleteServerModal.type === 'sonarr'
                   ? 'Sonarr'
-                  : deleteServerModal.type === 'lidarr'
-                    ? 'Lidarr'
-                    : deleteServerModal.type === 'backissue'
-                      ? 'BackIssue'
-                      : deleteServerModal.type === 'audiobookshelf'
-                        ? 'Audiobookshelf'
-                        : deleteServerModal.type === 'navidrome'
-                          ? 'Navidrome'
-                          : deleteServerModal.type === 'jellystat'
-                            ? 'Jellystat'
-                            : 'Bookshelf',
+                  : deleteServerModal.type === 'sportarr'
+                    ? 'Sportarr'
+                    : deleteServerModal.type === 'lidarr'
+                      ? 'Lidarr'
+                      : deleteServerModal.type === 'backissue'
+                        ? 'BackIssue'
+                        : deleteServerModal.type === 'audiobookshelf'
+                          ? 'Audiobookshelf'
+                          : deleteServerModal.type === 'navidrome'
+                            ? 'Navidrome'
+                            : deleteServerModal.type === 'jellystat'
+                              ? 'Jellystat'
+                              : 'Bookshelf',
           })}
         >
           {intl.formatMessage(messages.deleteserverconfirm)}
@@ -945,6 +984,67 @@ const SettingsServices = () => {
                   >
                     <PlusIcon />
                     <span>{intl.formatMessage(messages.addsonarr)}</span>
+                  </Button>
+                </div>
+              </li>
+            </ul>
+          </>
+        )}
+      </div>
+      <div className="settings-service-heading">
+        <h3 className="heading">
+          {intl.formatMessage(messages.sportarrsettings)}
+        </h3>
+        <p className="description">
+          {intl.formatMessage(messages.sportarrDescription)}
+        </p>
+      </div>
+      <div className="app-card-sub section settings-service-section">
+        {!sportarrData && !sportarrError && <LoadingSpinner />}
+        {sportarrData && !sportarrError && (
+          <>
+            {sportarrData.length > 0 &&
+              !sportarrData.some((instance) => instance.isDefault) && (
+                <Alert title={intl.formatMessage(messages.noDefaultSportarr)} />
+              )}
+            <ul className="settings-service-grid">
+              {sportarrData.map((instance) => (
+                <ServerInstance
+                  key={`sportarr-config-${instance.id}`}
+                  name={instance.name}
+                  hostname={instance.hostname}
+                  port={instance.port}
+                  profileName={instance.activeProfileName}
+                  isSSL={instance.useSsl}
+                  isSportarr
+                  isDefault={instance.isDefault}
+                  externalUrl={instance.externalUrl}
+                  onEdit={() =>
+                    setEditSportarrModal({ open: true, sportarr: instance })
+                  }
+                  onDelete={() =>
+                    setDeleteServerModal({
+                      open: true,
+                      serverId: instance.id,
+                      type: 'sportarr',
+                    })
+                  }
+                />
+              ))}
+              <li className="settings-service-add-card">
+                <div className="settings-service-add-card-content">
+                  <Button
+                    buttonType="success"
+                    buttonSize="standard"
+                    onClick={() =>
+                      setEditSportarrModal({ open: true, sportarr: null })
+                    }
+                  >
+                    <PlusIcon
+                      className="settings-service-add-icon"
+                      aria-hidden="true"
+                    />
+                    <span>{intl.formatMessage(messages.addSportarr)}</span>
                   </Button>
                 </div>
               </li>

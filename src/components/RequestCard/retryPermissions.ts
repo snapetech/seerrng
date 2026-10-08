@@ -1,7 +1,7 @@
 import { hasPermission, Permission } from '@server/lib/permissions';
 
 export type RetryRequestMediaType =
-  'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
+  'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine' | 'sports';
 
 interface RetryRequestPermissionInput {
   requestType: RetryRequestMediaType;
@@ -41,7 +41,9 @@ export const canRetryRequest = ({
             ? [Permission.REQUEST, Permission.REQUEST_BOOK]
             : requestType === 'comic'
               ? [Permission.REQUEST, Permission.REQUEST_COMIC]
-              : [Permission.REQUEST, Permission.REQUEST_MAGAZINE];
+              : requestType === 'magazine'
+                ? [Permission.REQUEST, Permission.REQUEST_MAGAZINE]
+                : [Permission.REQUEST, Permission.REQUEST_SPORTS];
 
   return hasPermission(requestPermissions, permissions, { type: 'or' });
 };

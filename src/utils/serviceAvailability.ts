@@ -8,6 +8,7 @@ export interface OptionalServiceAvailability {
   readmeabookEnabled?: boolean;
   comicsEnabled: boolean;
   magazinesEnabled?: boolean;
+  sportsEnabled?: boolean;
   softwareEnabled?: boolean;
   romarrEnabled?: boolean;
   enabledMediaCategories?: Partial<Record<MediaCategoryKey, boolean>>;
@@ -161,6 +162,17 @@ export const isOptionalCatalogPathEnabled = (
     return (
       Boolean(availability.magazinesEnabled) &&
       isConfiguredMediaCategoryEnabled('magazine', availability)
+    );
+  }
+
+  if (
+    path === '/discover/sports' ||
+    path.startsWith('/discover/sports/') ||
+    path.startsWith('/sportarr/')
+  ) {
+    return (
+      Boolean(availability.sportsEnabled) &&
+      isConfiguredMediaCategoryEnabled('sports', availability)
     );
   }
 

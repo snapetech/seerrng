@@ -43,7 +43,8 @@ interface StatusBadgeProps {
   tmdbId?: number;
   mbId?: string;
   externalId?: string;
-  mediaType?: 'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
+  mediaType?:
+    'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine' | 'sports';
   bookFormat?: RequestedBookFormat;
   title?: string | string[];
   statusLabelOverride?: string;
@@ -116,9 +117,11 @@ const StatusBadge = ({
                   ? Permission.REQUEST_COMIC
                   : mediaType === 'magazine'
                     ? Permission.REQUEST_MAGAZINE
-                    : mediaType === 'movie'
-                      ? Permission.REQUEST_MOVIE
-                      : Permission.REQUEST_TV,
+                    : mediaType === 'sports'
+                      ? Permission.REQUEST_SPORTS
+                      : mediaType === 'movie'
+                        ? Permission.REQUEST_MOVIE
+                        : Permission.REQUEST_TV,
           ],
       {
         type: 'or',
@@ -128,6 +131,7 @@ const StatusBadge = ({
     mediaType !== 'book' &&
     mediaType !== 'comic' &&
     mediaType !== 'magazine' &&
+    mediaType !== 'sports' &&
     (!is4k ||
       (mediaType === 'movie'
         ? settings.currentSettings.movie4kEnabled
@@ -171,6 +175,11 @@ const StatusBadge = ({
       mediaLinkDescription = intl.formatMessage(messages.managemedia, {
         mediaType: 'Magazine',
       });
+    } else if (mediaType === 'sports' && externalId) {
+      mediaLink = `/sportarr/${encodeApiPathSegment(externalId)}?manage=1`;
+      mediaLinkDescription = intl.formatMessage(messages.managemedia, {
+        mediaType: intl.formatMessage(globalMessages.sports),
+      });
     } else if (mediaType && tmdbId) {
       mediaLink = `/${mediaType}/${tmdbId}?manage=1`;
       mediaLinkDescription = intl.formatMessage(messages.managemedia, {
@@ -190,9 +199,11 @@ const StatusBadge = ({
                 ? 'Comics'
                 : mediaType === 'magazine'
                   ? 'LazyLibrarian'
-                  : mediaType === 'movie'
-                    ? 'Radarr'
-                    : 'Sonarr',
+                  : mediaType === 'sports'
+                    ? 'Sportarr'
+                    : mediaType === 'movie'
+                      ? 'Radarr'
+                      : 'Sonarr',
       });
     }
   }

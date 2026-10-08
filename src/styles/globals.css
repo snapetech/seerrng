@@ -3386,6 +3386,126 @@
     color: rgb(243 244 246);
   }
 
+  .sportarr-detail-page {
+    display: grid;
+    gap: var(--card-body-spacing-before);
+  }
+
+  .sportarr-detail-navigation,
+  .sportarr-event-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--button-content-gap);
+  }
+
+  .sportarr-detail-poster {
+    aspect-ratio: var(--poster-aspect-ratio);
+  }
+
+  .sportarr-detail-overview {
+    margin-block: var(--detail-row-gap);
+    white-space: pre-line;
+  }
+
+  .sportarr-detail-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--button-content-gap) var(--card-spacing);
+    margin-block-start: var(--detail-row-gap);
+    color: rgb(var(--theme-control-text) / 0.78);
+  }
+
+  .sportarr-detail-facts strong {
+    color: rgb(var(--theme-control-text));
+    font-weight: 600;
+  }
+
+  .sportarr-event-section {
+    min-width: 0;
+  }
+
+  .sportarr-event-heading-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-inline-end: var(--button-content-gap);
+    vertical-align: text-bottom;
+  }
+
+  .sportarr-event-list {
+    display: grid;
+    gap: var(--card-body-spacing-before);
+  }
+
+  .sportarr-event-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--card-spacing);
+    min-width: 0;
+    padding: var(--inset-card-padding);
+    border: 1px solid rgb(var(--theme-control-border) / 0.72);
+    border-radius: var(--control-corner-radius);
+    background: rgb(var(--theme-control-surface) / 0.35);
+  }
+
+  .sportarr-event-card-main {
+    display: grid;
+    gap: var(--button-content-gap);
+    min-width: 0;
+  }
+
+  .sportarr-event-card h3 {
+    overflow-wrap: anywhere;
+    font-size: var(--card-title-font-size);
+    font-weight: 600;
+  }
+
+  .sportarr-event-date,
+  .sportarr-event-state {
+    color: rgb(var(--theme-control-text) / 0.76);
+    font-size: var(--card-body-font-size);
+  }
+
+  .sportarr-event-state {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    text-align: end;
+  }
+
+  .sportarr-event-file-ready,
+  .sportarr-event-file-missing {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--button-content-gap);
+  }
+
+  .sportarr-event-file-ready {
+    color: var(--palette-green-light);
+  }
+
+  .sportarr-event-file-ready svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .sportarr-event-load-more {
+    display: flex;
+    justify-content: center;
+    margin-block-start: var(--card-body-spacing-before);
+  }
+
+  @media (max-width: 639px) {
+    .sportarr-event-card {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sportarr-event-state {
+      justify-content: flex-start;
+      text-align: start;
+    }
+  }
+
   .detail-summary-title {
     display: block;
     min-width: 0;
@@ -7839,6 +7959,46 @@
 
   .settings-service-card-content {
     @apply flex min-w-0 flex-1 items-start gap-3;
+  }
+
+  .settings-service-heading {
+    margin-block: var(--card-body-spacing-before) var(--card-spacing);
+  }
+
+  .settings-service-add-card {
+    display: grid;
+    min-width: 0;
+    min-height: 8rem;
+    place-items: center;
+    padding: var(--inset-card-padding);
+    border: 2px dashed rgb(var(--theme-control-border) / 0.72);
+    border-radius: var(--control-corner-radius);
+    box-shadow: 0 1px 3px rgb(var(--theme-page-gradient-black) / 0.3);
+  }
+
+  .settings-service-add-card-content {
+    display: flex;
+    width: 100%;
+    min-height: inherit;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .settings-service-add-icon,
+  .settings-service-sportarr-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+  }
+
+  .settings-service-sportarr-icon {
+    color: rgb(var(--color-gray-300));
+  }
+
+  @media (min-width: 640px) {
+    .settings-service-add-card {
+      min-height: 11rem;
+    }
   }
 
   .settings-service-logo-link {

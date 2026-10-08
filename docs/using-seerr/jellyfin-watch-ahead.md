@@ -1,14 +1,29 @@
 ---
-title: TV episode watch-ahead
+title: TV Episode Queue
 description: Opt in to a small buffer of upcoming TV episodes requested in Sonarr as you watch in Plex, Jellyfin, or Emby.
 ---
 
-# TV episode watch-ahead
+# TV Episode Queue
 
 The Episode Queue lets a TV request owner ask SeerrNG to keep up to five
 upcoming episodes requested in Sonarr as they watch the series in Plex,
 Jellyfin, or Emby. It is optional and **Off by default for every request**.
 Choosing a buffer applies only to that request.
+
+When you enable Episode Queue on a **new** TV request, the episode list changes
+to a single starting episode. SeerrNG requests that episode first, then asks
+Sonarr to keep the selected number of upcoming episodes requested as playback
+progresses. Only one starting episode is selected, so this avoids requesting a
+whole season in advance. Choose **Off** to return to the normal season or
+episode selection and restore the selection you had before enabling the queue.
+The queue does not guarantee a download will finish before you reach the next
+episode; Sonarr controls searching and download timing.
+
+Enabling Episode Queue on an **existing** request changes future queueing only.
+It keeps the request's existing season and episode selections, and it does not
+delete episodes already in Sonarr or the media library. To stop future additions
+and remove an episode from Sonarr, turn the queue off first, then manage that
+episode in Sonarr.
 
 ## Requirements
 
@@ -22,16 +37,15 @@ Choosing a buffer applies only to that request.
 
 ## Turn it on or off
 
-When creating or editing your own TV request, choose a buffer under **Keep
-upcoming episodes requested**. The initial selection is **Off**. You can change
-it later from that request's card in **Requests** or **Request Status**. Only
-the request owner can change the setting; administrators cannot enable it for
-someone else.
+When creating or editing your own TV request, choose a buffer under **Episode
+Queue**. The initial setting is **Off**. You can change it later from that
+request's card in **Requests** or **Request Status**. Only the request owner can
+change the setting; administrators cannot enable it for someone else.
 
 Choose **Off** to stop future watch-ahead requests. Episodes already created
-remain in Sonarr and in SeerrNG's request history. Turn the queue off before
-removing an episode request you do not want; while it remains on, SeerrNG may
-add a missing episode again if it is needed to maintain the selected buffer.
+remain in Sonarr and in SeerrNG's request history. While the queue remains on,
+SeerrNG may add a missing episode again if it is needed to maintain the selected
+buffer. Episode Queue never deletes downloaded episodes or files.
 
 ## What SeerrNG does
 

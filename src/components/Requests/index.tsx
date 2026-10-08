@@ -69,6 +69,7 @@ import type { ComicDetails } from '@server/models/Comic';
 import type { MagazineDetails } from '@server/models/Magazine';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MusicDetails } from '@server/models/Music';
+import type { SportarrDetails } from '@server/models/Sportarr';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
@@ -131,6 +132,7 @@ const messages = defineMessages('components.Requests', {
   album: 'Album',
   comic: 'Comic',
   magazine: 'Magazine',
+  sports: 'Sports',
   bookAndAudiobook: 'Book + Audiobook',
   book: 'Book',
   fourK: '4K',
@@ -156,6 +158,8 @@ const messages = defineMessages('components.Requests', {
   creator: 'Creator',
   publisher: 'Publisher',
   network: 'Network',
+  sport: 'Sport',
+  country: 'Country',
   studio: 'Studio',
   requestDate: 'Date',
   requestTime: 'Time',
@@ -180,6 +184,7 @@ const messages = defineMessages('components.Requests', {
   audiobooks: 'Audiobooks',
   comics: 'Comics',
   magazines: 'Magazines',
+  sportsLeagues: 'Sports',
   romsRetro: 'ROMs - Retro',
   romsModern: 'ROMs - Modern',
   pcGames: 'PC Games',
@@ -230,7 +235,7 @@ const messages = defineMessages('components.Requests', {
   modifyFailed: 'Unable to update this request.',
   watchAheadLabel: 'Episode Queue',
   watchAheadDescription:
-    'This optional queue is Off by default for every TV request. If you turn it on, SeerrNG follows your linked media server playback and keeps this many upcoming episodes requested in Sonarr after the request is approved. Episodes use the parent approval and do not count against your request quota. Turning it off stops future additions but does not cancel episodes already requested.',
+    'This optional queue is Off by default for every TV request. If you turn it on, SeerrNG follows your linked Plex, Jellyfin, or Emby playback and keeps this many upcoming episodes requested in Sonarr after approval. On a new request, choose one starting episode; enabling the queue on an existing request preserves its current selections. Episodes use the parent approval and do not count against your request quota. Turning it off stops future additions but does not cancel episodes already requested.',
   watchAheadOff: 'Off',
   watchAheadOption: '{count, plural, one {# episode} other {# episodes}}',
   watchAheadUpdated: 'Requested episode queue updated.',
@@ -271,7 +276,8 @@ type MediaDetails =
   | MusicDetails
   | BookDetails
   | ComicDetails
-  | MagazineDetails;
+  | MagazineDetails
+  | SportarrDetails;
 type StatusStage =
   | 'requested'
   | 'approved'
@@ -294,6 +300,7 @@ type MediaFilter =
   | 'audiobook'
   | 'comic'
   | 'magazine'
+  | 'sports'
   | 'retro'
   | 'modern'
   | 'game';
@@ -343,6 +350,7 @@ const mediaTypeValues: MediaFilter[] = [
   'audiobook',
   'comic',
   'magazine',
+  'sports',
   'retro',
   'modern',
   'game',
@@ -532,6 +540,9 @@ const isComic = (details: MediaDetails): details is ComicDetails =>
 const isMagazine = (details: MediaDetails): details is MagazineDetails =>
   (details as MagazineDetails).mediaType === 'magazine';
 
+const isSports = (details: MediaDetails): details is SportarrDetails =>
+  (details as SportarrDetails).mediaType === 'sports';
+
 const getBookId = (item: RequestStatusItem): string | undefined =>
   item.request.media.identifiers?.find(
     (identifier) =>
@@ -553,6 +564,11 @@ const getMagazineId = (item: RequestStatusItem): string | undefined =>
     (identifier) => identifier.provider === 'lazylibrarian'
   )?.value;
 
+const getSportarrId = (item: RequestStatusItem): string | undefined =>
+  item.request.media.identifiers?.find(
+    (identifier) => identifier.provider === 'sportarr'
+  )?.value;
+
 const getDetailsUrl = (item: RequestStatusItem): string | null => {
   const request = item.request;
   if (request.type === 'movie' || request.type === 'tv') {
@@ -569,6 +585,12 @@ const getDetailsUrl = (item: RequestStatusItem): string | null => {
     const magazineId = getMagazineId(item);
     return magazineId
       ? `/api/v1/magazine/${encodeApiPathSegment(magazineId)}`
+      : null;
+  }
+  if (request.type === 'sports') {
+    const sportarrId = getSportarrId(item);
+    return sportarrId
+      ? `/api/v1/sportarr/${encodeApiPathSegment(sportarrId)}`
       : null;
   }
   const bookId = getBookId(item);
@@ -592,6 +614,10 @@ const getDetailHref = (item: RequestStatusItem): string | null => {
   if (request.type === 'magazine') {
     const magazineId = getMagazineId(item);
     return magazineId ? `/magazine/${encodeApiPathSegment(magazineId)}` : null;
+  }
+  if (request.type === 'sports') {
+    const sportarrId = getSportarrId(item);
+    return sportarrId ? `/sportarr/${encodeApiPathSegment(sportarrId)}` : null;
   }
   const bookId = getBookId(item);
   const bookFormat = getRequestedBookFormat(item.request.bookFormat);
@@ -627,6 +653,9 @@ const getTitle = (
   if (item.request.type === 'magazine') {
     return getMagazineId(item) ?? intl.formatMessage(messages.unknownTitle);
   }
+  if (item.request.type === 'sports') {
+    return getSportarrId(item) ?? intl.formatMessage(messages.unknownTitle);
+  }
   return `${item.request.type.toUpperCase()} #${item.request.media.tmdbId}`;
 };
 
@@ -659,6 +688,7 @@ const getBackdrop = (
       ? { src: details.posterPath, type: 'book' }
       : undefined;
   }
+  if (isSports(details)) return undefined;
   if (details.backdropPath) {
     return {
       src: `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${details.backdropPath}`,
@@ -688,6 +718,8 @@ const getMediaBadge = (
   if (item.request.type === 'comic') return intl.formatMessage(messages.comic);
   if (item.request.type === 'magazine')
     return intl.formatMessage(messages.magazine);
+  if (item.request.type === 'sports')
+    return intl.formatMessage(messages.sports);
   return intl.formatMessage(messages.book);
 };
 
@@ -699,6 +731,7 @@ const getMediaBadgeType = (
   if (item.request.type === 'music') return 'album';
   if (item.request.type === 'comic') return 'comic';
   if (item.request.type === 'magazine') return 'magazine';
+  if (item.request.type === 'sports') return 'sports';
   return undefined;
 };
 
@@ -717,6 +750,9 @@ const getMediaFormat = (
   }
   if (item.request.type === 'magazine') {
     return intl.formatMessage(messages.magazine);
+  }
+  if (item.request.type === 'sports') {
+    return intl.formatMessage(messages.sports);
   }
   return intl.formatMessage(
     getBookFormatMessage(getRequestedBookFormat(item.request.bookFormat))
@@ -742,6 +778,10 @@ const getReleaseDate = (
   }
   if (item.request.type === 'magazine') {
     return (details as MagazineDetails).latestIssue;
+  }
+  if (item.request.type === 'sports') {
+    const year = (details as SportarrDetails).year;
+    return year ? String(year) : undefined;
   }
   const year = (details as BookDetails).firstPublishYear;
   return year ? String(year) : undefined;
@@ -804,6 +844,9 @@ const getRuntime = (
       ? intl.formatNumber(issueCount)
       : notAvailable;
   }
+  if (item.request.type === 'sports') {
+    return (details as SportarrDetails).country ?? notAvailable;
+  }
   return notAvailable;
 };
 
@@ -816,7 +859,9 @@ const getRuntimeLabel = (
       ? messages.pages
       : item.request.type === 'magazine' || item.request.type === 'comic'
         ? messages.issues
-        : messages.runtime
+        : item.request.type === 'sports'
+          ? messages.country
+          : messages.runtime
   );
 
 const getRuntimeOrPages = (
@@ -860,6 +905,9 @@ const getFeaturedCredits = (
     }
 
     if (item.request.type === 'comic') {
+      return [];
+    }
+    if (item.request.type === 'sports') {
       return [];
     }
 
@@ -911,6 +959,13 @@ const getFeaturedCredits = (
         name: magazine.latestIssue ?? notAvailable,
       },
     ];
+  }
+
+  if (item.request.type === 'sports') {
+    const league = details as SportarrDetails;
+    return league.sport
+      ? [{ label: intl.formatMessage(messages.sport), name: league.sport }]
+      : [];
   }
 
   if (item.request.type === 'comic') {
@@ -1039,6 +1094,17 @@ const getGenres = (
   if (item.request.type === 'comic') {
     // ComicVine has no genre-equivalent field.
     return [];
+  }
+  if (item.request.type === 'sports') {
+    const sport = (details as SportarrDetails).sport;
+    return sport
+      ? [
+          {
+            name: sport,
+            href: `/discover/sports?query=${encodeURIComponent(sport)}`,
+          },
+        ]
+      : [];
   }
   return (
     (details as BookDetails).subjects
@@ -1576,7 +1642,8 @@ const RequestStatusCard = ({
             item.request.type === 'music' ||
             item.request.type === 'book' ||
             item.request.type === 'comic' ||
-            item.request.type === 'magazine'
+            item.request.type === 'magazine' ||
+            item.request.type === 'sports'
               ? undefined
               : item.request.media.tmdbId
           }
@@ -1589,6 +1656,14 @@ const RequestStatusCard = ({
           comicId={item.request.type === 'comic' ? getComicId(item) : undefined}
           magazineTitle={
             item.request.type === 'magazine' ? getMagazineId(item) : undefined
+          }
+          sportarrLeagueId={
+            item.request.type === 'sports' ? getSportarrId(item) : undefined
+          }
+          sportarrTitle={
+            item.request.type === 'sports' && details && isSports(details)
+              ? details.title
+              : undefined
           }
           type={item.request.type}
           is4k={item.request.is4k}
@@ -2632,6 +2707,7 @@ const Requests = () => {
     { value: 'audiobook', label: 'audiobooks' },
     { value: 'comic', label: 'comics' },
     { value: 'magazine', label: 'magazines' },
+    { value: 'sports', label: 'sportsLeagues' },
     { value: 'retro', label: 'romsRetro' },
     { value: 'modern', label: 'romsModern' },
     { value: 'game', label: 'pcGames' },
@@ -2787,7 +2863,9 @@ const Requests = () => {
               ? 'music'
               : mediaFilter === 'book' || mediaFilter === 'audiobook'
                 ? 'book'
-                : 'movie'
+                : mediaFilter === 'sports'
+                  ? 'tv'
+                  : 'movie'
         }
         sections={[
           {

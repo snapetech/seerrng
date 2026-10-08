@@ -167,17 +167,17 @@ test('upstream public commands preserve build-time translation and visual guards
     [
       'ui-style:check',
       'node --test src/styles/buttonGeometry.test.mjs',
-      'retain style and control-geometry checks',
+      'retain style, control-geometry, and Sportarr role checks',
     ],
     [
       'ui-style:check',
       'node bin/check-refreshed-ui-style.js',
-      'retain style and control-geometry checks',
+      'retain style, control-geometry, and Sportarr role checks',
     ],
     [
       'ui-style:check',
       'node bin/check-refreshed-ui-style.js; node --test src/styles/buttonGeometry.test.mjs',
-      'retain style and control-geometry checks',
+      'retain style, control-geometry, and Sportarr role checks',
     ],
     [
       'i18n:check',

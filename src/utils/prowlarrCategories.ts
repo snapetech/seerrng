@@ -21,6 +21,7 @@ const categoryMatchers: Record<MediaCategoryKey, RegExp> = {
   audiobook: /^(?:audio\s?books?|spoken books?)$/,
   comic: /^(?:comics?|manga|graphic novels?)$/,
   magazine: /^(?:mags?|magazines?|periodicals?|journals?)$/,
+  sports: /^(?:sports?|tv sports?)$/,
   retro:
     /^(?:nes|nintendo entertainment system|snes|super nintendo|nintendo ds|nds|nintendo 3ds|3ds|game boy(?: color| advance)?|gameboy(?: color| advance)?|gba|gamecube|game cube|nintendo 64|n64|psp|ps vita|playstation vita|playstation 3|ps3|playstation 2|ps2|playstation 1|ps1|wii|wiiware|wii u|xbox 360|sega genesis|mega drive|sega saturn|saturn|sega dreamcast|dreamcast|sega master system|master system|atari (?:2600|5200|7800|lynx|jaguar)|commodore 64)(?: roms?)?$/,
   modern:

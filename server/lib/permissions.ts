@@ -42,6 +42,8 @@ export enum Permission {
   REQUEST_MAGAZINE = 2199023255552,
   AUTO_REQUEST_MAGAZINE = 4398046511104,
   MANAGE_DOWNLOADS = 8796093022208,
+  AUTO_APPROVE_SPORTS = 17592186044416,
+  REQUEST_SPORTS = 35184372088832,
 }
 
 export const MAX_PERMISSION_VALUE = Object.values(Permission)
@@ -111,7 +113,7 @@ export const hasPermission = (
 };
 
 export type RequestApprovalMediaType =
-  'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine';
+  'movie' | 'tv' | 'music' | 'book' | 'comic' | 'magazine' | 'sports';
 
 export const hasAutoApprovePermission = (
   permissions: number,
@@ -133,7 +135,9 @@ export const hasAutoApprovePermission = (
             ? Permission.AUTO_APPROVE_COMIC
             : mediaType === 'magazine'
               ? Permission.AUTO_APPROVE_MAGAZINE
-              : Permission.AUTO_APPROVE_BOOK;
+              : mediaType === 'sports'
+                ? Permission.AUTO_APPROVE_SPORTS
+                : Permission.AUTO_APPROVE_BOOK;
   const generalPermission = is4k
     ? Permission.AUTO_APPROVE_4K
     : Permission.AUTO_APPROVE;

@@ -131,6 +131,7 @@ import readMeABookRoutes from './readmeabook';
 import slskdnRoutes from './slskdn';
 import softwareAcquisitionRoutes from './softwareAcquisition';
 import sonarrRoutes from './sonarr';
+import sportarrRoutes from './sportarr';
 import swipeSettingsRoutes from './swipe';
 import tunerrRoutes from './tunerr';
 
@@ -1428,6 +1429,7 @@ export const parseLogMessages = (
 settingsRoutes.use('/notifications', notificationRoutes);
 settingsRoutes.use('/radarr', radarrRoutes);
 settingsRoutes.use('/sonarr', sonarrRoutes);
+settingsRoutes.use('/sportarr', sportarrRoutes);
 settingsRoutes.use('/lidarr', lidarrRoutes);
 settingsRoutes.use('/readarr', readarrRoutes);
 settingsRoutes.use('/audiobookshelf', audiobookshelfRoutes);

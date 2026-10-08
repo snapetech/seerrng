@@ -47,6 +47,7 @@ export interface SeasonEpisodeTreeProps {
   mediaServerType?: WatchStatusResponse['serverType'];
   feedback?: ReactNode;
   selectionPurpose?: 'playback' | 'request';
+  selectionMode?: 'multiple' | 'single-episode';
   disabled?: boolean;
 }
 
@@ -96,6 +97,7 @@ const SeasonEpisodeTree = ({
   mediaServerType,
   feedback,
   selectionPurpose = 'playback',
+  selectionMode = 'multiple',
   disabled = false,
 }: SeasonEpisodeTreeProps) => {
   const intl = useIntl();
@@ -133,9 +135,13 @@ const SeasonEpisodeTree = ({
   const toggleEpisode = (episode: TreeEpisode) => {
     if (!isTreeEpisodeSelectable(episode)) return;
     onSelectionChange(
-      selectedIds.includes(episode.id)
-        ? selectedIds.filter((id) => id !== episode.id)
-        : [...selectedIds, episode.id]
+      selectionMode === 'single-episode'
+        ? selectedIds.includes(episode.id)
+          ? []
+          : [episode.id]
+        : selectedIds.includes(episode.id)
+          ? selectedIds.filter((id) => id !== episode.id)
+          : [...selectedIds, episode.id]
     );
   };
   const selectionDescription =
@@ -158,27 +164,30 @@ const SeasonEpisodeTree = ({
   const seasonControls = (season: TreeSeason) => {
     const state = seasonSelection(season, selectedIds);
     const open = isExpanded(season);
-    const selection = (
-      <Tooltip
-        content={
-          state.disabled
-            ? 'No episodes in this season are available for selection.'
-            : `${state.selected ? 'Deselect' : 'Select'} every ${selectionDescription} episode in ${season.name}.`
-        }
-      >
-        <span data-tree-part="selection">
-          <SelectionCircle
-            selected={state.selected}
-            partial={state.partial}
-            disabled={disabled || state.disabled}
-            label={`${state.selected ? 'Deselect' : 'Select'} ${selectionDescription} episodes in ${season.name}`}
-            onClick={() =>
-              onSelectionChange(toggleSeasonSelection(season, selectedIds))
-            }
-          />
-        </span>
-      </Tooltip>
-    );
+    const selection =
+      selectionMode === 'single-episode' ? (
+        <span data-tree-part="selection" aria-hidden="true" />
+      ) : (
+        <Tooltip
+          content={
+            state.disabled
+              ? 'No episodes in this season are available for selection.'
+              : `${state.selected ? 'Deselect' : 'Select'} every ${selectionDescription} episode in ${season.name}.`
+          }
+        >
+          <span data-tree-part="selection">
+            <SelectionCircle
+              selected={state.selected}
+              partial={state.partial}
+              disabled={disabled || state.disabled}
+              label={`${state.selected ? 'Deselect' : 'Select'} ${selectionDescription} episodes in ${season.name}`}
+              onClick={() =>
+                onSelectionChange(toggleSeasonSelection(season, selectedIds))
+              }
+            />
+          </span>
+        </Tooltip>
+      );
     const episodeCount = season.episodeCount ?? season.episodes.length;
     const countDescription = `${state.count} of ${episodeCount} episodes selected`;
     const expanderIcon =
@@ -336,23 +345,27 @@ const SeasonEpisodeTree = ({
 
   const columnHeadings = () => (
     <div className="card-table" data-tree-part="column-headings">
-      <Tooltip
-        content={
-          availableIds.size === 0
-            ? 'No episodes are available for selection.'
-            : `${allSelected ? 'Deselect' : 'Select'} every ${selectionDescription} episode across all seasons, including collapsed seasons.`
-        }
-      >
-        <span data-tree-part="select-all">
-          <SelectionCircle
-            selected={allSelected}
-            partial={selectedCount > 0 && !allSelected}
-            disabled={disabled || availableIds.size === 0}
-            label={`${allSelected ? 'Deselect' : 'Select'} all ${selectionDescription} episodes`}
-            onClick={toggleAll}
-          />
-        </span>
-      </Tooltip>
+      {selectionMode === 'single-episode' ? (
+        <span data-tree-part="select-all" aria-hidden="true" />
+      ) : (
+        <Tooltip
+          content={
+            availableIds.size === 0
+              ? 'No episodes are available for selection.'
+              : `${allSelected ? 'Deselect' : 'Select'} every ${selectionDescription} episode across all seasons, including collapsed seasons.`
+          }
+        >
+          <span data-tree-part="select-all">
+            <SelectionCircle
+              selected={allSelected}
+              partial={selectedCount > 0 && !allSelected}
+              disabled={disabled || availableIds.size === 0}
+              label={`${allSelected ? 'Deselect' : 'Select'} all ${selectionDescription} episodes`}
+              onClick={toggleAll}
+            />
+          </span>
+        </Tooltip>
+      )}
       <Tooltip content="The episode number within this season.">
         <span
           className="card-table-heading"
@@ -422,7 +435,12 @@ const SeasonEpisodeTree = ({
     <section
       className="selection-tree card-layout"
       data-tree-layout={layouts[layout]}
-      aria-label="Seasons And Episodes"
+      data-selection-mode={selectionMode}
+      aria-label={
+        selectionMode === 'single-episode'
+          ? 'Choose one starting episode'
+          : 'Seasons And Episodes'
+      }
     >
       <div
         className="app-card-inset card-layout refreshed-inset-surface"

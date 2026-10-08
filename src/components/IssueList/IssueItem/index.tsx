@@ -300,11 +300,12 @@ const IssueItem = ({
   const issueOption = issueOptions.find(
     (opt) => opt.issueType === issue?.issueType
   );
-  const issueSubtypeOption = issue
-    ? getIssueSubtypeOptionsForMediaType(issue.media.mediaType).find(
-        (option) => option.value === issue.issueSubtype
-      )
-    : undefined;
+  const issueSubtypeOption =
+    issue && issue.media.mediaType !== 'sports'
+      ? getIssueSubtypeOptionsForMediaType(issue.media.mediaType).find(
+          (option) => option.value === issue.issueSubtype
+        )
+      : undefined;
 
   const description = issue.comments?.[0]?.message || '';
   const unavailable = intl.formatMessage(messages.unavailable);

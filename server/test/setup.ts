@@ -86,6 +86,7 @@ Reflect.set(
       tautulli: settings.tautulli,
       radarr: settings.radarr,
       sonarr: settings.sonarr,
+      sportarr: settings.sportarr,
       lidarr: settings.lidarr,
       readarr: settings.readarr,
       mylar: settings.mylar,

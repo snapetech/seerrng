@@ -36,6 +36,7 @@ const globalMessages = defineMessages('i18n', {
   comics: 'Comics',
   magazine: 'Magazine',
   magazines: 'Magazines',
+  sports: 'Sports',
   cancel: 'Cancel',
   canceling: 'Canceling…',
   approve: 'Approve',

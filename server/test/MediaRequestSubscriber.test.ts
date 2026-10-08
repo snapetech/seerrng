@@ -12,6 +12,8 @@ import type {
 import ReadarrAPI from '@server/api/servarr/readarr';
 import type { AddSeriesOptions } from '@server/api/servarr/sonarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import type { SportarrLeague } from '@server/api/servarr/sportarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import WikidataAPI from '@server/api/wikidata';
 import {
   MediaRequestStatus,
@@ -29,9 +31,11 @@ import {
   getRequestMutationAdmissionKey,
   runWithRequestAdmission,
 } from '@server/entity/MediaRequest';
+import { MediaSearchMetadata } from '@server/entity/MediaSearchMetadata';
 import { RequestDispatchOutbox } from '@server/entity/RequestDispatchOutbox';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { runMediaEntityMutation } from '@server/lib/mediaMutation';
 import notificationManager from '@server/lib/notifications';
 import requestDispatchManager from '@server/lib/requestDispatch';
@@ -130,6 +134,7 @@ describe('MediaRequestSubscriber service dispatch', () => {
     settings.sonarr = [];
     settings.lidarr = [];
     settings.readarr = [];
+    settings.sportarr = [];
   });
 
   it('bounds provider-directed Bookshelf retry delays', () => {
@@ -139,6 +144,212 @@ describe('MediaRequestSubscriber service dispatch', () => {
       clampReadarrProviderRetryDelay(Number.MAX_SAFE_INTEGER),
       3_600_000
     );
+  });
+
+  it('recovers a committed Sportarr add when its POST response is lost', async () => {
+    const settings = getSettings();
+    settings.sportarr = [
+      {
+        id: 44,
+        name: 'Sportarr',
+        hostname: 'sportarr.local',
+        port: 1867,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 5,
+        activeProfileName: 'HD',
+        isDefault: true,
+      },
+    ];
+    assert.equal(getExternalRuntimeConfig().sportarr[0]?.id, 44);
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.SPORTS,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    await getRepository(MediaIdentifier).save(
+      new MediaIdentifier({
+        media,
+        provider: MediaIdentifierProvider.SPORTARR,
+        value: 'lg-000042',
+        canonical: true,
+      })
+    );
+    assert.equal(
+      (
+        await getRepository(MediaIdentifier).find({
+          where: { media: { id: media.id } },
+        })
+      )[0]?.provider,
+      MediaIdentifierProvider.SPORTARR
+    );
+    const persistedMedia = await getRepository(Media).findOneOrFail({
+      where: { id: media.id },
+      relations: { identifiers: true },
+    });
+    assert.deepEqual(
+      persistedMedia.identifiers.map(({ provider, value }) => ({
+        provider,
+        value,
+      })),
+      [{ provider: MediaIdentifierProvider.SPORTARR, value: 'lg-000042' }]
+    );
+    await getRepository(MediaSearchMetadata).save(
+      Object.assign(new MediaSearchMetadata(), {
+        mediaId: media.id,
+        title: 'Premier League',
+        overview: 'Top division football league.',
+        genres: 'Football',
+        provider: 'sportarr',
+        searchText: 'premier league football',
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).save(request);
+
+    const monitoredLeague: SportarrLeague = {
+      id: 51,
+      externalId: 'lg-000042',
+      title: 'Premier League',
+      overview: 'Top division football league.',
+      sport: 'Football',
+      monitored: true,
+      images: [],
+    };
+    const lookupLeague = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueByExternalId',
+      async () => undefined
+    );
+    const addLeague = mock.method(
+      SportarrAPI.prototype,
+      'addLeague',
+      async () => {
+        throw new Error('Connection reset after Sportarr committed the add');
+      }
+    );
+    const getLibraryLeagues = mock.method(
+      SportarrAPI.prototype,
+      'getLibraryLeagues',
+      async () => [monitoredLeague]
+    );
+
+    const outcome = await new MediaRequestSubscriber().dispatchRequestById(
+      request.id
+    );
+
+    assert.equal(lookupLeague.mock.callCount(), 1);
+    assert.equal(addLeague.mock.callCount(), 1);
+    assert.equal(getLibraryLeagues.mock.callCount(), 1);
+    assert.deepEqual(outcome, { delivered: true });
+    const savedMedia = await getRepository(Media).findOneByOrFail({
+      id: media.id,
+    });
+    assert.equal(savedMedia.status, MediaStatus.PROCESSING);
+    assert.equal(savedMedia.serviceId, 44);
+    assert.equal(savedMedia.externalServiceId, 51);
+    assert.equal(savedMedia.externalServiceSlug, 'lg-000042');
+    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(savedRequest.status, MediaRequestStatus.COMPLETED);
+    assert.deepEqual(savedRequest.serviceTargets, [
+      {
+        serviceType: 'sportarr',
+        format: 'sports',
+        serverId: 44,
+        profileId: 5,
+        externalServiceId: 51,
+        externalServiceSlug: 'lg-000042',
+        rootFolder: null,
+        status: MediaStatus.PROCESSING,
+      },
+    ]);
+  });
+
+  it('does not reactivate an existing unmonitored Sportarr league', async () => {
+    const settings = getSettings();
+    settings.sportarr = [
+      {
+        id: 44,
+        name: 'Sportarr',
+        hostname: 'sportarr.local',
+        port: 1867,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 5,
+        activeProfileName: 'HD',
+        isDefault: true,
+      },
+    ];
+
+    const requestedBy = await getRequester();
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.SPORTS,
+        tmdbId: 0,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    await getRepository(MediaIdentifier).save(
+      new MediaIdentifier({
+        media,
+        provider: MediaIdentifierProvider.SPORTARR,
+        value: 'lg-000043',
+        canonical: true,
+      })
+    );
+    await getRepository(MediaSearchMetadata).save(
+      Object.assign(new MediaSearchMetadata(), {
+        mediaId: media.id,
+        title: 'National Hockey League',
+        genres: 'Ice Hockey',
+        provider: 'sportarr',
+        searchText: 'national hockey league',
+      })
+    );
+    const request = await createApprovedRequest(media, requestedBy);
+    await getRepository(MediaRequest).save(request);
+
+    const unmonitoredLeague: SportarrLeague = {
+      id: 52,
+      externalId: 'lg-000043',
+      title: 'National Hockey League',
+      overview: '',
+      sport: 'Ice Hockey',
+      monitored: false,
+      images: [],
+    };
+    mock.method(
+      SportarrAPI.prototype,
+      'getLeagueByExternalId',
+      async () => unmonitoredLeague
+    );
+    const addLeague = mock.method(
+      SportarrAPI.prototype,
+      'addLeague',
+      async () => unmonitoredLeague
+    );
+
+    const outcome = await new MediaRequestSubscriber().dispatchRequestById(
+      request.id
+    );
+
+    assert.deepEqual(outcome, {
+      delivered: false,
+      retryAfterMs: READARR_FAILED_RETRY_DELAY_MS,
+    });
+    assert.equal(addLeague.mock.callCount(), 0);
+    const savedRequest = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(savedRequest.status, MediaRequestStatus.FAILED);
   });
 
   it('holds request, media, and service authority while dispatching to Radarr', async () => {
