@@ -956,7 +956,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads, hardcover]
+          enum: [imdb, imdb-csv, goodreads, hardcover]
         sourceUrl:
           type: string
           format: uri
@@ -983,7 +983,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads, hardcover]
+          enum: [imdb, imdb-csv, goodreads, hardcover]
         sourceItems:
           type: integer
         requested:
@@ -16079,6 +16079,44 @@ paths:
           description: Existing Hardcover shelf updated
         '400':
           description: Hardcover rejected the token or query
+  /request/lists/{listId}/import:
+    post:
+      summary: Import IMDb watchlist export title IDs
+      description: Imports up to 100 unique IMDb title IDs from the signed-in user's CSV export. Imported IMDb lists are updated manually and are excluded from scheduled server-side fetching.
+      tags: [request]
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [itemIds]
+              properties:
+                itemIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    pattern: '^tt[0-9]{5,20}$'
+      responses:
+        '200':
+          description: Imported IMDb titles were sent through normal request permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalRequestListSyncResult'
+        '400':
+          description: The list is not an IMDb watchlist or the title IDs are invalid
   /request/lists/{listId}/sync:
     post:
       summary: Sync a configured public list now

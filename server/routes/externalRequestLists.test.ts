@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { before, beforeEach, describe, it, mock } from 'node:test';
 
+import TheMovieDb from '@server/api/themoviedb';
 import { getRepository } from '@server/datasource';
 import { ExternalRequestList } from '@server/entity/ExternalRequestList';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import axios from 'axios';
@@ -102,6 +105,70 @@ describe('external request list routes', () => {
       where: { sourceId: profileId },
     });
     assert.equal(stored.sourceId, profileId);
+  });
+
+  it('imports an IMDb export and switches the list to manual updates', async () => {
+    mock.method(
+      TheMovieDb.prototype,
+      'getByExternalId',
+      async () =>
+        ({
+          movie_results: [{ id: 123 }],
+          tv_results: [],
+          person_results: [],
+        }) as unknown as Awaited<ReturnType<TheMovieDb['getByExternalId']>>
+    );
+    const requested: { mediaId: number; userId: number }[] = [];
+    mock.method(
+      MediaRequest,
+      'request',
+      async (...args: Parameters<typeof MediaRequest.request>) => {
+        requested.push({
+          mediaId: Number(args[0].mediaId),
+          userId: args[1].id,
+        });
+        return {} as MediaRequest;
+      }
+    );
+
+    const agent = await loginAs('friend@seerr.dev');
+    const created = await agent.post('/api/v1/request/lists').send({
+      url: 'https://www.imdb.com/user/ur12345678/watchlist/',
+    });
+    assert.equal(created.status, 201);
+
+    const imported = await agent
+      .post(`/api/v1/request/lists/${created.body.id}/import`)
+      .send({ itemIds: ['tt1234567'] });
+
+    assert.equal(imported.status, 200, JSON.stringify(imported.body));
+    assert.equal(imported.body.provider, 'imdb-csv');
+    assert.equal(imported.body.requested, 1);
+    assert.equal(imported.body.failed, 0);
+    const owner = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    assert.deepEqual(requested, [{ mediaId: 123, userId: owner.id }]);
+
+    const stored = await getRepository(ExternalRequestList).findOneOrFail({
+      where: { id: created.body.id },
+    });
+    assert.equal(stored.provider, 'imdb-csv');
+    assert.deepEqual(stored.processedItemIds, ['tt1234567']);
+  });
+
+  it('rejects invalid IMDb export title IDs', async () => {
+    const agent = await loginAs('friend@seerr.dev');
+    const created = await agent.post('/api/v1/request/lists').send({
+      url: 'https://www.imdb.com/user/ur12345678/watchlist/',
+    });
+    assert.equal(created.status, 201);
+
+    const response = await agent
+      .post(`/api/v1/request/lists/${created.body.id}/import`)
+      .send({ itemIds: ['javascript:alert(1)'] });
+
+    assert.equal(response.status, 400);
   });
 
   it('rejects a public-list URL that could target a private network', async () => {

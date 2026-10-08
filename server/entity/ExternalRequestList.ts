@@ -24,7 +24,7 @@ export class ExternalRequestList {
   public user: User;
 
   @Column({ type: 'varchar', length: 16 })
-  public provider: 'imdb' | 'goodreads' | 'hardcover';
+  public provider: 'imdb' | 'imdb-csv' | 'goodreads' | 'hardcover';
 
   @Column({ type: 'varchar', length: 64 })
   public sourceId: string;

@@ -124,7 +124,7 @@ const mockIntegrationData = () => {
     ) {
       // These settings endpoints return one optional service, not a list.
       // `[]` is truthy and makes the service cards render invalid fields.
-      request.reply(null);
+      request.reply({ body: null });
     } else if (pathname === '/api/v1/settings/tunerr') {
       request.reply({
         enabled: false,

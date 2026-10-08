@@ -1,9 +1,11 @@
 import { getRepository } from '@server/datasource';
 import { ExternalRequestList } from '@server/entity/ExternalRequestList';
 import { User } from '@server/entity/User';
+import type { ExternalRequestListItem } from '@server/lib/externalRequestLists';
 import {
-  MAX_EXTERNAL_REQUEST_LISTS_PER_USER,
   fetchHardcoverToRead,
+  MAX_EXTERNAL_REQUEST_LIST_ITEMS,
+  MAX_EXTERNAL_REQUEST_LISTS_PER_USER,
   parseExternalRequestListUrl,
   syncExternalRequestList,
 } from '@server/lib/externalRequestLists';
@@ -164,6 +166,73 @@ externalRequestListRoutes.post('/hardcover', async (req, res, next) => {
 });
 
 externalRequestListRoutes.post<{ listId: string }>(
+  '/:listId/import',
+  async (req, res, next) => {
+    const listId = parsePositiveRouteId(req.params.listId, maxRequestListId);
+    if (!listId) return next({ status: 404, message: 'List not found.' });
+
+    const itemIds = req.body?.itemIds;
+    if (
+      !req.body ||
+      typeof req.body !== 'object' ||
+      Array.isArray(req.body) ||
+      Object.keys(req.body).length !== 1 ||
+      !Array.isArray(itemIds) ||
+      itemIds.length < 1 ||
+      itemIds.length > MAX_EXTERNAL_REQUEST_LIST_ITEMS ||
+      itemIds.some(
+        (itemId: unknown) =>
+          typeof itemId !== 'string' || !/^tt[0-9]{5,20}$/.test(itemId)
+      )
+    ) {
+      return next({
+        status: 400,
+        message: 'Import an IMDb CSV export containing valid title IDs.',
+      });
+    }
+
+    try {
+      const repository = getRepository(ExternalRequestList);
+      const list = await repository.findOne({
+        where: { id: listId, user: { id: req.user!.id } },
+      });
+      if (!list) return next({ status: 404, message: 'List not found.' });
+      if (list.provider !== 'imdb' && list.provider !== 'imdb-csv') {
+        return next({
+          status: 400,
+          message: 'IMDb CSV exports can only update an IMDb watchlist.',
+        });
+      }
+
+      const user = await getRepository(User).findOne({
+        where: { id: req.user!.id },
+      });
+      if (!user) return next({ status: 404, message: 'User not found.' });
+
+      list.provider = 'imdb-csv';
+      const items: ExternalRequestListItem[] = [
+        ...new Set(itemIds as string[]),
+      ].map((id) => ({ id }));
+      const result = await syncExternalRequestList(
+        list,
+        user,
+        undefined,
+        items
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      return next({
+        status: 500,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Unable to import the IMDb watchlist export.',
+      });
+    }
+  }
+);
+
+externalRequestListRoutes.post<{ listId: string }>(
   '/:listId/sync',
   async (req, res, next) => {
     const listId = parsePositiveRouteId(req.params.listId, maxRequestListId);
@@ -178,6 +247,13 @@ externalRequestListRoutes.post<{ listId: string }>(
         .andWhere('user.id = :userId', { userId: req.user!.id })
         .getOne();
       if (!list) return next({ status: 404, message: 'List not found.' });
+      if (list.provider === 'imdb-csv') {
+        return next({
+          status: 400,
+          message:
+            'Upload a new IMDb watchlist CSV export to update this list.',
+        });
+      }
 
       const user = await getRepository(User).findOne({
         where: { id: req.user!.id },
