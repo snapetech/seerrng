@@ -103,7 +103,22 @@ const mockIntegrationData = () => {
     const pathname = new URL(request.url).pathname;
     if (pathname === '/api/v1/settings/public') {
       request.alias = 'publicSettings';
-      request.continue();
+      request.continue((response) => {
+        const body = response.body as {
+          enabledMediaCategories?: Record<string, boolean>;
+        } & Record<string, unknown>;
+        response.body = {
+          ...body,
+          softwareEnabled: true,
+          romarrEnabled: true,
+          enabledMediaCategories: {
+            ...body.enabledMediaCategories,
+            retro: true,
+            modern: true,
+            game: true,
+          },
+        };
+      });
     } else if (pathname === '/api/v1/settings/cache') {
       request.reply({
         apiCaches: [],
@@ -310,10 +325,7 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();
-    cy.contains('h4', 'ROMarrNG to IGDB platform matching')
-      .closest('section')
-      .find('button')
-      .click();
+    cy.contains('button', 'Preview platform matches').click();
     cy.contains('dt', 'Sega CD').parent().contains('No automatic match');
     cy.contains('Systems without a match: 1').should('be.visible');
     cy.get('select[aria-label="Sega CD: ROMarrNG to IGDB platform matching"]')
@@ -329,7 +341,11 @@ describe('ROMarrNG software acquisition integration', () => {
       .its('request.body.emulationPlatformMappings.sega-cd')
       .should('eq', 29);
 
-    cy.contains('h4', 'ROMarrNG').closest('section').find('button').click();
+    cy.contains('h4', 'ROMarrNG')
+      .closest('section')
+      .within(() => {
+        cy.contains('button', 'Test connection').click();
+      });
     cy.contains('DAT catalog ready for 2 systems').should('be.visible');
     cy.contains('ColecoVision').should('be.visible');
     cy.viewport(390, 720);
@@ -343,10 +359,7 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();
-    cy.contains('h4', 'ROMarrNG to IGDB platform matching')
-      .closest('section')
-      .find('button')
-      .click();
+    cy.contains('button', 'Preview platform matches').click();
     cy.get(
       'select[aria-label="Nintendo Entertainment System: ROMarrNG to IGDB platform matching"]'
     )
