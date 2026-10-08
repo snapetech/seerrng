@@ -286,19 +286,26 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();
-    cy.contains('button', 'Preview platform matches').click();
+    cy.contains('h4', 'ROMarrNG to IGDB platform matching')
+      .closest('section')
+      .find('button')
+      .click();
     cy.contains('dt', 'Sega CD').parent().contains('No automatic match');
     cy.contains('Systems without a match: 1').should('be.visible');
     cy.get('select[aria-label="Sega CD: ROMarrNG to IGDB platform matching"]')
       .select('29')
       .parent()
       .contains('Manual match · Sega CD');
-    cy.contains('button', 'Save settings').click();
+    cy.contains('h3', 'Software acquisition')
+      .parent()
+      .next()
+      .find('button.app-button-primary')
+      .click();
     cy.wait('@saveSoftwareSettings')
       .its('request.body.emulationPlatformMappings.sega-cd')
       .should('eq', 29);
 
-    cy.get('button').contains('Test connection').first().click();
+    cy.contains('h4', 'ROMarrNG').closest('section').find('button').click();
     cy.contains('DAT catalog ready for 2 systems').should('be.visible');
     cy.contains('ColecoVision').should('be.visible');
     cy.viewport(390, 720);
@@ -312,7 +319,10 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();
-    cy.contains('button', 'Preview platform matches').click();
+    cy.contains('h4', 'ROMarrNG to IGDB platform matching')
+      .closest('section')
+      .find('button')
+      .click();
     cy.get(
       'select[aria-label="Nintendo Entertainment System: ROMarrNG to IGDB platform matching"]'
     )
