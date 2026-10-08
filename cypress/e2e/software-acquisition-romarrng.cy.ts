@@ -102,11 +102,8 @@ const mockIntegrationData = () => {
   cy.intercept('GET', '**/api/v1/settings/**', (request) => {
     const pathname = new URL(request.url).pathname;
     if (pathname === '/api/v1/settings/public') {
-      request.reply({
-        softwareEnabled: true,
-        romarrEnabled: true,
-        enabledMediaCategories: { retro: true, modern: true, game: true },
-      });
+      request.alias = 'publicSettings';
+      request.continue();
     } else if (pathname === '/api/v1/settings/cache') {
       request.reply({
         apiCaches: [],
@@ -281,6 +278,7 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.wait('@overrideRuleSettings')
       .its('response.statusCode')
       .should('eq', 200);
+    cy.wait('@publicSettings').its('response.statusCode').should('eq', 200);
     cy.wait('@downloadClientsSettings')
       .its('response.body.clients')
       .should('deep.equal', []);
@@ -290,6 +288,14 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.wait('@softwareCatalogSystems')
       .its('response.statusCode')
       .should('eq', 200);
+    cy.get('body').then(($body) => {
+      const pageText = $body.text().replace(/\s+/g, ' ').trim();
+      if (!pageText.includes('Software acquisition')) {
+        throw new Error(
+          `Software acquisition is missing at ${window.location.pathname}: ${pageText.slice(0, 1800)}`
+        );
+      }
+    });
     cy.contains('h3', 'Software acquisition').should('be.visible');
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
