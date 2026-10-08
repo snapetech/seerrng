@@ -186,6 +186,27 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.55.1](https://github.com/snapetech/seerrng/compare/v3.55.0..v3.55.1) - 2026-10-08
+
+### User-facing changes
+
+#### Changed
+
+- **Contributing:** Maintainer and contributor instructions now avoid duplicate approval gates, scope UI Fix-It to actual interface changes, route final checks through the validation engine, point contributors at SeerrNG's current repository, and keep distributed Mode 3 dormant unless explicitly authorized.
+- **Development Validation:** Development validation now stages repository checks, security scans, production builds, and browser tests in one engine. It selects worker limits from available CPUs and execution context, preserves native GitHub jobs, never reuses test results, and limits reuse to a successful same-run build consumed by its dependent browser stage.
+- **Development Validation:** Mode 3 distributed validation remains dormant while its controller/node code and regression tests are retained for continued development. It is not connected to application runtime, package scripts, hooks, or GitHub workflows and is not a supported validation path.
+
+#### Fixed
+
+- **Software Acquisition:** ROMarrNG installations using request contract v2 now pass SeerrNG's connection check and use the supported integration API. Legacy ROMarrNG installations remain supported.
+- **Maintenance:** Deployment, packaging, and Plex maintenance scripts now use portable macOS and Linux commands, reducing setup and recovery failures on developer systems.
+- **External Request Lists:** IMDb watchlists now accept newer `p.*` profile URLs alongside legacy `ur*` links, so profile migrations no longer block list connections.
+
+### 🐛 Bug Fixes
+- Support migrated IMDb profile watchlists (#177) - ([481dc9a](https://github.com/snapetech/seerrng/commit/481dc9a1c58bad8e79d57a13ceb0ab76d1497e7a))
+
 ## [3.55.0](https://github.com/snapetech/seerrng/compare/v3.54.0..v3.55.0) - 2026-10-08
 
 ### User-facing changes
