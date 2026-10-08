@@ -20,8 +20,20 @@ unknown. Distinguish implemented code, automated verification, human visual
 acceptance, and live integration verification. Give numbered review items.
 Do not claim a build or source assertion proves the rendered interface works.
 Read and follow `CONTRIBUTING.md`; preserve attribution and disclose AI assistance.
-Never publish, merge, or deploy without the maintainer's applicable
-authorization.
+Record visual inspection separately from automated verification. Do not make
+project-owner or other human acceptance a merge or release gate when the
+maintainer explicitly directs the work to proceed. Never publish, merge, or
+deploy without the maintainer's applicable authorization.
+
+Act on explicit user instructions without asking for the same authorization
+again. A request to fix, clean up, commit, push, merge, or release authorizes the
+reversible repository changes and checks needed to complete that request. If
+the user explicitly includes repository-wide work or a complete gate, repair
+failures that block it without asking again. Ask only when a material decision
+is genuinely unresolved or an action falls outside the user's authorization.
+This explicit authorization takes precedence over narrower request-direction
+rules in linked repository instructions; it does not waive verification or
+evidence requirements.
 
 ## Required development reading
 
@@ -59,7 +71,7 @@ do not choose a new design merely to make a check pass.
 
 ## Required verification
 
-Work in approved page/asset batches. During editing, run affected focused checks
+Work in scoped page/asset batches. During editing, run affected focused checks
 and record a preview as an iteration, not a release candidate. Use the reviewed
 combined test engine for the exact final candidate, with repository-owned tests
 and supplemental checks discovered for that source revision. Use the same
@@ -84,9 +96,11 @@ A page-by-page audit does not narrow the contribution's preservation scope.
 Retain accepted Request-page and shared title/heading, page-status/spinner,
 button, poster and layout work alongside Series changes. Trace affected shared
 consumers, but do not turn visual cleanup into an unrelated backend repair
-mission. Record an unrelated failure, stop finalization, and request direction
-before expanding implementation scope. See the integration checkpoint for the
-preservation inventory, current evidence and pending gates.
+mission unless the user explicitly authorizes broader remediation or asks for
+the complete required gate. Under that authorization, repair every failure that
+blocks the requested gate and verify the candidate without asking again.
+Otherwise record out-of-scope failures and keep them out of the change. See the
+integration checkpoint for the preservation inventory and current evidence.
 
 Checkpoint: `docs/maintainers/interface-integration-checkpoint.md`.
 
@@ -102,10 +116,10 @@ Build and check the exact final source, using the pinned repository runtime and
 lockfile. Run affected integration/e2e checks in disposable environments where
 available. Never aim tests at live configuration, accounts, queues, playlists,
 collections, watchlists, or databases. A mocked provider pass is not a live
-round-trip pass. Perform desktop/narrow and interaction review of changed
-roles. Record visual acceptance separately from automated checks. The project
-owner may confirm acceptance directly; do not require a separate external
-reviewer after the owner has confirmed it.
+round-trip pass. When visual inspection is available, inspect changed roles at
+desktop and narrow widths and record that evidence separately from automated
+checks. Visual acceptance is evidence, not a merge or release gate when the
+maintainer explicitly directs the work to proceed.
 
 ## Test-engine maintenance for contributors and maintainers
 
@@ -147,8 +161,9 @@ preview change or upstream merge:
    Keep CSS/i18n/security/network guards and separate browser, CodeQL, platform,
    packaging and deployment gates visible. A test-engine pass is not the entire
    GitHub pipeline. Report files, cases, failures, skips, elapsed time, worker
-   budget, repairs and remaining gates; visual approval occurs during development
-   and review, not an exhaustive visual crawl before every compile.
+   budget, repairs and remaining gates; record desktop/narrow inspection evidence
+   when available, without making visual approval a prerequisite for authorized
+   merge or release.
 
 The saved 3.48.1 reference packet does not establish acceptance of this preview or
 a later merge. A version-specific compiler experiment is optional, not authority

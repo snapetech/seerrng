@@ -6,9 +6,9 @@
 - Worktree: `/home/keith/Documents/code/seerrng-bookshelf-format-stats`
 - Branch: `codex/bookshelf-format-statistics`
 - Base: `origin/main` at `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`
-- Publication: pending maintainer review of the exact candidate and a human-written
-  pull request description with accurate AI disclosure, as required by
-  `CONTRIBUTING.md`.
+- Publication was pending in this historical entry. The project owner's
+  October 7, 2026 direction removes separate human acceptance as a merge or
+  release gate. Keep the pull request description accurate and disclose AI use.
 
 ## Integration contract
 
@@ -65,12 +65,15 @@ this change adds no new UI control.
   documentation, and release note in place. Only this journal's final receipt
   text was added afterward; that documentation-only update was checked with
   Prettier and `git diff --check`.
-- Human visual acceptance and live BookshelfNG round-trip verification: pending;
-  static source checks and mocked tests do not establish either.
+- Visual inspection and live BookshelfNG round-trip evidence were pending in
+  this historical entry. Visual acceptance is not a publication gate; record
+  the live integration status separately from static checks and mocked tests.
 
 ## Recovery
 
 The candidate can be rebuilt from the base commit above and the uncommitted
 branch changes. The original `/home/keith/Documents/code/seerrng` checkout
 contains unrelated dirty work and must remain untouched. Do not cherry-pick or
-publish this candidate until the required human review is complete.
+overwrite that checkout. Publish only when the maintainer authorizes it and the
+applicable automated and functional checks pass; separate human review is not
+required.

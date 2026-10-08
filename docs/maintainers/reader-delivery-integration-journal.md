@@ -1,5 +1,10 @@
 # Grimmory and BookOrbit reader delivery integration journal
 
+> **Current maintainer direction — October 7, 2026:** Pending human visual
+> review recorded below is historical evidence, not a merge or release gate.
+> Visual inspection can be recorded separately; user authorization and the
+> applicable automated and functional checks still govern publication.
+
 ## Recovery identity
 
 - Starting repository revision: `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`.
@@ -194,8 +199,10 @@ regression coverage described above supersede that implementation status.
   OpenAPI files.
 - Shared English catalog extraction also includes the independently preserved
   game-library and external-request-list strings.
-- The cumulative development gate, production build, isolated rendered preview,
-  and human visual acceptance are pending on the combined final candidate.
+- The cumulative development gate, production build and isolated rendered
+  preview were pending in this historical candidate. Human visual acceptance
+  was also recorded as pending, but is not a publication gate under current
+  maintainer direction.
 - The first integrated validation attempt stopped at formatting before test
   execution. Twenty-two candidate files were formatted; no test results were
   counted from that attempt.
@@ -276,7 +283,8 @@ not separate newer patches. No source worktree or stash was dropped.
 Recovery before merging the all-dirty inventory is preserved as stash
 `057219485a063805eea0aabf4f1a0ef652842e6c`. The inventory and merge are
 complete; full development validation, production build, rendered review,
-human visual acceptance, commit, push, and release remain pending.
+commit, push, and release were pending at that checkpoint. Human visual
+acceptance is not a separate merge or release gate.
 
 Focused verification after the last request-edit and Audiobookshelf changes:
 

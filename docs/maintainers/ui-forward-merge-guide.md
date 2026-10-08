@@ -91,10 +91,10 @@ workflows or waive required checks. Retain the source manifest and tool versions
    previous build verifies code added afterward. Record the final exact target,
    contributor, integration, and tested commit IDs.
 5. Summarize preserved features, resolutions, commands/results, unverified native
-   paths, visual acceptance, and remaining scope. Record project-owner acceptance;
-   no separate reviewer is required after the owner confirms it. Use the project PR
-   template and AI disclosure, add/preview release notes, and finalize only under
-   the maintainer's publication/merge authority.
+   paths, visual inspection evidence, and remaining scope. Do not require separate
+   human acceptance when the maintainer explicitly directs merge or release. Use
+   the project PR template and AI disclosure, add/preview release notes, and
+   finalize only under the maintainer's publication/merge authority.
 
 ## Evidence and recovery
 

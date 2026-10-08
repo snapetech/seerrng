@@ -8,7 +8,10 @@ not a claim that every feature passed final verification or human review.
 - **Accepted** means an explicit recorded human decision for that named state.
 - **Implemented** means the source/journal records implementation; it does not
   establish current full-suite, rendered, physical-interaction or provider success.
-- **Pending** means required verification/review is still outstanding.
+- **Pending** means evidence was not recorded as complete at that checkpoint.
+  Pending human visual review is not a merge or release gate under the project
+  owner's October 7, 2026 direction; required automated and functional checks
+  still apply.
 - **Retired** means superseded; do not restore it during a conflict.
 - **Opt-in** means a retained experiment, not a global production decision.
 
@@ -122,5 +125,7 @@ conversation, not the exact start of the merge discussion.
 
 Review a page or two per batch, repair only established violations automatically,
 and bring new design choices or unrelated backend failures to the maintainer.
-Final cumulative checks, production compilation and human visual acceptance
-remain distinct required gates. This inventory is not publication authority.
+Final cumulative checks and production compilation remain required automated
+gates. Human visual acceptance is separate evidence and is not a publication
+gate when the maintainer explicitly directs the work to proceed. This inventory
+is not publication authority.

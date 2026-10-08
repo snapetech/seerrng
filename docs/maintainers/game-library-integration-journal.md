@@ -137,9 +137,10 @@
 
 - Implementation and integration are still in progress.
 - No task source is committed, pushed, tagged, or published at this point.
-- Human review remains necessary for the AI-assisted contribution under
-  `CONTRIBUTING.md`; the final contribution record must disclose Codex use and
-  the extent of assistance.
+- This historical record treated human review as necessary under
+  `CONTRIBUTING.md`. The project owner's October 7, 2026 direction removes
+  separate human acceptance as a merge or release gate. The final contribution
+  record must still disclose Codex use and the extent of assistance.
 
 ## Rebuilt rendered workflow — October 4, 2026 (Regina local)
 
