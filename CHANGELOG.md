@@ -190,6 +190,115 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.57.0](https://github.com/snapetech/seerrng/compare/v3.56.0..v3.57.0) - 2026-10-08
+
+### User-facing changes
+
+#### Added
+
+- **Setup Assistance:** Operators can generate a Docker Compose starter, discover apps on a selected Docker network, probe common ports on a chosen host, or create manual reports for native and remote services. Import suggestions to prefill hostnames and ports; SeerrNG tests each connection before saving, and API keys stay manual.
+- **Software:** Administrators can select ROMarrNG's DAT catalog for emulation requests. SeerrNG browses matched systems alphabetically, supports title search, and keeps requests tied to a stable DAT identity while reporting unmatched DAT headers for review.
+  - **Action required:** Load DAT files in ROMarrNG to enable the DAT emulation catalog.
+- **Sportarr:** SeerrNG now connects to Sportarr so users can browse sports leagues, request additions, and follow monitored events and available files from league details.
+  - **Action required:** Connect Sportarr in Settings > Services to browse and request leagues.
+- **External Request Lists:** IMDb watchlist sync now identifies automated access challenges and explains how they differ from a private or unavailable list. Users can import the CSV export supported by IMDb when server-side sync is blocked; new titles still follow their normal request permissions and approval settings.
+  - **Action required:** Import an IMDb watchlist CSV export when IMDb blocks server-side sync. Imported lists request new titles on demand and stop scheduled server-side fetching.
+
+#### Changed
+
+- **Request Lists:** Scheduled IMDb and Goodreads list synchronization now reads saved lists in batches of up to 100, keeping memory use bounded as more accounts connect public lists.
+- **Episode Queue:** New TV requests can start with one episode and use linked Plex, Jellyfin, or Emby playback to keep a small Sonarr episode buffer requested. The request screen explains setup requirements, and turning the queue off restores normal season selection.
+- **Contribution Policy:** AI-assisted contributions now follow the same quality and automated-check requirements as other work, without a separate human sign-off gate before merge or release.
+
+#### Fixed
+
+- **Requests:** Edit Request now opens for requests on movie, series, book, music, comic, and magazine details, including API responses that omit the request's media back-reference.
+- **Games:** On narrow screens, shared game-library filters now keep their labels within the page width, so using Play Together no longer causes horizontal scrolling.
+- **Games:** Re-adding an owned game to your library now keeps its existing progress and privacy choices.
+- **Software:** Software catalog and bookshelf database migrations now run in a unique order when both features are enabled, avoiding collisions during upgrades.
+
+#### Security
+
+- **Requests:** The temporary request-management QA route has been removed from production builds; the supported Edit Request flow remains available on media detail pages.
+- **Dependencies:** Next.js is updated to 16.3.8 to address upstream security advisories affecting image optimization and page caching. Handlebars is updated to 4.7.10 to address three template-injection advisories. Game Library requests are also limited per user to help contain abusive bursts.
+
+### 🚀 Features
+- *(requests)* Add per-user external list syncing - ([a5ce1ce](https://github.com/snapetech/seerrng/commit/a5ce1cebcf31b17abd68bdba05ac914c74bc1bd1))
+- *(software)* Support ROMarrNG request contract v2 - ([352390e](https://github.com/snapetech/seerrng/commit/352390e0c9f5409feb5523d27ec4a3823903b3be))
+- *(software)* Integrate ROMarrNG DAT catalog - ([e72f113](https://github.com/snapetech/seerrng/commit/e72f113e6354ccdb0315a947557639f4ef8293c3))
+- Add ReadMeABook and per-user book integration - ([c6e3eb6](https://github.com/snapetech/seerrng/commit/c6e3eb6369d2a413d21b598bb30ade9c2eefbb2f))
+- Support OpenAI and compatible servers for swipe ordering - ([deb6958](https://github.com/snapetech/seerrng/commit/deb6958ee740face27106b9343a223a8d1261a15))
+- Add the Swipe page for movies, series, and books - ([097ecc5](https://github.com/snapetech/seerrng/commit/097ecc5a49abb5eed18695b37db1376e1e7b9c39))
+- Add swipe discovery decks with optional Claude ranking - ([cdb32d1](https://github.com/snapetech/seerrng/commit/cdb32d1602de07b2d1064d8bf179500c6d7521d0))
+- Record followed sports teams' games through Tunerr - ([141ac35](https://github.com/snapetech/seerrng/commit/141ac354455fb4e916e5205c084f77f8ccd14e38))
+- Show ROMarrNG DAT verification on available ROM requests - ([7db31a0](https://github.com/snapetech/seerrng/commit/7db31a08ba5ac9832963403d701177dae432a9f7))
+- Show the download client handling each download to admins - ([82a0a4d](https://github.com/snapetech/seerrng/commit/82a0a4da116d7e19774426a9c30d6e358ced67a2))
+- Add Soulseek request, album health, and SongID UI - ([715960e](https://github.com/snapetech/seerrng/commit/715960eddfce986afd79cf859f2820547104dd94))
+- Add Soulseek track requests, album fixes, and SongID via slskdN - ([e0583a9](https://github.com/snapetech/seerrng/commit/e0583a9ba4d8e0aab74963c8f246432fe3ca064c))
+- Add Live TV airing and recording UI - ([b10d971](https://github.com/snapetech/seerrng/commit/b10d971cc5ad3a1a0916e8c5d51cf048b87de8b0))
+- Add Live TV recording requests through IPTV Tunerr - ([8dd9da3](https://github.com/snapetech/seerrng/commit/8dd9da3a62e2ff21defab718c8d01cb2e7bafa5f))
+- Add live torrent download progress - ([7faf42f](https://github.com/snapetech/seerrng/commit/7faf42f5d1d6d3bd2e70fda8cf686d2a0a0ca184))
+- Probe native app ports - ([335abc7](https://github.com/snapetech/seerrng/commit/335abc75b9417dfa063f533df95a099ed1d5935a))
+- Support native service setup assistance - ([492d5a2](https://github.com/snapetech/seerrng/commit/492d5a252e13cf17aaa03c88c6c6967c015f0e30))
+- Add Docker network setup discovery - ([4df616b](https://github.com/snapetech/seerrng/commit/4df616b1f7e1a73f6af6c9362a43798757028379))
+- Integrate SeerrNG workflow improvements - ([f605182](https://github.com/snapetech/seerrng/commit/f6051829c4d61b10ee103a09566b30fb255cc1a0))
+
+### 🐛 Bug Fixes
+- *(security)* Resolve locked Next.js 16.3.8 - ([22d192f](https://github.com/snapetech/seerrng/commit/22d192f1580adca8ba3bf00f9ce82bae03fe9fad))
+- *(security)* Rate limit game library endpoints - ([d490b2e](https://github.com/snapetech/seerrng/commit/d490b2edf73cd6d5c2b9b268330c183a7c189ebe))
+- *(software)* Remove duplicate DAT capability - ([dafc4df](https://github.com/snapetech/seerrng/commit/dafc4dfb0f991cf47094330bb6210e2668b7b670))
+- *(software)* Fall back when paged game search fails - ([1c23147](https://github.com/snapetech/seerrng/commit/1c231472159c4e61180180c73dfe7365b82595c4))
+- Update vulnerable Handlebars dependency - ([cdba239](https://github.com/snapetech/seerrng/commit/cdba239afe58d84d3e8f9e844186c82a99088ee1))
+- Import IMDb watchlists when sync is blocked - ([ada0c5c](https://github.com/snapetech/seerrng/commit/ada0c5c0cd80255918325f8041b909d6f0ccfa0a))
+- Diagnose IMDb challenges and stabilize settings tests - ([3945324](https://github.com/snapetech/seerrng/commit/3945324b796955d41a330a972b4b17ad2b279725))
+- Stabilize security and season browser checks - ([99167cd](https://github.com/snapetech/seerrng/commit/99167cddb0fa55180415d251571a4651923c3583))
+- Close validation races and repair software provider build - ([1cae413](https://github.com/snapetech/seerrng/commit/1cae413fa2ace77c93e6cb4f4f732bfbf83e2ca2))
+- Reconcile software catalog contract and migrations - ([da97fc6](https://github.com/snapetech/seerrng/commit/da97fc6accdd44c2965b41797b2ea176c6e95104))
+- Sequence phase 7 migrations after theme adoption - ([c7f2261](https://github.com/snapetech/seerrng/commit/c7f2261dbe43711ba2b37d272afde5e3da19391a))
+- Deliver live download progress to regular users - ([4d98167](https://github.com/snapetech/seerrng/commit/4d98167fac8093760a5e95a745a75d8ec0fcea10))
+- Make maintenance scripts portable across macOS - ([c91998b](https://github.com/snapetech/seerrng/commit/c91998beb08de2a9bd448c5fef4653130f6a517d))
+
+### 📖 Documentation
+- *(maintainers)* Record final ROMarrNG integration validation - ([4800035](https://github.com/snapetech/seerrng/commit/48000359b75b2e4f4342ee669de8afb2e67fe429))
+- *(maintainers)* Record ROMarrNG DAT integration evidence - ([d7db566](https://github.com/snapetech/seerrng/commit/d7db566b3b459e098059bf0c6f212c4e728b420a))
+- Use existing security release note - ([3c5d2f0](https://github.com/snapetech/seerrng/commit/3c5d2f0b8285291733e2d1b063281652812bbbcc))
+- Record current integration checkpoint - ([afb5fdb](https://github.com/snapetech/seerrng/commit/afb5fdb1ee3d4351a7d01e8843b12325a4da0371))
+- Remove human sign-off gate for contributions - ([bd215ed](https://github.com/snapetech/seerrng/commit/bd215ed8d7fe3718d1b376b4181b7ddd76309f9e))
+- Record final phase 7 validation checkpoint - ([94ff573](https://github.com/snapetech/seerrng/commit/94ff57382ade91cff11181ef1229951879cf7e09))
+- Record phase 7 integration checkpoint - ([1457808](https://github.com/snapetech/seerrng/commit/14578084e17df5eaeb5b794c2de68109fdb088ba))
+- Plan remaining ReadMeABook features - ([f78f27a](https://github.com/snapetech/seerrng/commit/f78f27aab9506ee63a6bad2748c5ab67387a3361))
+- Propose fastest-source routing design - ([135c5c1](https://github.com/snapetech/seerrng/commit/135c5c1c68ac71346cbd0320755afaa5a42b2421))
+- Record Tunerr recording-rule fork progress - ([83c1f37](https://github.com/snapetech/seerrng/commit/83c1f377b9e047700ac5f8ae7705ebb007faa938))
+- Remove human sign-off gate for contributions - ([b6639aa](https://github.com/snapetech/seerrng/commit/b6639aa2ab768ef127334066bd65a7b551775710))
+
+### ⚡ Performance
+- Trim the initial English app bundle - ([a1f0a8d](https://github.com/snapetech/seerrng/commit/a1f0a8d0417a0d86430645983d281d4307ebcca1))
+
+### 🧪 Testing
+- *(security)* Verify game library rate limits - ([cfbd060](https://github.com/snapetech/seerrng/commit/cfbd06063e2a886c7e1878f05201d1ad368f11fe))
+- *(ui)* Cover manager blocklist preference - ([ead182d](https://github.com/snapetech/seerrng/commit/ead182d582df7efa235c0139ca4492b912657f06))
+- Stabilize ROMarrNG Cypress fixtures - ([a1afb3f](https://github.com/snapetech/seerrng/commit/a1afb3fd9a8724fca96bf3288d885ad16d85f2bd))
+- Return nullable settings service fixtures - ([c62f2e7](https://github.com/snapetech/seerrng/commit/c62f2e7b0b04548369b872e3e235e163760fbb20))
+- Capture services page state in Cypress failure - ([e99ef8d](https://github.com/snapetech/seerrng/commit/e99ef8d891cc331f05881683ed6e2024fa484ac9))
+- Use complete public settings response in services spec - ([7f0d976](https://github.com/snapetech/seerrng/commit/7f0d976c0aebbc42b11ba9ae2c6f42980609236f))
+- Isolate override rule data in services spec - ([7a30726](https://github.com/snapetech/seerrng/commit/7a30726feb0b593aec8eb9e54de91727786e97c5))
+- Use stable selectors for async settings actions - ([131fe45](https://github.com/snapetech/seerrng/commit/131fe457354482916049db78c9f88d1efe030399))
+- Wait for software catalog settings to settle - ([c1322ef](https://github.com/snapetech/seerrng/commit/c1322effffa40761352f3483239619e468dd5192))
+- Rate limit game library route harness - ([51fdac1](https://github.com/snapetech/seerrng/commit/51fdac14538bd50cc2349b8af88a42d9a1abcc76))
+- Improve route failure diagnostics - ([68baf4a](https://github.com/snapetech/seerrng/commit/68baf4a0c1bf4b9a8ab566b7139dcd577ac16ec9))
+- Isolate music fallback service settings - ([8a12560](https://github.com/snapetech/seerrng/commit/8a1256023c0d5e5b4df7a3d53697c182874783c5))
+- Repair settings Cypress assertions and fixtures - ([72ea493](https://github.com/snapetech/seerrng/commit/72ea49383c455d8b38ffce4e056fb43ee417a462))
+
+### ⚙️ Miscellaneous Tasks
+- Stop publishing the YunoHost package - ([c7a93b8](https://github.com/snapetech/seerrng/commit/c7a93b85c8b57246ce1f48993fea80158c194742))
+- Record accepted preview ancestry - ([15e2ce7](https://github.com/snapetech/seerrng/commit/15e2ce7f6f56b1b9c068769c0a5bb118cad41966))
+- Record issue-fix branch ancestry - ([81ae0d7](https://github.com/snapetech/seerrng/commit/81ae0d789788dedb365a84e5fe65cf46f4181209))
+- Record cross-platform setup ancestry - ([d13a012](https://github.com/snapetech/seerrng/commit/d13a012d9999601e67bbcabc1a03057d69537cae))
+- Record romarrng branch ancestry - ([3ee9306](https://github.com/snapetech/seerrng/commit/3ee93068db1e961454d5f1e444f27e88a3962a39))
+- Record reader-groupings ancestry - ([d4d580c](https://github.com/snapetech/seerrng/commit/d4d580cbc1d5f098fcb9401ac96c405b3bf21667))
+
 ## [3.56.0](https://github.com/snapetech/seerrng/compare/v3.55.1..v3.56.0) - 2026-10-08
 
 ### User-facing changes
