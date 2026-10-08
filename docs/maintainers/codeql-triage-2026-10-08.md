@@ -21,8 +21,10 @@ Dependabot refreshes its dependency graph.
   `server/routes/gameLibrary.test.ts:51`. The alert surfaced at the test app's
   mount of the production router. The Game Library router now limits every
   authenticated user's requests to 120 per minute; the existing Steam sync
-  limit remains 4 per minute. Test and E2E environments skip these limits. The
-  next CodeQL analysis should close this alert as fixed.
+  limit remains 4 per minute. Since CodeQL treats the test harness's
+  `checkUser` middleware as a route and does not follow the imported router,
+  the test app now also applies an active outer rate limit before `checkUser`.
+  The next CodeQL analysis should close this alert as fixed.
 
 ## Dismissed as false positives
 
@@ -77,9 +79,11 @@ reaches `main` and CodeQL refreshes its analysis.
   never fire. It was removed; a second plan is still rejected as unexpected
   trailing TAP structure, now covered by a regression test.
 - **#481 — `js/missing-rate-limiting`**. The alert points to the Game Library
-  test app mount. Production already applies a per-user 120-request/minute
-  router limit and preserves a 4-request/minute Steam sync limit. Keep this
-  alert open until the default-branch reanalysis confirms the route is covered.
+  test app's `checkUser` middleware. Production applies a per-user
+  120-request/minute router limit and preserves a 4-request/minute Steam sync
+  limit, but CodeQL does not follow the imported router. The test app now has
+  its own active request limit before `checkUser`, covering the reported path.
+  The next default-branch scan should confirm closure.
 
 Focused verification on the candidate passed 157 tests across evidence
 reconciliation, Node attestation, native TAP accounting, config management,

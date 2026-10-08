@@ -14,6 +14,7 @@ import { setupTestDb } from '@server/test/db';
 import type { Request } from 'express';
 import express, { type Express } from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
+import rateLimit from 'express-rate-limit';
 import request from 'supertest';
 import gameLibraryRoutes from './gameLibrary';
 
@@ -48,6 +49,14 @@ const createApp = (
     req.session = session as unknown as Request['session'];
     next();
   });
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: 1000,
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  );
   app.use(checkUser);
   app.use(
     OpenApiValidator.middleware({

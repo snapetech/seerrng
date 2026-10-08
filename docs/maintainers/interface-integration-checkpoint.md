@@ -1070,7 +1070,10 @@ return attacker-controlled bytes while the original path identity was restored;
 the new reader detects the same swap. The CodeQL trivial conditional and
 unreachable duplicate-plan guard were also corrected, with a TAP regression
 test proving duplicate plans remain rejected. The race test is registered in
-the portable tooling suite.
+the portable tooling suite. The Game Library CodeQL finding points to the test
+app's `checkUser` middleware because its production router limiter is skipped
+in the test environment. The test app now applies its own active rate limiter
+before authentication middleware, so the reported test route is covered.
 
 Focused checks passed: 157 tests, one expected platform-specific skip, and no
 failures. The first hosted run passed the unit shard and release-note contract
