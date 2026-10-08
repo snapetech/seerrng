@@ -71,7 +71,7 @@ if [[ ! -r "$keytab" ]]; then
   exit 1
 fi
 
-base64 "$keytab" | tr -d '\r\n' | bao kv patch "$secret_path" \
+base64 < "$keytab" | tr -d '\r\n' | bao kv patch "$secret_path" \
   copr_kerberos_principal="$principal" \
   copr_kerberos_keytab_b64=-
 

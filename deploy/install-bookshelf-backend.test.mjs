@@ -135,13 +135,14 @@ describe('Bookshelf backup restoration', () => {
       path.join(environment.BOOKSHELF_EBOOKS_CONFIG_DIR, 'keep'),
       'original'
     );
-    await execFileAsync('tar', [
-      '-C',
-      path.dirname(source),
-      '--transform=s#^payload#../escaped#',
-      '-czf',
+    await execFileAsync('python3', [
+      '-c',
+      `import sys, tarfile
+archive_path, payload_path = sys.argv[1:]
+with tarfile.open(archive_path, 'w:gz') as archive:
+    archive.add(payload_path, arcname='../escaped/payload')`,
       path.join(environment.BACKUP_DIR, 'bookshelf-ebooks-config.tgz'),
-      path.basename(source),
+      source,
     ]);
 
     const result = await runInstaller(environment, '--restore-backup');

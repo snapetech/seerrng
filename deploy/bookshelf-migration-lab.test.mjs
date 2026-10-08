@@ -99,14 +99,26 @@ describe('Bookshelf migration lab paths', () => {
     const root = await createTemporaryDirectory();
     const labDirectory = path.join(root, 'lab');
     const sourceDirectory = path.join(root, 'source');
+    const executableDirectory = path.join(root, 'bin');
     await fs.mkdir(sourceDirectory);
+    await fs.mkdir(executableDirectory);
     await fs.writeFile(path.join(sourceDirectory, 'readarr.db'), 'fixture');
+    for (const command of ['curl', 'docker', 'node', 'rsync', 'sqlite3']) {
+      await fs.writeFile(
+        path.join(executableDirectory, command),
+        '#!/bin/sh\nexit 0\n',
+        {
+          mode: 0o755,
+        }
+      );
+    }
 
     const result = await runLab(
       {
         BUILD_LOCAL_IMAGE: 'false',
         HARDCOVER_AUTH: 'invalid-token',
         LAB_DIR: labDirectory,
+        PATH: `${executableDirectory}:${process.env.PATH}`,
         SKIP_PULL: 'true',
         SOURCE_EBOOK_CONFIG_DIR: sourceDirectory,
       },

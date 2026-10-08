@@ -24,8 +24,7 @@ if [[ -L "$DB_FILE" || ! -f "$DB_FILE" ]]; then
   exit 1
 fi
 
-readarray -t plex_values < <(
-  PLEX_PREFS="$PLEX_PREFS" python - <<'PY'
+exec 3< <(PLEX_PREFS="$PLEX_PREFS" python3 - <<'PY'
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -43,16 +42,18 @@ print(root.attrib.get("FriendlyName") or "Plex")
 PY
 )
 
-PLEX_TOKEN="${plex_values[0]}"
-PLEX_MACHINE_ID="${plex_values[1]}"
-PLEX_NAME="${plex_values[2]}"
+IFS= read -r PLEX_TOKEN <&3
+IFS= read -r PLEX_MACHINE_ID <&3
+IFS= read -r PLEX_NAME <&3
+exec 3<&-
 
 if [[ ! "$PLEX_PROXY_PORT" =~ ^[0-9]{1,5}$ ]] ||
   ((10#$PLEX_PROXY_PORT < 1 || 10#$PLEX_PROXY_PORT > 65535)); then
   echo "PLEX_PROXY_PORT must be an integer from 1 through 65535" >&2
   exit 2
 fi
-if [[ ! "$PLEX_TOKEN" =~ ^[A-Za-z0-9_-]{1,512}$ ]]; then
+if [[ ! "$PLEX_TOKEN" =~ ^[A-Za-z0-9_-]+$ ]] ||
+  (( ${#PLEX_TOKEN} < 1 || ${#PLEX_TOKEN} > 512 )); then
   echo "Plex Preferences.xml contains an invalid token" >&2
   exit 1
 fi
@@ -67,7 +68,7 @@ PLEX_PROXY_HOST="$PLEX_PROXY_HOST" \
 PLEX_PROXY_PORT="$PLEX_PROXY_PORT" \
 PLEX_MACHINE_ID="$PLEX_MACHINE_ID" \
 PLEX_NAME="$PLEX_NAME" \
-python - <<'PY'
+python3 - <<'PY'
 import json
 import os
 import stat
@@ -115,7 +116,7 @@ except BaseException:
     raise
 PY
 
-DB_FILE="$DB_FILE" PLEX_TOKEN="$PLEX_TOKEN" python - <<'PY'
+DB_FILE="$DB_FILE" PLEX_TOKEN="$PLEX_TOKEN" python3 - <<'PY'
 import os
 import sqlite3
 import stat
