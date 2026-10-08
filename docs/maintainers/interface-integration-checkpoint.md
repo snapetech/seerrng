@@ -1266,3 +1266,10 @@ notes, and the validation-engine aggregate. That run covered candidate
 checkpoint-file conflict, which is resolved by keeping both integration
 entries. The resulting latest-main candidate must complete a fresh hosted run
 before merging. No local production build was run.
+
+The push notification also surfaced Dependabot alerts #315–#317 for transitive
+Handlebars 4.7.9 (two critical and one medium). The workspace override and
+lockfile now resolve to patched 4.7.10. `pnpm install --lockfile-only
+--frozen-lockfile --offline` passed, and `pnpm audit --prod` reported no known
+vulnerabilities in the updated lockfile. The hosted run for the synced candidate
+must be repeated after this dependency update.

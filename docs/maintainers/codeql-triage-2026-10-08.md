@@ -15,6 +15,15 @@ vulnerable version. The override and lockfile now both resolve to `16.3.8`.
 default-branch alerts remain open until this lockfile repair reaches `main` and
 Dependabot refreshes its dependency graph.
 
+## Dependabot Handlebars alerts
+
+Dependabot alerts **#315–#317** report two critical and one medium advisory for
+transitive Handlebars `4.7.9`, pulled in by `email-templates` and the FormatJS
+TypeScript transformer. The workspace override and lockfile now pin Handlebars
+to patched version `4.7.10`. This release includes the fix for all three
+advisories; GitHub's default-branch alerts will close after the updated lockfile
+reaches `main` and Dependabot refreshes its dependency graph.
+
 ## Fixed in source
 
 - **#481 — `js/missing-rate-limiting`** at
