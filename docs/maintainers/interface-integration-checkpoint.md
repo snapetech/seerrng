@@ -1088,3 +1088,17 @@ backup because the volume was full; it was an environment error, not an i18n
 assertion failure. The focused native and React receipts above remain the
 executed feature evidence. Hosted checks, build, integration, and release
 verification are still pending.
+
+#### Hosted validation repair — October 8, 2026
+
+PR #180's first hosted validation run (37829505156) caught a client type error
+before Cypress or Playwright specs started. In
+`src/components/RequestModal/TvRequestModal.tsx`, a conditional between full
+episode selections and whole-season selections inferred a season-only shape;
+the selection snapshot then accessed `episodeNumbers`. Both browser lanes
+failed at their shared production build for this same error. The source now
+types that snapshot as `SeasonEpisodeSelection[]`, preserving optional episode
+numbers for partial selections. After the fix, `pnpm typecheck:client` passed
+and the three TV request tree suites passed 24/24. A fresh hosted run against
+the corrected commit is pending; the first-run failure remains recorded and is
+not counted as a pass.

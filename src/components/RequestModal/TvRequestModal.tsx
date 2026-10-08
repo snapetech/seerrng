@@ -591,8 +591,8 @@ const TvRequestModal = ({
   );
   const changeWatchAheadEpisodeCount = (nextCount: number) => {
     if (!editRequest && watchAheadEpisodeCount === 0 && nextCount > 0) {
-      const currentNormalSelection = settings.currentSettings
-        .partialRequestsEnabled
+      const currentNormalSelection: SeasonEpisodeSelection[] = settings
+        .currentSettings.partialRequestsEnabled
         ? seasonSelections
         : unrequestedSeasons.map((seasonNumber) => ({ seasonNumber }));
       selectionBeforeWatchAhead.current = currentNormalSelection.map(
