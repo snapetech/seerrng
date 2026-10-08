@@ -86,6 +86,24 @@ describe('external request list routes', () => {
     assert.equal(response.body.processedItemIds, undefined);
   });
 
+  it('accepts IMDb watchlists with migrated profile IDs', async () => {
+    const profileId = 'p.mqcc26fvagqmqbomwbssqddwh4';
+    const agent = await loginAs('friend@seerr.dev');
+    const response = await agent.post('/api/v1/request/lists').send({
+      url: `https://www.imdb.com/user/${profileId}/watchlist/`,
+    });
+
+    assert.equal(response.status, 201, JSON.stringify(response.body));
+    assert.equal(
+      response.body.sourceUrl,
+      `https://www.imdb.com/user/${profileId}/watchlist/`
+    );
+    const stored = await getRepository(ExternalRequestList).findOneOrFail({
+      where: { sourceId: profileId },
+    });
+    assert.equal(stored.sourceId, profileId);
+  });
+
   it('rejects a public-list URL that could target a private network', async () => {
     const agent = await loginAs('friend@seerr.dev');
     const response = await agent
