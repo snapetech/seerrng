@@ -12,6 +12,7 @@ import OpenLibraryAPI from '@server/api/openlibrary';
 import PlexTvAPI from '@server/api/plextv';
 import RadarrAPI from '@server/api/servarr/radarr';
 import ReadarrAPI from '@server/api/servarr/readarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -51,6 +52,7 @@ import discoverRoutes, {
   GENRE_SLIDER_CONCURRENCY,
   MAX_GENRE_SLIDER_ITEMS,
 } from './discover';
+import sportarrRoutes from './sportarr';
 
 let app: Express;
 
@@ -68,6 +70,7 @@ function createApp() {
   app.use(rateLimit({ windowMs: 60_000, limit: 10_000 }), checkUser);
   app.use('/auth', authRoutes);
   app.use('/discover', discoverRoutes);
+  app.use('/sportarr', sportarrRoutes);
   app.use(
     (
       err: { status?: number; message?: string },
@@ -90,6 +93,7 @@ before(() => {
 
 afterEach(() => {
   mock.restoreAll();
+  getSettings().sportarr = [];
 });
 
 setupTestDb();
@@ -223,6 +227,228 @@ describe('media category availability guards', () => {
     } finally {
       settings.main.enabledMediaCategories = originalCategories;
     }
+  });
+});
+
+describe('Sportarr discovery and event routes', () => {
+  const configureSportarr = () => {
+    getSettings().sportarr = [
+      {
+        id: 44,
+        name: 'Sportarr',
+        hostname: 'sportarr.test',
+        port: 1867,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 5,
+        activeProfileName: 'HD',
+        isDefault: true,
+      },
+    ];
+  };
+
+  it('checks library state on an advanced requester’s selected destination', async () => {
+    configureSportarr();
+    getSettings().sportarr.push({
+      id: 45,
+      name: 'Sportarr Secondary',
+      hostname: 'sportarr-secondary.test',
+      port: 1867,
+      apiKey: 'secondary-key',
+      useSsl: false,
+      activeProfileId: 6,
+      activeProfileName: 'HD Plus',
+      isDefault: false,
+    });
+    let selectedHostname: string | undefined;
+    const originalBuildUrl = SportarrAPI.buildUrl;
+    const buildUrl = mock.method(
+      SportarrAPI,
+      'buildUrl',
+      (settings: Parameters<typeof SportarrAPI.buildUrl>[0], path?: string) => {
+        selectedHostname = settings.hostname;
+        return originalBuildUrl(settings, path);
+      }
+    );
+    const getLeague = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueByExternalId',
+      async (externalId: string) => {
+        const inSecondary = selectedHostname === 'sportarr-secondary.test';
+        return {
+          ...(inSecondary ? { id: 91 } : {}),
+          externalId,
+          title: 'Premier League',
+          overview: '',
+          sport: 'Football',
+          monitored: false,
+          images: [],
+        };
+      }
+    );
+
+    const admin = await login();
+    const secondary = await admin.get('/sportarr/lg-000042?serverId=45');
+    const defaultService = await admin.get('/sportarr/lg-000042');
+    const friend = await login('friend@seerr.dev');
+    const unauthorized = await friend.get('/sportarr/lg-000042?serverId=45');
+
+    assert.equal(secondary.status, 200);
+    assert.equal(secondary.body.libraryState, 'unmonitored');
+    assert.equal(secondary.body.requestable, false);
+    assert.equal(defaultService.status, 200);
+    assert.equal(defaultService.body.libraryState, 'not-added');
+    assert.equal(defaultService.body.requestable, true);
+    assert.equal(unauthorized.status, 403);
+    assert.deepEqual(
+      buildUrl.mock.calls.map((call) => call.arguments[0].hostname),
+      ['sportarr-secondary.test', 'sportarr.test']
+    );
+    assert.equal(getLeague.mock.callCount(), 2);
+  });
+
+  it('labels catalog leagues using the live Sportarr library state', async () => {
+    configureSportarr();
+    mock.method(SportarrAPI.prototype, 'getLeaguesByTitle', async () => [
+      {
+        externalId: 'lg-000042',
+        title: 'Premier League',
+        overview: '',
+        sport: 'Football',
+        monitored: false,
+        images: [],
+      },
+      {
+        externalId: 'lg-000043',
+        title: 'National Hockey League',
+        overview: '',
+        sport: 'Ice Hockey',
+        monitored: false,
+        images: [],
+      },
+    ]);
+    mock.method(SportarrAPI.prototype, 'getLibraryLeagues', async () => [
+      {
+        id: 91,
+        externalId: 'lg-000043',
+        title: 'National Hockey League',
+        overview: '',
+        sport: 'Ice Hockey',
+        monitored: false,
+        images: [],
+      },
+    ]);
+
+    const agent = await login();
+    const response = await agent.get('/discover/sports?query=league');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      response.body.results.map(
+        (league: {
+          id: string;
+          requestable: boolean;
+          libraryState: string;
+          eventsAvailable: boolean;
+        }) => ({
+          id: league.id,
+          requestable: league.requestable,
+          libraryState: league.libraryState,
+          eventsAvailable: league.eventsAvailable,
+        })
+      ),
+      [
+        {
+          id: 'lg-000042',
+          requestable: true,
+          libraryState: 'not-added',
+          eventsAvailable: false,
+        },
+        {
+          id: 'lg-000043',
+          requestable: false,
+          libraryState: 'unmonitored',
+          eventsAvailable: false,
+        },
+      ]
+    );
+  });
+
+  it('returns paged events only for a monitored library league', async () => {
+    configureSportarr();
+    mock.method(SportarrAPI.prototype, 'getLibraryLeagues', async () => [
+      {
+        id: 91,
+        externalId: 'lg-000042',
+        title: 'Premier League',
+        overview: '',
+        sport: 'Football',
+        monitored: true,
+        images: [],
+      },
+    ]);
+    const getLeagueEvents = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueEvents',
+      async (_id: number, page = 1, pageSize = 50) => ({
+        page,
+        pageSize,
+        totalRecords: 1,
+        totalPages: 1,
+        records: [
+          {
+            id: 301,
+            title: 'Final',
+            eventDate: '2026-10-01T19:00:00Z',
+            monitored: true,
+            hasFile: true,
+            fileCount: 1,
+          },
+        ],
+      })
+    );
+
+    const agent = await login();
+    const response = await agent.get(
+      '/sportarr/lg-000042/events?page=2&pageSize=25'
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(getLeagueEvents.mock.calls[0].arguments[0], 91);
+    assert.equal(getLeagueEvents.mock.calls[0].arguments[1], 2);
+    assert.equal(getLeagueEvents.mock.calls[0].arguments[2], 25);
+    assert.equal(response.body.eventsAvailable, true);
+    assert.equal(response.body.results[0].hasFile, true);
+  });
+
+  it('does not expose events for an unmonitored league', async () => {
+    configureSportarr();
+    mock.method(SportarrAPI.prototype, 'getLibraryLeagues', async () => [
+      {
+        id: 91,
+        externalId: 'lg-000042',
+        title: 'Premier League',
+        overview: '',
+        sport: 'Football',
+        monitored: false,
+        images: [],
+      },
+    ]);
+    const getLeagueEvents = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueEvents',
+      async () => {
+        throw new Error('Unmonitored league events must not be fetched');
+      }
+    );
+
+    const agent = await login();
+    const response = await agent.get('/sportarr/lg-000042/events');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.eventsAvailable, false);
+    assert.deepEqual(response.body.results, []);
+    assert.equal(getLeagueEvents.mock.callCount(), 0);
   });
 });
 

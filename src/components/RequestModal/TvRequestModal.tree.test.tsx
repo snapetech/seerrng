@@ -13,6 +13,9 @@ const fixtureState = vi.hoisted(() => ({
   quota: { tv: { limit: 0, remaining: 10 } },
   catalog: undefined as unknown,
   partialRequestsEnabled: true,
+  requestPermission: false,
+  linkedPlexAccount: false,
+  sonarrServers: [] as unknown[],
   ready: true,
   mutate: vi.fn(),
   addToast: vi.fn(),
@@ -26,7 +29,9 @@ vi.mock('swr', () => ({
       ? fixtureState.data
       : key?.endsWith('/quota')
         ? fixtureState.quota
-        : undefined,
+        : key === '/api/v1/service/sonarr'
+          ? fixtureState.sonarrServers
+          : undefined,
   }),
   mutate: fixtureState.mutate,
 }));
@@ -41,8 +46,12 @@ vi.mock('@app/hooks/useSettings', () => ({
 }));
 vi.mock('@app/hooks/useUser', () => ({
   useUser: () => ({
-    user: { id: 7, permissions: 0 },
-    hasPermission: () => false,
+    user: {
+      id: 7,
+      permissions: 0,
+      ...(fixtureState.linkedPlexAccount ? { plexId: 101 } : {}),
+    },
+    hasPermission: () => fixtureState.requestPermission,
   }),
 }));
 vi.mock('@app/hooks/usePlaybackCatalog', () => ({
@@ -62,8 +71,13 @@ vi.mock('@app/hooks/useAdvancedOptionsDisclosure', () => ({
 vi.mock('react-intl', async (importOriginal) => ({
   ...(await importOriginal<typeof ReactIntl>()),
   useIntl: () => ({
-    formatMessage: ({ defaultMessage }: { defaultMessage: string }) =>
-      defaultMessage,
+    formatMessage: (
+      { defaultMessage }: { defaultMessage: string },
+      values?: Record<string, unknown>
+    ) =>
+      defaultMessage.replace(/\{([^}]+)\}/g, (placeholder, key) =>
+        values?.[key] === undefined ? placeholder : String(values[key])
+      ),
     formatDate: () => 'Fixture Date',
     formatNumber: String,
   }),
@@ -83,18 +97,27 @@ vi.mock('@app/components/Common/Button', () => ({
     disabled,
     type,
     'data-testid': testId,
+    as,
+    href,
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     'data-testid'?: string;
-  }) => (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      data-testid={testId}
-    >
-      {children}
-    </button>
-  ),
+    as?: 'a' | 'button';
+    href?: string;
+  }) =>
+    as === 'a' ? (
+      <a href={href} data-testid={testId}>
+        {children}
+      </a>
+    ) : (
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        data-testid={testId}
+      >
+        {children}
+      </button>
+    ),
 }));
 vi.mock('@app/components/RequestModal/RequestMediaCard', () => ({
   default: ({ children }: { children: React.ReactNode }) => (
@@ -109,7 +132,37 @@ vi.mock('@app/components/RequestModal/QuotaDisplay', () => ({
 }));
 vi.mock('@app/components/RequestModal/AdvancedRequester', () => ({
   default: () => null,
-  RequestListboxControl: () => null,
+  RequestListboxControl: ({
+    id,
+    label,
+    value,
+    options,
+    onChange,
+    disabled,
+  }: {
+    id: string;
+    label: React.ReactNode;
+    value: number;
+    options: { value: number; label: string }[];
+    onChange: (value: number) => void;
+    disabled?: boolean;
+  }) => (
+    <label>
+      {label}
+      <select
+        data-testid={id}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  ),
 }));
 vi.mock('@app/components/RequestModal/AdvancedOptionsDisclosureButton', () => ({
   default: () => null,
@@ -153,20 +206,31 @@ vi.mock('@app/components/RequestModal/RequestSeasonEpisodeTree', () => ({
     disabledEpisodes,
     onReadyChange,
     onSelectionsChange,
+    selectionMode,
   }: {
     selections: SeasonEpisodeSelection[];
     disabledSeasons: number[];
     disabledEpisodes: Record<number, number[]>;
     onReadyChange: (ready: boolean) => void;
     onSelectionsChange: (selection: SeasonEpisodeSelection[]) => void;
+    selectionMode: 'multiple' | 'single-episode';
   }) {
     useEffect(() => {
       onReadyChange(fixtureState.ready);
     }, [onReadyChange]);
+    useEffect(() => {
+      if (
+        selectionMode === 'single-episode' &&
+        (selections.length !== 1 || selections[0]?.episodeNumbers?.length !== 1)
+      ) {
+        onSelectionsChange([{ seasonNumber: 1, episodeNumbers: [1] }]);
+      }
+    }, [onSelectionsChange, selectionMode, selections]);
     return (
       <div
         data-testid="tree"
         data-selections={JSON.stringify(selections)}
+        data-selection-mode={selectionMode}
         data-disabled-seasons={JSON.stringify(disabledSeasons)}
         data-disabled-episodes={JSON.stringify(disabledEpisodes)}
       >
@@ -192,6 +256,15 @@ vi.mock('@app/components/RequestModal/RequestSeasonEpisodeTree', () => ({
           }
         >
           Episodes
+        </button>
+        <button
+          type="button"
+          data-testid="tree-start-episode-2"
+          onClick={() =>
+            onSelectionsChange([{ seasonNumber: 2, episodeNumbers: [2] }])
+          }
+        >
+          Start Episode 2
         </button>
         <button
           type="button"
@@ -253,6 +326,9 @@ async function fixture(
   fixtureState.quota = { tv: { limit: 0, remaining: 10 } };
   fixtureState.catalog = undefined;
   fixtureState.partialRequestsEnabled = true;
+  fixtureState.requestPermission = false;
+  fixtureState.linkedPlexAccount = false;
+  fixtureState.sonarrServers = [];
   fixtureState.ready = true;
   options.configure?.();
   vi.mocked(axios.post).mockResolvedValue({
@@ -292,6 +368,17 @@ function selections(doc: Document) {
 }
 async function click(doc: Document, id: string) {
   await act(async () => button(doc, id).click());
+}
+async function selectValue(doc: Document, id: string, value: string) {
+  const control = doc.querySelector<HTMLSelectElement>(
+    `[data-testid="${id}"]`
+  )!;
+  await act(async () => {
+    control.value = value;
+    control.dispatchEvent(
+      new doc.defaultView!.Event('change', { bubbles: true })
+    );
+  });
 }
 
 it('default whole-season selection reaches the actual Request handler and completion callback', async () => {
@@ -472,6 +559,188 @@ it('clearing an edited request retains Cancel Request and its existing DELETE be
       },
       configure: () => {
         fixtureState.ready = false;
+      },
+    }
+  );
+});
+
+it('surfaces Episode Queue requirements when the requester has not linked Plex', async () => {
+  await fixture(async (doc) => {
+    const control = doc.querySelector<HTMLSelectElement>(
+      '[data-testid="tv-watch-ahead-count"]'
+    );
+    expect(control).not.toBeNull();
+    expect(control?.disabled).toBe(true);
+    expect(doc.body.textContent).toContain('Link your Plex account to SeerrNG');
+    expect(
+      doc.querySelector('a[href="/profile/settings/linked-accounts"]')
+    ).not.toBeNull();
+    expect(
+      doc.querySelector('a[href*="docs/using-seerr/jellyfin-watch-ahead.md"]')
+    ).not.toBeNull();
+  });
+});
+
+it('starts a new Episode Queue request with one episode and submits the chosen buffer', async () => {
+  await fixture(
+    async (doc) => {
+      await selectValue(doc, 'tv-watch-ahead-count', '3');
+      expect(
+        doc
+          .querySelector('[data-testid="tree"]')
+          ?.getAttribute('data-selection-mode')
+      ).toBe('single-episode');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1, episodeNumbers: [1] },
+      ]);
+      await click(doc, 'tree-start-episode-2');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 2, episodeNumbers: [2] },
+      ]);
+      await click(doc, 'modal-ok-button');
+      expect(axios.post).toHaveBeenCalledExactlyOnceWith(
+        '/api/v1/request',
+        expect.objectContaining({
+          seasons: [2],
+          seasonRequests: [{ seasonNumber: 2, episodeNumbers: [2] }],
+          watchAheadEpisodeCount: 3,
+        })
+      );
+    },
+    {
+      configure: () => {
+        fixtureState.requestPermission = true;
+        fixtureState.linkedPlexAccount = true;
+        fixtureState.sonarrServers = [
+          { id: 1, name: 'Sonarr', is4k: false, isDefault: true },
+        ];
+      },
+    }
+  );
+});
+
+it('restores the normal season selection when Episode Queue is turned off', async () => {
+  await fixture(
+    async (doc) => {
+      await selectValue(doc, 'tv-watch-ahead-count', '2');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1, episodeNumbers: [1] },
+      ]);
+      await click(doc, 'tree-start-episode-2');
+      await selectValue(doc, 'tv-watch-ahead-count', '0');
+      expect(
+        doc
+          .querySelector('[data-testid="tree"]')
+          ?.getAttribute('data-selection-mode')
+      ).toBe('multiple');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1 },
+        { seasonNumber: 2 },
+      ]);
+      await click(doc, 'modal-ok-button');
+      expect(axios.post).toHaveBeenCalledExactlyOnceWith(
+        '/api/v1/request',
+        expect.objectContaining({
+          seasons: [1, 2],
+          seasonRequests: [{ seasonNumber: 1 }, { seasonNumber: 2 }],
+          watchAheadEpisodeCount: 0,
+        })
+      );
+    },
+    {
+      configure: () => {
+        fixtureState.requestPermission = true;
+        fixtureState.linkedPlexAccount = true;
+        fixtureState.sonarrServers = [
+          { id: 1, name: 'Sonarr', is4k: false, isDefault: true },
+        ];
+      },
+    }
+  );
+});
+
+it('restores full-season requests when Episode Queue is off and partial selection is disabled', async () => {
+  await fixture(
+    async (doc) => {
+      expect(doc.querySelector('[data-testid="tree"]')).toBeNull();
+      await selectValue(doc, 'tv-watch-ahead-count', '1');
+      expect(
+        doc
+          .querySelector('[data-testid="tree"]')
+          ?.getAttribute('data-selection-mode')
+      ).toBe('single-episode');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1, episodeNumbers: [1] },
+      ]);
+      await selectValue(doc, 'tv-watch-ahead-count', '0');
+      expect(doc.querySelector('[data-testid="tree"]')).toBeNull();
+      await click(doc, 'modal-ok-button');
+      expect(axios.post).toHaveBeenCalledExactlyOnceWith(
+        '/api/v1/request',
+        expect.objectContaining({
+          seasons: [1, 2],
+          seasonRequests: undefined,
+          watchAheadEpisodeCount: 0,
+        })
+      );
+    },
+    {
+      configure: () => {
+        fixtureState.partialRequestsEnabled = false;
+        fixtureState.requestPermission = true;
+        fixtureState.linkedPlexAccount = true;
+        fixtureState.sonarrServers = [
+          { id: 1, name: 'Sonarr', is4k: false, isDefault: true },
+        ];
+      },
+    }
+  );
+});
+
+it('keeps an existing request selection when its owner enables Episode Queue', async () => {
+  await fixture(
+    async (doc) => {
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1 },
+        { seasonNumber: 2 },
+      ]);
+      await selectValue(doc, 'tv-watch-ahead-count', '2');
+      expect(
+        doc
+          .querySelector('[data-testid="tree"]')
+          ?.getAttribute('data-selection-mode')
+      ).toBe('multiple');
+      expect(selections(doc)).toEqual([
+        { seasonNumber: 1 },
+        { seasonNumber: 2 },
+      ]);
+      await click(doc, 'modal-ok-button');
+      expect(axios.put).toHaveBeenCalledExactlyOnceWith(
+        '/api/v1/request/88',
+        expect.objectContaining({
+          seasons: [1, 2],
+          seasonRequests: [{ seasonNumber: 1 }, { seasonNumber: 2 }],
+          watchAheadEpisodeCount: 2,
+        })
+      );
+      expect(axios.delete).not.toHaveBeenCalled();
+    },
+    {
+      props: {
+        editRequest: {
+          id: 88,
+          requestedBy: { id: 7, displayName: 'Fixture User' },
+          seasons: [{ seasonNumber: 1 }, { seasonNumber: 2 }],
+          media: { tvdbId: 456 },
+          watchAheadEpisodeCount: 0,
+        } as ModalProps['editRequest'],
+      },
+      configure: () => {
+        fixtureState.requestPermission = true;
+        fixtureState.linkedPlexAccount = true;
+        fixtureState.sonarrServers = [
+          { id: 1, name: 'Sonarr', is4k: false, isDefault: true },
+        ];
       },
     }
   );

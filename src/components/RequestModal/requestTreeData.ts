@@ -75,11 +75,51 @@ export const requestSelectionToTreeIds = (
       : [];
   });
 
+export const firstSelectableRequestEpisodeId = (
+  seasons: TreeSeason[],
+  preferredIds: number[] = []
+): number | undefined => {
+  const selectableIds = seasons.flatMap((season) =>
+    season.episodes
+      .filter((episode) => episode.selectable)
+      .map((episode) => episode.id)
+  );
+  return (
+    preferredIds.find((id) => selectableIds.includes(id)) ?? selectableIds[0]
+  );
+};
+
 export const treeSelectionToRequests = (
   seasons: TreeSeason[],
   ids: number[],
-  previousSelections: SeasonEpisodeSelection[] = []
+  previousSelections: SeasonEpisodeSelection[] = [],
+  singleEpisodeSelection = false
 ): SeasonEpisodeSelection[] => {
+  if (singleEpisodeSelection) {
+    const selectedId = ids.find((id) =>
+      seasons.some((season) =>
+        season.episodes.some(
+          (episode) => episode.id === id && episode.selectable
+        )
+      )
+    );
+    if (selectedId === undefined) return [];
+    for (const season of seasons) {
+      const episode = season.episodes.find(
+        (candidate) => candidate.id === selectedId && candidate.selectable
+      );
+      if (episode) {
+        return [
+          {
+            seasonNumber: season.seasonNumber,
+            episodeNumbers: [episode.episodeNumber],
+          },
+        ];
+      }
+    }
+    return [];
+  }
+
   const selected = new Set(ids);
   const result: SeasonEpisodeSelection[] = [];
   for (const season of seasons) {

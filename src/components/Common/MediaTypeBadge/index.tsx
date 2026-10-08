@@ -7,6 +7,7 @@ import {
   NewspaperIcon,
   RectangleStackIcon,
   Square3Stack3DIcon,
+  TrophyIcon,
   TvIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -20,7 +21,8 @@ export type MediaTypeBadgeType =
   | 'artist'
   | 'book'
   | 'comic'
-  | 'magazine';
+  | 'magazine'
+  | 'sports';
 
 export const mediaTypeBadgeTone: Record<MediaTypeBadgeType, string> = {
   movie: 'media-type-badge-tone-movie',
@@ -31,6 +33,7 @@ export const mediaTypeBadgeTone: Record<MediaTypeBadgeType, string> = {
   book: 'media-type-badge-tone-book',
   comic: 'media-type-badge-tone-comic',
   magazine: 'media-type-badge-tone-magazine',
+  sports: 'media-type-badge-tone-tv',
 };
 
 export const getMediaTypeBadgeType = (
@@ -48,7 +51,8 @@ export const getMediaTypeBadgeType = (
     mediaType === 'artist' ||
     mediaType === 'book' ||
     mediaType === 'comic' ||
-    mediaType === 'magazine'
+    mediaType === 'magazine' ||
+    mediaType === 'sports'
   ) {
     return mediaType;
   }
@@ -111,6 +115,11 @@ const badgeConfig = {
     icon: NewspaperIcon,
     tone: mediaTypeBadgeTone.magazine,
   },
+  sports: {
+    message: globalMessages.sports,
+    icon: TrophyIcon,
+    tone: mediaTypeBadgeTone.sports,
+  },
 } as const satisfies Record<
   MediaTypeBadgeType,
   {
@@ -136,6 +145,7 @@ const posterToneClass: Record<MediaTypeBadgeType, string> = {
   book: 'poster-control-type-book',
   comic: 'poster-control-type-comic',
   magazine: 'poster-control-type-magazine',
+  sports: 'poster-control-type-tv',
 };
 
 const buttonToneClass: Record<MediaTypeBadgeType, string> = {
@@ -147,6 +157,7 @@ const buttonToneClass: Record<MediaTypeBadgeType, string> = {
   book: 'app-button-media-type-book',
   comic: 'app-button-media-type-comic',
   magazine: 'app-button-media-type-magazine',
+  sports: 'app-button-media-type-tv',
 };
 
 const MediaTypeBadge = ({

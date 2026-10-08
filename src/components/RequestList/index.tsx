@@ -63,11 +63,11 @@ type Sort = 'added' | 'modified';
 
 type SortDirection = 'asc' | 'desc';
 
-type MediaType = 'all' | 'movie' | 'tv' | 'music' | 'book';
+type MediaType = 'all' | 'movie' | 'tv' | 'music' | 'book' | 'sports';
 
 const isMediaType = (value: unknown): value is MediaType =>
   typeof value === 'string' &&
-  ['all', 'movie', 'tv', 'music', 'book'].includes(value);
+  ['all', 'movie', 'tv', 'music', 'book', 'sports'].includes(value);
 const REQUEST_FILTER_OPTIONS = Object.values(Filter);
 const REQUEST_SORT_OPTIONS: readonly Sort[] = ['added', 'modified'];
 const SORT_DIRECTION_OPTIONS: readonly SortDirection[] = ['asc', 'desc'];
@@ -237,11 +237,13 @@ const RequestList = () => {
         mediaType={
           effectiveMediaType === 'tv'
             ? 'tv'
-            : effectiveMediaType === 'music'
-              ? 'music'
-              : effectiveMediaType === 'book'
-                ? 'book'
-                : 'movie'
+            : effectiveMediaType === 'sports'
+              ? 'tv'
+              : effectiveMediaType === 'music'
+                ? 'music'
+                : effectiveMediaType === 'book'
+                  ? 'book'
+                  : 'movie'
         }
         sections={[
           {
@@ -301,6 +303,7 @@ const RequestList = () => {
                       ['tv', globalMessages.tvshows],
                       ['music', globalMessages.music],
                       ['book', globalMessages.books],
+                      ['sports', globalMessages.sports],
                     ] as const
                   ).map(([value, label]) => ({
                     value,

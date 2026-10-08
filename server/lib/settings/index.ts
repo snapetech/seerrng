@@ -321,6 +321,20 @@ export interface SonarrSettings extends DVRSettings {
   monitorNewItems: 'all' | 'none';
 }
 
+export interface SportarrSettings {
+  id: number;
+  name: string;
+  hostname: string;
+  port: number;
+  apiKey: string;
+  useSsl: boolean;
+  baseUrl?: string;
+  activeProfileId: number;
+  activeProfileName: string;
+  isDefault: boolean;
+  externalUrl?: string;
+}
+
 export interface LidarrSettings extends DVRSettings {
   activeMetadataProfileId?: number;
   activeMetadataProfileName?: string;
@@ -518,6 +532,7 @@ interface FullPublicSettings extends PublicSettings {
   readmeabookEnabled: boolean;
   comicsEnabled: boolean;
   magazinesEnabled: boolean;
+  sportsEnabled: boolean;
   softwareEnabled: boolean;
   romarrEnabled: boolean;
   enabledMediaCategories: EnabledMediaCategories;
@@ -780,6 +795,7 @@ export interface AllSettings {
   tautulli: TautulliSettings;
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
+  sportarr: SportarrSettings[];
   lidarr: LidarrSettings[];
   readarr: ReadarrSettings[];
   audiobookshelf?: AudiobookshelfSettings | null;
@@ -905,6 +921,7 @@ class Settings {
       },
       radarr: [],
       sonarr: [],
+      sportarr: [],
       lidarr: [],
       readarr: [],
       audiobookshelf: null,
@@ -1452,6 +1469,14 @@ class Settings {
     this.data.sonarr = data;
   }
 
+  get sportarr(): SportarrSettings[] {
+    return this.data.sportarr;
+  }
+
+  set sportarr(data: SportarrSettings[]) {
+    this.data.sportarr = data;
+  }
+
   get mylar(): MylarSettings[] {
     return this.data.mylar;
   }
@@ -1587,6 +1612,7 @@ class Settings {
         this.data.kapowarr.length > 0 ||
         this.data.backissue.length > 0,
       magazinesEnabled: this.data.lazylibrarian.length > 0,
+      sportsEnabled: this.data.sportarr.length > 0,
       softwareEnabled: Boolean(
         this.data.softwareAcquisition.questarr.hostname &&
         this.data.softwareAcquisition.questarr.apiKey
@@ -1880,6 +1906,7 @@ class Settings {
       },
       radarr: [],
       sonarr: [],
+      sportarr: [],
       lidarr: [],
       readarr: [],
       audiobookshelf: null,

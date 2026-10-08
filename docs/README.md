@@ -23,6 +23,7 @@ connects to.
 ## Use SeerrNG
 
 - [Find books, authors, and series](/using-seerr/books-and-series/)
+- [Browse, request, and track sports leagues with Sportarr](/using-seerr/sportarr/)
 - [Follow requests and status history](/using-seerr/request-status/)
 - [Opt in to the TV episode queue with Plex, Jellyfin, or Emby playback](/using-seerr/jellyfin-watch-ahead/)
 - [Browse and request ROMs and PC games](/using-seerr/software-acquisition/)

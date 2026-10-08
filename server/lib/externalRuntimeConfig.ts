@@ -27,6 +27,7 @@ export type ExternalRuntimeConfig = Pick<
   | 'tautulli'
   | 'radarr'
   | 'sonarr'
+  | 'sportarr'
   | 'lidarr'
   | 'readarr'
   | 'audiobookshelf'
@@ -170,6 +171,10 @@ const validate = (value: unknown): ExternalRuntimeConfig => {
     },
     radarr: normalizeServarrServices(root.radarr, 'radarr'),
     sonarr: normalizeServarrServices(root.sonarr, 'sonarr'),
+    sportarr:
+      root.sportarr === undefined
+        ? []
+        : normalizeServarrServices(root.sportarr, 'sportarr'),
     lidarr: normalizeServarrServices(root.lidarr, 'lidarr'),
     readarr: normalizeServarrServices(root.readarr, 'readarr'),
     audiobookshelf: normalizeAudiobookshelf(root.audiobookshelf),
@@ -223,6 +228,7 @@ const loadFromSettingsFile = (): ExternalRuntimeConfig | undefined => {
       tautulli: settings.tautulli,
       radarr: settings.radarr ?? [],
       sonarr: settings.sonarr ?? [],
+      sportarr: settings.sportarr ?? [],
       lidarr: settings.lidarr ?? [],
       readarr: settings.readarr ?? [],
       audiobookshelf: settings.audiobookshelf ?? null,

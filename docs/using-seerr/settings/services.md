@@ -120,6 +120,14 @@ make matched items clickable from book details. See the
 [Bookshelf Backend](../bookshelf-backend.md#audiobookshelf-availability)
 guide for the connection behavior and limitations.
 
+### Sportarr
+
+Connect Sportarr under **Settings → Services → Sportarr**. SeerrNG checks the
+connection, loads Sportarr's quality profiles, and uses the default connection
+when dispatching approved sports requests. Sportarr controls its own root
+folder and monitoring defaults. See the [Sportarr guide](../sportarr.md) for
+setup, permissions, quotas, and event status.
+
 ## Override Rules
 
 Override rules can assign a root folder, quality profile, or tags when a movie

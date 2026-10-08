@@ -3,6 +3,7 @@ import type { SeasonWithEpisodes, TvDetails } from '@server/models/Tv';
 import { describe, expect, it } from 'vitest';
 import {
   buildRequestTreeData,
+  firstSelectableRequestEpisodeId,
   hasCompleteRequestMetadata,
   requestSelectionToTreeIds,
   treeSelectionToRequests,
@@ -95,6 +96,24 @@ describe('request tree payload adapter', () => {
         { seasonNumber: 2 },
       ])
     ).toEqual([]);
+  });
+
+  it('chooses an existing selectable episode first, then the first selectable fallback', () => {
+    const tree = build([2], { 1: [2] });
+    expect(firstSelectableRequestEpisodeId(tree, [13, 11])).toBe(13);
+    expect(firstSelectableRequestEpisodeId(tree, [12, 22])).toBe(0);
+    expect(firstSelectableRequestEpisodeId(build([0, 1, 2]))).toBeUndefined();
+  });
+
+  it('keeps single-episode intent explicit even when it is the only selectable episode', () => {
+    const tree = build([], { 1: [2, 3] });
+    expect(treeSelectionToRequests(tree, [11], [], true)).toEqual([
+      { seasonNumber: 1, episodeNumbers: [1] },
+    ]);
+    expect(treeSelectionToRequests(tree, [11, 13], [], true)).toEqual([
+      { seasonNumber: 1, episodeNumbers: [1] },
+    ]);
+    expect(treeSelectionToRequests(tree, [12], [], true)).toEqual([]);
   });
 
   it('requires every season metadata record before editing, including zero-valued specials', () => {

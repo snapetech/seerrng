@@ -461,3 +461,48 @@ history features are not used.
 
 No reference to the claimed lifetime price exists in the repository. The claim
 came from one source and remains unverified. Nothing to correct.
+
+## 9. Ecosystem follow-up — 2026-10-08
+
+This follow-up rechecks the remaining media automation candidates against the
+current SeerrNG provider inventory and primary project sources. Confidence is
+**high** for each project's stated function and **moderate** for whether that
+function merits a SeerrNG integration; the latter depends on user demand and
+product policy.
+
+### Current request and acquisition coverage
+
+The current product already has request/catalog or acquisition paths for
+movies, TV, sports, music, ebooks and audiobooks, comics, magazines, PC games,
+and emulation ROMs. Sportarr is the newly implemented sports request provider
+in this worktree. Its current stable integration contract documents league,
+event, paging, and file semantics; new integrations are directed to native
+/api routes instead of the Sonarr compatibility layer
+([Sportarr Integration API](https://wiki.sportarr.net/development/integration-api/)).
+Source inspection also found that Sportarr's native catalog responses use
+idLeague/strLeague, while the library and event API use different shapes;
+SeerrNG's branch now normalizes these at the provider boundary and resolves
+catalog identities through /api/leagues/all.
+
+### Candidates and recommendation
+
+| Project | What it does | SeerrNG gap | Recommendation |
+|---|---|---|---|
+| [Whisparr](https://github.com/Whisparr/Whisparr) | Adult media acquisition. The official project describes v2 as Sonarr-based and studio-focused, and v3 as Radarr-based and scene-focused; v3 is developed separately in [Whisparr-Eros](https://github.com/Whisparr/Whisparr-Eros). The main repository's current release list includes 2.2.0-develop.404 from September 19, 2026 ([releases](https://github.com/Whisparr/Whisparr/releases)). | The only clear missing *arr-style request/acquisition category found in this pass. | Investigate first if SeerrNG is to support adult catalogs. Treat v2 and v3 as separate provider targets until their APIs and catalog identities are verified; do not assume their Radarr/Sonarr lineage means compatible routes. |
+| [Bazarr](https://github.com/morpheus65535/bazarr) | Manages and downloads subtitles for series and movies already indexed by Sonarr and Radarr; its README explicitly says it does not scan disks for media. | Optional downstream subtitle state/actions; no independent catalog or acquisition request target. | Defer as an optional media-detail enhancement, not a new request provider. |
+| [Bindery](https://github.com/vavallee/bindery) | Self-hosted book manager with indexers, download clients, library import, and Readarr database migration. | No clear media-category gap: SeerrNG already supports Readarr-compatible book workflows through BookshelfNG and ChaptarrNG plus BookData and reader/library integrations. | Monitor for demand and a stable SeerrNG-relevant API. Reconsider if users need a distinct Bindery capability or its API becomes a maintained target. |
+| [Huntarr2](https://github.com/refringe/huntarr2) | Periodically tells Sonarr, Radarr, Lidarr, and Whisparr to search monitored missing items and quality upgrades; it does not download items itself. | Operations automation, not request discovery, approvals, identity, or destinations. | No request-provider integration. Episode Queue remains distinct because it uses each enrolled user's media-server playback position to request a bounded future buffer. |
+| [Recyclarr](https://github.com/recyclarr/recyclarr) | Synchronizes TRaSH Guide quality profiles, custom formats, quality definitions, and naming/settings to Sonarr and Radarr. | Administration of existing providers, not a catalog or acquisition service. | No request-provider integration. Continue to let users configure these settings in their acquisition apps. |
+| [Readarr](https://github.com/Readarr/Readarr/releases) | Archived upstream; GitHub marks the repository read-only since June 27, 2025. | None that warrants a new integration. | Keep existing compatibility where useful; direct new book work toward maintained alternatives. |
+
+### Result
+
+**Whisparr is the only additional Arr-style request target found in this
+follow-up**, with moderate confidence because its two active lines have
+different catalog emphases and require separate API validation. Supporting it
+also needs an explicit adult-catalog product decision covering discoverability,
+permissions, and visibility. Bazarr, Huntarr2, and Recyclarr solve adjacent
+operational or subtitle tasks rather than media request acquisition. Bindery is
+a book backend to monitor, but it does not expose a gap in the current book
+coverage. No additional missing general-purpose movie, TV, music, book, comic,
+magazine, PC-game, or ROM acquisition category was confirmed.

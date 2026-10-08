@@ -15,6 +15,7 @@ import type { MbAlbumResult } from '@server/api/musicbrainz/interfaces';
 import type { OpenLibrarySearchDoc } from '@server/api/openlibrary';
 import OpenLibraryAPI from '@server/api/openlibrary';
 import RadarrAPI, { type RadarrMovie } from '@server/api/servarr/radarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import type { SortOptions } from '@server/api/themoviedb';
 import TheMovieDb, {
   MovieSortOptionsIterable,
@@ -108,6 +109,7 @@ import {
   mapTvResult,
   type AlbumResult,
 } from '@server/models/Search';
+import { mapSportarrLeague } from '@server/models/Sportarr';
 import { mapNetwork } from '@server/models/Tv';
 import {
   getBookshelfAudiobookLibrary,
@@ -4203,6 +4205,127 @@ discoverRoutes.get('/comics', async (req, res) => {
       status: 503,
       message:
         'ComicVine, the service used for comic searches, timed out or is unavailable. Please try again.',
+    });
+  }
+});
+
+discoverRoutes.get('/sports', async (req, res) => {
+  if (!isMediaCategoryEnabled('sports')) {
+    return res.status(404).json({ status: 404, message: 'Not found.' });
+  }
+
+  const parsedQuery = parseOptionalDiscoverString(
+    req.query.query,
+    'Query',
+    MAX_DISCOVER_QUERY_LENGTH
+  );
+  if ('error' in parsedQuery) {
+    return res.status(400).json({ status: 400, message: parsedQuery.error });
+  }
+
+  const query = parsedQuery.value?.trim() ?? '';
+  const page = parsePositiveInt(req.query.page, 1, 500);
+  const itemsPerPage = 20;
+  const settings = getExternalRuntimeConfig();
+  const service =
+    settings.sportarr.find((instance) => instance.isDefault) ??
+    settings.sportarr[0];
+
+  if (!service) {
+    return res.status(503).json({
+      status: 503,
+      message: 'Connect Sportarr in Settings > Services to browse leagues.',
+    });
+  }
+  if (!query) {
+    return res.status(200).json({
+      page,
+      totalPages: 0,
+      totalResults: 0,
+      results: [],
+    });
+  }
+
+  try {
+    const { leagues, library } = await runWithServarrServiceSnapshot(
+      'sportarr',
+      service,
+      async (current) => {
+        const api = new SportarrAPI({
+          url: SportarrAPI.buildUrl(current, '/api'),
+          apiKey: current.apiKey,
+        });
+        const [catalog, existing] = await Promise.all([
+          api.getLeaguesByTitle(query),
+          api.getLibraryLeagues(),
+        ]);
+        return { leagues: catalog, library: existing };
+      }
+    );
+    const libraryByExternalId = new Map(
+      library.map((league) => [league.externalId, league])
+    );
+    const libraryAwareLeagues = leagues.map((league) => {
+      const libraryLeague = libraryByExternalId.get(league.externalId);
+      return libraryLeague ? { ...league, ...libraryLeague } : league;
+    });
+    const uniqueLeagues = [
+      ...new Map(
+        libraryAwareLeagues.map((league) => [league.externalId, league])
+      ).values(),
+    ];
+    const totalResults = uniqueLeagues.length;
+    const pageItems = uniqueLeagues.slice(
+      (page - 1) * itemsPerPage,
+      page * itemsPerPage
+    );
+    const identifiers = pageItems.length
+      ? await getRepository(MediaIdentifier).find({
+          where: {
+            provider: MediaIdentifierProvider.SPORTARR,
+            value: In(pageItems.map((league) => league.externalId)),
+          },
+          relations: { media: true },
+          relationLoadStrategy: 'query',
+        })
+      : [];
+    const mediaByExternalId = new Map(
+      identifiers
+        .filter(
+          (identifier) => identifier.media?.mediaType === MediaType.SPORTS
+        )
+        .map((identifier) => [identifier.value, identifier.media])
+    );
+    const hydratedMedia = await hydrateMediaSummaryRelations(
+      [...mediaByExternalId.values()],
+      req.user
+    );
+    const hydratedById = new Map(
+      hydratedMedia.map((media) => [media.id, media])
+    );
+    const results = pageItems.map((league) => {
+      const media = mediaByExternalId.get(league.externalId);
+      return mapSportarrLeague(
+        league,
+        media ? hydratedById.get(media.id) : undefined,
+        service.id
+      );
+    });
+
+    return res.status(200).json({
+      page,
+      totalPages: Math.ceil(totalResults / itemsPerPage),
+      totalResults,
+      results: filterEntityResponse(results, req.user),
+    });
+  } catch (error) {
+    logger.warn('Failed to search Sportarr leagues', {
+      label: 'Discover Sports',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return res.status(503).json({
+      status: 503,
+      message: 'Sportarr is unavailable. Try again shortly.',
     });
   }
 });

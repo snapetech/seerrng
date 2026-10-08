@@ -4,6 +4,7 @@ import MusicBrainz from '@server/api/musicbrainz';
 import OpenLibraryAPI from '@server/api/openlibrary';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import TheMovieDb from '@server/api/themoviedb';
 import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
@@ -31,6 +32,7 @@ import {
   cleanMagazineTitle,
   normalizeMagazineTitle,
 } from '@server/lib/magazineIdentity';
+import { upsertMediaSearchMetadata } from '@server/lib/mediaSearchMetadata';
 import {
   MediaServerUserAuthorityChangedError,
   assertMediaServerUserAuthorityCurrent,
@@ -64,6 +66,7 @@ import {
   type ReadarrSettings,
   type SonarrSettings,
 } from '@server/lib/settings';
+import { isSportarrLeagueExternalId } from '@server/lib/sportarrIdentity';
 import {
   isUserCredentialVersionCurrent,
   runUserSecurityMutation,
@@ -105,7 +108,14 @@ export class ServiceConfigurationError extends Error {}
 export type MediaRequestServiceTarget = {
   serviceType: ServarrServiceType;
   format:
-    'standard' | '4k' | 'music' | 'ebook' | 'audiobook' | 'comic' | 'magazine';
+    | 'standard'
+    | '4k'
+    | 'music'
+    | 'ebook'
+    | 'audiobook'
+    | 'comic'
+    | 'magazine'
+    | 'sports';
   serverId: number;
   profileId?: number | null;
   metadataProfileId?: number | null;
@@ -227,6 +237,11 @@ export const hasMediaRequestPermission = (
     case MediaType.MAGAZINE:
       return user.hasPermission(
         [Permission.REQUEST, Permission.REQUEST_MAGAZINE],
+        { type: 'or' }
+      );
+    case MediaType.SPORTS:
+      return user.hasPermission(
+        [Permission.REQUEST, Permission.REQUEST_SPORTS],
         { type: 'or' }
       );
   }
@@ -564,6 +579,14 @@ export class MediaRequest {
       throw new RequestPermissionError(
         'You do not have permission to make magazine requests.'
       );
+    } else if (
+      requestBody.mediaType === MediaType.SPORTS &&
+      !isManagedRequestForAnotherUser &&
+      !hasMediaRequestPermission(requestUser, requestBody.mediaType)
+    ) {
+      throw new RequestPermissionError(
+        'You do not have permission to make sports requests.'
+      );
     }
 
     if (requestBody.mediaType === MediaType.MAGAZINE) {
@@ -578,7 +601,8 @@ export class MediaRequest {
       canUseAdvancedRequestOptions(user) &&
       requestBody.serverId != null &&
       requestBody.mediaType !== MediaType.COMIC &&
-      requestBody.mediaType !== MediaType.MAGAZINE
+      requestBody.mediaType !== MediaType.MAGAZINE &&
+      requestBody.mediaType !== MediaType.SPORTS
     ) {
       const serviceName =
         requestBody.mediaType === MediaType.MOVIE
@@ -642,6 +666,8 @@ export class MediaRequest {
           return quotas.comic;
         case MediaType.MAGAZINE:
           return quotas.magazine;
+        case MediaType.SPORTS:
+          return quotas.tv;
         default:
           return undefined;
       }
@@ -686,6 +712,11 @@ export class MediaRequest {
         quotas.magazine.restricted
       ) {
         throw new QuotaRestrictedError('Magazine Quota exceeded.');
+      } else if (
+        requestBody.mediaType === MediaType.SPORTS &&
+        quotas.tv.restricted
+      ) {
+        throw new QuotaRestrictedError('TV and sports request quota exceeded.');
       }
     }
 
@@ -844,6 +875,13 @@ export class MediaRequest {
                 ({ is4k, isDefault }) =>
                   isDefault && Boolean(is4k) === Boolean(requestBody.is4k)
               )?.id
+        );
+      } else if (requestBody.mediaType === MediaType.SPORTS) {
+        addService(
+          'sportarr',
+          useAdvancedOptions && requestBody.serverId != null
+            ? requestBody.serverId
+            : settings.sportarr.find(({ isDefault }) => isDefault)?.id
         );
       } else if (requestBody.mediaType === MediaType.MUSIC) {
         addService(
@@ -1886,6 +1924,193 @@ export class MediaRequest {
         request.media = savedMedia;
         return saveRequestWithFreshMedia(manager, request);
       });
+    }
+
+    if (requestBody.mediaType === MediaType.SPORTS) {
+      const externalId = String(requestBody.mediaId ?? '').trim();
+      if (!isSportarrLeagueExternalId(externalId)) {
+        throw new ServiceConfigurationError(
+          'A valid Sportarr league identity is required.'
+        );
+      }
+
+      const blocked = await getRepository(Blocklist).findOne({
+        where: { externalId, mediaType: MediaType.SPORTS },
+      });
+      if (blocked) {
+        throw new BlocklistedMediaError('This sports league is blocklisted.');
+      }
+
+      const useAdvancedOptions = canUseAdvancedRequestOptions(user);
+      const requestedServer =
+        useAdvancedOptions && requestBody.serverId != null
+          ? settings.sportarr.find(({ id }) => id === requestBody.serverId)
+          : undefined;
+      if (
+        useAdvancedOptions &&
+        requestBody.serverId != null &&
+        !requestedServer
+      ) {
+        throw new ServiceConfigurationError(
+          'Selected Sportarr server does not exist.'
+        );
+      }
+      const selectedServer =
+        requestedServer ?? settings.sportarr.find(({ isDefault }) => isDefault);
+      if (!selectedServer) {
+        throw new ServiceConfigurationError(
+          'No default Sportarr server is configured for sports requests.'
+        );
+      }
+
+      const api = new SportarrAPI({
+        url: SportarrAPI.buildUrl(selectedServer, '/api'),
+        apiKey: selectedServer.apiKey,
+      });
+      const league = await api.getLeagueByExternalId(externalId);
+      if (!league) {
+        throw new ServiceConfigurationError(
+          'This league is no longer in the Sportarr catalog. Search again and retry.'
+        );
+      }
+      if (league.id && league.monitored) {
+        throw new DuplicateMediaRequestError(
+          'This league is already monitored in Sportarr.'
+        );
+      }
+      if (league.id && !league.monitored) {
+        throw new ServiceConfigurationError(
+          'This league exists in Sportarr but is not monitored. Enable it in Sportarr before requesting it here.'
+        );
+      }
+
+      const existingIdentifier = await mediaIdentifierRepository.findOne({
+        where: {
+          provider: MediaIdentifierProvider.SPORTARR,
+          value: externalId,
+        },
+        relations: { media: true },
+        relationLoadStrategy: 'query',
+      });
+      let media = existingIdentifier?.media;
+      if (media && media.mediaType !== MediaType.SPORTS) {
+        throw new ServiceConfigurationError(
+          'The stored Sportarr league identity is linked to a different media type.'
+        );
+      }
+      if (!media) {
+        media = new Media({
+          tmdbId: 0,
+          mediaType: MediaType.SPORTS,
+          status: MediaStatus.PENDING,
+          status4k: MediaStatus.UNKNOWN,
+        });
+      } else if (media.status === MediaStatus.BLOCKLISTED) {
+        throw new BlocklistedMediaError('This sports league is blocklisted.');
+      } else if (
+        media.status === MediaStatus.UNKNOWN ||
+        media.status === MediaStatus.DELETED
+      ) {
+        media.status = MediaStatus.PENDING;
+      }
+
+      const selectedDestination = {
+        serviceType: 'sportarr',
+        format: 'sports',
+        serverId: selectedServer.id,
+        profileId: selectedServer.activeProfileId,
+        rootFolder: null,
+      } satisfies RequestDestination;
+      const destinationRequests = media.id
+        ? await requestRepository
+            .createQueryBuilder('request')
+            .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+            .leftJoinAndSelect('request.media', 'media')
+            .where('request.media = :mediaId', { mediaId: media.id })
+            .getMany()
+        : [];
+
+      if (
+        isDestinationAvailableInTargets(
+          destinationRequests,
+          selectedDestination
+        )
+      ) {
+        throw new DuplicateMediaRequestError(
+          'This league is already linked to the selected Sportarr server.'
+        );
+      }
+      if (
+        isDestinationCoveredByActiveRequest(
+          destinationRequests,
+          selectedDestination
+        )
+      ) {
+        const promotablePendingRequest = findPromotablePendingRequest(
+          destinationRequests,
+          [selectedDestination],
+          user,
+          MediaType.SPORTS
+        );
+        if (promotablePendingRequest) {
+          return promotePendingRequest(promotablePendingRequest, user);
+        }
+        throw new DuplicateMediaRequestError(
+          'A request for this league already exists.'
+        );
+      }
+
+      const autoApproved = hasAutoApprovePermission(
+        requestUser.permissions,
+        'sports'
+      );
+      const request = new MediaRequest({
+        type: MediaType.SPORTS,
+        media,
+        requestedBy: requestUser,
+        status: autoApproved
+          ? MediaRequestStatus.APPROVED
+          : MediaRequestStatus.PENDING,
+        modifiedBy: autoApproved ? user : undefined,
+        is4k: false,
+        serverId: selectedServer.id,
+        profileId: selectedServer.activeProfileId,
+        serviceTargets: [
+          {
+            ...selectedDestination,
+            status: MediaStatus.PENDING,
+          },
+        ],
+        isAutoRequest: options.isAutoRequest ?? false,
+        ignoreQuota,
+      });
+
+      const savedRequest = await dataSource.transaction(async (manager) => {
+        const savedMedia = await manager.getRepository(Media).save(media!);
+        if (!existingIdentifier) {
+          await manager.getRepository(MediaIdentifier).save(
+            new MediaIdentifier({
+              media: savedMedia,
+              provider: MediaIdentifierProvider.SPORTARR,
+              value: externalId,
+              canonical: true,
+            })
+          );
+        }
+        request.media = savedMedia;
+        return saveRequestWithFreshMedia(manager, request);
+      });
+
+      await upsertMediaSearchMetadata(savedRequest.media?.id, {
+        title: league.title,
+        overview: league.overview,
+        releaseDate: league.year ? String(league.year) : undefined,
+        genres: league.sport,
+        network: 'Sportarr',
+        provider: 'sportarr',
+        externalIds: JSON.stringify({ sportarr: externalId }),
+      });
+      return savedRequest;
     }
 
     const tmdbMedia =

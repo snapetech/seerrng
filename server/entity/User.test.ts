@@ -126,7 +126,8 @@ test('failed and declined requests do not consume retry quota', async () => {
   const quota = await user.getQuota();
 
   assert.strictEqual(quota.movie.used, 1);
-  assert.strictEqual(quota.tv.used, 1);
+  // One completed TV season and one completed sports league share this quota.
+  assert.strictEqual(quota.tv.used, 2);
   assert.strictEqual(quota.music.used, 1);
   assert.strictEqual(quota.book.used, 1);
 });

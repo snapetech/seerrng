@@ -52,7 +52,11 @@ afterEach(() => {
 
 const setup = async (
   initial: SeasonEpisodeSelection[] = [{ seasonNumber: 1 }],
-  blocked: Record<number, number[]> = {}
+  blocked: Record<number, number[]> = {},
+  options: {
+    selectionMode?: 'multiple' | 'single-episode';
+    visibleSeasons?: TvDetails['seasons'];
+  } = {}
 ) => {
   const dom = new JSDOM('<div id="root"></div>');
   vi.stubGlobal('window', dom.window);
@@ -69,10 +73,11 @@ const setup = async (
       <IntlProvider locale="en">
         <RequestSeasonEpisodeTree
           tvId={24}
-          seasons={seasons}
+          seasons={options.visibleSeasons ?? seasons}
           selections={selection}
           disabledEpisodes={blocked}
           availableEpisodesBySeason={{ 1: [2] }}
+          selectionMode={options.selectionMode}
           onSelectionsChange={(next) => {
             changed(next);
             setSelection(next);
@@ -138,6 +143,62 @@ it('keeps unavailable episodes requestable, disables blocked episodes and leaves
     expect(
       document.querySelector('[aria-label="Not Available"]')
     ).not.toBeNull();
+  } finally {
+    await ui.close();
+  }
+});
+
+it('limits Episode Queue selection to one requestable starting episode', async () => {
+  swr.data = metadata;
+  const ui = await setup(
+    [{ seasonNumber: 1 }],
+    {},
+    {
+      selectionMode: 'single-episode',
+      visibleSeasons: seasons.filter((season) => season.seasonNumber > 0),
+    }
+  );
+  try {
+    expect(ui.changed).toHaveBeenLastCalledWith([
+      { seasonNumber: 1, episodeNumbers: [1] },
+    ]);
+    expect(
+      document.querySelector('[data-tree-part="select-all"] button')
+    ).toBeNull();
+    expect(
+      [...document.querySelectorAll('[data-tree-part="season"] button')].some(
+        (button) =>
+          button.getAttribute('aria-label') ===
+          'Select requestable episodes in Season 01'
+      )
+    ).toBe(false);
+    await ui.click('Expand Season 01');
+    expect(
+      ui.button('Deselect Episode 1: First').getAttribute('aria-pressed')
+    ).toBe('true');
+    await ui.click('Select Episode 2: Second');
+    expect(ui.changed).toHaveBeenLastCalledWith([
+      { seasonNumber: 1, episodeNumbers: [2] },
+    ]);
+  } finally {
+    await ui.close();
+  }
+});
+
+it('starts the queue at the first selectable episode when no current selection remains', async () => {
+  swr.data = metadata;
+  const ui = await setup(
+    [],
+    { 1: [1] },
+    {
+      selectionMode: 'single-episode',
+      visibleSeasons: seasons.filter((season) => season.seasonNumber > 0),
+    }
+  );
+  try {
+    expect(ui.changed).toHaveBeenLastCalledWith([
+      { seasonNumber: 1, episodeNumbers: [2] },
+    ]);
   } finally {
     await ui.close();
   }

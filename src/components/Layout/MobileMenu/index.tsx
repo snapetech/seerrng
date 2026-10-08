@@ -21,6 +21,7 @@ import {
   SparklesIcon,
   SpeakerWaveIcon,
   Square3Stack3DIcon,
+  TrophyIcon,
   TvIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -39,6 +40,7 @@ import {
   SparklesIcon as FilledSparklesIcon,
   SpeakerWaveIcon as FilledSpeakerWaveIcon,
   Square3Stack3DIcon as FilledSquare3Stack3DIcon,
+  TrophyIcon as FilledTrophyIcon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
   XMarkIcon,
@@ -167,6 +169,13 @@ const MobileMenu = ({
         svgIcon: <NewspaperIcon className="h-6 w-6" />,
         svgIconSelected: <FilledNewspaperIcon className="h-6 w-6" />,
         activeRegExp: /^\/(?:discover\/magazines(?:\/.*)?|magazine\/)/,
+      },
+      {
+        href: '/discover/sports',
+        content: intl.formatMessage(menuMessages.browsesports),
+        svgIcon: <TrophyIcon className="h-6 w-6" />,
+        svgIconSelected: <FilledTrophyIcon className="h-6 w-6" />,
+        activeRegExp: /^\/(?:discover\/sports(?:\/.*)?|sportarr\/)/,
       },
       {
         href: '/software',

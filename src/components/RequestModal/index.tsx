@@ -18,6 +18,10 @@ const MagazineRequestModal = dynamic(
   () => import('@app/components/RequestModal/MagazineRequestModal'),
   { ssr: false }
 );
+const SportarrRequestModal = dynamic(
+  () => import('@app/components/RequestModal/SportarrRequestModal'),
+  { ssr: false }
+);
 const CollectionRequestModal = dynamic(
   () => import('@app/components/RequestModal/CollectionRequestModal'),
   { ssr: false }
@@ -37,12 +41,22 @@ const TvRequestModal = dynamic(
 
 interface RequestModalProps {
   show: boolean;
-  type: 'movie' | 'tv' | 'collection' | 'music' | 'book' | 'comic' | 'magazine';
+  type:
+    | 'movie'
+    | 'tv'
+    | 'collection'
+    | 'music'
+    | 'book'
+    | 'comic'
+    | 'magazine'
+    | 'sports';
   tmdbId?: number;
   mbId?: string;
   bookId?: string;
   comicId?: string;
   magazineTitle?: string;
+  sportarrLeagueId?: string;
+  sportarrTitle?: string;
   initialBookFormat?: 'ebook' | 'audiobook' | 'both';
   initialMusicServerId?: number;
   initialIs4k?: boolean;
@@ -62,6 +76,8 @@ const RequestModal = ({
   bookId,
   comicId,
   magazineTitle,
+  sportarrLeagueId,
+  sportarrTitle,
   initialBookFormat,
   initialMusicServerId,
   initialIs4k,
@@ -139,6 +155,15 @@ const RequestModal = ({
       ) : type === 'magazine' && magazineTitle ? (
         <MagazineRequestModal
           magazineTitle={magazineTitle}
+          onComplete={onComplete}
+          onCancel={onCancel}
+          onUpdating={onUpdating}
+          editRequest={editRequest}
+        />
+      ) : type === 'sports' && sportarrLeagueId ? (
+        <SportarrRequestModal
+          leagueId={sportarrLeagueId}
+          leagueTitle={sportarrTitle}
           onComplete={onComplete}
           onCancel={onCancel}
           onUpdating={onUpdating}

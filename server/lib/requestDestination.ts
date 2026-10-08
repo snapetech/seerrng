@@ -3,6 +3,7 @@ import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 export type RequestServiceType =
   | 'radarr'
   | 'sonarr'
+  | 'sportarr'
   | 'lidarr'
   | 'readarr'
   | 'mylar'
@@ -10,7 +11,14 @@ export type RequestServiceType =
   | 'backissue'
   | 'lazylibrarian';
 export type RequestTargetFormat =
-  'standard' | '4k' | 'music' | 'ebook' | 'audiobook' | 'comic' | 'magazine';
+  | 'standard'
+  | '4k'
+  | 'music'
+  | 'ebook'
+  | 'audiobook'
+  | 'comic'
+  | 'magazine'
+  | 'sports';
 
 export interface RequestDestination {
   serviceType: RequestServiceType;
@@ -105,6 +113,9 @@ const getLegacyRequestDestinations = (
         format: request.is4k ? '4k' : 'standard',
       },
     ];
+  }
+  if (request.type === 'sports') {
+    return [{ ...base, serviceType: 'sportarr', format: 'sports' }];
   }
   if (request.type === 'music') {
     return [{ ...base, serviceType: 'lidarr', format: 'music' }];

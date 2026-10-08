@@ -10,6 +10,7 @@ export type SearchFilterCategory =
   | 'author'
   | 'comic'
   | 'magazine'
+  | 'sports'
   | 'software';
 
 export const searchContextualFilterKeys = [
@@ -86,6 +87,10 @@ export const getSearchEndpoint = (
   mainQuery = '',
   hasContextualFilters = false
 ): string => {
+  if (category === 'sports') {
+    return '/api/v1/discover/sports';
+  }
+
   // Scoped discovery routes accept catalogue constraints alongside the main
   // keyword. Use combined search only when no contextual constraints are set.
   if (mainQuery.trim() && !hasContextualFilters) {
@@ -125,7 +130,8 @@ export const isSearchDataReady = ({
   (category === 'all' ||
   category === 'author' ||
   category === 'comic' ||
-  category === 'magazine'
+  category === 'magazine' ||
+  category === 'sports'
     ? Boolean(query)
     : true);
 

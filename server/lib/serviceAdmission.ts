@@ -10,21 +10,26 @@ import {
   type RadarrSettings,
   type ReadarrSettings,
   type SonarrSettings,
+  type SportarrSettings,
 } from '@server/lib/settings';
 import AsyncLock from '@server/utils/asyncLock';
 
 export type ServarrServiceType =
   | 'radarr'
   | 'sonarr'
+  | 'sportarr'
   | 'lidarr'
   | 'readarr'
   | 'mylar'
   | 'kapowarr'
   | 'backissue'
   | 'lazylibrarian';
+export type ServarrDownloadServiceType =
+  'radarr' | 'sonarr' | 'lidarr' | 'readarr' | 'kapowarr' | 'backissue';
 export interface ServarrServiceSettingsByType {
   radarr: RadarrSettings;
   sonarr: SonarrSettings;
+  sportarr: SportarrSettings;
   lidarr: LidarrSettings;
   readarr: ReadarrSettings;
   mylar: MylarSettings;
@@ -39,9 +44,9 @@ export interface ServarrServiceSettingsByType {
 // neither) still satisfy this type.
 export type ServarrServiceAuthority = Pick<
   DVRSettings,
-  'id' | 'hostname' | 'port' | 'useSsl' | 'baseUrl' | 'apiKey' | 'syncEnabled'
+  'id' | 'hostname' | 'port' | 'useSsl' | 'baseUrl' | 'apiKey'
 > &
-  Partial<Pick<DVRSettings, 'is4k'>> &
+  Partial<Pick<DVRSettings, 'syncEnabled' | 'is4k'>> &
   Partial<Pick<ReadarrSettings, 'serviceType'>>;
 
 export const hasSameServarrServiceAuthority = (

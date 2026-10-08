@@ -87,6 +87,7 @@ import seriesRoutes from './series';
 import serviceRoutes from './service';
 import softwareRoutes from './software';
 import soulseekRoutes from './soulseek';
+import sportarrRoutes from './sportarr';
 import swipeRoutes from './swipe';
 import tvRoutes from './tv';
 import user from './user';
@@ -521,6 +522,12 @@ router.use(
   categoryAvailabilityGuard(['magazine']),
   externalMetadataRateLimit,
   magazineRoutes
+);
+router.use(
+  '/sportarr',
+  isAuthenticated(),
+  categoryAvailabilityGuard(['sports']),
+  sportarrRoutes
 );
 router.use(
   '/artist',

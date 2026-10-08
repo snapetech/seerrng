@@ -2,6 +2,7 @@ import LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import ReadarrAPI from '@server/api/servarr/readarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -75,6 +76,7 @@ import requestWorkCleanupManager, {
   RequestWorkCleanupError,
 } from '@server/lib/requestWorkCleanup';
 import { runWithCurrentServarrService } from '@server/lib/serviceAdmission';
+import { isSportarrLeagueExternalId } from '@server/lib/sportarrIdentity';
 import {
   UserMutationActorUnauthorizedError,
   acquireAuthorizedUserSecurityMutation,
@@ -260,6 +262,7 @@ const requestMediaTypeFilters = [
   'book',
   'comic',
   'magazine',
+  'sports',
 ] as const;
 const requestStatusFilters = [
   'all',
@@ -416,9 +419,11 @@ const getDisabledCategoryForRequest = (
             ? ['comic']
             : mediaType === MediaType.MAGAZINE
               ? ['magazine']
-              : format === 'both'
-                ? ['ebook', 'audiobook']
-                : [format === 'audiobook' ? 'audiobook' : 'ebook'];
+              : mediaType === MediaType.SPORTS
+                ? ['sports']
+                : format === 'both'
+                  ? ['ebook', 'audiobook']
+                  : [format === 'audiobook' ? 'audiobook' : 'ebook'];
 
   return categories.find((category) => !isMediaCategoryEnabled(category));
 };
@@ -432,6 +437,7 @@ const getMediaCategoryLabel = (category: MediaCategoryKey): string => {
     audiobook: 'Audiobook',
     comic: 'Comic',
     magazine: 'Magazine',
+    sports: 'Sports',
     retro: 'Retro emulation',
     modern: 'Modern emulation',
     game: 'PC game',
@@ -565,7 +571,7 @@ const getWatchAheadEligibilityError = (
         );
   return sonarrServer
     ? undefined
-    : 'A matching Sonarr server must be configured to enable watch-ahead.';
+    : 'A matching Sonarr server must be configured to enable the Episode Queue.';
 };
 
 const hasWatchAheadTvdbIdentity = (tvdbId: unknown): boolean =>
@@ -1166,6 +1172,31 @@ const sanitizeMediaRequestBody = (
     }
   }
 
+  if (mediaType === MediaType.SPORTS) {
+    const externalId =
+      typeof bodyObject.mediaId === 'string' ? bodyObject.mediaId.trim() : '';
+    if (
+      bodyObject.mediaId !== undefined &&
+      !isSportarrLeagueExternalId(externalId)
+    ) {
+      return {
+        error: {
+          status: 400,
+          message: 'mediaId must be a canonical Sportarr league ID.',
+        },
+      };
+    }
+    if (options.requireCreateIdentity && !externalId) {
+      return {
+        error: {
+          status: 400,
+          message: 'mediaId is required for sports requests.',
+        },
+      };
+    }
+    if (externalId) bodyObject.mediaId = externalId;
+  }
+
   const serverId = parseOptionalRequestOptionId(
     bodyObject.serverId,
     'serverId',
@@ -1295,6 +1326,22 @@ const sanitizeMediaRequestBody = (
       error: {
         status: 400,
         message: 'seasons are required for series requests.',
+      },
+    };
+  }
+  const singleEpisodeStart =
+    seasonRequests.value?.length === 1 ? seasonRequests.value[0] : undefined;
+  if (
+    options.requireCreateIdentity &&
+    mediaType === MediaType.TV &&
+    Number(bodyObject.watchAheadEpisodeCount ?? 0) > 0 &&
+    singleEpisodeStart?.episodeNumbers?.length !== 1
+  ) {
+    return {
+      error: {
+        status: 400,
+        message:
+          'Episode Queue requests must specify exactly one starting episode in seasonRequests.',
       },
     };
   }
@@ -2000,6 +2047,11 @@ requestRoutes.get<
           type: MediaType.MAGAZINE,
         });
         break;
+      case 'sports':
+        query = query.andWhere('request.type = :type', {
+          type: MediaType.SPORTS,
+        });
+        break;
     }
 
     const [requestRows, requestCount] = await query
@@ -2022,6 +2074,7 @@ requestRoutes.get<
     const radarrSettings = canHydrateServiceProfiles ? settings.radarr : [];
     const lidarrSettings = canHydrateServiceProfiles ? settings.lidarr : [];
     const readarrSettings = canHydrateServiceProfiles ? settings.readarr : [];
+    const sportarrSettings = canHydrateServiceProfiles ? settings.sportarr : [];
     const referencedProfileServiceIds = new Map<MediaType, Set<number>>();
     for (const item of requests) {
       if (
@@ -2210,6 +2263,47 @@ requestRoutes.get<
       }
     );
 
+    const sportarrServers = await mapWithConcurrency(
+      sportarrSettings
+        .filter((service) =>
+          referencedProfileServiceIds.get(MediaType.SPORTS)?.has(service.id)
+        )
+        .slice(0, MAX_SERVARR_INSTANCES_PER_TYPE),
+      REQUEST_SERVICE_PROFILE_CONCURRENCY,
+      async (sportarrSetting) => {
+        try {
+          return {
+            id: sportarrSetting.id,
+            profiles: await runWithCurrentServarrService(
+              'sportarr',
+              sportarrSetting.id,
+              async (current) =>
+                new SportarrAPI({
+                  apiKey: current.apiKey,
+                  url: SportarrAPI.buildUrl(current, '/api'),
+                }).getQualityProfiles()
+            ).catch((error) => {
+              logRequestServiceProfileFailure(
+                'sportarr',
+                sportarrSetting.id,
+                sportarrSetting.name,
+                error
+              );
+              return undefined;
+            }),
+          };
+        } catch (error) {
+          logRequestServiceProfileFailure(
+            'sportarr',
+            sportarrSetting.id,
+            sportarrSetting.name,
+            error
+          );
+          return { id: sportarrSetting.id, profiles: undefined };
+        }
+      }
+    );
+
     // add profile names to the media requests, with undefined if not found
     let mappedRequests = requests.map((r) => {
       switch (r.type) {
@@ -2244,6 +2338,14 @@ requestRoutes.get<
             ...r,
             profileName: readarrServers
               .find((serverr) => serverr.id === r.serverId)
+              ?.profiles?.find((profile) => profile.id === r.profileId)?.name,
+          };
+        }
+        case MediaType.SPORTS: {
+          return {
+            ...r,
+            profileName: sportarrServers
+              .find((server) => server.id === r.serverId)
               ?.profiles?.find((profile) => profile.id === r.profileId)?.name,
           };
         }
@@ -2378,6 +2480,14 @@ requestRoutes.get<
             name:
               settings.readarr.find((r) => r.id === s.id)?.name ||
               `Bookshelf ${s.id}`,
+          })),
+        sportarr: sportarrServers
+          .filter((s) => !s.profiles)
+          .map((s) => ({
+            id: s.id,
+            name:
+              settings.sportarr.find((r) => r.id === s.id)?.name ||
+              `Sportarr ${s.id}`,
           })),
       },
     });
@@ -2834,6 +2944,10 @@ requestRoutes.get('/count', async (req, res, next) => {
           'magazine'
         )
         .addSelect(
+          'SUM(CASE WHEN request.type = :sports THEN 1 ELSE 0 END)',
+          'sports'
+        )
+        .addSelect(
           'SUM(CASE WHEN request.status = :pending THEN 1 ELSE 0 END)',
           'pending'
         )
@@ -2878,6 +2992,7 @@ requestRoutes.get('/count', async (req, res, next) => {
           book: MediaType.BOOK,
           comic: MediaType.COMIC,
           magazine: MediaType.MAGAZINE,
+          sports: MediaType.SPORTS,
           pending: MediaRequestStatus.PENDING,
           approved: MediaRequestStatus.APPROVED,
           declined: MediaRequestStatus.DECLINED,
@@ -2914,6 +3029,7 @@ requestRoutes.get('/count', async (req, res, next) => {
         book: count('book'),
         comic: count('comic'),
         magazine: count('magazine'),
+        sports: count('sports'),
         pending: count('pending'),
         approved: count('approved'),
         declined: count('declined'),
