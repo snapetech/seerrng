@@ -283,18 +283,20 @@ describe('ROMarrNG software acquisition integration', () => {
       .its('response.body.clients')
       .should('deep.equal', []);
     cy.wait('@softwareAcquisitionSettings')
-      .its('response.statusCode')
-      .should('eq', 200);
+      .its('response.body')
+      .should('deep.equal', softwareSettings);
     cy.wait('@softwareCatalogSystems')
       .its('response.statusCode')
       .should('eq', 200);
-    cy.get('body').then(($body) => {
-      const pageText = $body.text().replace(/\s+/g, ' ').trim();
-      if (!pageText.includes('Software acquisition')) {
-        throw new Error(
-          `Software acquisition is missing at ${window.location.pathname}: ${pageText.slice(0, 1800)}`
-        );
-      }
+    cy.location('pathname').then((pathname) => {
+      cy.get('body').then(($body) => {
+        const pageText = $body.text().replace(/\s+/g, ' ').trim();
+        if (!pageText.includes('Software acquisition')) {
+          throw new Error(
+            `Software acquisition is missing at ${pathname}: ${pageText.slice(0, 1800)}`
+          );
+        }
+      });
     });
     cy.contains('h3', 'Software acquisition').should('be.visible');
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
