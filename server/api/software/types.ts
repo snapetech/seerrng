@@ -10,7 +10,6 @@ export interface SoftwareProviderCapabilities {
   requestActions: { retry: boolean; cancel: boolean };
   assetStreaming: boolean;
   assetBundles?: boolean;
-  datCatalog?: boolean;
 }
 
 export interface SoftwareProviderHandshake {
