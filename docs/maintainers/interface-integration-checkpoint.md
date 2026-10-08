@@ -1102,3 +1102,11 @@ numbers for partial selections. After the fix, `pnpm typecheck:client` passed
 and the three TV request tree suites passed 24/24. A fresh hosted run against
 the corrected commit is pending; the first-run failure remains recorded and is
 not counted as a pass.
+
+The next hosted run (37831436745) passed the application build, all four unit
+shards, both CodeQL analyses, Playwright, and five of six Cypress shards. The
+remaining Prowlarr responsive Cypress spec used a fixture without the newly
+required Sports mapping; the settings form correctly kept Test and Save disabled
+until every category had a selection. The fixture now includes the standard
+`sports: [5060]` mapping, and the existing interaction assertion is unchanged.
+A fresh hosted run is required for the final receipt.
