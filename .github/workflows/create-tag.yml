@@ -112,6 +112,7 @@ jobs:
             "$chart_readme"
           grep -Fxq "appVersion: '${TAG_VERSION}'" "$chart_file"
           grep -Fq "AppVersion: ${TAG_VERSION}" "$chart_readme"
+          grep -Fq "AppVersion-${TAG_VERSION}-informational" "$chart_readme"
           grep -Fq "Version: ${next_chart_version}" "$chart_readme"
 
       - name: Generate checked-in changelog
