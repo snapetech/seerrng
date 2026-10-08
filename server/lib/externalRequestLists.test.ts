@@ -15,6 +15,7 @@ import {
   parseExternalRequestListUrl,
   parseGoodreadsToReadFeed,
   parseImdbWatchlistHtml,
+  parseImdbWatchlistResponse,
   resolveGoodreadsItem,
   resolveImdbItem,
   syncAllExternalRequestLists,
@@ -103,6 +104,26 @@ describe('external request list synchronization', () => {
           isbn13: '9780441478125',
         },
       ]
+    );
+  });
+
+  it('reports IMDb automated access challenges separately from private lists', () => {
+    const challengeHtml = `
+      <script>
+        window.awsWafCookieDomainList = ['imdb.com'];
+        window.gokuProps = {};
+      </script>
+      <script src="https://example.token.awswaf.com/challenge.js"></script>
+      <div id="challenge-container"></div>
+    `;
+
+    assert.throws(
+      () => parseImdbWatchlistHtml(challengeHtml),
+      /automated access verification page instead of the watchlist/
+    );
+    assert.throws(
+      () => parseImdbWatchlistResponse({ body: '', status: 202 }),
+      /automated access verification page instead of the watchlist/
     );
   });
 

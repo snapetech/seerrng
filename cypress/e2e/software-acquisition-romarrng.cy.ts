@@ -120,6 +120,48 @@ const mockIntegrationData = () => {
         pollIntervalSeconds: 3,
         clients: [],
       });
+    } else if (pathname === '/api/v1/settings/tunerr') {
+      request.reply({
+        enabled: false,
+        hostname: '',
+        useSsl: false,
+        baseUrl: '',
+        deckPort: 48879,
+        tunerPort: 5004,
+        guideUrl: '',
+        username: '',
+        password: '',
+        guideHours: 72,
+      });
+    } else if (pathname === '/api/v1/settings/slskdn') {
+      request.reply({
+        enabled: false,
+        hostname: '',
+        port: 5030,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: '',
+        searchFilter: '',
+      });
+    } else if (pathname === '/api/v1/settings/readmeabook') {
+      request.reply({
+        enabled: false,
+        hostname: '',
+        port: 3000,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: '',
+        apiKeyConfigured: false,
+      });
+    } else if (pathname === '/api/v1/settings/swipe') {
+      request.reply({
+        enabled: true,
+        aiProvider: 'none',
+        aiApiKey: '',
+        aiModel: 'claude-opus-5-5',
+        aiBaseUrl: 'https://api.openai.com/v1',
+        aiEffort: 'medium',
+      });
     } else if (pathname === '/api/v1/settings/reader-delivery') {
       request.reply({
         grimmoryUrl: '',
@@ -150,6 +192,9 @@ const mockIntegrationData = () => {
   cy.intercept('GET', '/api/v1/settings/software-acquisition', {
     body: softwareSettings,
   }).as('softwareAcquisitionSettings');
+  cy.intercept('GET', '/api/v1/settings/download-clients', {
+    body: { pollIntervalSeconds: 3, clients: [] },
+  }).as('downloadClientsSettings');
 
   cy.intercept('GET', '/api/v1/request/software/catalog/systems', {
     body: {
@@ -228,9 +273,13 @@ describe('ROMarrNG software acquisition integration', () => {
   it('previews platform matches and saves a manual override', () => {
     cy.viewport(1280, 720);
     cy.visit('/settings/services');
+    cy.wait('@downloadClientsSettings')
+      .its('response.body.clients')
+      .should('deep.equal', []);
     cy.wait('@softwareAcquisitionSettings')
       .its('response.statusCode')
       .should('eq', 200);
+    cy.contains('h3', 'Software acquisition').should('be.visible');
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();

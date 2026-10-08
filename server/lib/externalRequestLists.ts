@@ -252,8 +252,11 @@ class PublicListApi extends ExternalAPI {
     );
   }
 
-  public fetchHtml(endpoint: string): Promise<string> {
-    return this.get<string>(endpoint, {}, 0);
+  public async fetchHtml(
+    endpoint: string
+  ): Promise<{ body: string; status: number }> {
+    const response = await this.request<string>('GET', endpoint);
+    return { body: response.data, status: response.status };
   }
 
   public fetchXml(endpoint: string): Promise<string> {
@@ -261,9 +264,20 @@ class PublicListApi extends ExternalAPI {
   }
 }
 
+const imdbAutomatedAccessError = () =>
+  new Error(
+    'IMDb returned an automated access verification page instead of the watchlist. Confirm the watchlist is public; if it is, IMDb is blocking server-side sync from this instance.'
+  );
+
 export const parseImdbWatchlistHtml = (
   html: string
 ): ExternalRequestListItem[] => {
+  if (
+    /awswaf\.com|awsWafCookieDomainList|AwsWafIntegration|gokuProps/i.test(html)
+  ) {
+    throw imdbAutomatedAccessError();
+  }
+
   const matches = html.matchAll(/\/title\/(tt[0-9]{5,20})(?:[/?#"\\])/g);
   const seen = new Set<string>();
   const items: ExternalRequestListItem[] = [];
@@ -281,13 +295,26 @@ export const parseImdbWatchlistHtml = (
   return items;
 };
 
+export const parseImdbWatchlistResponse = (response: {
+  body: unknown;
+  status: number;
+}): ExternalRequestListItem[] => {
+  if (response.status === 202) {
+    throw imdbAutomatedAccessError();
+  }
+  if (typeof response.body !== 'string') {
+    throw new Error('IMDb returned an invalid watchlist response.');
+  }
+  return parseImdbWatchlistHtml(response.body);
+};
+
 const fetchImdbWatchlist = async (
   userId: string
 ): Promise<ExternalRequestListItem[]> => {
-  const html = await new PublicListApi('https://www.imdb.com').fetchHtml(
+  const response = await new PublicListApi('https://www.imdb.com').fetchHtml(
     `/user/${userId}/watchlist/`
   );
-  return parseImdbWatchlistHtml(html);
+  return parseImdbWatchlistResponse(response);
 };
 
 export const parseGoodreadsToReadFeed = async (
