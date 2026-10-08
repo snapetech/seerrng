@@ -1,29 +1,29 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddSoftwareCatalogIdentityAndProviderProgress1791100000000 implements MigrationInterface {
-  name = 'AddSoftwareCatalogIdentityAndProviderProgress1791100000000';
+export class AddSoftwareCatalogIdentityAndProviderProgress1791130000000 implements MigrationInterface {
+  name = 'AddSoftwareCatalogIdentityAndProviderProgress1791130000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "software_request" ADD COLUMN "catalogProvider" varchar(16) NOT NULL DEFAULT 'igdb'`
+      `ALTER TABLE "software_request" ADD "catalogProvider" character varying(16) NOT NULL DEFAULT 'igdb'`
     );
     await queryRunner.query(
-      'ALTER TABLE "software_request" ADD COLUMN "catalogKey" varchar(128)'
+      'ALTER TABLE "software_request" ADD "catalogKey" character varying(128)'
     );
     await queryRunner.query(
-      'ALTER TABLE "software_request" ADD COLUMN "providerStage" varchar(64)'
+      'ALTER TABLE "software_request" ADD "providerStage" character varying(64)'
     );
     await queryRunner.query(
-      'ALTER TABLE "software_request" ADD COLUMN "failureCode" varchar(64)'
+      'ALTER TABLE "software_request" ADD "failureCode" character varying(64)'
     );
     await queryRunner.query(
-      'UPDATE "software_request" SET "catalogKey" = CAST("catalogId" AS TEXT) WHERE "catalogId" IS NOT NULL'
+      'UPDATE "software_request" SET "catalogKey" = CAST("catalogId" AS text) WHERE "catalogId" IS NOT NULL'
     );
     await queryRunner.query(
-      'ALTER TABLE "software_request_status_event" ADD COLUMN "providerStage" varchar(64)'
+      'ALTER TABLE "software_request_status_event" ADD "providerStage" character varying(64)'
     );
     await queryRunner.query(
-      'ALTER TABLE "software_request_status_event" ADD COLUMN "failureCode" varchar(64)'
+      'ALTER TABLE "software_request_status_event" ADD "failureCode" character varying(64)'
     );
   }
 

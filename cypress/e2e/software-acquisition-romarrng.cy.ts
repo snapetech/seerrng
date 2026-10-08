@@ -115,8 +115,6 @@ const mockIntegrationData = () => {
           avatar: { imageCount: 0, size: 0 },
         },
       });
-    } else if (pathname === '/api/v1/settings/software-acquisition') {
-      request.reply(softwareSettings);
     } else if (pathname === '/api/v1/settings/reader-delivery') {
       request.reply({
         grimmoryUrl: '',
@@ -143,6 +141,10 @@ const mockIntegrationData = () => {
       request.reply([]);
     }
   });
+
+  cy.intercept('GET', '/api/v1/settings/software-acquisition', {
+    body: softwareSettings,
+  }).as('softwareAcquisitionSettings');
 
   cy.intercept('GET', '/api/v1/request/software/catalog/systems', {
     body: {
@@ -221,7 +223,12 @@ describe('ROMarrNG software acquisition integration', () => {
   it('previews platform matches and saves a manual override', () => {
     cy.viewport(1280, 720);
     cy.visit('/settings/services');
-    cy.contains('h4', 'ROMarrNG to IGDB platform matching').scrollIntoView();
+    cy.wait('@softwareAcquisitionSettings')
+      .its('response.statusCode')
+      .should('eq', 200);
+    cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
+      timeout: 10000,
+    }).scrollIntoView();
     cy.contains('button', 'Preview platform matches').click();
     cy.contains('dt', 'Sega CD').parent().contains('No automatic match');
     cy.contains('Systems without a match: 1').should('be.visible');
@@ -239,7 +246,12 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.contains('ColecoVision').should('be.visible');
     cy.viewport(390, 720);
     cy.reload();
-    cy.contains('h4', 'ROMarrNG to IGDB platform matching').scrollIntoView();
+    cy.wait('@softwareAcquisitionSettings')
+      .its('response.statusCode')
+      .should('eq', 200);
+    cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
+      timeout: 10000,
+    }).scrollIntoView();
     cy.contains('button', 'Preview platform matches').click();
     cy.get(
       'select[aria-label="Nintendo Entertainment System: ROMarrNG to IGDB platform matching"]'

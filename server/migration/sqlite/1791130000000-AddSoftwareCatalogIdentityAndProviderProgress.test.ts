@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DataSource } from 'typeorm';
-import { AddSoftwareCatalogIdentityAndProviderProgress1791100000000 } from './1791100000000-AddSoftwareCatalogIdentityAndProviderProgress';
+import { AddSoftwareCatalogIdentityAndProviderProgress1791130000000 } from './1791130000000-AddSoftwareCatalogIdentityAndProviderProgress';
 
 test('software catalog identity and provider progress migration backfills IGDB keys', async () => {
   const dataSource = await new DataSource({
@@ -10,7 +10,7 @@ test('software catalog identity and provider progress migration backfills IGDB k
   }).initialize();
   const queryRunner = dataSource.createQueryRunner();
   const migration =
-    new AddSoftwareCatalogIdentityAndProviderProgress1791100000000();
+    new AddSoftwareCatalogIdentityAndProviderProgress1791130000000();
 
   try {
     await queryRunner.query(

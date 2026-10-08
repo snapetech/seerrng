@@ -939,6 +939,10 @@ describe('software request routes', () => {
         ];
       }
     );
+    mock.method(ROMarrNGAPI.prototype, 'getDatCatalogPlatforms', async () => ({
+      results: [],
+      unmatchedDatNames: [],
+    }));
 
     const response = await request(app)
       .post('/api/v1/settings/software-acquisition/test/romarr')
@@ -956,6 +960,7 @@ describe('software request routes', () => {
     assert.strictEqual(response.body.requestContractVersion, 2);
     assert.strictEqual(response.body.capabilities.datCatalog, true);
     assert.strictEqual(response.body.platformCount, 1);
+    assert.strictEqual(response.body.datCatalogPlatformCount, 0);
   });
 
   it('rejects unsupported ROMarrNG request contract versions', async () => {
