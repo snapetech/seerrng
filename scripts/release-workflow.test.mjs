@@ -158,7 +158,10 @@ test('AppImage pins its builder, uses the current launcher, and loads its bundle
     path.join(rootDirectory, 'packaging', 'appimage', 'AppRun'),
     'utf8'
   );
-  const nextSwc = fs.readFileSync(require.resolve('next/dist/build/swc'), 'utf8');
+  const nextSwc = fs.readFileSync(
+    require.resolve('next/dist/build/swc'),
+    'utf8'
+  );
   const applicationPackage = JSON.parse(
     fs.readFileSync(path.join(rootDirectory, 'package.json'), 'utf8')
   );
