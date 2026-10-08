@@ -211,7 +211,7 @@ const mockIntegrationData = () => {
         },
       ],
     },
-  });
+  }).as('softwareCatalogSystems');
   cy.intercept(
     'GET',
     '/api/v1/settings/software-acquisition/platform-mapping/preview',
@@ -279,6 +279,9 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.wait('@softwareAcquisitionSettings')
       .its('response.statusCode')
       .should('eq', 200);
+    cy.wait('@softwareCatalogSystems')
+      .its('response.statusCode')
+      .should('eq', 200);
     cy.contains('h3', 'Software acquisition').should('be.visible');
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
@@ -301,6 +304,9 @@ describe('ROMarrNG software acquisition integration', () => {
     cy.viewport(390, 720);
     cy.reload();
     cy.wait('@softwareAcquisitionSettings')
+      .its('response.statusCode')
+      .should('eq', 200);
+    cy.wait('@softwareCatalogSystems')
       .its('response.statusCode')
       .should('eq', 200);
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
