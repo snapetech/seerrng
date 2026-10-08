@@ -130,6 +130,34 @@ beforeEach(() => configureSettings());
 afterEach(() => mock.restoreAll());
 
 describe('game library routes', () => {
+  it('limits game library requests per user outside test mode', async () => {
+    const testEnvironment = process.env as Record<string, string | undefined>;
+    const previousNodeEnv = testEnvironment.NODE_ENV;
+    const previousE2eTests = testEnvironment.E2E_TESTS;
+    testEnvironment.NODE_ENV = 'production';
+    delete testEnvironment.E2E_TESTS;
+
+    try {
+      const app = createApp().app;
+      const statuses: number[] = [];
+      for (let index = 0; index < 121; index += 1) {
+        const response = await request(app)
+          .get('/api/v1/game-library/steam/connect')
+          .redirects(0);
+        statuses.push(response.status);
+      }
+
+      assert.equal(statuses.filter((status) => status === 429).length, 1);
+      assert.equal(statuses.filter((status) => status === 302).length, 120);
+    } finally {
+      if (previousNodeEnv === undefined) delete testEnvironment.NODE_ENV;
+      else testEnvironment.NODE_ENV = previousNodeEnv;
+
+      if (previousE2eTests === undefined) delete testEnvironment.E2E_TESTS;
+      else testEnvironment.E2E_TESTS = previousE2eTests;
+    }
+  });
+
   it('keeps libraries private by default and groups only explicitly shared owned games', async () => {
     const ownerApp = createApp(2).app;
     const householdApp = createApp(3).app;
