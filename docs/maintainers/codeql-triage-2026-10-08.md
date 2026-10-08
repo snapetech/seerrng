@@ -5,6 +5,16 @@ This records the 26 open CodeQL alerts fetched from `main` at
 The alert IDs let the GitHub dispositions be checked against the reviewed
 source.
 
+## Dependabot Next.js alerts
+
+Dependabot alerts **#309–#314** identify Next.js versions below `16.3.8` in
+`pnpm-lock.yaml`. PR #172 changed the root `package.json` version but left the
+workspace override at `16.3.6`, so the lockfile continued resolving the
+vulnerable version. The override and lockfile now both resolve to `16.3.8`.
+`pnpm install --lockfile-only --frozen-lockfile --offline` passes. GitHub's
+default-branch alerts remain open until this lockfile repair reaches `main` and
+Dependabot refreshes its dependency graph.
+
 ## Fixed in source
 
 - **#481 — `js/missing-rate-limiting`** at
