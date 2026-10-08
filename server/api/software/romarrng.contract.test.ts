@@ -198,6 +198,54 @@ it('keeps ROM acquisition working through the legacy integration prefix', async 
   }
 });
 
+it('uses the stable SeerrNG integration prefix for request contract v2', async () => {
+  const requests: string[] = [];
+  const server = createServer((request, response) => {
+    const path = request.url ?? '/';
+    requests.push(`${request.method ?? 'GET'} ${path}`);
+    const payload = path.endsWith('/ping')
+      ? {
+          service: 'ROMarrNG',
+          apiVersion: 1,
+          requestContractVersion: 2,
+          capabilities: {
+            catalog: true,
+            pcAcquisition: false,
+            emulationAcquisition: true,
+            requestActions: { retry: true, cancel: true },
+            assetStreaming: true,
+            datCatalog: true,
+          },
+        }
+      : { ready: true, partial: false, matches: [] };
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(payload));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const api = new ROMarrNGAPI({
+      hostname: '127.0.0.1',
+      port: (server.address() as AddressInfo).port,
+      baseUrl: '',
+      useSsl: false,
+      apiKey: 'romarr-contract-v2-test',
+    });
+    const lookup = await api.lookupLibrary([
+      { title: 'Example game', platform: 'nes' },
+    ]);
+
+    assert.deepEqual(lookup, { ready: true, partial: false, matches: [] });
+    assert.deepEqual(requests, [
+      'GET /api/integration/seerrng/v1/ping',
+      'POST /api/integration/seerrng/v1/library/lookup',
+    ]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 it('rejects a request contract version it does not understand', async () => {
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -205,7 +253,7 @@ it('rejects a request contract version it does not understand', async () => {
       JSON.stringify({
         service: 'ROMarrNG',
         apiVersion: 1,
-        requestContractVersion: 2,
+        requestContractVersion: 3,
       })
     );
   });
@@ -221,7 +269,7 @@ it('rejects a request contract version it does not understand', async () => {
     });
     await assert.rejects(
       api.lookupLibrary([{ title: 'Example', platform: 'nes' }]),
-      /request contract v2 is not supported/
+      /request contract v3 is not supported/
     );
   } finally {
     server.closeAllConnections();

@@ -95,11 +95,12 @@ export class ROMarrNGAPI extends ExternalAPI {
 
   private async getIntegrationBase(): Promise<string> {
     const handshake = await this.getHandshake();
-    if (handshake.requestContractVersion === 1) {
-      return '/api/integration/seerrng/v1';
-    }
     if (handshake.requestContractVersion === undefined) {
       return '/api/v1/integration';
+    }
+    if ([1, 2].includes(handshake.requestContractVersion)) {
+      // Request contracts v1 and v2 both use the stable SeerrNG v1 route.
+      return '/api/integration/seerrng/v1';
     }
     throw new Error(
       `ROMarrNG request contract v${handshake.requestContractVersion} is not supported`
