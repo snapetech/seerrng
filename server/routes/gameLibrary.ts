@@ -40,6 +40,17 @@ gameLibraryRoutes.use((_req, res, next) => {
   next();
 });
 gameLibraryRoutes.use(isAuthenticated());
+gameLibraryRoutes.use(
+  rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `user:${req.user?.id ?? 'anonymous'}`,
+    skip: () =>
+      process.env.NODE_ENV === 'test' || process.env.E2E_TESTS === 'true',
+  })
+);
 
 const STEAM_ID_PATTERN = /^[0-9]{17}$/;
 const OAUTH_STATE_TTL_MS = 10 * 60_000;

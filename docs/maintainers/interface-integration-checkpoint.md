@@ -101,10 +101,12 @@ per-test restoration. Unexpected fixture IDs fail outside the production catch.
 A new unavailable-enrichment case checks the exact lookup and preserved status.
 All 18 focused tests pass, with no skips/cancellations/todos. This test-only repair
 is not a production backend fix or a complete cumulative gate/build pass. The
-final gate and human acceptance remain pending; unrelated failures required
-scoped direction for that attempt. On 2026-10-06, explicit user authorization
-covered fixing failures that block the requested software-acquisition
-validation and release, superseding that pause for this work.
+The final gate and human acceptance were pending at that checkpoint; unrelated
+failures required scoped direction for that attempt. On 2026-10-06, explicit
+user authorization covered fixing failures that block the requested
+software-acquisition validation and release, superseding that pause for this
+work. The 2026-10-07 direction removes human acceptance as a merge or release
+gate.
 
 The visual/client fixtures were also tightened: negative CSS/role fixtures must
 fail with their intended diagnostics, wrong icon padding is checked without a
@@ -322,7 +324,8 @@ the accepted preview and authorized integration with Keith's current main,
 scoped Fix-it repairs, source-specific engine validation, separate guarded
 compilation, and a laptop preview on port 5071 with an independent copy of the
 5070 configuration/database. The final preview is shown only after those checks
-complete. John's visual review remains required before any PR.
+complete. Visual inspection was pending at that historical checkpoint; the
+user's 2026-10-07 direction supersedes it as a PR or release gate.
 
 The pinned upstream base is `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`
 (3.48.3). The exact accepted working-byte checkpoint is
@@ -451,8 +454,9 @@ The unique added focused checks pass: Audiobookshelf scan helper/scanner/API
 and discover contract **12/12 Node tests**; RequestBlock edit identity
 **2/2 Vitest tests**; server/client TypeScript, focused ESLint, i18n and
 formatting also pass. Full cumulative validation and a production build remain
-pending on this expanded candidate. Rendered desktop/narrow review and John's
-visual acceptance remain release gates.
+pending on this expanded candidate. Rendered desktop/narrow inspection and
+John's visual acceptance were recorded as pending then; neither is a current
+release gate under the user's 2026-10-07 direction.
 
 ## Current main integration and gate follow-up — October 4, 2026
 
@@ -479,8 +483,9 @@ changelog section. This receipt is invalidated by the forward integration; the
 complete gate must be rerun against this exact merged tree. The production build
 has not run. The in-app browser control and isolated workspace controls are not
 available in this session; rendered review is pending on an available local
-browser path. Human visual review of the new game and reader surfaces
-remains pending and is still required before release.
+browser path. Human visual review of the new game and reader surfaces was
+recorded as pending at this checkpoint; the user's 2026-10-07 direction removes
+it as a release gate.
 
 ## UI correction and verification record — October 5, 2026
 
@@ -548,7 +553,8 @@ element diagnostics on failure.
   `/tmp/seerrng-game-library-validation-final-candidate-20261005.log`.
 - Tests used a fresh disposable SQLite configuration and local providers only.
   No live Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was
-  contacted. Human visual review remains a release gate.
+  contacted. Human visual review was recorded as pending then; it is not a
+  release gate under the user's 2026-10-07 direction.
 
 ## Rebuilt candidate and rendered review — October 4, 2026 (Regina local)
 
@@ -587,8 +593,8 @@ rebuilt after this correction.
   Log: `/tmp/seerrng-validate-development-final-20261005.log`.
 - The Chromium exploratory Cypress attempt timed out waiting for a page load and
   is not counted. The final built-app workflows passed separately under the
-  repository's Cypress Electron runner. Human visual review remains a
-  release gate.
+  repository's Cypress Electron runner. Human visual review was recorded as
+  pending then; it is not a release gate under the user's 2026-10-07 direction.
 - Release-note preview, commits, push, and release remain pending. Live Grimmory,
   BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain unverified.
 
@@ -632,7 +638,8 @@ the game source-level lint fixes and new main target; it is historical only.
 The final integrated gate, production build, and rebuilt disposable browser
 flows remain pending. No branch push, tag, or release has occurred. Live
 Grimmory, BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain
-unverified; human visual review remains a release gate.
+unverified; human visual review was recorded as pending then and is not a
+release gate under the user's 2026-10-07 direction.
 
 ## Reader settings readability follow-up — October 5, 2026
 
@@ -655,8 +662,9 @@ Vitest, 385 native TypeScript, 56 native JavaScript, and 32 tooling files, with
 zero declared platform exclusions. The final gate, clean production build,
 and rebuilt desktop/narrow browser flows remain pending on this follow-up.
 Earlier build and screenshot evidence predates the reader layout change.
-Provider round trips remain unverified, and human visual review is
-still required before release.
+Provider round trips remain unverified. Human visual review was recorded as
+pending at this checkpoint; the user's 2026-10-07 direction supersedes it as a
+release gate.
 
 ## Final verification receipt — October 5, 2026
 
