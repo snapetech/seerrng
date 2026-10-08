@@ -600,12 +600,12 @@ describe('software request routes', () => {
     assert.equal(cleared.body.steamApiKeyConfigured, false);
   });
 
-  it('accepts the current QuestarrNG handshake without optional capabilities', async () => {
+  it('accepts the current QuestarrNG v2 handshake without optional capabilities', async () => {
     const app = createOpenApiValidatedSettingsApp();
     mock.method(QuestarrNGAPI.prototype, 'getHandshake', async () => ({
       service: 'questarr',
       apiVersion: 1,
-      requestContractVersion: 1,
+      requestContractVersion: 2,
     }));
 
     const response = await request(app)
@@ -629,13 +629,14 @@ describe('software request routes', () => {
       service: 'ROMarrNG',
       version: '1.0.0',
       apiVersion: 1,
-      requestContractVersion: 1,
+      requestContractVersion: 2,
       capabilities: {
         catalog: true,
         pcAcquisition: false,
         emulationAcquisition: true,
         requestActions: { retry: true, cancel: true },
         assetStreaming: true,
+        datCatalog: true,
       },
     }));
     const response = await request(app)
@@ -779,12 +780,21 @@ describe('software request routes', () => {
     );
   });
 
-  it('refreshes ROMarr systems while testing edited settings and reports the count', async () => {
+  it('accepts ROMarrNG v2 while testing edited settings and reports the system count', async () => {
     const app = createOpenApiValidatedSettingsApp();
     mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
       service: 'romarr',
       version: 'test',
       apiVersion: 1,
+      requestContractVersion: 2,
+      capabilities: {
+        catalog: true,
+        pcAcquisition: false,
+        emulationAcquisition: true,
+        requestActions: { retry: true, cancel: true },
+        assetStreaming: true,
+        datCatalog: true,
+      },
     }));
     let forceFresh: boolean | undefined;
     mock.method(
@@ -817,7 +827,31 @@ describe('software request routes', () => {
     assert.strictEqual(response.status, 200);
     assert.strictEqual(forceFresh, true);
     assert.strictEqual(response.body.apiVersion, 1);
+    assert.strictEqual(response.body.requestContractVersion, 2);
+    assert.strictEqual(response.body.capabilities.datCatalog, true);
     assert.strictEqual(response.body.platformCount, 1);
+  });
+
+  it('rejects unsupported ROMarrNG request contract versions', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
+      service: 'ROMarrNG',
+      apiVersion: 1,
+      requestContractVersion: 3,
+    }));
+
+    const response = await request(app)
+      .post('/api/v1/settings/software-acquisition/test/romarr')
+      .send({
+        hostname: 'romarr.test',
+        port: 6868,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: 'romarr-test-key',
+      });
+
+    assert.strictEqual(response.status, 502);
+    assert.match(response.body.error, /unsupported integration contract/i);
   });
 
   it('validates the ROMarr retry confirmation against the OpenAPI contract', async () => {
