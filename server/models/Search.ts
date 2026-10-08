@@ -20,9 +20,11 @@ import { normalizeMusicBrainzId } from '@server/lib/externalIds';
 import type { AuthorResult, BookResult } from '@server/models/Book';
 import type { ComicResult } from '@server/models/Comic';
 import type { MagazineResult } from '@server/models/Magazine';
+import type { SportarrResult } from '@server/models/Sportarr';
 export type { AuthorResult, BookResult } from '@server/models/Book';
 export type { ComicResult } from '@server/models/Comic';
 export type { MagazineResult } from '@server/models/Magazine';
+export type { SportarrResult } from '@server/models/Sportarr';
 export type MediaType =
   | 'tv'
   | 'movie'
@@ -33,7 +35,8 @@ export type MediaType =
   | 'book'
   | 'author'
   | 'comic'
-  | 'magazine';
+  | 'magazine'
+  | 'sports';
 
 interface TmdbSearchResult {
   id: number;
@@ -147,7 +150,8 @@ export type Results =
   | BookResult
   | AuthorResult
   | ComicResult
-  | MagazineResult;
+  | MagazineResult
+  | SportarrResult;
 
 type SearchProviderResult =
   | TmdbMovieResult
@@ -159,7 +163,8 @@ type SearchProviderResult =
   | BookResult
   | AuthorResult
   | ComicResult
-  | MagazineResult;
+  | MagazineResult
+  | SportarrResult;
 
 export const mapMovieResult = (
   movieResult: TmdbMovieResult,

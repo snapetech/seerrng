@@ -17,6 +17,7 @@ import type {
   SonarrSeries,
 } from '@server/api/servarr/sonarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import SportarrAPI from '@server/api/servarr/sportarr';
 import TheMovieDb from '@server/api/themoviedb';
 import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
 import WikidataAPI from '@server/api/wikidata';
@@ -38,6 +39,7 @@ import {
   type MediaRequestServiceTarget,
 } from '@server/entity/MediaRequest';
 import MediaRequestStatusEvent from '@server/entity/MediaRequestStatusEvent';
+import { MediaSearchMetadata } from '@server/entity/MediaSearchMetadata';
 import { RequestDispatchOutbox } from '@server/entity/RequestDispatchOutbox';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -72,6 +74,7 @@ import {
   type ServarrServiceType,
 } from '@server/lib/serviceAdmission';
 import { type ReadarrSettings } from '@server/lib/settings';
+import { isSportarrLeagueExternalId } from '@server/lib/sportarrIdentity';
 import logger from '@server/logger';
 import { parseBookshelfBookId } from '@server/utils/bookshelfCatalog';
 import {
@@ -115,6 +118,7 @@ export const READARR_LOOKUP_HYDRATION_CONCURRENCY = 5;
 const activeReadarrDispatches = new Map<number, Promise<number | undefined>>();
 const activeComicDispatches = new Map<number, Promise<number | undefined>>();
 const activeMagazineDispatches = new Map<number, Promise<number | undefined>>();
+const activeSportarrDispatches = new Map<number, Promise<number | undefined>>();
 
 const saveRequestServiceTarget = async (
   request: MediaRequest,
@@ -239,6 +243,13 @@ const getRequestDispatchServiceSelection = (
       serviceType: 'lazylibrarian',
       serviceIds: uniqueIds([selected?.id]),
     };
+  }
+  if (request.type === MediaType.SPORTS) {
+    const selected =
+      request.serverId !== null && request.serverId >= 0
+        ? settings.sportarr.find(({ id }) => id === request.serverId)
+        : settings.sportarr.find(({ isDefault }) => isDefault);
+    return { serviceType: 'sportarr', serviceIds: uniqueIds([selected?.id]) };
   }
 
   const format = request.bookFormat ?? 'ebook';
@@ -642,7 +653,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         const isRetryableFailedRequest =
           (request?.type === MediaType.BOOK ||
             request?.type === MediaType.COMIC ||
-            request?.type === MediaType.MAGAZINE) &&
+            request?.type === MediaType.MAGAZINE ||
+            request?.type === MediaType.SPORTS) &&
           request.status === MediaRequestStatus.FAILED;
         if (
           !request ||
@@ -753,6 +765,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
     } else if (request.type === MediaType.MAGAZINE) {
       const retryAfterMs = await this.sendToMagazineBackend(request);
+      if (retryAfterMs !== undefined) {
+        return { delivered: false, retryAfterMs };
+      }
+    } else if (request.type === MediaType.SPORTS) {
+      const retryAfterMs = await this.sendToSportarr(request);
       if (retryAfterMs !== undefined) {
         return { delivered: false, retryAfterMs };
       }
@@ -2677,6 +2694,177 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           errorMessage: error instanceof Error ? error.message : String(error),
         }
       );
+      if (media && !wasAlreadyFailed) {
+        await MediaRequest.sendNotification(
+          entity,
+          media,
+          Notification.MEDIA_FAILED
+        );
+      }
+      return READARR_FAILED_RETRY_DELAY_MS;
+    }
+  }
+
+  public async sendToSportarr(
+    entity: MediaRequest
+  ): Promise<number | undefined> {
+    if (entity.type !== MediaType.SPORTS) return;
+    if (
+      entity.status !== MediaRequestStatus.APPROVED &&
+      entity.status !== MediaRequestStatus.FAILED
+    ) {
+      return;
+    }
+
+    const activeDispatch = activeSportarrDispatches.get(entity.id);
+    if (activeDispatch) return activeDispatch;
+
+    const dispatch = this.dispatchSportarrRequest(entity);
+    const trackedDispatch = dispatch.finally(() => {
+      if (activeSportarrDispatches.get(entity.id) === trackedDispatch) {
+        activeSportarrDispatches.delete(entity.id);
+      }
+    });
+    activeSportarrDispatches.set(entity.id, trackedDispatch);
+    return trackedDispatch;
+  }
+
+  private async dispatchSportarrRequest(
+    entity: MediaRequest
+  ): Promise<number | undefined> {
+    try {
+      const settings = getExternalRuntimeConfig();
+      const selection = getRequestDispatchServiceSelection(entity);
+      const service = settings.sportarr.find(
+        ({ id }) => id === selection.serviceIds[0]
+      );
+      if (!service) {
+        throw new Error('No default Sportarr server is configured.');
+      }
+
+      const mediaRepository = getRepository(Media);
+      const requestRepository = getRepository(MediaRequest);
+      const media = await mediaRepository.findOne({
+        where: { id: entity.media.id },
+        relations: { identifiers: true },
+      });
+      if (!media) throw new Error('Sports league media data not found.');
+
+      const externalId = media.identifiers?.find(
+        ({ provider }) => provider === MediaIdentifierProvider.SPORTARR
+      )?.value;
+      if (!externalId || !isSportarrLeagueExternalId(externalId)) {
+        throw new Error('Sports request is missing its Sportarr league ID.');
+      }
+      if (
+        !Number.isSafeInteger(service.activeProfileId) ||
+        service.activeProfileId <= 0
+      ) {
+        throw new Error('Select an active Sportarr quality profile first.');
+      }
+
+      const api = new SportarrAPI({
+        url: SportarrAPI.buildUrl(service, '/api'),
+        apiKey: service.apiKey,
+      });
+      let league = await api.getLeagueByExternalId(externalId);
+      if (league?.id && !league.monitored) {
+        throw new Error(
+          'This league exists in Sportarr but is not monitored. Enable it in Sportarr before retrying.'
+        );
+      }
+
+      if (!league?.id) {
+        const metadata = await getRepository(MediaSearchMetadata).findOne({
+          where: { mediaId: media.id },
+        });
+        const title = metadata?.title?.trim();
+        if (!title) {
+          throw new Error('Sports request is missing its league title.');
+        }
+        try {
+          league = await api.addLeague(
+            {
+              externalId,
+              title,
+              sport: league?.sport ?? metadata?.genres ?? undefined,
+              country: league?.country,
+              overview: league?.overview ?? metadata?.overview ?? undefined,
+            },
+            service.activeProfileId
+          );
+        } catch (addError) {
+          // A competing request or a lost POST response can leave the library
+          // write committed while the caller sees an error. Read the canonical
+          // library before deciding whether the dispatch failed.
+          const readBack = (await api.getLibraryLeagues()).find(
+            (entry) => entry.externalId === externalId
+          );
+          if (!readBack?.monitored) throw addError;
+          league = readBack;
+        }
+        if (!league?.id || !league.monitored) {
+          // A successful POST can race a response loss. Re-read before we
+          // report failure so retrying never creates a second league.
+          league = await api.getLeagueByExternalId(externalId);
+        }
+      }
+
+      if (!league?.id || !league.monitored) {
+        throw new Error('Sportarr did not confirm that the league was added.');
+      }
+
+      media.serviceId = service.id;
+      media.externalServiceId = league.id;
+      media.externalServiceSlug = externalId;
+      media.mediaType = MediaType.SPORTS;
+      media.status = MediaStatus.PROCESSING;
+      await mediaRepository.save(media);
+      await saveRequestServiceTarget(entity, {
+        serviceType: 'sportarr',
+        format: 'sports',
+        serverId: service.id,
+        profileId: service.activeProfileId,
+        externalServiceId: league.id,
+        externalServiceSlug: externalId,
+        rootFolder: null,
+        status: MediaStatus.PROCESSING,
+      });
+
+      entity.status = MediaRequestStatus.COMPLETED;
+      await requestRepository.save(entity);
+      logger.info('Added sports league to Sportarr', {
+        label: 'Media Request',
+        requestId: entity.id,
+        mediaId: entity.media.id,
+        serviceId: service.id,
+        externalId,
+      });
+      return;
+    } catch (error) {
+      if (isTransientExternalError(error)) {
+        const providerRetryDelay = getRetryAfterMs(error);
+        return providerRetryDelay === undefined
+          ? READARR_MIN_PROVIDER_RETRY_DELAY_MS
+          : clampReadarrProviderRetryDelay(providerRetryDelay);
+      }
+
+      const wasAlreadyFailed = entity.status === MediaRequestStatus.FAILED;
+      const requestRepository = getRepository(MediaRequest);
+      const mediaRepository = getRepository(Media);
+      const media = await mediaRepository.findOne({
+        where: { id: entity.media.id },
+      });
+      if (!wasAlreadyFailed) {
+        entity.status = MediaRequestStatus.FAILED;
+        await requestRepository.save(entity);
+      }
+      logger.warn('Failed to send sports request to Sportarr', {
+        label: 'Media Request',
+        requestId: entity.id,
+        mediaId: entity.media.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       if (media && !wasAlreadyFailed) {
         await MediaRequest.sendNotification(
           entity,

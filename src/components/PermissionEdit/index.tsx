@@ -37,6 +37,9 @@ export const messages = defineMessages('components.PermissionEdit', {
   requestMagazines: 'Request Magazines',
   requestMagazinesDescription:
     'Grant permission to submit magazine requests through LazyLibrarian.',
+  requestSports: 'Request Sports',
+  requestSportsDescription:
+    'Grant permission to submit sports league requests through Sportarr.',
   autoapprove: 'Auto-Approve',
   autoapproveDescription:
     'Grant automatic approval for all non-4K media requests.',
@@ -55,6 +58,9 @@ export const messages = defineMessages('components.PermissionEdit', {
   autoapproveMagazines: 'Auto-Approve Magazines',
   autoapproveMagazinesDescription:
     'Grant automatic approval for magazine requests.',
+  autoapproveSports: 'Auto-Approve Sports',
+  autoapproveSportsDescription:
+    'Grant automatic approval for sports league requests.',
   autoapprove4k: 'Auto-Approve 4K',
   autoapprove4kDescription:
     'Grant automatic approval for all 4K media requests.',
@@ -245,6 +251,12 @@ export const PermissionEdit = ({
           description: intl.formatMessage(messages.requestMagazinesDescription),
           permission: Permission.REQUEST_MAGAZINE,
         },
+        {
+          id: 'request-sports',
+          name: intl.formatMessage(messages.requestSports),
+          description: intl.formatMessage(messages.requestSportsDescription),
+          permission: Permission.REQUEST_SPORTS,
+        },
       ],
     },
     {
@@ -330,6 +342,20 @@ export const PermissionEdit = ({
           requires: [
             {
               permissions: [Permission.REQUEST, Permission.REQUEST_MAGAZINE],
+              type: 'or',
+            },
+          ],
+        },
+        {
+          id: 'autoapprovesports',
+          name: intl.formatMessage(messages.autoapproveSports),
+          description: intl.formatMessage(
+            messages.autoapproveSportsDescription
+          ),
+          permission: Permission.AUTO_APPROVE_SPORTS,
+          requires: [
+            {
+              permissions: [Permission.REQUEST, Permission.REQUEST_SPORTS],
               type: 'or',
             },
           ],

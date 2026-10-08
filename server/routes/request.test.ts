@@ -694,7 +694,7 @@ describe('PUT /request/:requestId/watch-ahead', () => {
   });
 });
 
-describe('POST /request with Jellyfin watch-ahead', () => {
+describe('POST /request with Episode Queue', () => {
   it('rejects opt-in when TMDB has no TVDB identity for the series', async () => {
     const settings = getSettings();
     const previousMediaServerType = settings.main.mediaServerType;
@@ -711,10 +711,19 @@ describe('POST /request with Jellyfin watch-ahead', () => {
       await userRepository.save(requestedBy);
 
       const owner = await loginAs('friend@seerr.dev', 'test1234');
-      const response = await owner.post('/request').send({
+      const wholeSeason = await owner.post('/request').send({
         mediaType: 'tv',
         mediaId: 765437,
         seasons: [1],
+        watchAheadEpisodeCount: 2,
+      });
+      assert.strictEqual(wholeSeason.status, 400);
+      assert.match(wholeSeason.body.message, /exactly one starting episode/);
+
+      const response = await owner.post('/request').send({
+        mediaType: 'tv',
+        mediaId: 765437,
+        seasonRequests: [{ seasonNumber: 1, episodeNumbers: [1] }],
         watchAheadEpisodeCount: 2,
       });
       assert.strictEqual(response.status, 400);

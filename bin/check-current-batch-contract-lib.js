@@ -2777,8 +2777,8 @@ const validateCurrentBatchContract = (files) => {
   );
   requirePublicCommand(
     'ui-style:check',
-    'node bin/check-refreshed-ui-style.js && node --test src/styles/buttonGeometry.test.mjs',
-    'the shared visual command must retain style and control-geometry checks'
+    'node bin/check-refreshed-ui-style.js && node --test src/styles/buttonGeometry.test.mjs src/styles/sportarrRoles.test.mjs',
+    'the shared visual command must retain style, control-geometry, and Sportarr role checks'
   );
   requirePublicCommand(
     'i18n:check',

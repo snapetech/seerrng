@@ -571,11 +571,15 @@ export class User {
     const tvQuotaStartDate = tvDate.toJSON();
     const tvQuotaUsedQuery = requestRepository
       .createQueryBuilder('request')
-      .innerJoin('request.seasons', 'season')
-      .select('COUNT(season.id)', 'count')
+      .leftJoin('request.seasons', 'season')
+      .select(
+        'COUNT(season.id) + SUM(CASE WHEN request.type = :sportsType THEN 1 ELSE 0 END)',
+        'count'
+      )
       .leftJoin('request.requestedBy', 'requestedBy')
-      .where('request.type = :requestType', {
-        requestType: MediaType.TV,
+      .where('request.type IN (:...requestTypes)', {
+        requestTypes: [MediaType.TV, MediaType.SPORTS],
+        sportsType: MediaType.SPORTS,
       })
       .andWhere('requestedBy.id = :userId', {
         userId: this.id,

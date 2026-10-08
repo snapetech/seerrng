@@ -35,6 +35,7 @@ import type {
   MagazineResult,
   MovieResult,
   PersonResult,
+  SportarrResult,
   TvResult,
 } from '@server/models/Search';
 import { useRouter } from 'next/router';
@@ -70,6 +71,7 @@ const messages = defineMessages('components.Search', {
   music: 'Music',
   comics: 'Comics',
   magazines: 'Magazines',
+  sports: 'Sports',
   software: 'Software',
   filter: 'Filters',
   mediaFilters: 'Media Filters',
@@ -114,6 +116,7 @@ const searchCategories = [
   { key: 'music', type: 'music', message: messages.music },
   { key: 'comic', type: 'comic', message: messages.comics },
   { key: 'magazine', type: 'magazine', message: messages.magazines },
+  { key: 'sports', type: 'sports', message: messages.sports },
   { key: 'software', type: 'software', message: messages.software },
   { key: 'author', type: 'author', message: messages.authors },
 ] as const;
@@ -129,7 +132,8 @@ type SearchResult =
   | BookResult
   | AuthorResult
   | ComicResult
-  | MagazineResult;
+  | MagazineResult
+  | SportarrResult;
 
 const getSearchResultKey = (result: SearchResult) =>
   `${result.mediaType}:${result.id}`;
@@ -177,6 +181,7 @@ const sortFieldsByCategory: Record<
   author: ['title'],
   comic: ['date', 'title'],
   magazine: ['date', 'title'],
+  sports: ['date', 'title'],
   software: [],
 };
 
@@ -253,6 +258,10 @@ const getResultDate = (result: SearchResult): number | undefined => {
   if (result.mediaType === 'magazine') {
     const issueDate = Date.parse(result.latestIssue ?? '');
     return Number.isFinite(issueDate) ? issueDate : undefined;
+  }
+
+  if (result.mediaType === 'sports') {
+    return result.year;
   }
 
   const value =
@@ -350,6 +359,11 @@ const Search = () => {
           '/discover/magazines',
           currentSettings
         );
+      case 'sports':
+        return isOptionalCatalogPathEnabled(
+          '/discover/sports',
+          currentSettings
+        );
       case 'software':
         return isAnySoftwareCategoryEnabled(currentSettings);
       default:
@@ -379,7 +393,9 @@ const Search = () => {
         ? 'music'
         : category.key === 'book' || category.key === 'audiobook'
           ? 'book'
-          : 'movie';
+          : category.key === 'sports'
+            ? 'tv'
+            : 'movie';
   const mediaPin = useMediaFilterPin<SearchCategory['key']>({
     scope: 'search',
     selected: category.key,

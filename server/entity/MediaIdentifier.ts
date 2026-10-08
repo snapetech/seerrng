@@ -31,6 +31,7 @@ export enum MediaIdentifierProvider {
   MYLAR = 'mylar',
   KAPOWARR = 'kapowarr',
   LAZYLIBRARIAN = 'lazylibrarian',
+  SPORTARR = 'sportarr',
 }
 
 @Entity()
@@ -47,6 +48,10 @@ export enum MediaIdentifierProvider {
 @Index('UQ_media_identifier_canonical_magazine', ['provider', 'value'], {
   unique: true,
   where: `"provider" = 'lazylibrarian'`,
+})
+@Index('UQ_media_identifier_canonical_sportarr', ['provider', 'value'], {
+  unique: true,
+  where: `"provider" = 'sportarr'`,
 })
 class MediaIdentifier {
   @PrimaryGeneratedColumn()

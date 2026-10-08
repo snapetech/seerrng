@@ -81,6 +81,7 @@ const mediaListTypes: MediaType[] = [
   MediaType.BOOK,
   MediaType.COMIC,
   MediaType.MAGAZINE,
+  MediaType.SPORTS,
 ];
 const mediaFileFormats = ['ebook', 'audiobook', 'both'] as const;
 const mediaListPermissions: Permission[] = [
@@ -97,6 +98,7 @@ const mediaTypeCategories: Record<
   [MediaType.BOOK]: { categories: ['ebook', 'audiobook'], mode: 'any' },
   [MediaType.COMIC]: { categories: ['comic'] },
   [MediaType.MAGAZINE]: { categories: ['magazine'] },
+  [MediaType.SPORTS]: { categories: ['sports'] },
 };
 const isMediaTypeCategoryEnabled = (mediaType: MediaType): boolean => {
   const config = mediaTypeCategories[mediaType];

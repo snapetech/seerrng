@@ -985,3 +985,156 @@ merged as `800745e107b2d044045484e74d0f0686239a3e05`, and its result was release
 from `fe1ef9790369c4694cb6b7de4444e6c9330dcfc1` as `v3.54.0`. The historical
 failed macOS tooling receipt remains evidence of that attempt, not a current
 merge prohibition.
+
+## Sportarr forward integration and verification — October 8, 2026
+
+The isolated `feat/sportarr-integration` worktree started from
+`1ba2da2033a8c26f5001c7e5a0d6ee58f670a7c1`. Before integration, its dirty
+source was saved as stash `e3a493f1b3eecdf5e0ad53b39c1c9669768ba16d` and the
+verified recovery bundle
+`/private/tmp/seerrng-sportarr-preintegration-20261008.bundle`. The worktree
+was the only one on this feature branch. It was advanced to current
+`origin/main` at `42397ee61d496337134106ef341a7d8b45ff412b`; applying the stash
+reported no textual conflicts. The 12 overlapping files were reviewed
+semantically, retaining current-main API, settings, ReadMeABook, locale, and
+service-availability changes alongside Sportarr. No target-main file was
+deleted. Sportarr's PostgreSQL/SQLite migration and test were moved from
+`1791090000000` to `1791130000000`, after current main's `1791120000000`
+ReadMeABook/login-link migration.
+
+The pre-integration development gate selected 611 files (104 Vitest, 417 native
+TypeScript, 59 native JavaScript, and 31 tooling files), with zero declared
+platform exclusions. On the pinned Node 24.19.0/pnpm 10.24.0 runtime,
+translations, the 593-file current-batch check, the 420-component shared-style
+check, formatting, lint, server/client types, Vitest (471/471), native
+TypeScript (3,105 passed, four skipped), and native JavaScript (496/496) passed.
+The macOS tooling lane failed. Its loopback failure was confirmed as a sandbox
+restriction and passed when rerun outside the sandbox; remaining observed
+failures use GNU-only commands, assume a `python` executable, or require an
+amd64 Flatpak smoke target. The exact tooling case total was not retained in
+the filtered gate output. This is a failed pre-integration receipt, not a green
+cumulative result.
+
+On the rebased tree, the Sportarr adapter, canonical-identity, and SQLite
+uniqueness-migration checks passed 7/7. The four Sportarr discovery/detail/event
+HTTP route checks passed 4/4 outside the sandbox. The API schema now leaves
+`SportarrEvent.eventDate` unconstrained to ISO format because the adapter
+preserves provider strings. The integrated-tree cumulative gate, Linux tooling
+receipt, build, desktop/narrow rendered review, release-note preview, GitHub
+checks, release, and verification of the released artifact remain pending.
+No live Sportarr service round-trip has been performed.
+
+### Episode Queue clarification and ecosystem follow-up — October 8, 2026
+
+The supplied user screenshot clarified that the requested playback feature is
+the per-request TV Episode Queue: request one starting episode, then have
+linked Plex, Jellyfin, or Emby playback maintain a bounded 1–5 episode buffer
+through Sonarr. The existing branch implementation exposes the setting while
+creating and editing a request, keeps Off as the default, restores the previous
+season/episode selection when disabled, and adds owner-controlled enable/disable
+from request cards. The worker matches the linked account and series, waits for
+90% playback, counts existing files and active requests toward the buffer, and
+creates approved child requests without deleting files.
+
+The focused Episode Queue worker test is new in
+server/lib/episodeWatchAhead.dispatch.test.ts. It passes with a disposable
+SQLite test database and mocked Jellyfin/Sonarr APIs: linked Jellyfin playback
+at 90% advances the parent and creates exactly episodes 2 and 3 for a two
+episode buffer. It does not establish a live provider round-trip. The grouped
+native suite covering Episode Queue selection/playback, this worker test,
+Sportarr adapter/identity, and the Sportarr SQLite identity migration passed
+17/17. The TV request-tree React suites passed 24/24, and a standalone full
+server/routes/request.test.ts run passed 191/191. The earlier full
+server/routes/discover.test.ts run passed 128/128; Sportarr HTTP route tests
+passed 4/4. pnpm format:check and pnpm i18n:check passed after the new
+worker test and ecosystem appendix were added.
+
+docs/maintainers/market-research-2026-10-06.md now has an October 8 follow-up
+with primary-source links and a gap assessment. It identifies Whisparr as the
+only additional Arr-style request target found, subject to a product decision
+about adult catalogs and separate API validation of its v2 and v3 lines.
+Bazarr, Huntarr2, and Recyclarr are recorded as adjacent subtitle/operations
+tools; Bindery is a book backend to monitor rather than a confirmed gap.
+
+The first complete local pnpm validate:development attempt stopped in
+prerequisite admission before repository tests ran. Its retained receipt is
+/private/tmp/seerrng-native-validation-ZctJ3f; the current macOS ARM64 host
+does not provide the required GNU find, and the validator requires an actual
+Linux read-only mount for the installed dependency reference. The runner's
+discovery plan contained 658 selected files (525 Vitest, 58 native JavaScript,
+and 75 tooling; zero declared platform exclusions). Discovery is not execution
+evidence. The Mac prerequisite failure is not counted as a test failure or a
+pass. A full Linux gate, build, source and browser review, release-note preview,
+GitHub checks, and released-artifact exercise remain pending. The computer-use
+surface reported no connected browsers, so rendered desktop/narrow visual
+inspection was unavailable; no live Sportarr or media-server service was used.
+
+#### Final-candidate local runner follow-up — October 8, 2026
+
+The retry used a separate `seerrng-validation` Colima profile with read/write
+mounts limited to `/private/tmp` and `/Users/keith/Code`; the existing default
+profile was left running and unchanged. Colima downloaded its 3.5 GiB guest
+image but could not decompress it: the APFS container had 124.6 MB unallocated
+(the host reported 107 MiB available). I removed only that failed attempt's
+317 MB cached image. The Linux prerequisite was therefore still unavailable;
+no Linux gate stage is claimed as executed. The earlier receipt remains at
+`/private/tmp/seerrng-native-validation-ZctJ3f`.
+
+After restoring that temporary disk space, `pnpm format:check`,
+`pnpm i18n:check`, `pnpm current-batch:check` (598 files), and its nested
+`pnpm ui-style:check` (425 components inspected; 71 style checks passed) passed.
+One `i18n:check` attempt before cleanup could not create its temporary locale
+backup because the volume was full; it was an environment error, not an i18n
+assertion failure. The focused native and React receipts above remain the
+executed feature evidence. Hosted checks, build, integration, and release
+verification are still pending.
+
+#### Hosted validation repair — October 8, 2026
+
+PR #180's first hosted validation run (37829505156) caught a client type error
+before Cypress or Playwright specs started. In
+`src/components/RequestModal/TvRequestModal.tsx`, a conditional between full
+episode selections and whole-season selections inferred a season-only shape;
+the selection snapshot then accessed `episodeNumbers`. Both browser lanes
+failed at their shared production build for this same error. The source now
+types that snapshot as `SeasonEpisodeSelection[]`, preserving optional episode
+numbers for partial selections. After the fix, `pnpm typecheck:client` passed
+and the three TV request tree suites passed 24/24. A fresh hosted run against
+the corrected commit is pending; the first-run failure remains recorded and is
+not counted as a pass.
+
+The next hosted run (37831436745) passed the application build, all four unit
+shards, both CodeQL analyses, Playwright, and five of six Cypress shards. The
+remaining Prowlarr responsive Cypress spec used a fixture without the newly
+required Sports mapping; the settings form correctly kept Test and Save disabled
+until every category had a selection. The fixture now includes the standard
+`sports: [5060]` mapping, and the existing interaction assertion is unchanged.
+A fresh hosted run 37833591956 passed for the corrected candidate. GitHub
+validated the synthetic PR merge commit `7b15b40fa15c24ca2a8bed8ca63d8ec57906fe60`,
+combining head `630cf235499e5dc1c903c1cf8ac22baa0091be5b` with the then-current
+main `42397ee61d496337134106ef341a7d8b45ff412b`. Its immutable validation plan
+covered 703 test files: 525 Vitest, 75 tooling, 58 native `node:test` MJS, one
+documentation-security, 43 Cypress, and one Playwright file. All applicable
+hosted units and both CodeQL analyses passed; the Helm chart job was correctly
+not applicable to this PR's file changes.
+
+Executed test evidence: Vitest ran 3,613 tests (3,609 passed, four skipped);
+the 58 native JavaScript files ran 481 tests (all passed); the 75 tooling files
+ran 858 tests (852 passed, six skipped); Cypress ran all 43 files across six
+passing shards (153 passed, 32 pending, zero failed); and Playwright passed its
+one test. The four Vitest skips are the pre-existing real-PostgreSQL migration
+checks in `server/migration/postgres/mediaUniqueness.test.ts`; they require
+`SEERR_TEST_POSTGRES_URL`, which was not configured. The new Sportarr
+PostgreSQL index migration was therefore not exercised against PostgreSQL.
+Its SQLite counterpart's uniqueness migration test passed in the native test
+lane. The documentation image-parser security test, `pnpm build`, generated
+API docs plus the documentation-site build, Jellyfin bridge build and smoke
+test on Jellyfin 10.11.11, i18n, documentation links, release-note contract,
+and JavaScript/Actions CodeQL checks also passed. The aggregate native
+validation-engine result is success with no failures.
+
+This is hosted pre-merge evidence for the stated synthetic merge candidate;
+integrated-main validation is still required after merge. Rendered desktop or
+narrow review and live Sportarr or media-server round-trips were not performed.
+Episode Queue playback dispatch was tested with disposable SQLite and mocked
+Jellyfin/Sonarr APIs, not a live service.

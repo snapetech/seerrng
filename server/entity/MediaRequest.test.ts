@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 import ExternalAPI from '@server/api/externalapi';
-import { MediaType } from '@server/constants/media';
+import SportarrAPI from '@server/api/servarr/sportarr';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
@@ -10,9 +15,11 @@ import {
   MediaRequest,
   QuotaRestrictedError,
 } from '@server/entity/MediaRequest';
+import { MediaSearchMetadata } from '@server/entity/MediaSearchMetadata';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 
 // get is a prototype method unlike getMovie, and replaces the cache lookup too
@@ -42,8 +49,16 @@ mock.method(MediaRequest, 'sendNotification', async () => undefined);
 
 setupTestDb();
 
+const sportarrLookupRestores: (() => void)[] = [];
+
+afterEach(() => {
+  sportarrLookupRestores.splice(0).forEach((restore) => restore());
+  getSettings().sportarr = [];
+});
+
 beforeEach(() => {
   externalApiGetMock.resetCalls();
+  getSettings().sportarr = [];
 });
 
 async function seedRequester(movieQuotaLimit: number): Promise<User> {
@@ -82,6 +97,133 @@ function rejections(results: PromiseSettledResult<MediaRequest>[]) {
 }
 
 describe('MediaRequest.request', () => {
+  it('creates canonical sports requests for a user with sports permission', async () => {
+    const settings = getSettings();
+    settings.sportarr = [
+      {
+        id: 44,
+        name: 'Sportarr',
+        hostname: 'sportarr.test',
+        port: 1867,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 5,
+        activeProfileName: 'HD',
+        isDefault: true,
+      },
+    ];
+    const lookup = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueByExternalId',
+      async () => ({
+        externalId: 'lg-000042',
+        title: 'Premier League',
+        overview: 'Top division football league.',
+        sport: 'Football',
+        country: 'England',
+        year: 1888,
+        monitored: false,
+        images: [],
+      })
+    );
+    sportarrLookupRestores.push(() => lookup.mock.restore());
+
+    const requester = await createRequester(
+      'sports-requester@seerr.dev',
+      Permission.REQUEST_SPORTS
+    );
+    const created = await MediaRequest.request(
+      {
+        mediaId: 'lg-000042',
+        mediaType: MediaType.SPORTS,
+        is4k: false,
+      },
+      requester
+    );
+
+    assert.equal(created.type, MediaType.SPORTS);
+    assert.equal(created.status, MediaRequestStatus.PENDING);
+    assert.deepEqual(created.serviceTargets, [
+      {
+        serviceType: 'sportarr',
+        format: 'sports',
+        serverId: 44,
+        profileId: 5,
+        rootFolder: null,
+        status: MediaStatus.PENDING,
+      },
+    ]);
+    const savedMedia = await getRepository(Media).findOneOrFail({
+      where: { id: created.media.id },
+      relations: { identifiers: true },
+    });
+    assert.equal(
+      savedMedia.identifiers.find(
+        (identifier) => identifier.provider === 'sportarr'
+      )?.value,
+      'lg-000042'
+    );
+    const metadata = await getRepository(MediaSearchMetadata).findOneByOrFail({
+      mediaId: created.media.id,
+    });
+    assert.equal(metadata.title, 'Premier League');
+    assert.equal(metadata.provider, 'sportarr');
+  });
+
+  it('counts sports requests against the same TV quota', async () => {
+    const settings = getSettings();
+    settings.sportarr = [
+      {
+        id: 45,
+        name: 'Sportarr',
+        hostname: 'sportarr.test',
+        port: 1867,
+        apiKey: 'test-key',
+        useSsl: false,
+        activeProfileId: 5,
+        activeProfileName: 'HD',
+        isDefault: true,
+      },
+    ];
+    const lookup = mock.method(
+      SportarrAPI.prototype,
+      'getLeagueByExternalId',
+      async () => ({
+        externalId: 'lg-000043',
+        title: 'National Hockey League',
+        overview: '',
+        sport: 'Ice Hockey',
+        monitored: false,
+        images: [],
+      })
+    );
+    sportarrLookupRestores.push(() => lookup.mock.restore());
+
+    const requester = await createRequester(
+      'sports-quota@seerr.dev',
+      Permission.REQUEST
+    );
+    requester.tvQuotaLimit = 1;
+    await getRepository(User).save(requester);
+    await MediaRequest.request(
+      {
+        mediaId: 'lg-000043',
+        mediaType: MediaType.SPORTS,
+        is4k: false,
+      },
+      requester
+    );
+
+    await assert.rejects(
+      () =>
+        MediaRequest.request(
+          { mediaId: 98765, mediaType: MediaType.TV, is4k: false },
+          requester
+        ),
+      QuotaRestrictedError
+    );
+  });
+
   it('rejects the second of two concurrent requests at the movie quota', async () => {
     const requestRepository = getRepository(MediaRequest);
     const requester = await seedRequester(1);

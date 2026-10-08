@@ -23,6 +23,7 @@ export interface RequestResultsResponse extends PaginatedResponse {
     sonarr: { id: number; name: string }[];
     lidarr: { id: number; name: string }[];
     readarr: { id: number; name: string }[];
+    sportarr: { id: number; name: string }[];
   };
 }
 

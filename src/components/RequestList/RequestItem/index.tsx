@@ -43,6 +43,7 @@ import type { ComicDetails } from '@server/models/Comic';
 import type { MagazineDetails } from '@server/models/Magazine';
 import type { MovieDetails } from '@server/models/Movie';
 import type { MusicDetails } from '@server/models/Music';
+import type { SportarrDetails } from '@server/models/Sportarr';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
@@ -83,7 +84,7 @@ const messages = defineMessages('components.RequestList.RequestItem', {
   partialBookService: 'Partial Bookshelf link',
   watchAheadTitle: 'Episode Queue',
   watchAheadDescription:
-    'This optional queue is Off by default for every TV request. If you turn it on, SeerrNG follows your linked media server playback and keeps up to {count} upcoming episodes requested in Sonarr after the request is approved. Episodes use the parent approval and do not count against your request quota. Turning it off stops future additions but does not cancel episodes already requested.',
+    'This optional queue is Off by default for every TV request. If you turn it on, SeerrNG follows your linked Plex, Jellyfin, or Emby playback and keeps up to {count} upcoming episodes requested in Sonarr after approval. On a new request, choose one starting episode; enabling the queue on an existing request preserves its current selections. Episodes use the parent approval and do not count against your request quota. Turning it off stops future additions but does not cancel episodes already requested.',
   watchAheadOff: 'Off',
   watchAheadEpisodes: '{count, plural, one {# episode} other {# episodes}}',
   saveWatchAhead: 'Save',
@@ -102,7 +103,8 @@ type RequestItemTitle =
   | MusicDetails
   | BookDetails
   | ComicDetails
-  | MagazineDetails;
+  | MagazineDetails
+  | SportarrDetails;
 
 const isMovie = (media: RequestItemTitle): media is MovieDetails => {
   return (
@@ -125,6 +127,9 @@ const isComic = (media: RequestItemTitle): media is ComicDetails => {
 
 const isMagazine = (media: RequestItemTitle): media is MagazineDetails =>
   (media as MagazineDetails).mediaType === 'magazine';
+
+const isSports = (media: RequestItemTitle): media is SportarrDetails =>
+  (media as SportarrDetails).mediaType === 'sports';
 
 const getBookId = (request: NonFunctionProperties<MediaRequest>) =>
   request.media.identifiers?.find(
@@ -150,6 +155,11 @@ const getMagazineId = (request: NonFunctionProperties<MediaRequest>) =>
     (identifier) => identifier.provider === 'lazylibrarian'
   )?.value;
 
+const getSportarrId = (request: NonFunctionProperties<MediaRequest>) =>
+  request.media.identifiers?.find(
+    (identifier) => identifier.provider === 'sportarr'
+  )?.value;
+
 const getRequestDetailHref = (
   request: NonFunctionProperties<MediaRequest>,
   manage = false
@@ -167,6 +177,7 @@ const getRequestDetailHref = (
   const musicId = getNormalizedMusicId(request);
   const comicId = getComicId(request);
   const magazineId = getMagazineId(request);
+  const sportarrId = getSportarrId(request);
 
   if (request.type === 'music' && musicId) {
     return `/music/${encodeApiPathSegment(musicId)}${suffix}`;
@@ -181,6 +192,9 @@ const getRequestDetailHref = (
   }
   if (request.type === 'magazine' && magazineId) {
     return `/magazine/${encodeApiPathSegment(magazineId)}${suffix}`;
+  }
+  if (request.type === 'sports' && sportarrId) {
+    return `/sportarr/${encodeApiPathSegment(sportarrId)}${suffix}`;
   }
 
   return `/${request.type}/${request.media.tmdbId}${suffix}`;
@@ -312,7 +326,9 @@ const RequestItemError = ({
                           ? globalMessages.comic
                           : requestData?.type === 'magazine'
                             ? globalMessages.magazine
-                            : globalMessages.book
+                            : requestData?.type === 'sports'
+                              ? globalMessages.sports
+                              : globalMessages.book
                   : globalMessages.request
               ),
             })}
@@ -322,7 +338,8 @@ const RequestItemError = ({
               {requestData.type !== 'music' &&
                 requestData.type !== 'book' &&
                 requestData.type !== 'comic' &&
-                requestData.type !== 'magazine' && (
+                requestData.type !== 'magazine' &&
+                requestData.type !== 'sports' && (
                   <div className="card-field">
                     <span className="card-field-name">
                       {intl.formatMessage(messages.tmdbid)}
@@ -395,7 +412,9 @@ const RequestItemError = ({
                           ? getComicId(requestData)
                           : requestData.type === 'magazine'
                             ? getMagazineId(requestData)
-                            : undefined
+                            : requestData.type === 'sports'
+                              ? getSportarrId(requestData)
+                              : undefined
                     }
                     mediaType={
                       requestData.type === 'music'
@@ -406,9 +425,11 @@ const RequestItemError = ({
                             ? 'comic'
                             : requestData.type === 'magazine'
                               ? 'magazine'
-                              : requestData.type === 'tv'
-                                ? 'tv'
-                                : 'movie'
+                              : requestData.type === 'sports'
+                                ? 'sports'
+                                : requestData.type === 'tv'
+                                  ? 'tv'
+                                  : 'movie'
                     }
                     bookFormat={
                       requestData.type === 'book'
@@ -576,6 +597,8 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
   const comicId = request.type === 'comic' ? getComicId(request) : undefined;
   const magazineId =
     request.type === 'magazine' ? getMagazineId(request) : undefined;
+  const sportarrId =
+    request.type === 'sports' ? getSportarrId(request) : undefined;
   const url =
     request.type === 'movie'
       ? `/api/v1/movie/${request.media.tmdbId}`
@@ -589,7 +612,9 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
               ? `/api/v1/comic/${encodeApiPathSegment(comicId)}`
               : request.type === 'magazine' && magazineId
                 ? `/api/v1/magazine/${encodeApiPathSegment(magazineId)}`
-                : null;
+                : request.type === 'sports' && sportarrId
+                  ? `/api/v1/sportarr/${encodeApiPathSegment(sportarrId)}`
+                  : null;
   const { data: title, error } = useSWR<RequestItemTitle>(inView ? url : null);
   const { data: sonarrServers } = useSWR<ServiceCommonServer[]>(
     '/api/v1/service/sonarr'
@@ -791,7 +816,8 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
           request.type === 'music' ||
           request.type === 'book' ||
           request.type === 'comic' ||
-          request.type === 'magazine'
+          request.type === 'magazine' ||
+          request.type === 'sports'
             ? undefined
             : request.media.tmdbId
         }
@@ -799,6 +825,8 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
         bookId={request.type === 'book' ? bookId : undefined}
         comicId={request.type === 'comic' ? comicId : undefined}
         magazineTitle={magazineId}
+        sportarrLeagueId={sportarrId}
+        sportarrTitle={isSports(title) ? title.title : undefined}
         type={
           request.type === 'music'
             ? 'music'
@@ -808,9 +836,11 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                 ? 'comic'
                 : request.type === 'magazine'
                   ? 'magazine'
-                  : request.type === 'tv'
-                    ? 'tv'
-                    : 'movie'
+                  : request.type === 'sports'
+                    ? 'sports'
+                    : request.type === 'tv'
+                      ? 'tv'
+                      : 'movie'
         }
         is4k={request.is4k}
         editRequest={request}
@@ -825,6 +855,7 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
           !isBook(title) &&
           !isComic(title) &&
           !isMagazine(title) &&
+          !isSports(title) &&
           title.backdropPath && (
             <div className="absolute inset-0 z-0 w-full bg-cover bg-center xl:w-2/3">
               <CachedImage
@@ -857,13 +888,15 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                   (isMusic(title) ||
                     isBook(title) ||
                     isComic(title) ||
-                    isMagazine(title)) &&
+                    isMagazine(title) ||
+                    isSports(title)) &&
                   title.posterPath
                     ? title.posterPath
                     : !isMusic(title) &&
                         !isBook(title) &&
                         !isComic(title) &&
                         !isMagazine(title) &&
+                        !isSports(title) &&
                         title.posterPath
                       ? getTmdbPosterImageUrl(title.posterPath)
                       : '/images/seerr_poster_not_found.png'
@@ -899,7 +932,9 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                           ? title.startYear
                           : isMagazine(title)
                             ? title.latestIssue
-                            : title.firstAirDate
+                            : isSports(title)
+                              ? title.year?.toString()
+                              : title.firstAirDate
                   )?.slice(0, 4)}
                 </span>
               </div>
@@ -913,7 +948,7 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                     ? title.title
                     : isBook(title)
                       ? title.title
-                      : isComic(title) || isMagazine(title)
+                      : isComic(title) || isMagazine(title) || isSports(title)
                         ? title.title
                         : title.name}
               </Link>
@@ -925,6 +960,11 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
               {isMagazine(title) && title.latestIssue && (
                 <div className="mr-2 min-w-0 truncate text-sm text-gray-300">
                   {title.latestIssue}
+                </div>
+              )}
+              {isSports(title) && (title.sport || title.country) && (
+                <div className="mr-2 min-w-0 truncate text-sm text-gray-300">
+                  {[title.sport, title.country].filter(Boolean).join(' · ')}
                 </div>
               )}
               {!isMovie(title) &&
@@ -987,7 +1027,9 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                         ? title.title
                         : isBook(title)
                           ? title.title
-                          : isComic(title) || isMagazine(title)
+                          : isComic(title) ||
+                              isMagazine(title) ||
+                              isSports(title)
                             ? title.title
                             : title.name
                   }
@@ -1001,7 +1043,8 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                       : requestData.type === 'book'
                         ? undefined
                         : requestData.type === 'comic' ||
-                            requestData.type === 'magazine'
+                            requestData.type === 'magazine' ||
+                            requestData.type === 'sports'
                           ? undefined
                           : requestData.media.tmdbId
                   }
@@ -1017,7 +1060,9 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                         ? getComicId(requestData)
                         : requestData.type === 'magazine'
                           ? getMagazineId(requestData)
-                          : undefined
+                          : requestData.type === 'sports'
+                            ? getSportarrId(requestData)
+                            : undefined
                   }
                   mediaType={
                     requestData.type === 'music'
@@ -1028,9 +1073,11 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                           ? 'comic'
                           : requestData.type === 'magazine'
                             ? 'magazine'
-                            : requestData.type === 'tv'
-                              ? 'tv'
-                              : 'movie'
+                            : requestData.type === 'sports'
+                              ? 'sports'
+                              : requestData.type === 'tv'
+                                ? 'tv'
+                                : 'movie'
                   }
                   bookFormat={
                     requestData.type === 'book'

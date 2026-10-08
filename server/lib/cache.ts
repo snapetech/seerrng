@@ -6,6 +6,7 @@ export type AvailableCacheIds =
   | 'tmdbscan'
   | 'radarr'
   | 'sonarr'
+  | 'sportarr'
   | 'rt'
   | 'imdb'
   | 'github'
@@ -186,6 +187,7 @@ class CacheManager {
     }),
     radarr: new Cache('radarr', 'Radarr API', { maxKeys: RADARR_MAX_KEYS }),
     sonarr: new Cache('sonarr', 'Sonarr API', { maxKeys: SONARR_MAX_KEYS }),
+    sportarr: new Cache('sportarr', 'Sportarr API'),
     rt: new Cache('rt', 'Rotten Tomatoes API', {
       stdTtl: 43200,
       maxKeys: RT_MAX_KEYS,

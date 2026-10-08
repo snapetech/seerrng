@@ -12,6 +12,7 @@ export const PROWLARR_SEARCH_TYPE_BY_CATEGORY: Record<
 > = {
   movie: 'movie',
   tv: 'tvsearch',
+  sports: 'tvsearch',
   music: 'music',
   ebook: 'book',
   audiobook: 'book',
@@ -26,6 +27,7 @@ export const PROWLARR_SEARCH_TYPE_BY_CATEGORY: Record<
 export const DEFAULT_PROWLARR_CATEGORY_MAPPINGS: ProwlarrCategoryMappings = {
   movie: [2000],
   tv: [5000],
+  sports: [5060],
   music: [3000],
   ebook: [7020],
   audiobook: [3030],

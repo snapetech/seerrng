@@ -16,6 +16,7 @@ provider only for the media categories you want to request.
 | --- | --- | --- |
 | Movies | [Radarr](https://github.com/Radarr/Radarr) | Searches, imports, and tracks movie requests. |
 | TV | [Sonarr](https://github.com/Sonarr/Sonarr) | Searches, imports, and tracks series and episode requests. |
+| Sports leagues | [Sportarr](https://github.com/Sportarr/Sportarr) | Searches sports leagues and requests them using the configured quality profile and library defaults. |
 | Music | [Lidarr](https://github.com/Lidarr/Lidarr) | Searches, imports, and tracks artist and album requests. |
 | Books and audiobooks | [BookshelfNG](https://github.com/snapetech/bookshelfng) or [ChaptarrNG](https://github.com/snapetech/chaptarrng) | Recommended SeerrNG-compatible book managers. Either can serve both formats from one instance; add one SeerrNG service entry for each format. Other Readarr-compatible services may work, but do not provide the NG-specific behavior listed below. |
 | Comics | [BackIssue](https://backissue.app/), [Mylar3](https://github.com/mylar3/mylar3), or [Kapowarr](https://github.com/Casvt/Kapowarr) | Connect one or more supported comic services, then choose a default destination for requests. Mylar3, Kapowarr, and BackIssue use different search sources and download flows. |

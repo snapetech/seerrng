@@ -47,6 +47,7 @@ import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid';
 import { MediaStatus } from '@server/constants/media';
 import type { Watchlist } from '@server/entity/Watchlist';
 import type { AlbumResult, MediaType } from '@server/models/Search';
+import type { SportarrLibraryState } from '@server/models/Sportarr';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -95,6 +96,7 @@ interface TitleCardProps {
   showAllBookFormats?: boolean;
   availableQualities?: ('MP3' | 'FLAC')[];
   qualityStatuses?: AlbumResult['qualityStatuses'];
+  sportarrState?: SportarrLibraryState;
 }
 
 const messages = defineMessages('components.TitleCard', {
@@ -122,6 +124,13 @@ const messages = defineMessages('components.TitleCard', {
   magazineAvailableReason: 'This magazine is already available.',
   magazinePartiallyAvailableReason:
     'Some issues of this magazine are already available.',
+  sportarrMonitored: 'Monitored in Sportarr',
+  sportarrMonitoredReason: 'This league is already monitored in Sportarr.',
+  sportarrUnmonitored: 'Not monitored in Sportarr',
+  sportarrUnmonitoredReason:
+    'This league already exists in Sportarr but is not monitored. Enable it in Sportarr before requesting it here.',
+  sportarrRequested: 'Requested',
+  sportarrRequestedReason: 'This league already has an active request.',
 });
 
 const TitleCard = ({
@@ -157,6 +166,7 @@ const TitleCard = ({
   showAllBookFormats = false,
   availableQualities,
   qualityStatuses,
+  sportarrState,
 }: TitleCardProps) => {
   const isTouch = useIsTouch();
   const router = useRouter();
@@ -514,6 +524,7 @@ const TitleCard = ({
   const isBook = mediaType === 'book';
   const isComic = mediaType === 'comic';
   const isMagazine = mediaType === 'magazine';
+  const isSports = mediaType === 'sports';
   const canonicalId = normalizeExternalTitleId(mediaType, id);
   const artwork = useAlbumArtwork(
     isAlbum ? String(canonicalId) : undefined,
@@ -582,7 +593,12 @@ const TitleCard = ({
     }
   );
   const canUseRequestActions =
-    canUseVideoActions || isAlbum || isBook || isComic || isMagazine;
+    canUseVideoActions ||
+    isAlbum ||
+    isBook ||
+    isComic ||
+    isMagazine ||
+    isSports;
   const canUseWatchlistActions =
     canUseVideoActions || isAlbum || isBook || isComic || isMagazine;
   const detailHref =
@@ -607,7 +623,9 @@ const TitleCard = ({
                 ? `/comic/${encodeApiPathSegment(canonicalId)}`
                 : mediaType === 'magazine'
                   ? `/magazine/${encodeApiPathSegment(canonicalId)}`
-                  : `/artist/${encodeApiPathSegment(canonicalId)}`;
+                  : isSports
+                    ? `/sportarr/${encodeApiPathSegment(canonicalId)}`
+                    : `/artist/${encodeApiPathSegment(canonicalId)}`;
   const displayImage = getTmdbPosterImageUrl(artwork);
   const supplementalPoster = getTmdbPosterImageUrl(
     fallbackImage ?? posterFallbackDetails?.supplementalMetadata?.posterUrl
@@ -700,7 +718,9 @@ const TitleCard = ({
             ? Permission.REQUEST_COMIC
             : isMagazine
               ? Permission.REQUEST_MAGAZINE
-              : Permission.REQUEST_BOOK,
+              : isSports
+                ? Permission.REQUEST_SPORTS
+                : Permission.REQUEST_BOOK,
   ];
 
   if (mediaType === 'movie') {
@@ -735,11 +755,13 @@ const TitleCard = ({
       currentStatus4k === MediaStatus.DELETED);
   const canShowRequestButton =
     showRequestButton &&
-    (!currentStatus ||
-      currentStatus === MediaStatus.UNKNOWN ||
-      currentStatus === MediaStatus.DELETED ||
-      canRequestAdditionalFormat ||
-      canRequest4k);
+    (isSports
+      ? requestable
+      : !currentStatus ||
+        currentStatus === MediaStatus.UNKNOWN ||
+        currentStatus === MediaStatus.DELETED ||
+        canRequestAdditionalFormat ||
+        canRequest4k);
   const requestingAdditional4k =
     canRequest4k &&
     !!currentStatus &&
@@ -785,6 +807,28 @@ const TitleCard = ({
       return {
         label: intl.formatMessage(messages.magazineTracked),
         reason: intl.formatMessage(messages.magazineTrackedReason),
+      };
+    }
+    return undefined;
+  })();
+  const sportarrRequestState = (() => {
+    if (!isSports) return undefined;
+    if (sportarrState === 'monitored') {
+      return {
+        label: intl.formatMessage(messages.sportarrMonitored),
+        reason: intl.formatMessage(messages.sportarrMonitoredReason),
+      };
+    }
+    if (sportarrState === 'unmonitored') {
+      return {
+        label: intl.formatMessage(messages.sportarrUnmonitored),
+        reason: intl.formatMessage(messages.sportarrUnmonitoredReason),
+      };
+    }
+    if (sportarrState === 'requested') {
+      return {
+        label: intl.formatMessage(messages.sportarrRequested),
+        reason: intl.formatMessage(messages.sportarrRequestedReason),
       };
     }
     return undefined;
@@ -934,6 +978,17 @@ const TitleCard = ({
               magazineTitle={canonicalId}
               show={showRequestModal}
               type="magazine"
+              onComplete={requestComplete}
+              onUpdating={requestUpdating}
+              onCancel={closeModal}
+            />
+          )}
+          {isSports && typeof canonicalId === 'string' && (
+            <RequestModal
+              sportarrLeagueId={canonicalId}
+              sportarrTitle={title}
+              show={showRequestModal}
+              type="sports"
               onComplete={requestComplete}
               onUpdating={requestUpdating}
               onCancel={closeModal}
@@ -1191,7 +1246,17 @@ const TitleCard = ({
               </Link>
 
               <div data-poster-region="actions">
-                {magazineRequestState && showFullDetailOverlay ? (
+                {sportarrRequestState && showFullDetailOverlay ? (
+                  <Button
+                    buttonType="default"
+                    buttonSize="sm"
+                    disabled
+                    disabledReason={sportarrRequestState.reason}
+                    aria-label={sportarrRequestState.label}
+                  >
+                    <span>{sportarrRequestState.label}</span>
+                  </Button>
+                ) : magazineRequestState && showFullDetailOverlay ? (
                   <Button
                     buttonType="default"
                     buttonSize="sm"

@@ -32,6 +32,7 @@ import type {
   PersonResult,
   TvResult,
 } from '@server/models/Search';
+import type { SportarrResult } from '@server/models/Sportarr';
 import { useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { twMerge } from 'tailwind-merge';
@@ -48,6 +49,7 @@ type ListViewProps = {
     | AuthorResult
     | ComicResult
     | MagazineResult
+    | SportarrResult
   )[];
   plexItems?: WatchlistItem[];
   isEmpty?: boolean;
@@ -103,6 +105,7 @@ const ListView = ({
               | BookResult
               | ComicResult
               | MagazineResult
+              | SportarrResult
           ).mediaInfo?.status !== MediaStatus.BLOCKLISTED
       ),
     [items, canManageBlocklist, currentSettings.hideBlocklisted]
@@ -215,6 +218,25 @@ const ListView = ({
                 inProgress4k={
                   (title.mediaInfo?.downloadStatus4k ?? []).length > 0
                 }
+                canExpand
+                showText={visibility.tv === 'always'}
+              />
+            );
+            break;
+          case 'sports':
+            titleCard = (
+              <TitleCard
+                titleWeight={posterTitleWeight}
+                key={title.id}
+                id={title.id}
+                image={title.posterPath}
+                summary={title.overview}
+                title={title.title}
+                year={title.year ? String(title.year) : undefined}
+                mediaType={title.mediaType}
+                status={title.mediaInfo?.status}
+                requestable={title.requestable}
+                sportarrState={title.libraryState}
                 canExpand
                 showText={visibility.tv === 'always'}
               />

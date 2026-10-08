@@ -9,6 +9,7 @@ import type {
   RadarrSettings,
   ReadarrSettings,
   SonarrSettings,
+  SportarrSettings,
 } from '@server/lib/settings';
 import {
   normalizeServiceHostname,
@@ -443,6 +444,50 @@ export const parseSonarrSettings = (
       animeTags: animeTags.value,
       enableSeasonFolders: enableSeasonFolders.value,
       monitorNewItems,
+    },
+  };
+};
+
+export const parseSportarrSettings = (
+  body: unknown,
+  current?: SportarrSettings
+): { value: SportarrSettings } | { error: string } => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { error: 'settings must be an object.' };
+  }
+
+  const settings = body as Partial<SportarrSettings>;
+  const connection = parseServarrConnectionSettings(body);
+  if ('error' in connection) return connection;
+
+  const name = parseRequiredServiceString(settings.name, 'name');
+  if ('error' in name) return name;
+  const activeProfileId = parseOptionalNonNegativeInteger(
+    settings.activeProfileId,
+    MAX_SERVICE_ID
+  );
+  if (activeProfileId === undefined || activeProfileId < 1) {
+    return { error: 'activeProfileId is invalid.' };
+  }
+  const activeProfileName = parseRequiredServiceString(
+    settings.activeProfileName,
+    'activeProfileName'
+  );
+  if ('error' in activeProfileName) return activeProfileName;
+  const isDefault = parseServiceBoolean(settings.isDefault, 'isDefault');
+  if ('error' in isDefault) return isDefault;
+  const externalUrl = parseOptionalExternalUrl(settings.externalUrl);
+  if ('error' in externalUrl) return externalUrl;
+
+  return {
+    value: {
+      id: current?.id ?? 0,
+      name: name.value,
+      ...connection.value,
+      activeProfileId,
+      activeProfileName: activeProfileName.value,
+      isDefault: isDefault.value,
+      externalUrl: externalUrl.value,
     },
   };
 };

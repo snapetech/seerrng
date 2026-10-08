@@ -1,6 +1,7 @@
 const categoryMappings = {
   movie: [2000],
   tv: [5000],
+  sports: [5060],
   music: [3000],
   ebook: [7000],
   audiobook: [3030],

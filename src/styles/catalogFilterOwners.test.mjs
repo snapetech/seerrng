@@ -382,7 +382,7 @@ const verifyLegacyRequestControls = (source) => {
     [
       1,
       'effectiveMediaType',
-      ['all', 'movie', 'tv', 'music', 'book'],
+      ['all', 'movie', 'tv', 'music', 'book', 'sports'],
       'setCurrentMediaType',
     ],
     [2, 'currentSort', ['added', 'modified'], 'setCurrentSort'],

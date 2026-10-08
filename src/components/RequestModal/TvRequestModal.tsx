@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
+import { getMediaServerName } from '@app/components/Common/MediaServerIcon';
 import Modal from '@app/components/Common/Modal';
 import MediaQualitySelect from '@app/components/MediaDetails/MediaQualitySelect';
 import AdvancedOptionsDisclosureButton from '@app/components/RequestModal/AdvancedOptionsDisclosureButton';
@@ -47,7 +48,7 @@ import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import { Permission, hasAutoApprovePermission } from '@server/lib/permissions';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 
@@ -94,7 +95,26 @@ const messages = defineMessages('components.RequestModal', {
   quality: 'Quality',
   watchAheadLabel: 'Episode Queue',
   watchAheadDescription:
-    'Off by default. Follows your linked playback and keeps this many upcoming episodes requested. Uses 1 request. Turning it off stops future additions, not existing requests.',
+    'Off by default. Choose one starting episode. When linked playback reaches 90%, SeerrNG asks Sonarr to keep this many upcoming episodes requested. Sonarr controls download timing. Turning the queue off stops future additions; episodes already requested stay in place.',
+  watchAheadEditDescription:
+    'This changes future episode queueing only. Your current request selections and episodes already requested stay in place.',
+  watchAheadUnavailableServer:
+    'Episode Queue needs Plex, Jellyfin, or Emby playback tracking.',
+  watchAheadUnavailableLink:
+    'Link your {mediaServer} account to SeerrNG so it can match your playback to this request.',
+  watchAheadUnavailableIdentity:
+    'Episode Queue needs a TVDB match for this series before it can connect playback to Sonarr.',
+  watchAheadUnavailablePermission:
+    'You need permission to request the selected TV quality to use Episode Queue.',
+  watchAheadUnavailableSonarr:
+    'Choose or configure a Sonarr server for the selected TV quality to use Episode Queue.',
+  watchAheadUnavailableOwner:
+    'Episode Queue follows the signed-in request owner’s playback, so it is available when you request for yourself.',
+  watchAheadLearnMore: 'How Episode Queue works',
+  watchAheadLinkAccount: 'Link account',
+  watchAheadStartingEpisode:
+    'Choose one episode to request first. As you watch, SeerrNG maintains the selected buffer of upcoming episodes in Sonarr.',
+  watchAheadEditOnly: 'Update future queueing',
   watchAheadOff: 'Off',
   watchAheadEpisodeOption:
     '{count, plural, one {# episode} other {# episodes}}',
@@ -138,6 +158,9 @@ const TvRequestModal = ({
   >(editRequest ? editingSeasonSelections : []);
   const [watchAheadEpisodeCount, setWatchAheadEpisodeCount] = useState(
     editRequest?.watchAheadEpisodeCount ?? 0
+  );
+  const selectionBeforeWatchAhead = useRef<SeasonEpisodeSelection[] | null>(
+    null
   );
   const [initializedSelectionKey, setInitializedSelectionKey] = useState('');
   const [requestTreeReady, setRequestTreeReady] = useState(false);
@@ -213,6 +236,50 @@ const TvRequestModal = ({
     Boolean(selectedService ?? fallbackService) &&
     isWatchAheadRequestForCurrentUser &&
     !editRequest?.watchAheadParentRequestId;
+  const watchAheadMediaServerName = getMediaServerName(
+    settings.currentSettings.mediaServerType
+  );
+  const needsWatchAheadAccountLink =
+    Boolean(watchAheadMediaServerName) &&
+    isWatchAheadRequestForCurrentUser &&
+    !hasLinkedWatchAheadAccount(user, settings.currentSettings.mediaServerType);
+  const watchAheadCardVisible =
+    !editRequest ||
+    (editRequest.requestedBy.id === user?.id &&
+      !editRequest.watchAheadParentRequestId);
+  const watchAheadUnavailableMessage = (() => {
+    if (!watchAheadMediaServerName) {
+      return intl.formatMessage(messages.watchAheadUnavailableServer);
+    }
+    if (!isWatchAheadRequestForCurrentUser) {
+      return intl.formatMessage(messages.watchAheadUnavailableOwner);
+    }
+    if (needsWatchAheadAccountLink) {
+      return intl.formatMessage(messages.watchAheadUnavailableLink, {
+        mediaServer: watchAheadMediaServerName,
+      });
+    }
+    if (
+      !Number.isSafeInteger(Number(watchAheadTvdbId)) ||
+      Number(watchAheadTvdbId) <= 0
+    ) {
+      return intl.formatMessage(messages.watchAheadUnavailableIdentity);
+    }
+    if (
+      !hasPermission(
+        effectiveIs4k
+          ? [Permission.REQUEST_4K, Permission.REQUEST_4K_TV]
+          : [Permission.REQUEST, Permission.REQUEST_TV],
+        { type: 'or' }
+      )
+    ) {
+      return intl.formatMessage(messages.watchAheadUnavailablePermission);
+    }
+    if (!selectedService && !fallbackService) {
+      return intl.formatMessage(messages.watchAheadUnavailableSonarr);
+    }
+    return undefined;
+  })();
   const selectedDestination = useMemo(
     () =>
       createRequestDestination(
@@ -326,10 +393,7 @@ const TvRequestModal = ({
       return;
     }
 
-    if (
-      settings.currentSettings.partialRequestsEnabled &&
-      selectedSeasons.length === 0
-    ) {
+    if (usesEpisodeSelection && selectedSeasons.length === 0) {
       return;
     }
 
@@ -356,14 +420,14 @@ const TvRequestModal = ({
         mediaType: 'tv',
         is4k: effectiveIs4k,
         ignoreQuota: requestOverrides?.ignoreQuota,
-        seasons: settings.currentSettings.partialRequestsEnabled
+        seasons: usesEpisodeSelection
           ? requestableSelections
               .map((selection) => selection.seasonNumber)
               .sort((a, b) => a - b)
           : getAllSeasons().filter(
               (season) => !getAllRequestedSeasons().includes(season)
             ),
-        seasonRequests: settings.currentSettings.partialRequestsEnabled
+        seasonRequests: usesEpisodeSelection
           ? requestableSelections
           : undefined,
         ...(isWatchAheadRequestForCurrentUser
@@ -525,11 +589,37 @@ const TvRequestModal = ({
   const unrequestedSeasons = getAllSeasons().filter(
     (season) => !getAllRequestedSeasons().includes(season)
   );
+  const changeWatchAheadEpisodeCount = (nextCount: number) => {
+    if (!editRequest && watchAheadEpisodeCount === 0 && nextCount > 0) {
+      const currentNormalSelection: SeasonEpisodeSelection[] = settings
+        .currentSettings.partialRequestsEnabled
+        ? seasonSelections
+        : unrequestedSeasons.map((seasonNumber) => ({ seasonNumber }));
+      selectionBeforeWatchAhead.current = currentNormalSelection.map(
+        (selection) => ({
+          seasonNumber: selection.seasonNumber,
+          ...(selection.episodeNumbers
+            ? { episodeNumbers: [...selection.episodeNumbers] }
+            : {}),
+        })
+      );
+      setSeasonSelections(currentNormalSelection);
+    } else if (!editRequest && watchAheadEpisodeCount > 0 && nextCount === 0) {
+      if (selectionBeforeWatchAhead.current) {
+        setSeasonSelections(selectionBeforeWatchAhead.current);
+      }
+      selectionBeforeWatchAhead.current = null;
+    }
+    setWatchAheadEpisodeCount(nextCount);
+  };
+  const usesEpisodeSelection =
+    settings.currentSettings.partialRequestsEnabled ||
+    watchAheadEpisodeCount > 0;
   const blockedEpisodesBySeason = mergeEpisodeNumbersBySeason(
     availableEpisodesBySeason,
     getAllRequestedEpisodes()
   );
-  const requestSelections = settings.currentSettings.partialRequestsEnabled
+  const requestSelections = usesEpisodeSelection
     ? seasonSelections
     : unrequestedSeasons.map((seasonNumber) => ({ seasonNumber }));
   const requestableSelections = getRequestableTvSelections(
@@ -548,16 +638,12 @@ const TvRequestModal = ({
     !requestOverrides?.ignoreQuota &&
     unrequestedSeasons.length > (quota.tv.remaining ?? 0);
   const requestDisabledReason =
-    settings.currentSettings.partialRequestsEnabled &&
-    !requestTreeReady &&
-    selectedSeasons.length > 0
+    usesEpisodeSelection && !requestTreeReady && selectedSeasons.length > 0
       ? intl.formatMessage(messages.episodesLoading)
-      : partialQuotaExceeded ||
-          (!settings.currentSettings.partialRequestsEnabled &&
-            fullQuotaExceeded)
+      : partialQuotaExceeded || (!usesEpisodeSelection && fullQuotaExceeded)
         ? intl.formatMessage(messages.requestQuotaExceeded)
         : requestableSelections.length === 0
-          ? settings.currentSettings.partialRequestsEnabled &&
+          ? usesEpisodeSelection &&
             seasonSelections.length === 0 &&
             unrequestedSeasons.length > 0
             ? intl.formatMessage(messages.selectUnavailableItemsToRequest)
@@ -673,14 +759,12 @@ const TvRequestModal = ({
         : intl.formatMessage(messages.edit)
     : intl.formatMessage(globalMessages.request);
   const requestDisabled = editRequest
-    ? settings.currentSettings.partialRequestsEnabled &&
-      selectedSeasons.length > 0 &&
-      !requestTreeReady
-    : (settings.currentSettings.partialRequestsEnabled && !requestTreeReady) ||
+    ? usesEpisodeSelection && selectedSeasons.length > 0 && !requestTreeReady
+    : (usesEpisodeSelection && !requestTreeReady) ||
       selectedDestinationCovered ||
       requestableSelections.length === 0 ||
       partialQuotaExceeded ||
-      (!settings.currentSettings.partialRequestsEnabled && fullQuotaExceeded);
+      (!usesEpisodeSelection && fullQuotaExceeded);
   const closeAction = tvdbId ? () => setSearchModal({ show: true }) : onCancel;
   const submitAction = () =>
     editRequest
@@ -901,7 +985,7 @@ const TvRequestModal = ({
         </div>
 
         <div className="request-selection-layout">
-          {settings.currentSettings.partialRequestsEnabled && data && (
+          {usesEpisodeSelection && data && (
             <RequestSeasonEpisodeTree
               key={requestSelectionKey}
               tvId={data.id}
@@ -910,6 +994,11 @@ const TvRequestModal = ({
               disabledSeasons={getAllRequestedSeasons()}
               disabledEpisodes={blockedEpisodesBySeason}
               availableEpisodesBySeason={availableEpisodesBySeason}
+              selectionMode={
+                watchAheadEpisodeCount > 0 && !editRequest
+                  ? 'single-episode'
+                  : 'multiple'
+              }
               onReadyChange={setRequestTreeReady}
               onSelectionsChange={(nextSelections) => {
                 const allowedSelections =
@@ -945,7 +1034,7 @@ const TvRequestModal = ({
                 purpose="request"
               />
             )}
-            {canConfigureWatchAhead && (
+            {watchAheadCardVisible && (
               <div className="app-card-inset refreshed-inset-surface detail-item-padded request-episode-queue">
                 <RequestListboxControl
                   id="tv-watch-ahead-count"
@@ -956,22 +1045,65 @@ const TvRequestModal = ({
                       value: 0,
                       label: intl.formatMessage(messages.watchAheadOff),
                     },
-                    ...[1, 2, 3, 4, 5].map((count) => ({
+                    ...(canConfigureWatchAhead
+                      ? [1, 2, 3, 4, 5]
+                      : watchAheadEpisodeCount > 0
+                        ? [watchAheadEpisodeCount]
+                        : []
+                    ).map((count) => ({
                       value: count,
                       label: intl.formatMessage(
                         messages.watchAheadEpisodeOption,
-                        {
-                          count,
-                        }
+                        { count }
                       ),
                     })),
                   ]}
-                  onChange={setWatchAheadEpisodeCount}
+                  onChange={changeWatchAheadEpisodeCount}
+                  disabled={
+                    !canConfigureWatchAhead && watchAheadEpisodeCount === 0
+                  }
                   loadingLabel={intl.formatMessage(messages.watchAheadOff)}
                 />
                 <p className="request-episode-queue-description refreshed-detail-text-muted">
-                  {intl.formatMessage(messages.watchAheadDescription)}
+                  {intl.formatMessage(
+                    editRequest
+                      ? messages.watchAheadEditDescription
+                      : messages.watchAheadDescription
+                  )}
                 </p>
+                {!editRequest && watchAheadEpisodeCount > 0 && (
+                  <p className="request-episode-queue-description refreshed-detail-text-muted">
+                    {intl.formatMessage(messages.watchAheadStartingEpisode)}
+                  </p>
+                )}
+                {watchAheadUnavailableMessage && (
+                  <p
+                    className="request-episode-queue-description refreshed-detail-text-muted"
+                    role="status"
+                  >
+                    {watchAheadUnavailableMessage}
+                  </p>
+                )}
+                {needsWatchAheadAccountLink && (
+                  <Button
+                    as="a"
+                    href="/profile/settings/linked-accounts"
+                    buttonType="ghost"
+                    buttonSize="sm"
+                  >
+                    {intl.formatMessage(messages.watchAheadLinkAccount)}
+                  </Button>
+                )}
+                <Button
+                  as="a"
+                  href="https://github.com/snapetech/seerrng/blob/main/docs/using-seerr/jellyfin-watch-ahead.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  buttonType="ghost"
+                  buttonSize="sm"
+                >
+                  {intl.formatMessage(messages.watchAheadLearnMore)}
+                </Button>
               </div>
             )}
           </div>
