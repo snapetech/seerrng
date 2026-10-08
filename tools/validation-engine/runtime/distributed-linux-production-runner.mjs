@@ -8,7 +8,6 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
   realpathSync,
   unlinkSync,
   writeFileSync,
@@ -51,6 +50,7 @@ import { reconcileDistributedLinuxRunEvidence } from './distributed-linux-run-re
 import { executeDistributedLinuxStagedValidation } from './distributed-linux-staged-bridge.mjs';
 import { createNativeStageContext } from './native-stage-context.mjs';
 import { canonicalJsonSha256 } from './run-scoped-ledger.mjs';
+import { readStableOrdinaryFileSync } from './stable-file-read.mjs';
 
 const HASH64 = /^[a-f0-9]{64}$/u;
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -253,17 +253,7 @@ function writeDurableEvidenceFile(path, bytesValue) {
 }
 
 function readEvidenceFile(path) {
-  const before = lstatSync(path);
-  if (!before.isFile() || before.isSymbolicLink())
-    throw new Error(`Evidence is not a regular file: ${basename(path)}`);
-  const bytes = readFileSync(path);
-  const after = lstatSync(path);
-  for (const field of ['dev', 'ino', 'mode', 'size', 'mtimeMs', 'ctimeMs'])
-    if (before[field] !== after[field])
-      throw new Error(`Evidence changed while it was read: ${basename(path)}`);
-  if (bytes.length !== after.size)
-    throw new Error(`Evidence byte count changed: ${basename(path)}`);
-  return bytes;
+  return readStableOrdinaryFileSync(path, 'Evidence').bytes;
 }
 
 function dependencies(overrides) {

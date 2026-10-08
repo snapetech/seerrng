@@ -1,7 +1,7 @@
 // Copyright (c) snapetech and SeerrNG contributors.
 // Independent disk-only reconciliation for one production Linux Mode 3 run.
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -20,6 +20,7 @@ import {
 } from './distributed-native-adapter.mjs';
 import { verifyDistributedShardRun } from './distributed-shard-executor.mjs';
 import { canonicalJsonSha256 } from './run-scoped-ledger.mjs';
+import { readStableOrdinaryFileSync } from './stable-file-read.mjs';
 
 const HASH64 = /^[a-f0-9]{64}$/u;
 const GIT_OBJECT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
@@ -226,39 +227,28 @@ function readStableEvidenceFile({
     samePath(dirname(absolute), evidenceRoot),
     `${role} evidence path is stale or outside the current evidence directory`
   );
-  let before;
+  let file;
   try {
-    before = lstatSync(absolute);
+    file = readStableOrdinaryFileSync(absolute, `${role} evidence`, {
+      maxBytes: FILE_LIMITS[role],
+      requireCanonicalPath: true,
+    });
   } catch (error) {
-    fail(`${role} evidence file is missing: ${error.message}`);
+    if (error?.code === 'ENOENT')
+      fail(`${role} evidence file is missing: ${error.message}`);
+    fail(`${role} evidence could not be read safely: ${error.message}`);
   }
+  const { bytes, metadata } = file;
   assert(
-    before.isFile() && !before.isSymbolicLink(),
-    `${role} evidence is not an ordinary file`
-  );
-  assert(
-    samePath(realpathSync(absolute), absolute),
-    `${role} evidence path resolves through an untrusted link`
-  );
-  assert(
-    before.size > 0 && before.size <= FILE_LIMITS[role],
+    metadata.size > 0 && metadata.size <= FILE_LIMITS[role],
     `${role} evidence exceeds its bounded size`
   );
   if (evidenceRootBirthtimeMs > 0)
     assert(
-      before.mtimeMs + STALE_TIMESTAMP_TOLERANCE_MS >= evidenceRootBirthtimeMs,
+      metadata.mtimeMs + STALE_TIMESTAMP_TOLERANCE_MS >=
+        evidenceRootBirthtimeMs,
       `${role} evidence is stale for this run directory`
     );
-  const first = readFileSync(absolute);
-  const middle = lstatSync(absolute);
-  const second = readFileSync(absolute);
-  const after = lstatSync(absolute);
-  assert(
-    isDeepStrictEqual(metadataIdentity(before), metadataIdentity(middle)) &&
-      isDeepStrictEqual(metadataIdentity(middle), metadataIdentity(after)) &&
-      first.equals(second),
-    `${role} evidence changed while it was read`
-  );
   const relativePath = relative(evidenceRoot, absolute).split(sep).join('/');
   assert(
     relativePath.length > 0 &&
@@ -270,9 +260,9 @@ function readStableEvidenceFile({
     role,
     absolute,
     relativePath,
-    bytes: first,
-    metadata: metadataIdentity(after),
-    sha256: sha256(first),
+    bytes,
+    metadata: metadataIdentity(metadata),
+    sha256: sha256(bytes),
   };
 }
 
@@ -341,19 +331,21 @@ function createEvidenceReader(value) {
   };
   const assertStable = () => {
     for (const entry of entries.values()) {
-      const metadata = lstatSync(entry.absolute);
+      let reread;
+      try {
+        reread = readStableOrdinaryFileSync(
+          entry.absolute,
+          `${entry.role} evidence`,
+          { maxBytes: FILE_LIMITS[entry.role], requireCanonicalPath: true }
+        );
+      } catch {
+        fail(`${entry.role} evidence changed before reconciliation completed`);
+      }
       assert(
-        metadata.isFile() &&
-          !metadata.isSymbolicLink() &&
-          samePath(realpathSync(entry.absolute), entry.absolute) &&
-          isDeepStrictEqual(metadataIdentity(metadata), entry.metadata),
-        `${entry.role} evidence changed before reconciliation completed`
-      );
-      const reread = readFileSync(entry.absolute);
-      assert(
-        reread.length === entry.bytes.length &&
-          sha256(reread) === entry.sha256 &&
-          reread.equals(entry.bytes),
+        isDeepStrictEqual(metadataIdentity(reread.metadata), entry.metadata) &&
+          reread.bytes.length === entry.bytes.length &&
+          sha256(reread.bytes) === entry.sha256 &&
+          reread.bytes.equals(entry.bytes),
         `${entry.role} evidence changed before reconciliation completed`
       );
     }

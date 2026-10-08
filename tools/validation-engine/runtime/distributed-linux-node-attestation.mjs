@@ -101,15 +101,19 @@ function sameFile(left, right) {
 }
 
 async function hashOrdinaryFile(filePath, label) {
-  const before = await lstat(filePath);
-  if (!before.isFile() || before.isSymbolicLink())
-    throw new Error(`${label} must be an ordinary nonsymlink file`);
   const noFollow =
     process.platform === 'win32' ? 0 : (constants.O_NOFOLLOW ?? 0);
   const handle = await open(filePath, constants.O_RDONLY | noFollow);
   try {
     const opened = await handle.stat();
-    if (!opened.isFile() || !sameFile(before, opened))
+    if (!opened.isFile())
+      throw new Error(`${label} must be an ordinary nonsymlink file`);
+    const current = await lstat(filePath);
+    if (
+      !current.isFile() ||
+      current.isSymbolicLink() ||
+      !sameFile(current, opened)
+    )
       throw new Error(`${label} changed while being opened`);
     const hash = createHash('sha256');
     const buffer = Buffer.allocUnsafe(READ_BUFFER_BYTES);
@@ -127,7 +131,12 @@ async function hashOrdinaryFile(filePath, label) {
     }
     const closedOver = await handle.stat();
     const after = await lstat(filePath);
-    if (!sameFile(opened, closedOver) || !sameFile(opened, after))
+    if (
+      !sameFile(opened, closedOver) ||
+      !after.isFile() ||
+      after.isSymbolicLink() ||
+      !sameFile(opened, after)
+    )
       throw new Error(`${label} changed while being read`);
     return Object.freeze({ bytes: opened.size, sha256: hash.digest('hex') });
   } finally {

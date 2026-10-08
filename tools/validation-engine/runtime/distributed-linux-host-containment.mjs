@@ -1702,15 +1702,16 @@ function containsExactEnvironment(actual, expected) {
 }
 
 function verifyLocalVolume(volume, expectedName) {
+  if (volume?.Name !== expectedName)
+    throw new Error(`Exact local volume differs: ${expectedName}`);
+  const options =
+    volume.Options === null
+      ? null
+      : plainObject(volume.Options, 'local volume options');
   if (
-    volume?.Name !== expectedName ||
     volume.Driver !== 'local' ||
     volume.Scope !== 'local' ||
-    !(
-      volume.Options === null ||
-      (plainObject(volume.Options, 'local volume options') &&
-        Object.keys(volume.Options).length === 0)
-    ) ||
+    (options !== null && Object.keys(options).length !== 0) ||
     typeof volume.Mountpoint !== 'string' ||
     !path.isAbsolute(volume.Mountpoint) ||
     path.normalize(volume.Mountpoint) !== volume.Mountpoint ||

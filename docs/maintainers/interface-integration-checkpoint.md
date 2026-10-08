@@ -1052,3 +1052,28 @@ pending on the final checkpoint commit. No local production build, live
 provider round trip, or new manual visual inspection was performed. Those
 evidence limits are reported separately; explicit maintainer direction to
 merge and release removes a separate human sign-off gate.
+
+### Follow-up build and CodeQL repair — October 8, 2026
+
+The first hosted run on the integration checkpoint failed its app build because
+the merged `SoftwareProviderCapabilities` interface declared `datCatalog` twice.
+The duplicate declaration is removed. The same scan identified an additional
+open alert, #538, in `distributed-linux-management.mjs`; together with the
+previously listed findings, the current default-branch scan has 12 open alerts.
+
+The file-system-race findings (#538–#545) shared a check-then-read pattern. The
+affected evidence readers now read from a pinned descriptor and reject a path
+that no longer identifies the opened file. Configuration, marker and runner
+attestation readers validate the descriptor and path after opening. A focused
+regression test reproduced a symlink replacement that made the old pattern
+return attacker-controlled bytes while the original path identity was restored;
+the new reader detects the same swap. The CodeQL trivial conditional and
+unreachable duplicate-plan guard were also corrected, with a TAP regression
+test proving duplicate plans remain rejected. The race test is registered in
+the portable tooling suite.
+
+Focused checks passed: 157 tests, one expected platform-specific skip, and no
+failures. The first hosted run passed the unit shard and release-note contract
+but failed the app build due to the duplicate type declaration. A fresh hosted
+run on the corrected and hardened candidate is required before merging. No local
+production build was run.

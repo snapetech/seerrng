@@ -31,6 +31,7 @@ const portableTests = [
   'bin/engine-pr-check-stages.test.mjs',
   'bin/engine-native-stage-context.test.mjs',
   'bin/engine-native-accounting.test.mjs',
+  'bin/engine-stable-file-read.test.mjs',
   'bin/engine-native-process-ledger.test.mjs',
   'bin/engine-workflow-triggers.test.mjs',
   'bin/engine-github-binding.test.mjs',

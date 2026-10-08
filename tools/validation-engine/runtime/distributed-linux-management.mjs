@@ -192,23 +192,19 @@ function syncParentDirectory(filePath) {
 }
 
 function readActiveConfigMarkerText(markerPath) {
-  const before = lstatSync(markerPath);
-  assertOrdinaryFile(before, 'Active config marker');
-  assertPrivateMode(before, 'Active config marker');
-  if (before.size > MAX_ACTIVE_CONFIG_MARKER_BYTES)
-    throw new Error('Active config marker exceeds its safe size limit');
-
   const noFollow =
     process.platform === 'win32' ? 0 : (constants.O_NOFOLLOW ?? 0);
   const descriptor = openSync(markerPath, constants.O_RDONLY | noFollow);
   try {
     const opened = fstatSync(descriptor);
-    if (!sameFile(before, opened))
-      throw new Error('Active config marker changed while it was opened');
     assertOrdinaryFile(opened, 'Active config marker');
     assertPrivateMode(opened, 'Active config marker');
     if (opened.size > MAX_ACTIVE_CONFIG_MARKER_BYTES)
       throw new Error('Active config marker exceeds its safe size limit');
+    const current = lstatSync(markerPath);
+    assertOrdinaryFile(current, 'Active config marker');
+    if (!sameFile(opened, current))
+      throw new Error('Active config marker changed while it was opened');
     const text = readFileSync(descriptor, 'utf8');
     const after = fstatSync(descriptor);
     if (
@@ -217,8 +213,8 @@ function readActiveConfigMarkerText(markerPath) {
       opened.mtimeMs !== after.mtimeMs
     )
       throw new Error('Active config marker changed while it was read');
-    const current = lstatSync(markerPath);
-    if (!sameFile(opened, current))
+    const afterPath = lstatSync(markerPath);
+    if (!sameFile(opened, afterPath))
       throw new Error('Active config marker was replaced while it was read');
     return text;
   } finally {

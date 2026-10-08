@@ -46,3 +46,45 @@ untrusted destination from the request being handled.
   sends the token rather than the password. Replacing MD5 here would break the
   protocol; the [Subsonic API authentication specification](https://www.subsonic.org/pages/api.jsp)
   defines this calculation.
+
+## October 8 follow-up scan and corrections
+
+A later scan of the default branch at `42397ee61d496337134106ef341a7d8b45ff412b`
+reported 12 open alerts: **#538–#546, #548, #481, and #485**. The changes below
+are on the integration candidate and remain open in GitHub until the candidate
+reaches `main` and CodeQL refreshes its analysis.
+
+- **#548 — `CVE-2026-94483`**. The workspace override had kept resolving Next.js
+  to vulnerable `16.3.6` after the package manifest was changed. Both the
+  override and lockfile now resolve to `16.3.8`, the fixed version. A release
+  note records the update.
+- **#541–#545 and #538–#540 — `js/file-system-race`**. Several Mode 3 paths
+  checked file metadata and later reopened the path to read evidence, profiles,
+  or configuration. A replacement between those operations could redirect the
+  read. Evidence reads now pin an ordinary file descriptor, verify that the
+  path still names that object, read only the opened file within its recorded
+  size, and compare descriptor metadata before and after. Configuration,
+  active-marker, and runner-attestation readers likewise open first and then
+  validate the opened object and current path before consuming it. Regression
+  coverage swaps in a symlink between the old check and read: the old pattern
+  returns the symlink target while preserving the original path identity; the
+  descriptor reader detects the swap and rejects it.
+- **#546 — `js/trivial-conditional`**. Local volume options were validated for
+  type inside a boolean `&&` whose object result was always truthy. Validation
+  now produces an explicit options value before checking for an empty object.
+- **#485 — `js/unneeded-defensive-code`**. The duplicate-plan guard ran after a
+  parser branch that always exits at the first level plan, so the guard could
+  never fire. It was removed; a second plan is still rejected as unexpected
+  trailing TAP structure, now covered by a regression test.
+- **#481 — `js/missing-rate-limiting`**. The alert points to the Game Library
+  test app mount. Production already applies a per-user 120-request/minute
+  router limit and preserves a 4-request/minute Steam sync limit. Keep this
+  alert open until the default-branch reanalysis confirms the route is covered.
+
+Focused verification on the candidate passed 157 tests across evidence
+reconciliation, Node attestation, native TAP accounting, config management,
+public lifecycle, production runner, and host containment; one platform-specific
+case was skipped. The dedicated race reproduction passed. The first hosted
+build also exposed a duplicate `datCatalog` declaration introduced while
+reconciling the software-provider contract; that duplicate has been removed.
+The new hosted run must verify the corrected build and re-evaluate CodeQL.
