@@ -19,8 +19,10 @@ import xml2js from 'xml2js';
 
 export const MAX_EXTERNAL_REQUEST_LISTS_PER_USER = 10;
 export const MAX_EXTERNAL_REQUEST_LIST_ITEMS = 100;
+export const MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE = 100;
 
-export type ExternalRequestListProvider = 'imdb' | 'goodreads' | 'hardcover';
+export type ExternalRequestListProvider =
+  'imdb' | 'imdb-csv' | 'goodreads' | 'hardcover';
 
 export type ParsedExternalRequestListUrl = {
   provider: ExternalRequestListProvider;
@@ -251,8 +253,11 @@ class PublicListApi extends ExternalAPI {
     );
   }
 
-  public fetchHtml(endpoint: string): Promise<string> {
-    return this.get<string>(endpoint, {}, 0);
+  public async fetchHtml(
+    endpoint: string
+  ): Promise<{ body: string; status: number }> {
+    const response = await this.request<string>('GET', endpoint);
+    return { body: response.data, status: response.status };
   }
 
   public fetchXml(endpoint: string): Promise<string> {
@@ -260,9 +265,20 @@ class PublicListApi extends ExternalAPI {
   }
 }
 
+const imdbAutomatedAccessError = () =>
+  new Error(
+    'IMDb returned an automated access verification page instead of the watchlist. Confirm the list is public. If IMDb continues to block server-side sync, export the watchlist CSV from IMDb and import it here.'
+  );
+
 export const parseImdbWatchlistHtml = (
   html: string
 ): ExternalRequestListItem[] => {
+  if (
+    /awswaf\.com|awsWafCookieDomainList|AwsWafIntegration|gokuProps/i.test(html)
+  ) {
+    throw imdbAutomatedAccessError();
+  }
+
   const matches = html.matchAll(/\/title\/(tt[0-9]{5,20})(?:[/?#"\\])/g);
   const seen = new Set<string>();
   const items: ExternalRequestListItem[] = [];
@@ -280,13 +296,26 @@ export const parseImdbWatchlistHtml = (
   return items;
 };
 
+export const parseImdbWatchlistResponse = (response: {
+  body: unknown;
+  status: number;
+}): ExternalRequestListItem[] => {
+  if (response.status === 202) {
+    throw imdbAutomatedAccessError();
+  }
+  if (typeof response.body !== 'string') {
+    throw new Error('IMDb returned an invalid watchlist response.');
+  }
+  return parseImdbWatchlistHtml(response.body);
+};
+
 const fetchImdbWatchlist = async (
   userId: string
 ): Promise<ExternalRequestListItem[]> => {
-  const html = await new PublicListApi('https://www.imdb.com').fetchHtml(
+  const response = await new PublicListApi('https://www.imdb.com').fetchHtml(
     `/user/${userId}/watchlist/`
   );
-  return parseImdbWatchlistHtml(html);
+  return parseImdbWatchlistResponse(response);
 };
 
 export const parseGoodreadsToReadFeed = async (
@@ -430,7 +459,8 @@ const errorMessage = (error: unknown): string =>
 export const syncExternalRequestList = async (
   list: ExternalRequestList,
   user: User,
-  adapters: ExternalRequestListSyncAdapters = defaultAdapters
+  adapters: ExternalRequestListSyncAdapters = defaultAdapters,
+  importedItems?: ExternalRequestListItem[]
 ): Promise<ExternalRequestListSyncResult> => {
   const result: ExternalRequestListSyncResult = {
     listId: list.id,
@@ -447,18 +477,24 @@ export const syncExternalRequestList = async (
   );
 
   try {
-    const userId =
-      list.provider === 'imdb'
-        ? list.sourceId
-        : list.provider === 'goodreads'
-          ? list.sourceId.match(/^goodreads:([0-9]{1,20}):to-read$/)?.[1]
-          : list.sourceId === 'hardcover:me:want-to-read' && list.apiToken
-            ? list.apiToken
-            : undefined;
+    const isImdbList = list.provider === 'imdb' || list.provider === 'imdb-csv';
+    if (list.provider === 'imdb-csv' && !importedItems) {
+      throw new Error(
+        'IMDb CSV lists are updated by importing a new IMDb watchlist export.'
+      );
+    }
+    const userId = isImdbList
+      ? list.sourceId
+      : list.provider === 'goodreads'
+        ? list.sourceId.match(/^goodreads:([0-9]{1,20}):to-read$/)?.[1]
+        : list.sourceId === 'hardcover:me:want-to-read' && list.apiToken
+          ? list.apiToken
+          : undefined;
     if (!userId) throw new Error('The saved list source is invalid.');
 
     const items =
-      list.provider === 'imdb'
+      importedItems ??
+      (list.provider === 'imdb'
         ? await adapters.fetchImdbWatchlist(userId)
         : list.provider === 'goodreads'
           ? await adapters.fetchGoodreadsToRead(userId)
@@ -468,16 +504,15 @@ export const syncExternalRequestList = async (
                 throw new Error(
                   'Hardcover list synchronization is unavailable.'
                 );
-              })();
+              })());
     result.sourceItems = items.length;
 
     for (const item of items.slice(0, MAX_EXTERNAL_REQUEST_LIST_ITEMS)) {
       if (processed.has(item.id)) continue;
 
-      const resolved =
-        list.provider === 'imdb'
-          ? await adapters.resolveImdbItem(item.id)
-          : await adapters.resolveGoodreadsItem(item);
+      const resolved = isImdbList
+        ? await adapters.resolveImdbItem(item.id)
+        : await adapters.resolveGoodreadsItem(item);
       if (!resolved) {
         result.unmatched += 1;
         continue;
@@ -522,26 +557,46 @@ export const syncExternalRequestList = async (
   return result;
 };
 
-export const syncAllExternalRequestLists = async (): Promise<void> => {
-  const lists = await getRepository(ExternalRequestList)
-    .createQueryBuilder('list')
-    .leftJoinAndSelect('list.user', 'user')
-    .addSelect('list.apiToken')
-    .orderBy('list.id', 'ASC')
-    .getMany();
+export const syncAllExternalRequestLists = async (
+  syncOne: typeof syncExternalRequestList = syncExternalRequestList,
+  requestedBatchSize = MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE
+): Promise<void> => {
+  const repository = getRepository(ExternalRequestList);
+  const batchSize = Number.isSafeInteger(requestedBatchSize)
+    ? Math.max(
+        1,
+        Math.min(requestedBatchSize, MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE)
+      )
+    : MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE;
+  let lastId = 0;
 
-  for (const list of lists) {
-    if (!list.user) continue;
-    const result = await syncExternalRequestList(list, list.user);
-    logger.info('External request list synchronization completed.', {
-      label: 'External Request Lists',
-      listId: list.id,
-      provider: list.provider,
-      requested: result.requested,
-      alreadyRequested: result.alreadyRequested,
-      unmatched: result.unmatched,
-      failed: result.failed,
-      error: result.error,
-    });
+  while (true) {
+    const lists = await repository
+      .createQueryBuilder('list')
+      .leftJoinAndSelect('list.user', 'user')
+      .addSelect('list.apiToken')
+      .where('list.id > :lastId', { lastId })
+      .orderBy('list.id', 'ASC')
+      .take(batchSize)
+      .getMany();
+    if (!lists.length) return;
+
+    for (const list of lists) {
+      lastId = list.id;
+      if (!list.user || list.provider === 'imdb-csv') continue;
+      const result = await syncOne(list, list.user);
+      logger.info('External request list synchronization completed.', {
+        label: 'External Request Lists',
+        listId: list.id,
+        provider: list.provider,
+        requested: result.requested,
+        alreadyRequested: result.alreadyRequested,
+        unmatched: result.unmatched,
+        failed: result.failed,
+        error: result.error,
+      });
+    }
+
+    if (lists.length < batchSize) return;
   }
 };

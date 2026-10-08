@@ -908,6 +908,7 @@ const SeriesDetailsLayout = ({
                 >
                   <SeriesSeasonEpisodeBrowser
                     contained
+                    active={showMediaServer}
                     metadataRetry={metadataRetry}
                     onLoadingChange={setEpisodesLoading}
                     tvId={data.id}

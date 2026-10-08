@@ -956,7 +956,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads, hardcover]
+          enum: [imdb, imdb-csv, goodreads, hardcover]
         sourceUrl:
           type: string
           format: uri
@@ -983,7 +983,7 @@ components:
           type: integer
         provider:
           type: string
-          enum: [imdb, goodreads, hardcover]
+          enum: [imdb, imdb-csv, goodreads, hardcover]
         sourceItems:
           type: integer
         requested:
@@ -8182,7 +8182,7 @@ paths:
   /settings/software-acquisition:
     get:
       summary: Get software acquisition provider settings
-      description: Returns ROMarrNG, QuestarrNG, and Steam connection state with API keys redacted, the selected emulation catalog provider, and administrator-assigned Retro and Modern system groups.
+      description: Returns ROMarrNG, QuestarrNG, and Steam connection state with API keys redacted, the selected QuestarrNG, ROMarrNG IGDB, or ROMarrNG DAT emulation catalog, administrator-assigned Retro and Modern system groups, and per-system IGDB platform overrides.
       tags:
         - settings
       responses:
@@ -8199,12 +8199,17 @@ paths:
                     $ref: '#/components/schemas/SoftwareProviderSettingsView'
                   emulationCatalogProvider:
                     type: string
-                    enum: [questarr, romarr]
+                    enum: [questarr, romarr, romarr-dat]
                   emulationSystemGroups:
                     type: object
                     additionalProperties:
                       type: string
                       enum: [retro, modern]
+                  emulationPlatformMappings:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      minimum: 1
                   steamApiKey:
                     type: string
                     description: Always empty or redacted; never returns the configured secret.
@@ -8212,7 +8217,7 @@ paths:
                     type: boolean
     put:
       summary: Update software acquisition settings
-      description: Updates provider connections, the selected emulation IGDB catalog, per-system emulation groups, and the Steam Web API key. API keys stay server-side and are redacted in responses; omit an unchanged secret to keep it.
+      description: Updates provider connections, the selected emulation catalog, per-system emulation groups and IGDB platform overrides, and the Steam Web API key. API keys stay server-side and are redacted in responses; omit an unchanged secret to keep it.
       tags:
         - settings
       requestBody:
@@ -8228,12 +8233,17 @@ paths:
                   $ref: '#/components/schemas/SoftwareProviderSettingsInput'
                 emulationCatalogProvider:
                   type: string
-                  enum: [questarr, romarr]
+                  enum: [questarr, romarr, romarr-dat]
                 emulationSystemGroups:
                   type: object
                   additionalProperties:
                     type: string
                     enum: [retro, modern]
+                emulationPlatformMappings:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                    minimum: 1
                 steamApiKey:
                   type: string
                   maxLength: 2048
@@ -8251,18 +8261,119 @@ paths:
                     $ref: '#/components/schemas/SoftwareProviderSettingsView'
                   emulationCatalogProvider:
                     type: string
-                    enum: [questarr, romarr]
+                    enum: [questarr, romarr, romarr-dat]
                   emulationSystemGroups:
                     type: object
                     additionalProperties:
                       type: string
                       enum: [retro, modern]
+                  emulationPlatformMappings:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      minimum: 1
                   steamApiKey:
                     type: string
                   steamApiKeyConfigured:
                     type: boolean
         '400':
           description: Invalid provider or system-group settings
+  /settings/software-acquisition/platform-mapping/preview:
+    get:
+      summary: Preview ROMarrNG system to IGDB platform matches
+      description: Returns ROMarrNG systems, automatic matches, saved overrides, and unmatched IGDB platforms without changing settings.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Platform mapping preview returned
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [
+                    systems,
+                    catalogPlatforms,
+                    unmatchedSystems,
+                    unmatchedCatalogPlatforms,
+                  ]
+                properties:
+                  systems:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [
+                          slug,
+                          name,
+                          aliases,
+                          automaticMatch,
+                          selectedMatch,
+                          status,
+                        ]
+                      properties:
+                        slug:
+                          type: string
+                        name:
+                          type: string
+                        aliases:
+                          type: array
+                          items:
+                            type: string
+                        automaticMatch:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                        selectedMatch:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                        status:
+                          type: string
+                          enum: [automatic, manual, unmatched]
+                  catalogPlatforms:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                  unmatchedSystems:
+                    type: array
+                    items:
+                      type: object
+                      required: [slug, name]
+                      properties:
+                        slug:
+                          type: string
+                        name:
+                          type: string
+                  unmatchedCatalogPlatforms:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+        '502':
+          description: ROMarrNG platform data could not be retrieved
+        '503':
+          description: ROMarrNG is not connected
   /settings/software-acquisition/test/{provider}:
     post:
       summary: Test a software acquisition provider connection
@@ -16452,6 +16563,44 @@ paths:
           description: Existing Hardcover shelf updated
         '400':
           description: Hardcover rejected the token or query
+  /request/lists/{listId}/import:
+    post:
+      summary: Import IMDb watchlist export title IDs
+      description: Imports up to 100 unique IMDb title IDs from the signed-in user's CSV export. Imported IMDb lists are updated manually and are excluded from scheduled server-side fetching.
+      tags: [request]
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [itemIds]
+              properties:
+                itemIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    pattern: '^tt[0-9]{5,20}$'
+      responses:
+        '200':
+          description: Imported IMDb titles were sent through normal request permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalRequestListSyncResult'
+        '400':
+          description: The list is not an IMDb watchlist or the title IDs are invalid
   /request/lists/{listId}/sync:
     post:
       summary: Sync a configured public list now

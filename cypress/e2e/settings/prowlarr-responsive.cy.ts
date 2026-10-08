@@ -169,4 +169,82 @@ describe('Prowlarr settings on a short mobile screen', () => {
       .click();
     cy.wait('@saveProwlarr').its('response.statusCode').should('eq', 200);
   });
+
+  it('shows setup assistance without horizontal overflow on a narrow screen', () => {
+    cy.visit('/settings/services');
+
+    cy.contains('section.app-card-sub', 'Connect your apps')
+      .should('be.visible')
+      .and('contain', 'probe common ports on a selected host');
+    cy.contains('a', 'Open the setup guide')
+      .should('be.visible')
+      .should(
+        'have.attr',
+        'href',
+        'https://github.com/snapetech/seerrng/blob/main/docs/using-seerr/setup-assistant.md'
+      );
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(
+        document.documentElement.clientWidth + 1
+      );
+    });
+    cy.screenshot('setup-assistant-mobile', { capture: 'viewport' });
+  });
+
+  it('shows setup assistance at desktop width', () => {
+    cy.viewport(1280, 720);
+    cy.visit('/settings/services');
+
+    cy.contains('section.app-card-sub', 'Connect your apps').should(
+      'be.visible'
+    );
+    cy.contains('section.app-card-sub', 'Connect your apps').should(($card) => {
+      const bounds = $card[0].getBoundingClientRect();
+      expect(bounds.right).to.be.at.most(
+        $card[0].ownerDocument.documentElement.clientWidth + 1
+      );
+      const description = $card.find('p')[0];
+      expect(description.scrollWidth).to.be.at.most(
+        description.clientWidth + 1
+      );
+    });
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(
+        document.documentElement.clientWidth + 1
+      );
+    });
+    cy.screenshot('setup-assistant-desktop', { capture: 'viewport' });
+  });
+
+  it('imports a discovered address into the matching add form without importing credentials', () => {
+    cy.visit('/settings/services');
+
+    const report = {
+      network: 'seerrng-shared',
+      connections: [
+        {
+          id: 'radarr',
+          title: 'Radarr',
+          hostname: 'radarr',
+          port: 7878,
+          state: 'running',
+          apiKey: 'must-not-be-imported',
+        },
+      ],
+    };
+    cy.get('input[aria-label="Import connection report"]').selectFile(
+      {
+        contents: Cypress.Buffer.from(JSON.stringify(report)),
+        fileName: 'seerrng-connections.json',
+        mimeType: 'application/json',
+      },
+      { force: true }
+    );
+
+    cy.contains('Loaded suggestions for 1 app').should('be.visible');
+    cy.contains('button', 'Add Radarr Server').scrollIntoView().click();
+    cy.get('input[name="hostname"]').should('have.value', 'radarr');
+    cy.get('input[name="port"]').should('have.value', '7878');
+    cy.get('input[name="apiKey"]').should('have.value', '');
+  });
 });

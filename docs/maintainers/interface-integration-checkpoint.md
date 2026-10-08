@@ -12,6 +12,15 @@ current status; no older imperative, command binding, or pending gate controls
 current work. Normative procedure lives in `AGENTS.md`, the UI guides, and
 `tools/validation-engine/README.md`.
 
+## Current maintainer direction — October 6, 2026
+
+The project owner explicitly removed human review/acceptance as a merge or
+release gate. Record visual inspection separately from automated evidence, but
+do not block authorized merges or releases waiting for owner sign-off. Earlier
+checkpoint entries preserve the status at the time they were written and do not
+override this current direction. Continue to require the applicable automated
+checks and report their actual results.
+
 ## Preservation and coverage map
 
 | Work to preserve                                                       | Established owners and existing checks                                                                                                                                                                            | Review boundary                                                                                                                                                      |
@@ -99,8 +108,12 @@ per-test restoration. Unexpected fixture IDs fail outside the production catch.
 A new unavailable-enrichment case checks the exact lookup and preserved status.
 All 18 focused tests pass, with no skips/cancellations/todos. This test-only repair
 is not a production backend fix or a complete cumulative gate/build pass. The
-final gate and human acceptance remain pending; unrelated failures still require
-scoped direction before further repair.
+The final gate and human acceptance were pending at that checkpoint; unrelated
+failures required scoped direction for that attempt. On 2026-10-06, explicit
+user authorization covered fixing failures that block the requested
+software-acquisition validation and release, superseding that pause for this
+work. The 2026-10-07 direction removes human acceptance as a merge or release
+gate.
 
 The visual/client fixtures were also tightened: negative CSS/role fixtures must
 fail with their intended diagnostics, wrong icon padding is checked without a
@@ -164,8 +177,9 @@ Current-batch/shared-style validators and changed-component lint pass;
 formatting passes. The actual PostCSS configuration compiles the shared CSS
 with zero warnings. Palette/theme, Book-order and other unreconciled failures
 remain recorded. The earlier frozen full/native-JS receipts are retained;
-this follow-up has only focused evidence and still needs rendered/human review.
-Repository/toolchain prerequisites and full gate/build remain blocked.
+this follow-up was recorded with focused evidence and without rendered review.
+Repository/toolchain prerequisites and the full gate/build remained blocked at
+that historical checkpoint; it is not an ongoing human-review gate.
 
 ## Latest bounded preview checkpoint — October 2, 2026
 
@@ -301,7 +315,9 @@ Fill these fields with observed facts; unknown means pending, never assumed.
 6. Live Plex evidence separately from mocked native coverage; safe prerequisites
    for unverified providers. Never copy credentials, runtime DBs or live config.
 7. Explicit deferrals, unresolved failures and next gate. A failed required gate
-   blocks finalization; report unrelated backend failures before expanding scope.
+   blocks finalization. Keep a narrow visual task from expanding into unrelated
+   backend work unless the user explicitly authorized broader remediation or a
+   complete gate; that authorization covers the repairs needed to pass it.
 8. Recoverable refs/archive identity and checksums, final source readback, and
    applicable publication authority. Local preview publication is not PR approval.
 
@@ -317,7 +333,8 @@ the accepted preview and authorized integration with Keith's current main,
 scoped Fix-it repairs, source-specific engine validation, separate guarded
 compilation, and a laptop preview on port 5071 with an independent copy of the
 5070 configuration/database. The final preview is shown only after those checks
-complete. John's visual review remains required before any PR.
+complete. Visual inspection was pending at that historical checkpoint; the
+user's 2026-10-07 direction supersedes it as a PR or release gate.
 
 The pinned upstream base is `a96fafa07c77a2d6d95badeb9f60c32a6b4a47c9`
 (3.48.3). The exact accepted working-byte checkpoint is
@@ -416,12 +433,12 @@ older records remain historical evidence for their original source trees.
   completed successfully in this isolated candidate.
 - The exact final `pnpm validate:development` run, one production build, browser
   run, screenshots, release-note preview, commits and remote push are pending.
-  human visual review of the new game and reader surfaces remains a release
-  gate; previous visual acceptance applies only to its recorded older scope.
-  A screenshot or passing build does not fulfill that human review.
-- No task commit, push, tag, draft/published release, merge, or deployment has
-  occurred. The user authorized pushing this work and cutting a release after
-  its required verification/review gates.
+  human visual review of the new game and reader surfaces was listed as a
+  release gate in this historical checkpoint. The user's 2026-10-07 instruction
+  supersedes that requirement; no human review is required for this repository.
+- No task commit, push, tag, draft/published release, merge, or deployment had
+  occurred at that checkpoint. The user later authorized merging and releasing
+  this work; current automated checks are recorded on the corresponding PR.
 
 ## Complete dirty-worktree inclusion — October 4, 2026
 
@@ -446,8 +463,9 @@ The unique added focused checks pass: Audiobookshelf scan helper/scanner/API
 and discover contract **12/12 Node tests**; RequestBlock edit identity
 **2/2 Vitest tests**; server/client TypeScript, focused ESLint, i18n and
 formatting also pass. Full cumulative validation and a production build remain
-pending on this expanded candidate. Rendered desktop/narrow review and John's
-visual acceptance remain release gates.
+pending on this expanded candidate. Rendered desktop/narrow inspection and
+John's visual acceptance were recorded as pending then; neither is a current
+release gate under the user's 2026-10-07 direction.
 
 ## Current main integration and gate follow-up — October 4, 2026
 
@@ -474,8 +492,9 @@ changelog section. This receipt is invalidated by the forward integration; the
 complete gate must be rerun against this exact merged tree. The production build
 has not run. The in-app browser control and isolated workspace controls are not
 available in this session; rendered review is pending on an available local
-browser path. Human visual review of the new game and reader surfaces
-remains pending and is still required before release.
+browser path. Human visual review of the new game and reader surfaces was
+recorded as pending at this checkpoint; the user's 2026-10-07 direction removes
+it as a release gate.
 
 ## UI correction and verification record — October 5, 2026
 
@@ -529,10 +548,11 @@ element diagnostics on failure.
   generated links, service-card width, and non-overlapping copy actions. Logs:
   `/tmp/seerrng-final-ui-game-cypress-20261005.log` and
   `/tmp/seerrng-final-ui-reader-cypress-20261005.log`.
-- Desktop and mobile review captures are at
+- Desktop and mobile rendered-content captures are at
   `/tmp/seerrng-game-library-final-review-20261005/` and
-  `/tmp/seerrng-reader-settings-final-review-20261005/`. These are iteration
-  captures, not a substitute for human review. The first exact-tree gate attempt
+  `/tmp/seerrng-reader-settings-final-review-20261005/`. They record the
+  automated rendered-content check; separate human review is not required under
+  the user's 2026-10-07 instruction. The first exact-tree gate attempt
   stopped during formatting before any test lane, reporting ENOENT for
   temporary locale `.bak` paths. A subsequent isolated sequential
   `pnpm i18n:check` and `pnpm format:check` passed. The first output is preserved
@@ -542,7 +562,8 @@ element diagnostics on failure.
   `/tmp/seerrng-game-library-validation-final-candidate-20261005.log`.
 - Tests used a fresh disposable SQLite configuration and local providers only.
   No live Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was
-  contacted. Human visual review remains a release gate.
+  contacted. Human visual review was recorded as pending then; it is not a
+  release gate under the user's 2026-10-07 direction.
 
 ## Rebuilt candidate and rendered review — October 4, 2026 (Regina local)
 
@@ -581,8 +602,8 @@ rebuilt after this correction.
   Log: `/tmp/seerrng-validate-development-final-20261005.log`.
 - The Chromium exploratory Cypress attempt timed out waiting for a page load and
   is not counted. The final built-app workflows passed separately under the
-  repository's Cypress Electron runner. Human visual review remains a
-  release gate.
+  repository's Cypress Electron runner. Human visual review was recorded as
+  pending then; it is not a release gate under the user's 2026-10-07 direction.
 - Release-note preview, commits, push, and release remain pending. Live Grimmory,
   BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain unverified.
 
@@ -626,7 +647,8 @@ the game source-level lint fixes and new main target; it is historical only.
 The final integrated gate, production build, and rebuilt disposable browser
 flows remain pending. No branch push, tag, or release has occurred. Live
 Grimmory, BookOrbit, Steam, QuestarrNG, and ROMarrNG round trips remain
-unverified; human visual review remains a release gate.
+unverified; human visual review was recorded as pending then and is not a
+release gate under the user's 2026-10-07 direction.
 
 ## Reader settings readability follow-up — October 5, 2026
 
@@ -649,8 +671,9 @@ Vitest, 385 native TypeScript, 56 native JavaScript, and 32 tooling files, with
 zero declared platform exclusions. The final gate, clean production build,
 and rebuilt desktop/narrow browser flows remain pending on this follow-up.
 Earlier build and screenshot evidence predates the reader layout change.
-Provider round trips remain unverified, and human visual review is
-still required before release.
+Provider round trips remain unverified. Human visual review was recorded as
+pending at this checkpoint; the user's 2026-10-07 direction supersedes it as a
+release gate.
 
 ## Final verification receipt — October 5, 2026
 
@@ -678,7 +701,9 @@ The game and reader workflows each passed **1/1** in their separate Chromium
 153 headless runs, checking desktop and narrow layouts. Captures are in
 `/tmp/seerrng-game-library-final-review-20261005/` and
 `/tmp/seerrng-reader-settings-final-review-20261005/`; their rendered content
-was inspected. The screenshots are iteration evidence, not a substitute for human review. Tests used disposable SQLite and local app endpoints only; no live
+was inspected. They record the automated rendered-content check. Human-review
+status from this checkpoint was superseded by the user's 2026-10-07 instruction.
+Tests used disposable SQLite and local app endpoints only; no live
 Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was contacted.
 Release-note preview and branch push remained pending at that checkpoint.
 Human visual review status was pending; these entries are superseded by the
@@ -986,6 +1011,77 @@ from `fe1ef9790369c4694cb6b7de4444e6c9330dcfc1` as `v3.54.0`. The historical
 failed macOS tooling receipt remains evidence of that attempt, not a current
 merge prohibition.
 
+## Current-main integration and software-catalog repair — October 8, 2026
+
+PR #175 integrates the remaining published feature branches and security fixes
+on `integration/all-branches-main-20261007`. The integration source before the
+latest-main sync was `da97fc6accdd44c2965b41797b2ea176c6e95104`; the new target
+was `origin/main` at `42397ee61d496337134106ef341a7d8b45ff412b` (v3.55.1), and
+their common ancestor was `40bb94fb085026c99b93ea129333ff30de81889b`. Main's
+intervening release and feature commits were integrated in merge commit
+`4578abe09e79f779db61a6ece9f47e0843efc8b6`.
+
+The forward merge retained both sides of three overlaps. ROMarrNG's version 1
+and version 2 request-contract route and regression test from main remain beside
+the DAT catalog API and stable DAT identity tests. The software-acquisition
+guide documents both the shared versioned route and the optional IGDB/DAT
+catalog capabilities. Main's IMDb profile-watchlist repair, AppImage runtime
+repair, and v3.55.1 release records are also retained.
+
+The latest hosted unit run found three integration defects: the OpenAPI
+contract omitted the platform-mapping preview route and the `romarr-dat`
+provider value; a version 2 ROMarrNG connection test did not stub its DAT
+platform request; and the DAT software migration reused timestamp
+`1791100000000`, already assigned to Hardcover. The API contract and test stub
+are corrected. The software migration and its SQLite/PostgreSQL classes were
+renumbered to `1791130000000`; the existing cross-history regression now passes.
+The failed software-acquisition Cypress assertion occurred before the page's
+settings data had been confirmed. Its fixture now uses an explicit response
+alias and waits for that response before the existing platform-mapping
+assertions.
+
+Focused verification on the latest-main merge passed: ROMarrNG contract tests
+5/5, software-route tests 47/47, and the Phase 7 plus software SQLite migration
+tests 3/3. Formatting, whitespace checks, and the release-note preview against
+`origin/main` passed. The preview includes the merged user-facing feature,
+security, and migration-order notes.
+
+The exact merged source was pushed to PR #175. Its fresh GitHub-hosted
+validation, including the guarded production build and browser suites, remains
+pending on the final checkpoint commit. No local production build, live
+provider round trip, or new manual visual inspection was performed. Those
+evidence limits are reported separately; explicit maintainer direction to
+merge and release removes a separate human sign-off gate.
+
+### Follow-up build and CodeQL repair — October 8, 2026
+
+The first hosted run on the integration checkpoint failed its app build because
+the merged `SoftwareProviderCapabilities` interface declared `datCatalog` twice.
+The duplicate declaration is removed. The same scan identified an additional
+open alert, #538, in `distributed-linux-management.mjs`; together with the
+previously listed findings, the current default-branch scan has 12 open alerts.
+
+The file-system-race findings (#538–#545) shared a check-then-read pattern. The
+affected evidence readers now read from a pinned descriptor and reject a path
+that no longer identifies the opened file. Configuration, marker and runner
+attestation readers validate the descriptor and path after opening. A focused
+regression test reproduced a symlink replacement that made the old pattern
+return attacker-controlled bytes while the original path identity was restored;
+the new reader detects the same swap. The CodeQL trivial conditional and
+unreachable duplicate-plan guard were also corrected, with a TAP regression
+test proving duplicate plans remain rejected. The race test is registered in
+the portable tooling suite. The Game Library CodeQL finding points to the test
+app's `checkUser` middleware because its production router limiter is skipped
+in the test environment. The test app now applies its own active rate limiter
+before authentication middleware, so the reported test route is covered.
+
+Focused checks passed: 157 tests, one expected platform-specific skip, and no
+failures. The first hosted run passed the unit shard and release-note contract
+but failed the app build due to the duplicate type declaration. A fresh hosted
+run on the corrected and hardened candidate is required before merging. No local
+production build was run.
+
+
 ## Sportarr forward integration and verification — October 8, 2026
 
 The isolated `feat/sportarr-integration` worktree started from
@@ -1138,3 +1234,42 @@ integrated-main validation is still required after merge. Rendered desktop or
 narrow review and live Sportarr or media-server round-trips were not performed.
 Episode Queue playback dispatch was tested with disposable SQLite and mocked
 Jellyfin/Sonarr APIs, not a live service.
+
+#### IMDb watchlist WAF report and latest-main sync — October 8, 2026
+
+Issue [#179](https://github.com/snapetech/seerrng/issues/179) followed #174:
+the reporter's migrated public profile URL is accepted, but server-side sync
+receives an AWS WAF HTTP 202 browser challenge and reports that the public page
+was unavailable. The same URL is viewable in the reporter's browser, which does
+not establish that IMDb will allow automated requests from SeerrNG's server.
+
+The fix gives users an IMDb CSV import path. The browser parses IMDb's supported
+CSV export and posts validated title IDs in batches of at most 100. The
+authenticated route verifies ownership and sends resolved items through the
+normal `MediaRequest.request` permissions and approval flow. Imported lists
+become manual and the recurring worker skips them. No WAF token or browser
+cookie is sent to or stored by SeerrNG. Focused coverage passed 17 server tests
+and four CSV parser tests; it also verifies invalid IDs are rejected, media
+requests use the list owner, and manual imports skip scheduled fetches.
+
+A WAF-token relay was not added. AWS WAF's challenge interstitial completes and
+resubmits the protected request in the browser context; its client integration
+is configured for the protected site's domain. IMDb's policy also disallows
+screen scraping and similar automated collection. Users can open the existing
+watchlist link in a browser and import IMDb's supported export.
+
+Hosted run 37859037274 passed the production build, all unit shards, Playwright,
+all Cypress shards, both CodeQL languages, i18n, documentation checks, release
+notes, and the validation-engine aggregate. That run covered candidate
+`a1afb3fd` before PR #180 was merged to `main`. `main` now includes PR #180 at
+`091411e2`; merging it into PR #175 retained both branches except for this
+checkpoint-file conflict, which is resolved by keeping both integration
+entries. The resulting latest-main candidate must complete a fresh hosted run
+before merging. No local production build was run.
+
+The push notification also surfaced Dependabot alerts #315–#317 for transitive
+Handlebars 4.7.9 (two critical and one medium). The workspace override and
+lockfile now resolve to patched 4.7.10. `pnpm install --lockfile-only
+--frozen-lockfile --offline` passed, and `pnpm audit --prod` reported no known
+vulnerabilities in the updated lockfile. The hosted run for the synced candidate
+must be repeated after this dependency update.

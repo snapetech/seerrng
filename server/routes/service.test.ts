@@ -1585,7 +1585,11 @@ describe('Bookshelf settings routes', () => {
 
     const res = await request(app).delete('/settings/readarr/7');
 
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      res.status,
+      200,
+      `Expected Bookshelf deletion to succeed; received ${JSON.stringify(res.body)}`
+    );
     assert.deepStrictEqual(
       getSettings().readarr.map(({ id, name, isDefault, serviceType }) => ({
         id,

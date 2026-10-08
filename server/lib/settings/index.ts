@@ -124,9 +124,32 @@ export interface SoftwareAcquisitionSettings {
   romarr: SoftwareProviderSettings;
   questarr: SoftwareProviderSettings;
   steamApiKey: string;
-  emulationCatalogProvider: 'questarr' | 'romarr';
+  emulationCatalogProvider: 'questarr' | 'romarr' | 'romarr-dat';
   emulationSystemGroups: Record<string, EmulationSystemGroup>;
+  emulationPlatformMappings: Record<string, number>;
 }
+
+export type ReaderDeliveryProvider = 'grimmory' | 'bookorbit';
+
+export interface ReaderDeliverySettings {
+  grimmoryUrl: string;
+  grimmoryUsername: string;
+  grimmoryPassword: string;
+  bookorbitUrl: string;
+  bookorbitUsername: string;
+  bookorbitPassword: string;
+  preferredProvider: ReaderDeliveryProvider;
+}
+
+export const defaultReaderDeliverySettings = (): ReaderDeliverySettings => ({
+  grimmoryUrl: '',
+  grimmoryUsername: '',
+  grimmoryPassword: '',
+  bookorbitUrl: '',
+  bookorbitUsername: '',
+  bookorbitPassword: '',
+  preferredProvider: 'grimmory',
+});
 
 export interface ProwlarrSettings extends SoftwareProviderSettings {
   categoryMappings: ProwlarrCategoryMappings;
@@ -753,28 +776,6 @@ export interface DiscoveryIntegrationsSettings {
   mdblist: { apiKey: string };
 }
 
-export type ReaderDeliveryProvider = 'grimmory' | 'bookorbit';
-
-export interface ReaderDeliverySettings {
-  grimmoryUrl: string;
-  grimmoryUsername: string;
-  grimmoryPassword: string;
-  bookorbitUrl: string;
-  bookorbitUsername: string;
-  bookorbitPassword: string;
-  preferredProvider: ReaderDeliveryProvider;
-}
-
-export const defaultReaderDeliverySettings = (): ReaderDeliverySettings => ({
-  grimmoryUrl: '',
-  grimmoryUsername: '',
-  grimmoryPassword: '',
-  bookorbitUrl: '',
-  bookorbitUsername: '',
-  bookorbitPassword: '',
-  preferredProvider: 'grimmory',
-});
-
 export const defaultDiscoveryIntegrations =
   (): DiscoveryIntegrationsSettings => ({
     trakt: { clientId: '', clientSecret: '' },
@@ -806,6 +807,7 @@ export interface AllSettings {
   backissue: BackIssueSettings[];
   lazylibrarian: LazyLibrarianSettings[];
   softwareAcquisition: SoftwareAcquisitionSettings;
+  readerDelivery: ReaderDeliverySettings;
   prowlarr: ProwlarrSettings;
   liveDownloads: LiveDownloadSettings;
   tunerr: TunerrSettings;
@@ -813,7 +815,6 @@ export interface AllSettings {
   readmeabook: ReadMeABookSettings;
   swipe: SwipeSettings;
   discoveryIntegrations: DiscoveryIntegrationsSettings;
-  readerDelivery: ReaderDeliverySettings;
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -932,7 +933,6 @@ class Settings {
       backissue: [],
       lazylibrarian: [],
       discoveryIntegrations: defaultDiscoveryIntegrations(),
-      readerDelivery: defaultReaderDeliverySettings(),
       softwareAcquisition: {
         romarr: {
           hostname: '',
@@ -948,10 +948,12 @@ class Settings {
           baseUrl: '',
           apiKey: '',
         },
-        steamApiKey: '',
         emulationCatalogProvider: 'questarr',
+        steamApiKey: '',
         emulationSystemGroups: {},
+        emulationPlatformMappings: {},
       },
+      readerDelivery: defaultReaderDeliverySettings(),
       prowlarr: {
         hostname: '',
         port: 9696,
@@ -1457,10 +1459,6 @@ class Settings {
     this.data.audiobookshelf = data;
   }
 
-  get readerDelivery(): ReaderDeliverySettings {
-    return this.data.readerDelivery;
-  }
-
   get sonarr(): SonarrSettings[] {
     return this.data.sonarr;
   }
@@ -1522,6 +1520,14 @@ class Settings {
       this.data.softwareAcquisition,
       data
     );
+  }
+
+  get readerDelivery(): ReaderDeliverySettings {
+    return this.data.readerDelivery;
+  }
+
+  set readerDelivery(data: ReaderDeliverySettings) {
+    this.data.readerDelivery = mergeSettings(this.data.readerDelivery, data);
   }
 
   get prowlarr(): ProwlarrSettings {
@@ -1917,7 +1923,6 @@ class Settings {
       backissue: [],
       lazylibrarian: [],
       discoveryIntegrations: defaultDiscoveryIntegrations(),
-      readerDelivery: defaultReaderDeliverySettings(),
       softwareAcquisition: {
         romarr: {
           hostname: '',
@@ -1933,10 +1938,12 @@ class Settings {
           baseUrl: '',
           apiKey: '',
         },
-        steamApiKey: '',
         emulationCatalogProvider: 'questarr',
+        steamApiKey: '',
         emulationSystemGroups: {},
+        emulationPlatformMappings: {},
       },
+      readerDelivery: defaultReaderDeliverySettings(),
       prowlarr: {
         hostname: '',
         port: 9696,

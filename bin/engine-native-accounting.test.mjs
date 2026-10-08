@@ -394,6 +394,12 @@ test('source binding reproduces Node TAP escaping independent of host platform',
   assert.equal(ledger.cases[0].leafName, tapEscape(absoluteFile));
   assert.equal(tapEscape('line\n\t#\\path'), 'line\\n\\t\\#\\\\path');
 });
+test('duplicate Node TAP level plans are rejected as trailing structure', () => {
+  const report = tap().replace('1..1\n# tests', '1..1\n1..1\n# tests');
+  const ledger = readNodeTapHierarchy(Buffer.from(report), 'node:test');
+  assert.equal(ledger.complete, false);
+  assert.ok(ledger.issues.includes('Unexpected trailing TAP structure'));
+});
 test('missing/malformed/off-source/duplicate/unclosed/zero-active native reports abort independent owners', async (t) => {
   for (const mode of [
     { failedVitest: true, missingReport: true },

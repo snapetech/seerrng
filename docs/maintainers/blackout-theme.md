@@ -31,4 +31,6 @@ Menu-only blue/sky variables preserve SeerrNG's active and hover colors without
 changing Blackout's non-menu accent colors. No other theme receives overrides.
 
 This laptop preview changes no server data or media-service configuration.
-The user must review it before production deployment or upstream publication.
+Visual inspection may be recorded separately, but it is not an approval gate
+for production deployment or upstream publication when the maintainer explicitly
+authorizes those actions. Applicable automated checks still apply.

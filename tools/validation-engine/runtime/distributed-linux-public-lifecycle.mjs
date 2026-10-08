@@ -13,7 +13,6 @@ import {
   mkdirSync,
   openSync,
   readdirSync,
-  readFileSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
@@ -72,6 +71,7 @@ import {
   verifySourceSnapshot,
 } from './native-stage-context.mjs';
 import { canonicalJsonSha256 } from './run-scoped-ledger.mjs';
+import { readStableOrdinaryFileSync } from './stable-file-read.mjs';
 
 export const DISTRIBUTED_LINUX_HOST_PROFILE_FILE =
   'distributed-linux-host-profile.json';
@@ -280,19 +280,7 @@ function parseJsonBytes(bytes, label) {
 }
 
 function readStableFile(path, label) {
-  const before = lstatSync(path);
-  if (!before.isFile() || before.isSymbolicLink())
-    throw new Error(`${label} must be an ordinary file`);
-  const bytes = readFileSync(path);
-  const after = lstatSync(path);
-  if (
-    before.dev !== after.dev ||
-    before.ino !== after.ino ||
-    before.size !== after.size ||
-    before.mtimeMs !== after.mtimeMs
-  )
-    throw new Error(`${label} changed while it was read`);
-  return bytes;
+  return readStableOrdinaryFileSync(path, label).bytes;
 }
 
 export function verifyDistributedLinuxOuterSuccessEvidence({

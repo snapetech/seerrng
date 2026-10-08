@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Settings, {
   assertSettingsFileSize,
+  defaultReaderDeliverySettings,
   MAX_SETTINGS_FILE_BYTES,
   type ReadarrSettings,
 } from '.';
@@ -45,6 +46,21 @@ describe('Settings reset', () => {
     settings.reset();
 
     assert.equal(settings.network.csrfProtection, false);
+  });
+
+  it('provides private reader-delivery defaults and clears them on reset', () => {
+    const settings = new Settings();
+
+    assert.deepEqual(settings.readerDelivery, defaultReaderDeliverySettings());
+    settings.readerDelivery = {
+      ...settings.readerDelivery,
+      grimmoryUrl: 'https://reader.example',
+      grimmoryUsername: 'reader',
+      grimmoryPassword: 'secret',
+    };
+    settings.reset();
+
+    assert.deepEqual(settings.readerDelivery, defaultReaderDeliverySettings());
   });
 });
 

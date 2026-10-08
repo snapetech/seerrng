@@ -5499,6 +5499,19 @@
     gap: 5px;
   }
 
+  .app-filter-row > .discover-filter-control {
+    flex-shrink: 1;
+  }
+
+  .app-filter-row > .discover-filter-control > .discover-filter-control-label {
+    display: block;
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .app-filter-search-input {
     min-width: 0;
     flex: 1;

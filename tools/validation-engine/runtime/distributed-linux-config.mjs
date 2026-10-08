@@ -1960,38 +1960,33 @@ function assertPrivateFileMode(metadata, label) {
     throw new Error(`${label} must use file mode 0600`);
 }
 
-function existingPrivateConfigMetadata(configPath, label) {
-  const metadata = lstatSync(configPath);
-  if (!metadata.isFile() || metadata.isSymbolicLink())
-    throw new Error(`${label} must be an ordinary file`);
-  if (metadata.size > MAX_MODE3_CONFIG_BYTES)
-    throw new Error(`${label} exceeds its safe size limit`);
-  assertPrivateFileMode(metadata, label);
-  return metadata;
-}
-
 function readPrivateConfigText(configPath, label) {
-  const before = existingPrivateConfigMetadata(configPath, label);
   const noFollow =
     process.platform === 'win32' ? 0 : (constants.O_NOFOLLOW ?? 0);
   const descriptor = openSync(configPath, constants.O_RDONLY | noFollow);
   try {
     const opened = fstatSync(descriptor);
-    if (!sameFileObject(before, opened))
-      throw new Error(`${label} changed while it was being opened`);
     if (!opened.isFile() || opened.size > MAX_MODE3_CONFIG_BYTES)
       throw new Error(`${label} is not a safe ordinary file`);
     assertPrivateFileMode(opened, label);
+    const current = lstatSync(configPath);
+    if (
+      !current.isFile() ||
+      current.isSymbolicLink() ||
+      !sameFileObject(opened, current)
+    )
+      throw new Error(`${label} changed while it was being opened`);
     const text = readFileSync(descriptor, 'utf8');
     const after = fstatSync(descriptor);
     if (
       !sameFileObject(opened, after) ||
       opened.size !== after.size ||
-      opened.mtimeMs !== after.mtimeMs
+      opened.mtimeMs !== after.mtimeMs ||
+      opened.ctimeMs !== after.ctimeMs
     )
       throw new Error(`${label} changed while it was being read`);
-    const current = lstatSync(configPath);
-    if (!sameFileObject(opened, current))
+    const afterPath = lstatSync(configPath);
+    if (!sameFileObject(opened, afterPath))
       throw new Error(`${label} was replaced while it was being read`);
     return text;
   } finally {
@@ -2002,30 +1997,31 @@ function readPrivateConfigText(configPath, label) {
 export function readApplicationDependencyProfileFile(profilePathValue) {
   const profilePath = dependencyProfilePath(profilePathValue);
   const label = 'Application dependency profile';
-  const before = lstatSync(profilePath);
-  if (!before.isFile() || before.isSymbolicLink())
-    throw new Error(`${label} must be an ordinary file`);
-  if (before.size > MAX_MODE3_CONFIG_BYTES)
-    throw new Error(`${label} exceeds its safe size limit`);
   const noFollow =
     process.platform === 'win32' ? 0 : (constants.O_NOFOLLOW ?? 0);
   const descriptor = openSync(profilePath, constants.O_RDONLY | noFollow);
   try {
     const opened = fstatSync(descriptor);
-    if (!sameFileObject(before, opened))
-      throw new Error(`${label} changed while it was being opened`);
     if (!opened.isFile() || opened.size > MAX_MODE3_CONFIG_BYTES)
       throw new Error(`${label} is not a safe ordinary file`);
+    const current = lstatSync(profilePath);
+    if (
+      !current.isFile() ||
+      current.isSymbolicLink() ||
+      !sameFileObject(opened, current)
+    )
+      throw new Error(`${label} changed while it was being opened`);
     const text = readFileSync(descriptor, 'utf8');
     const after = fstatSync(descriptor);
     if (
       !sameFileObject(opened, after) ||
       opened.size !== after.size ||
-      opened.mtimeMs !== after.mtimeMs
+      opened.mtimeMs !== after.mtimeMs ||
+      opened.ctimeMs !== after.ctimeMs
     )
       throw new Error(`${label} changed while it was being read`);
-    const current = lstatSync(profilePath);
-    if (!sameFileObject(opened, current))
+    const afterPath = lstatSync(profilePath);
+    if (!sameFileObject(opened, afterPath))
       throw new Error(`${label} was replaced while it was being read`);
     return parseApplicationDependencyProfile(text);
   } finally {

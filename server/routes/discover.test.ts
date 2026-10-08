@@ -183,7 +183,11 @@ async function login(email = 'admin@seerr.dev') {
     const res = await agent
       .post('/auth/local')
       .send({ email, password: 'test1234' });
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      res.status,
+      200,
+      `Local test login failed: ${JSON.stringify({ status: res.status, body: res.body, text: res.text })}`
+    );
     return agent;
   } finally {
     settings.main.localLogin = priorLocalLogin;
@@ -4163,7 +4167,11 @@ describe('GET /discover/books', () => {
       '/discover/books?subject=science_fiction&page=2'
     );
 
-    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      res.status,
+      200,
+      `Book discovery failed: ${JSON.stringify({ status: res.status, body: res.body, text: res.text })}`
+    );
     assert.strictEqual(searchBooksMock.mock.callCount(), 1);
     assert.strictEqual(res.body.totalPages, 1);
     assert.strictEqual(res.body.totalResults, 0);

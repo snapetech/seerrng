@@ -203,13 +203,26 @@ export interface SharedGame {
   playtimeMinutes: number;
 }
 
+export const MAX_SHARED_GAME_ENTRIES = 20_000;
+
+export class SharedGameLibraryLimitError extends Error {
+  constructor() {
+    super(
+      'The household game library exceeds the supported shared-entry limit.'
+    );
+    this.name = 'SharedGameLibraryLimitError';
+  }
+}
+
 const sharedGameKey = (entry: GameLibraryEntry): string => {
   if (entry.catalogId !== null) return `igdb:${entry.catalogId}`;
   if (entry.steamAppId !== null) return `steam:${entry.steamAppId}`;
   return `title:${entry.category}:${normalizeGameTitle(entry.title)}`;
 };
 
-export const getSharedGameLibrary = async (): Promise<SharedGame[]> => {
+export const getSharedGameLibrary = async (
+  maxEntries = MAX_SHARED_GAME_ENTRIES
+): Promise<SharedGame[]> => {
   const entries = await getRepository(GameLibraryEntry)
     .createQueryBuilder('entry')
     .innerJoinAndMapOne('entry.user', User, 'owner', 'owner.id = entry.userId')
@@ -219,34 +232,29 @@ export const getSharedGameLibrary = async (): Promise<SharedGame[]> => {
       owned: true,
     })
     .orderBy('entry.title', 'ASC')
+    .take(maxEntries + 1)
     .getMany();
 
-  const grouped = new Map<
-    string,
-    { game: SharedGame; ownerIds: Set<number> }
-  >();
+  if (entries.length > maxEntries) throw new SharedGameLibraryLimitError();
+
+  const grouped = new Map<string, SharedGame & { ownerIds: Set<number> }>();
   for (const entry of entries) {
     const owner = entry.user;
     if (!owner) continue;
     const key = sharedGameKey(entry);
-    const aggregate: { game: SharedGame; ownerIds: Set<number> } = grouped.get(
-      key
-    ) ?? {
-      game: {
-        key,
-        catalogId: entry.catalogId,
-        category: entry.category,
-        title: entry.title,
-        summary: entry.summary,
-        coverUrl: entry.coverUrl,
-        owners: [],
-        ownerCount: 0,
-        steamAppId: entry.steamAppId,
-        playtimeMinutes: 0,
-      },
+    const game = grouped.get(key) ?? {
+      key,
+      catalogId: entry.catalogId,
+      category: entry.category,
+      title: entry.title,
+      summary: entry.summary,
+      coverUrl: entry.coverUrl,
+      owners: [],
+      ownerCount: 0,
+      steamAppId: entry.steamAppId,
+      playtimeMinutes: 0,
       ownerIds: new Set<number>(),
     };
-    const game = aggregate.game;
     if (entry.catalogId !== null && game.catalogId === null) {
       game.catalogId = entry.catalogId;
       game.category = entry.category;
@@ -254,8 +262,8 @@ export const getSharedGameLibrary = async (): Promise<SharedGame[]> => {
       game.summary = entry.summary;
       game.coverUrl = entry.coverUrl;
     }
-    if (!aggregate.ownerIds.has(owner.id)) {
-      aggregate.ownerIds.add(owner.id);
+    if (!game.ownerIds.has(owner.id)) {
+      game.ownerIds.add(owner.id);
       game.owners.push({
         id: owner.id,
         displayName: owner.username || `User ${owner.id}`,
@@ -269,11 +277,11 @@ export const getSharedGameLibrary = async (): Promise<SharedGame[]> => {
       game.playtimeMinutes += entry.playtimeMinutes;
     }
     if (game.steamAppId === null) game.steamAppId = entry.steamAppId;
-    grouped.set(key, aggregate);
+    grouped.set(key, game);
   }
 
   return [...grouped.values()]
-    .map(({ game }) => game)
+    .map(({ ownerIds: _ownerIds, ...game }) => game)
     .sort(
       (left, right) =>
         right.ownerCount - left.ownerCount ||

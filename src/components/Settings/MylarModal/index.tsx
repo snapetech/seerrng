@@ -3,6 +3,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -66,6 +67,7 @@ interface MylarModalProps {
 
 const MylarModal = ({ onClose, mylar, onSave }: MylarModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('mylar3');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(mylar ? true : false);
@@ -161,8 +163,8 @@ const MylarModal = ({ onClose, mylar, onSave }: MylarModalProps) => {
       <Formik
         initialValues={{
           name: mylar?.name ?? '',
-          hostname: mylar?.hostname ?? '',
-          port: mylar?.port ?? 8090,
+          hostname: mylar?.hostname ?? setupConnection?.hostname ?? '',
+          port: mylar?.port ?? setupConnection?.port ?? 8090,
           ssl: mylar?.useSsl ?? false,
           apiKey: mylar?.apiKey ?? '',
           baseUrl: mylar?.baseUrl ?? '',

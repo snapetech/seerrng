@@ -13,6 +13,7 @@ import GameLibraryEntry, {
   type GameLibraryStatus,
 } from '@server/entity/GameLibraryEntry';
 import SoftwareRequest from '@server/entity/SoftwareRequest';
+import type { SharedGame } from '@server/lib/gameLibrary';
 import {
   getSharedGameLibrary,
   isGameLibraryCategory,
@@ -20,6 +21,7 @@ import {
   markSteamOwnershipUnverified,
   normalizeGameTitle,
   serializeGameLibraryEntry,
+  SharedGameLibraryLimitError,
   syncSteamLibrary,
 } from '@server/lib/gameLibrary';
 import { getSettings } from '@server/lib/settings';
@@ -38,6 +40,17 @@ gameLibraryRoutes.use((_req, res, next) => {
   next();
 });
 gameLibraryRoutes.use(isAuthenticated());
+gameLibraryRoutes.use(
+  rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `user:${req.user?.id ?? 'anonymous'}`,
+    skip: () =>
+      process.env.NODE_ENV === 'test' || process.env.E2E_TESTS === 'true',
+  })
+);
 
 const STEAM_ID_PATTERN = /^[0-9]{17}$/;
 const OAUTH_STATE_TTL_MS = 10 * 60_000;
@@ -209,6 +222,64 @@ const parseCatalogMutation = (
   };
 };
 
+const parseCatalogMatchMutation = (
+  value: unknown
+):
+  | {
+      category: GameLibraryCategory;
+      catalogId: number;
+      status?: GameLibraryStatus;
+      isOwned?: boolean;
+      storeName?: string;
+      platformName?: string;
+      shareWithHousehold?: boolean;
+    }
+  | undefined => {
+  if (!isRecord(value)) return undefined;
+  const allowed = new Set([
+    'category',
+    'catalogId',
+    'status',
+    'isOwned',
+    'storeName',
+    'platformName',
+    'shareWithHousehold',
+  ]);
+  const catalogId = Number(value.catalogId);
+  const storeName =
+    value.storeName === undefined ? undefined : cleanUserLabel(value.storeName);
+  const platformName =
+    value.platformName === undefined
+      ? undefined
+      : cleanUserLabel(value.platformName);
+  if (
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    !isGameLibraryCategory(value.category) ||
+    !Number.isSafeInteger(catalogId) ||
+    catalogId <= 0 ||
+    catalogId > MAX_CATALOG_ID ||
+    (value.status !== undefined && !isGameLibraryStatus(value.status)) ||
+    (value.isOwned !== undefined && typeof value.isOwned !== 'boolean') ||
+    (value.shareWithHousehold !== undefined &&
+      typeof value.shareWithHousehold !== 'boolean') ||
+    (value.storeName !== undefined && storeName === undefined) ||
+    (value.platformName !== undefined && platformName === undefined)
+  ) {
+    return undefined;
+  }
+  return {
+    category: value.category,
+    catalogId,
+    ...(value.status === undefined ? {} : { status: value.status }),
+    ...(value.isOwned === undefined ? {} : { isOwned: value.isOwned }),
+    ...(storeName === undefined ? {} : { storeName }),
+    ...(platformName === undefined ? {} : { platformName }),
+    ...(value.shareWithHousehold === undefined
+      ? {}
+      : { shareWithHousehold: value.shareWithHousehold }),
+  };
+};
+
 const parseManualMutation = (
   value: unknown
 ):
@@ -270,7 +341,7 @@ const saveCatalogEntry = async (
   game: SoftwareCatalogGame,
   values: NonNullable<ReturnType<typeof parseCatalogMutation>>
 ) => {
-  const externalKey = `igdb:${game.igdbId}`;
+  const externalKey = `igdb:${values.catalogId}`;
   return getRepository(GameLibraryEntry).manager.transaction(
     async (manager) => {
       const repository = manager.getRepository(GameLibraryEntry);
@@ -289,7 +360,7 @@ const saveCatalogEntry = async (
       if (!entry && steamMatch) {
         entry = steamMatch;
         entry.externalKey = externalKey;
-        entry.catalogId = game.igdbId;
+        entry.catalogId = values.catalogId;
         entry.source = 'manual';
       } else if (entry && steamMatch && entry.id !== steamMatch.id) {
         entry.steamAppId ??= steamMatch.steamAppId;
@@ -309,7 +380,7 @@ const saveCatalogEntry = async (
         entry = new GameLibraryEntry({
           userId,
           externalKey,
-          catalogId: game.igdbId,
+          catalogId: values.catalogId,
           category: values.category,
           title: game.title,
           summary: game.summary,
@@ -474,7 +545,15 @@ gameLibraryRoutes.get('/shared', async (req, res) => {
   const page = parsePageQuery(req);
   if (!page)
     return res.status(400).json({ error: 'Invalid shared game filters.' });
-  const games = await getSharedGameLibrary();
+  let games: SharedGame[];
+  try {
+    games = await getSharedGameLibrary();
+  } catch (error) {
+    if (error instanceof SharedGameLibraryLimitError) {
+      return res.status(503).json({ error: error.message });
+    }
+    throw error;
+  }
   const rawMinOwners = req.query.minOwners;
   const minOwners = rawMinOwners === undefined ? 1 : Number(rawMinOwners);
   if (
@@ -687,7 +766,7 @@ gameLibraryRoutes.post('/:id/match', async (req, res) => {
       .json({ error: 'A signed-in browser session is required.' });
   }
   const id = parsePositiveRouteId(req.params.id, MAX_CATALOG_ID);
-  const values = parseCatalogMutation(req.body);
+  const values = parseCatalogMatchMutation(req.body);
   if (!id || !values) {
     return res
       .status(400)
@@ -708,7 +787,7 @@ gameLibraryRoutes.post('/:id/match', async (req, res) => {
       const entries = manager.getRepository(GameLibraryEntry);
       const duplicate = await entries.findOneBy({
         userId: req.user!.id,
-        externalKey: `igdb:${game.igdbId}`,
+        externalKey: `igdb:${values.catalogId}`,
       });
       if (duplicate && duplicate.id !== imported.id) {
         duplicate.steamAppId ??= imported.steamAppId;
@@ -722,24 +801,65 @@ gameLibraryRoutes.post('/:id/match', async (req, res) => {
         if (!duplicate.storeName) duplicate.storeName = imported.storeName;
         if (!duplicate.platformName)
           duplicate.platformName = imported.platformName;
+        duplicate.category = values.category;
+        duplicate.title = game.title;
+        duplicate.summary = game.summary;
+        duplicate.coverUrl = game.coverUrl;
+        duplicate.releaseDate = game.releaseDate;
+        if (values.status !== undefined) duplicate.status = values.status;
+        if (values.isOwned !== undefined) duplicate.isOwned = values.isOwned;
+        if (values.storeName !== undefined)
+          duplicate.storeName = values.storeName;
+        if (values.platformName !== undefined)
+          duplicate.platformName = values.platformName;
+        if (values.shareWithHousehold !== undefined)
+          duplicate.shareWithHousehold = values.shareWithHousehold;
+        if (
+          duplicate.shareWithHousehold &&
+          !duplicate.isOwned &&
+          !duplicate.steamOwned
+        ) {
+          throw new Error('Mark this game owned before sharing it.');
+        }
+        if (!duplicate.isOwned && !duplicate.steamOwned) {
+          duplicate.shareWithHousehold = false;
+        }
         await entries.save(duplicate);
         await entries.delete({ id: imported.id, userId: req.user!.id });
         return duplicate;
       }
-      imported.externalKey = `igdb:${game.igdbId}`;
-      imported.catalogId = game.igdbId;
+      imported.externalKey = `igdb:${values.catalogId}`;
+      imported.catalogId = values.catalogId;
       imported.category = values.category;
       imported.title = game.title;
       imported.summary = game.summary;
       imported.coverUrl = game.coverUrl;
       imported.releaseDate = game.releaseDate;
       imported.source = 'manual';
-      imported.status = values.status;
-      imported.isOwned = values.isOwned;
-      imported.storeName =
-        values.storeName || (imported.steamOwned ? 'Steam' : '');
-      imported.platformName = values.platformName || imported.platformName;
-      imported.shareWithHousehold = values.shareWithHousehold;
+      if (values.status !== undefined) imported.status = values.status;
+      if (values.isOwned !== undefined) imported.isOwned = values.isOwned;
+      if (values.storeName !== undefined) {
+        imported.storeName =
+          values.storeName || (imported.steamOwned ? 'Steam' : '');
+      } else if (!imported.storeName && imported.steamOwned) {
+        imported.storeName = 'Steam';
+      }
+      if (values.platformName !== undefined) {
+        imported.platformName = values.platformName;
+      }
+      if (values.shareWithHousehold !== undefined) {
+        imported.shareWithHousehold = values.shareWithHousehold;
+      }
+      if (
+        imported.shareWithHousehold &&
+        !imported.isOwned &&
+        !imported.steamOwned
+      ) {
+        throw new Error('Mark this game owned before sharing it.');
+      }
+      if (!imported.isOwned && !imported.steamOwned) {
+        imported.shareWithHousehold = false;
+      }
       return entries.save(imported);
     });
     return res.json({ entry: serializeGameLibraryEntry(matched) });

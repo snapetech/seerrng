@@ -2,6 +2,10 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import useLocale from '@app/hooks/useLocale';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  IMDB_CSV_IMPORT_BATCH_SIZE,
+  parseImdbWatchlistCsv,
+} from '@app/utils/imdbWatchlistCsv';
 import axios from 'axios';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
@@ -10,7 +14,7 @@ import useSWR from 'swr';
 
 interface ExternalRequestList {
   id: number;
-  provider: 'imdb' | 'goodreads' | 'hardcover';
+  provider: 'imdb' | 'imdb-csv' | 'goodreads' | 'hardcover';
   sourceUrl: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
@@ -29,13 +33,17 @@ const messages = defineMessages(
   {
     title: 'External request lists',
     description:
-      'Connect a public IMDb watchlist, Goodreads to-read shelf, or your Hardcover Want to Read shelf. New items are checked daily and requested through your normal permissions and approval settings.',
+      'Connect a public IMDb watchlist, Goodreads to-read shelf, or your Hardcover Want to Read shelf. New items are checked daily and requested through your normal permissions and approval settings. If IMDb blocks server-side sync, export your watchlist as CSV and import the file here.',
     urlLabel: 'Public list URL',
     urlPlaceholder: 'https://www.imdb.com/user/ur12345678/watchlist/',
     add: 'Add list',
     adding: 'Adding…',
     empty: 'No external lists are connected.',
     imdb: 'IMDb watchlist',
+    imdbCsv: 'IMDb watchlist (CSV import)',
+    importImdbCsv: 'Import IMDb CSV export',
+    importingImdbCsv: 'Importing IMDb export…',
+    imdbCsvTooLarge: 'The IMDb export file must be 5 MB or smaller.',
     goodreads: 'Goodreads to-read shelf',
     hardcover: 'Hardcover Want to Read',
     hardcoverToken: 'Hardcover API token',
@@ -138,6 +146,62 @@ const ExternalRequestLists = () => {
     }
   };
 
+  const importImdbCsv = async (list: ExternalRequestList, file: File) => {
+    setMessage(undefined);
+    setErrorMessage(undefined);
+    setBusyListId(list.id);
+    try {
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error(intl.formatMessage(messages.imdbCsvTooLarge));
+      }
+      const { ids } = parseImdbWatchlistCsv(await file.text());
+      const summary = {
+        requested: 0,
+        alreadyRequested: 0,
+        unmatched: 0,
+        failed: 0,
+        error: undefined as string | undefined,
+      };
+      for (
+        let offset = 0;
+        offset < ids.length;
+        offset += IMDB_CSV_IMPORT_BATCH_SIZE
+      ) {
+        const { data } = await axios.post<ExternalRequestListSyncResult>(
+          `/api/v1/request/lists/${list.id}/import`,
+          {
+            itemIds: ids.slice(offset, offset + IMDB_CSV_IMPORT_BATCH_SIZE),
+          }
+        );
+        summary.requested += data.requested;
+        summary.alreadyRequested += data.alreadyRequested;
+        summary.unmatched += data.unmatched;
+        summary.failed += data.failed;
+        summary.error = data.error ?? summary.error;
+      }
+      setMessage(
+        intl.formatMessage(messages.syncSummary, {
+          requested: summary.requested,
+          alreadyRequested: summary.alreadyRequested,
+          unmatched: summary.unmatched,
+          failed: summary.failed,
+        })
+      );
+      if (summary.error) setErrorMessage(summary.error);
+      await mutate();
+    } catch (error) {
+      setErrorMessage(
+        axios.isAxiosError(error)
+          ? formatError(error)
+          : error instanceof Error
+            ? error.message
+            : formatError(error)
+      );
+    } finally {
+      setBusyListId(null);
+    }
+  };
+
   const removeList = async (list: ExternalRequestList) => {
     setMessage(undefined);
     setErrorMessage(undefined);
@@ -226,9 +290,11 @@ const ExternalRequestLists = () => {
                   {intl.formatMessage(
                     list.provider === 'imdb'
                       ? messages.imdb
-                      : list.provider === 'goodreads'
-                        ? messages.goodreads
-                        : messages.hardcover
+                      : list.provider === 'imdb-csv'
+                        ? messages.imdbCsv
+                        : list.provider === 'goodreads'
+                          ? messages.goodreads
+                          : messages.hardcover
                   )}
                 </span>
                 <a
@@ -251,17 +317,41 @@ const ExternalRequestLists = () => {
                   <span className="error">{list.lastSyncError}</span>
                 )}
                 <div className="app-action-row">
-                  <Button
-                    buttonType="default"
-                    buttonSize="sm"
-                    type="button"
-                    disabled={busyListId !== null}
-                    onClick={() => void syncList(list)}
-                  >
-                    {busyListId === list.id
-                      ? intl.formatMessage(messages.syncing)
-                      : intl.formatMessage(messages.sync)}
-                  </Button>
+                  {(list.provider === 'imdb' ||
+                    list.provider === 'imdb-csv') && (
+                    <label className="app-list-value flex flex-wrap items-center gap-2">
+                      {intl.formatMessage(
+                        busyListId === list.id
+                          ? messages.importingImdbCsv
+                          : messages.importImdbCsv
+                      )}
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        aria-label={intl.formatMessage(messages.importImdbCsv)}
+                        disabled={busyListId !== null}
+                        onChange={(event) => {
+                          const target = event.currentTarget;
+                          const file = target.files?.[0];
+                          target.value = '';
+                          if (file) void importImdbCsv(list, file);
+                        }}
+                      />
+                    </label>
+                  )}
+                  {list.provider !== 'imdb-csv' && (
+                    <Button
+                      buttonType="default"
+                      buttonSize="sm"
+                      type="button"
+                      disabled={busyListId !== null}
+                      onClick={() => void syncList(list)}
+                    >
+                      {busyListId === list.id
+                        ? intl.formatMessage(messages.syncing)
+                        : intl.formatMessage(messages.sync)}
+                    </Button>
+                  )}
                   <Button
                     buttonType="danger"
                     buttonSize="sm"

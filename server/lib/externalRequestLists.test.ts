@@ -15,10 +15,13 @@ import {
   parseExternalRequestListUrl,
   parseGoodreadsToReadFeed,
   parseImdbWatchlistHtml,
+  parseImdbWatchlistResponse,
   resolveGoodreadsItem,
   resolveImdbItem,
+  syncAllExternalRequestLists,
   syncExternalRequestList,
   type ExternalRequestListSyncAdapters,
+  type ExternalRequestListSyncResult,
 } from '@server/lib/externalRequestLists';
 import { setupTestDb } from '@server/test/db';
 
@@ -101,6 +104,26 @@ describe('external request list synchronization', () => {
           isbn13: '9780441478125',
         },
       ]
+    );
+  });
+
+  it('reports IMDb automated access challenges separately from private lists', () => {
+    const challengeHtml = `
+      <script>
+        window.awsWafCookieDomainList = ['imdb.com'];
+        window.gokuProps = {};
+      </script>
+      <script src="https://example.token.awswaf.com/challenge.js"></script>
+      <div id="challenge-container"></div>
+    `;
+
+    assert.throws(
+      () => parseImdbWatchlistHtml(challengeHtml),
+      /automated access verification page instead of the watchlist/
+    );
+    assert.throws(
+      () => parseImdbWatchlistResponse({ body: '', status: 202 }),
+      /automated access verification page instead of the watchlist/
     );
   });
 
@@ -193,6 +216,51 @@ describe('external request list synchronization', () => {
 
     assert.equal(result.failed, 0);
     assert.equal(fetchedProfileId, profileId);
+  });
+
+  it('uses imported IMDb CSV IDs without fetching the watchlist page', async () => {
+    const user = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    const repository = getRepository(ExternalRequestList);
+    const list = await repository.save(
+      new ExternalRequestList({
+        user,
+        provider: 'imdb-csv',
+        sourceId: 'ur12345678',
+        sourceUrl: 'https://www.imdb.com/user/ur12345678/watchlist/',
+        processedItemIds: [],
+      })
+    );
+    let fetchedWatchlist = false;
+    let resolvedId = '';
+    const adapters: ExternalRequestListSyncAdapters = {
+      fetchImdbWatchlist: async () => {
+        fetchedWatchlist = true;
+        return [];
+      },
+      fetchGoodreadsToRead: async () => [],
+      resolveImdbItem: async (id) => {
+        resolvedId = id;
+        return {
+          request: { mediaType: MediaType.MOVIE, mediaId: 123 },
+        };
+      },
+      resolveGoodreadsItem: async () => undefined,
+      requestMedia: async () => ({}),
+      saveList: (record) => repository.save(record),
+      now: () => new Date('2026-10-08T12:00:00.000Z'),
+    };
+
+    const result = await syncExternalRequestList(list, user, adapters, [
+      { id: 'tt1234567' },
+    ]);
+
+    assert.equal(result.requested, 1);
+    assert.equal(result.failed, 0);
+    assert.equal(fetchedWatchlist, false);
+    assert.equal(resolvedId, 'tt1234567');
+    assert.deepEqual(list.processedItemIds, ['tt1234567']);
   });
 
   it('submits new IMDb entries as the list owner through MediaRequest.request', async () => {
@@ -291,5 +359,52 @@ describe('external request list synchronization', () => {
     assert.equal(result.alreadyRequested, 1);
     assert.equal(result.failed, 0);
     assert.deepEqual(list.processedItemIds, ['tt9876543']);
+  });
+
+  it('synchronizes every saved list through bounded ID batches', async () => {
+    const user = await getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    const repository = getRepository(ExternalRequestList);
+    await repository.save(
+      Array.from(
+        { length: 5 },
+        (_, index) =>
+          new ExternalRequestList({
+            user,
+            provider: index === 0 ? 'imdb-csv' : 'imdb',
+            sourceId: `ur${12345678 + index}`,
+            sourceUrl: `https://www.imdb.com/user/ur${12345678 + index}/watchlist/`,
+            processedItemIds: [],
+          })
+      )
+    );
+
+    const processedIds: number[] = [];
+    const syncOne = async (
+      list: ExternalRequestList,
+      owner: User
+    ): Promise<ExternalRequestListSyncResult> => {
+      assert.equal(owner.id, user.id);
+      processedIds.push(list.id);
+      return {
+        listId: list.id,
+        provider: list.provider,
+        sourceItems: 0,
+        requested: 0,
+        alreadyRequested: 0,
+        unmatched: 0,
+        failed: 0,
+        lastSyncedAt: '2026-10-04T12:00:00.000Z',
+      };
+    };
+
+    await syncAllExternalRequestLists(syncOne, 2);
+
+    assert.equal(processedIds.length, 4);
+    assert.deepEqual(
+      processedIds,
+      [...processedIds].sort((a, b) => a - b)
+    );
   });
 });

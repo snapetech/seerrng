@@ -207,7 +207,6 @@ export function readNodeTapHierarchy(
       }
       const plan = new RegExp('^' + indent(n) + '1\\.\\.(\\d+)$').exec(line);
       if (plan) {
-        if (declared !== null) issue('Duplicate level plan');
         declared = Number(plan[1]);
         cursor++;
         break;

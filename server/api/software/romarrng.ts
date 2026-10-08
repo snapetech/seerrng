@@ -9,6 +9,7 @@ import type {
   SoftwareAssetsResponse,
   SoftwareCatalogGame,
   SoftwareCatalogPlatform,
+  SoftwareDatCatalogPlatformsResponse,
   SoftwareProviderHandshake,
   SoftwareProviderRequest,
 } from './types';
@@ -195,6 +196,68 @@ export class ROMarrNGAPI extends ExternalAPI {
     );
   }
 
+  public getDatCatalogPlatforms(): Promise<SoftwareDatCatalogPlatformsResponse> {
+    return this.getIntegrationBase().then((base) =>
+      this.get(`${base}/catalog/dat/platforms`, {}, 600)
+    );
+  }
+
+  public searchDatCatalogPage(
+    query: string,
+    limit = 24,
+    cursor?: string,
+    platformSlugs: string[] = []
+  ): Promise<RomarrCatalogSearchPage> {
+    return this.getIntegrationBase().then((base) =>
+      this.get(
+        `${base}/catalog/dat/search-page`,
+        {
+          params: {
+            q: query,
+            limit,
+            ...(cursor ? { cursor } : {}),
+            ...(platformSlugs.length
+              ? { platformSlugs: platformSlugs.join(',') }
+              : {}),
+          },
+        },
+        600
+      )
+    );
+  }
+
+  public browseDatCatalogPage(
+    limit = 24,
+    offset = 0,
+    platformSlugs: string[] = []
+  ): Promise<RomarrCatalogPopularPage> {
+    return this.getIntegrationBase().then((base) =>
+      this.get(
+        `${base}/catalog/dat/browse-page`,
+        {
+          params: {
+            limit,
+            offset,
+            ...(platformSlugs.length
+              ? { platformSlugs: platformSlugs.join(',') }
+              : {}),
+          },
+        },
+        600
+      )
+    );
+  }
+
+  public getDatCatalogGame(catalogKey: string): Promise<SoftwareCatalogGame> {
+    return this.getIntegrationBase().then((base) =>
+      this.get(
+        `${base}/catalog/dat/games/${encodeURIComponent(catalogKey)}`,
+        {},
+        600
+      )
+    );
+  }
+
   public getPlatforms(forceFresh = false): Promise<RomarrPlatform[]> {
     return this.get('/api/platforms', {}, forceFresh ? 0 : 300);
   }
@@ -212,7 +275,8 @@ export class ROMarrNGAPI extends ExternalAPI {
     game: string,
     platform: string,
     catalogId?: number,
-    platformId?: number
+    platformId?: number,
+    datIdentity?: { catalogKey: string; platformSlug: string }
   ): Promise<SoftwareProviderRequest> {
     return this.getIntegrationBase().then((base) =>
       this.post(`${base}/requests`, {
@@ -221,7 +285,15 @@ export class ROMarrNGAPI extends ExternalAPI {
         platform,
         ...(base.includes('/seerrng/v1') && catalogId
           ? { identity: { catalogProvider: 'igdb', catalogId, platformId } }
-          : {}),
+          : datIdentity && base.includes('/seerrng/v1')
+            ? {
+                identity: {
+                  catalogProvider: 'dat',
+                  catalogKey: datIdentity.catalogKey,
+                  platformSlug: datIdentity.platformSlug,
+                },
+              }
+            : {}),
       })
     );
   }

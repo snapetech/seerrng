@@ -30,7 +30,7 @@ layers.
 | Provider | Used for | What SeerrNG reads or sends |
 | --- | --- | --- |
 | [QuestarrNG](https://github.com/snapetech/QuestarrNG) | Default IGDB catalog source and PC game acquisition | Searches and popular titles, IGDB platform details, stable request identity and selected PC target, request progress, and imported files |
-| [ROMarrNG](https://github.com/snapetech/ROMarrNG) | Supported emulation systems and acquisition for ROM requests; optional IGDB catalog source for emulation | Supported platform list and aliases, optional IGDB search and browse, stable request identity and selected system, request progress, and imported files |
+| [ROMarrNG](https://github.com/snapetech/ROMarrNG) | Supported emulation systems and acquisition for ROM requests; optional IGDB or loaded DAT catalog source for emulation | Supported platform list and aliases, optional IGDB search and browse or DAT-backed browse, stable request identity and selected system, request progress, and imported files |
 
 Both providers are separate **NG** forks maintained for SeerrNG integration.
 Their project documentation identifies the upstream project, describes the
@@ -38,13 +38,14 @@ SeerrNG integration, and links back to the SeerrNG repository. Use the
 provider's SeerrNG integration API key and contract. SeerrNG does not use a
 provider's browser UI or expose its credentials to requesters.
 
-Provider handshakes can report retry, cancel, asset, and catalog capabilities.
+Provider handshakes can report retry, cancel, asset, IGDB catalog, and DAT
+catalog capabilities.
 Request Status follows reported retry and cancel availability and shows the
 provider's reason when an action is unavailable. Providers that do not report
 these optional capabilities continue to use the existing v1 acquisition
 contract. The emulation catalog source is QuestarrNG by default; SeerrNG only
-saves ROMarrNG as the source when ROMarrNG explicitly advertises the SeerrNG
-catalog capability.
+saves a ROMarrNG catalog source when that provider advertises the matching
+capability in its SeerrNG handshake.
 
 ## Configure the providers
 
@@ -56,12 +57,15 @@ port, optional base path, SSL setting, and API key.
    source.
 2. Configure **ROMarrNG** if users should request emulation games. To use its
    IGDB catalog, configure an IGDB metadata provider in ROMarrNG first.
-3. Select **Test connection** for each provider. ROMarrNG also reports its
-   supported-system count and whether that version advertises the optional
-   SeerrNG IGDB catalog API.
-4. Under **Emulation catalog source**, choose QuestarrNG or ROMarrNG. Save
-   verifies ROMarrNG's catalog capability again. PC game catalog and
-   acquisition always use QuestarrNG, and ROM acquisition always uses ROMarrNG.
+3. Select **Test connection** for each provider. ROMarrNG reports its
+   supported-system count and which optional IGDB or DAT catalog capabilities
+   are available. DAT readiness includes the number of systems with matched
+   entries and any unmatched DAT header names for review.
+4. Under **Emulation catalog source**, choose QuestarrNG, ROMarrNG's IGDB
+   catalog, or **ROMarrNG · DAT**. The DAT option is available only when
+   ROMarrNG advertises the capability and has loaded DAT entries. Save checks
+   the selected capability again. PC game catalog and acquisition always use
+   QuestarrNG, and ROM acquisition always uses ROMarrNG.
 5. Select **Save settings**. SeerrNG reloads the ROMarrNG system list after the
    provider settings are saved.
 6. Assign each supported ROMarrNG system to **Retro** or **Modern**, then save
@@ -78,12 +82,12 @@ emulation systems and ROM acquisition. Existing ROMarrNG installations keep
 using their documented v1 request and status routes. ROMarrNG v1 and v2
 contract handshakes use the stable `/api/integration/seerrng/v1` routes; older
 builds without a contract version continue using `/api/v1/integration`. The
-ROMarrNG catalog is enabled only by a provider build that advertises that
-capability.
+ROMarrNG IGDB or DAT catalog is enabled only when the provider advertises its
+matching capability.
 These connections are independent of Radarr, Sonarr, Bookshelf, and the other
 media automation services.
 
-## Assign emulation systems
+## Match IGDB platforms and assign emulation systems
 
 ROMarrNG's supported platform list is the source of selectable emulation
 systems. The administrator assigns each system to one of these groups:
@@ -98,10 +102,32 @@ change ROMarrNG's platform setup or automatically classify systems; choose the
 group for each platform that matches how you want users to browse it.
 
 The assignment is saved by the system's stable slug, so a provider display-name
-change does not discard it. SeerrNG matches IGDB catalog platforms to a
-ROMarrNG system name, slug, or alias. If there is no match, the title is not
-offered for that emulation system. Review new systems after updating ROMarrNG
-and save their group before users request them.
+change does not discard it. For IGDB catalogs, SeerrNG matches catalog
+platforms to a ROMarrNG system name, slug, or alias when the match is unique.
+Open **Preview platform matches** to review automatic matches, unmatched
+systems, and unused IGDB platforms. Choose a platform override when an
+automatic match is missing or incorrect; choosing **Automatic match** removes
+the saved override. A system without an IGDB match is hidden from IGDB-backed
+emulation browsing until it is mapped. Review new systems after updating
+ROMarrNG and save their group before users request them.
+
+## Use ROMarrNG's DAT catalog
+
+ROMarrNG can provide a second emulation catalog from its loaded DAT files. DAT
+headers are matched against ROMarrNG's declared system names and aliases.
+Unmatched or ambiguous headers stay out of browsing and appear in the
+connection result so an administrator can identify DATs that need attention.
+DAT browsing includes systems with matched entries; the system group still
+controls whether each system appears under Retro or Modern.
+
+DAT entries are grouped by title and system and use ROMarrNG's configured 1G1R
+region preference. The catalog supports title search and alphabetical
+browsing. DATs do not provide IGDB's artwork, popularity, genres, ratings, or
+release dates, so SeerrNG does not show IGDB genre or release-year filters for
+this source. Requests retain the stable DAT catalog key and selected system,
+including through provider retry, so a changed title cannot silently inherit
+the same request identity. Replacing a DAT version keeps an existing key when
+the same system, DAT name, and title group remain present.
 
 ## Browse and submit requests
 
@@ -144,9 +170,9 @@ availability and downloadable-file availability remain separate in that case.
 Within PC Games, select Windows, Linux, or macOS to narrow the catalog. The PC
 platform choice is preselected when opening a request and can still be changed
 before submission.
-Use **Genre** and **Release year** to narrow any software category. These filters
-apply to the selected catalog provider before pages are returned and require a
-build with SeerrNG's paged catalog contract.
+For IGDB catalogs, use **Genre** and **Release year** to narrow any software
+category. These filters apply before pages are returned. DAT catalogs support
+title and system filters only.
 
 Software titles load as you scroll, with a **Load more titles** button available
 when another page exists. SeerrNG filters by the selected PC or emulation
@@ -229,6 +255,12 @@ SeerrNG refreshes active provider requests in the background once per minute
 and while Request Status is open. An available library item may not have a
 download action when its files are remote or unavailable to SeerrNG. A
 provider-reported completion alone never exposes a download action.
+
+When a provider reports a real percentage, Request Status shows it with a
+progress bar. ROMarrNG currently reports the acquisition stage without a
+percentage because it cannot measure a reliable overall download percentage.
+Failure codes identify the type of failure while the displayed explanation
+stays readable. Provider status never exposes local filesystem paths.
 
 ### Cancel an active request
 

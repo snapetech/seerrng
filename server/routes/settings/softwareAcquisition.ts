@@ -8,6 +8,10 @@ import type {
   SoftwareProviderSettings,
 } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import {
+  getAutomaticCatalogPlatform,
+  type CatalogPlatformLabel,
+} from '@server/lib/softwareCatalogPlatformMapping';
 import { authorizedMutation } from '@server/middleware/authorizedMutation';
 import {
   REDACTED_SECRET,
@@ -108,6 +112,38 @@ const parseSystemGroups = (
   return { value: groups };
 };
 
+const parsePlatformMappings = (
+  value: unknown,
+  current: SoftwareAcquisitionSettings['emulationPlatformMappings']
+):
+  | { value: SoftwareAcquisitionSettings['emulationPlatformMappings'] }
+  | { error: string } => {
+  if (value === undefined) return { value: current };
+  if (!isRecord(value) || Object.keys(value).length > 500) {
+    return {
+      error: 'Platform mappings must be an object of at most 500 systems.',
+    };
+  }
+  const mappings: Record<string, number> = {};
+  for (const [rawSlug, platformId] of Object.entries(value)) {
+    const slug = rawSlug.trim().toLowerCase();
+    if (
+      !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(slug) ||
+      !Number.isSafeInteger(platformId) ||
+      (platformId as number) < 1 ||
+      (platformId as number) > 9_999_999_999 ||
+      Object.prototype.hasOwnProperty.call(mappings, slug)
+    ) {
+      return {
+        error:
+          'Each platform mapping needs a valid system slug and IGDB platform ID.',
+      };
+    }
+    mappings[slug] = platformId as number;
+  }
+  return { value: mappings };
+};
+
 const settingsView = (settings: SoftwareAcquisitionSettings) => ({
   romarr: {
     ...settings.romarr,
@@ -121,6 +157,7 @@ const settingsView = (settings: SoftwareAcquisitionSettings) => ({
   },
   emulationCatalogProvider: settings.emulationCatalogProvider ?? 'questarr',
   emulationSystemGroups: settings.emulationSystemGroups,
+  emulationPlatformMappings: settings.emulationPlatformMappings ?? {},
   steamApiKey: settings.steamApiKey ? REDACTED_SECRET : '',
   steamApiKeyConfigured: Boolean(settings.steamApiKey),
 });
@@ -131,6 +168,7 @@ const hasProviderCapabilities = (
   if (!isRecord(value) || !isRecord(value.requestActions)) return false;
   return (
     typeof value.catalog === 'boolean' &&
+    (value.datCatalog === undefined || typeof value.datCatalog === 'boolean') &&
     typeof value.pcAcquisition === 'boolean' &&
     typeof value.emulationAcquisition === 'boolean' &&
     typeof value.requestActions.retry === 'boolean' &&
@@ -209,6 +247,93 @@ softwareAcquisitionRoutes.get('/', (_req, res) => {
   res.status(200).json(settingsView(getSettings().softwareAcquisition));
 });
 
+softwareAcquisitionRoutes.get(
+  '/platform-mapping/preview',
+  async (_req, res) => {
+    const settings = getSettings().softwareAcquisition;
+    if (!settings.romarr.hostname || !settings.romarr.apiKey) {
+      return res.status(503).json({
+        error: 'Connect ROMarrNG before previewing platform matches.',
+      });
+    }
+    try {
+      const api = new ROMarrNGAPI(settings.romarr);
+      const [romarrSystems, rawPlatforms] = await Promise.all([
+        api.getPlatforms(true),
+        api.getCatalogPlatforms(),
+      ]);
+      const catalogPlatforms = rawPlatforms.filter(
+        (platform): platform is CatalogPlatformLabel =>
+          Number.isSafeInteger(platform.id) &&
+          platform.id > 0 &&
+          typeof platform.name === 'string' &&
+          platform.name.length > 0 &&
+          platform.name.length <= 128
+      );
+      const systems = romarrSystems
+        .filter(
+          (system) =>
+            typeof system.slug === 'string' &&
+            /^[a-z0-9][a-z0-9_-]{0,63}$/.test(system.slug) &&
+            typeof system.name === 'string' &&
+            system.name.length > 0
+        )
+        .map((system) => {
+          const automaticMatch = getAutomaticCatalogPlatform(
+            system,
+            catalogPlatforms
+          );
+          const overrideId =
+            settings.emulationPlatformMappings[system.slug] ?? null;
+          const selectedMatch = overrideId
+            ? catalogPlatforms.find((platform) => platform.id === overrideId)
+            : automaticMatch;
+          const status = overrideId
+            ? selectedMatch
+              ? 'manual'
+              : 'unmatched'
+            : automaticMatch
+              ? 'automatic'
+              : 'unmatched';
+          return {
+            slug: system.slug,
+            name: system.name,
+            aliases: Array.isArray(system.aliases)
+              ? system.aliases
+                  .filter(
+                    (alias): alias is string =>
+                      typeof alias === 'string' && alias.length > 0
+                  )
+                  .slice(0, 100)
+              : [],
+            automaticMatch: automaticMatch ?? null,
+            selectedMatch: selectedMatch ?? null,
+            status,
+          };
+        });
+      const usedIds = new Set(
+        systems.flatMap((system) =>
+          system.selectedMatch ? [system.selectedMatch.id] : []
+        )
+      );
+      return res.status(200).json({
+        systems,
+        catalogPlatforms,
+        unmatchedSystems: systems
+          .filter((system) => system.status === 'unmatched')
+          .map(({ slug, name }) => ({ slug, name })),
+        unmatchedCatalogPlatforms: catalogPlatforms.filter(
+          (platform) => !usedIds.has(platform.id)
+        ),
+      });
+    } catch (error) {
+      return res.status(502).json({
+        error: providerFailureMessage('romarr', 'platform list', error),
+      });
+    }
+  }
+);
+
 softwareAcquisitionRoutes.put(
   '/',
   authorizedMutation(Permission.ADMIN, async (req, res) => {
@@ -240,19 +365,17 @@ softwareAcquisitionRoutes.put(
     if ('error' in emulationSystemGroups) {
       return res.status(400).json({ error: emulationSystemGroups.error });
     }
+    const emulationPlatformMappings = parsePlatformMappings(
+      req.body.emulationPlatformMappings,
+      current.emulationPlatformMappings ?? {}
+    );
+    if ('error' in emulationPlatformMappings) {
+      return res.status(400).json({ error: emulationPlatformMappings.error });
+    }
     const emulationCatalogProvider =
       req.body.emulationCatalogProvider ??
       current.emulationCatalogProvider ??
       'questarr';
-    if (
-      emulationCatalogProvider !== 'questarr' &&
-      emulationCatalogProvider !== 'romarr'
-    ) {
-      return res.status(400).json({
-        error: 'Emulation catalog provider must be QuestarrNG or ROMarrNG.',
-      });
-    }
-
     const steamApiKey = req.body.steamApiKey ?? current.steamApiKey ?? '';
     if (
       typeof steamApiKey !== 'string' ||
@@ -261,29 +384,47 @@ softwareAcquisitionRoutes.put(
     ) {
       return res.status(400).json({ error: 'Steam Web API key is invalid.' });
     }
+    if (
+      emulationCatalogProvider !== 'questarr' &&
+      emulationCatalogProvider !== 'romarr' &&
+      emulationCatalogProvider !== 'romarr-dat'
+    ) {
+      return res.status(400).json({
+        error:
+          'Choose QuestarrNG, ROMarrNG IGDB, or ROMarrNG DAT as the emulation catalog.',
+      });
+    }
 
-    if (emulationCatalogProvider === 'romarr') {
+    if (
+      emulationCatalogProvider === 'romarr' ||
+      emulationCatalogProvider === 'romarr-dat'
+    ) {
       if (!romarr.value.hostname || !romarr.value.apiKey) {
         return res.status(400).json({
           error:
-            'Connect ROMarrNG and confirm its IGDB catalog capability before selecting it as the emulation catalog.',
+            'Connect ROMarrNG and confirm the selected catalog capability before choosing it as the emulation catalog.',
         });
       }
       try {
         const handshake = await new ROMarrNGAPI(romarr.value).getHandshake();
         if (
           !isSupportedHandshake('romarr', handshake) ||
-          handshake.capabilities?.catalog !== true
+          (emulationCatalogProvider === 'romarr'
+            ? handshake.capabilities?.catalog !== true
+            : handshake.requestContractVersion !== 2 ||
+              handshake.capabilities?.datCatalog !== true)
         ) {
           return res.status(400).json({
             error:
-              'This ROMarrNG version does not advertise the SeerrNG IGDB catalog. Keep QuestarrNG selected or upgrade ROMarrNG.',
+              emulationCatalogProvider === 'romarr'
+                ? 'This ROMarrNG version does not advertise the SeerrNG IGDB catalog. Keep QuestarrNG selected or upgrade ROMarrNG.'
+                : 'ROMarrNG must advertise the version 2 DAT catalog and have DATs loaded before you select it.',
           });
         }
       } catch {
         return res.status(400).json({
           error:
-            'ROMarrNG could not be reached to confirm its IGDB catalog capability.',
+            'ROMarrNG could not be reached to confirm the selected catalog capability.',
         });
       }
     }
@@ -293,6 +434,7 @@ softwareAcquisitionRoutes.put(
       questarr: questarr.value,
       emulationCatalogProvider,
       emulationSystemGroups: emulationSystemGroups.value,
+      emulationPlatformMappings: emulationPlatformMappings.value,
       steamApiKey,
     };
     const settings = getSettings();
@@ -344,6 +486,9 @@ softwareAcquisitionRoutes.post(
         }
         phase = 'platform list';
         const platforms = await api.getPlatforms(true);
+        const datCatalog = handshake.capabilities?.datCatalog
+          ? await api.getDatCatalogPlatforms()
+          : undefined;
         return res.status(200).json({
           success: true,
           service: 'ROMarrNG',
@@ -356,6 +501,12 @@ softwareAcquisitionRoutes.post(
             ? { capabilities: handshake.capabilities }
             : {}),
           platformCount: platforms.length,
+          ...(datCatalog
+            ? {
+                datCatalogPlatformCount: datCatalog.results.length,
+                unmatchedDatNames: datCatalog.unmatchedDatNames,
+              }
+            : {}),
         });
       }
 

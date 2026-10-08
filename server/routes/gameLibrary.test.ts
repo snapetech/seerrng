@@ -14,6 +14,7 @@ import { setupTestDb } from '@server/test/db';
 import type { Request } from 'express';
 import express, { type Express } from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
+import rateLimit from 'express-rate-limit';
 import request from 'supertest';
 import gameLibraryRoutes from './gameLibrary';
 
@@ -48,6 +49,14 @@ const createApp = (
     req.session = session as unknown as Request['session'];
     next();
   });
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: 1000,
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  );
   app.use(checkUser);
   app.use(
     OpenApiValidator.middleware({
@@ -96,6 +105,7 @@ const configureSettings = () => {
     },
     emulationCatalogProvider: 'questarr',
     emulationSystemGroups: {},
+    emulationPlatformMappings: {},
     steamApiKey: 'steam-server-test-key',
   };
 };
@@ -129,6 +139,34 @@ beforeEach(() => configureSettings());
 afterEach(() => mock.restoreAll());
 
 describe('game library routes', () => {
+  it('limits game library requests per user outside test mode', async () => {
+    const testEnvironment = process.env as Record<string, string | undefined>;
+    const previousNodeEnv = testEnvironment.NODE_ENV;
+    const previousE2eTests = testEnvironment.E2E_TESTS;
+    testEnvironment.NODE_ENV = 'production';
+    delete testEnvironment.E2E_TESTS;
+
+    try {
+      const app = createApp().app;
+      const statuses: number[] = [];
+      for (let index = 0; index < 121; index += 1) {
+        const response = await request(app)
+          .get('/api/v1/game-library/steam/connect')
+          .redirects(0);
+        statuses.push(response.status);
+      }
+
+      assert.equal(statuses.filter((status) => status === 429).length, 1);
+      assert.equal(statuses.filter((status) => status === 302).length, 120);
+    } finally {
+      if (previousNodeEnv === undefined) delete testEnvironment.NODE_ENV;
+      else testEnvironment.NODE_ENV = previousNodeEnv;
+
+      if (previousE2eTests === undefined) delete testEnvironment.E2E_TESTS;
+      else testEnvironment.E2E_TESTS = previousE2eTests;
+    }
+  });
+
   it('keeps libraries private by default and groups only explicitly shared owned games', async () => {
     const ownerApp = createApp(2).app;
     const householdApp = createApp(3).app;
@@ -218,6 +256,84 @@ describe('game library routes', () => {
       .query({ category: 'game', catalogId: 42 });
     assert.equal(lookup.status, 200, JSON.stringify(lookup.body));
     assert.equal(lookup.body.entry.id, existing.id);
+  });
+
+  it('stores the validated catalog ID when adding a new catalog title', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+
+    const response = await request(createApp().app)
+      .post('/api/v1/game-library')
+      .send({ category: 'game', catalogId: 42 });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.catalogId, 42);
+    assert.equal(response.body.entry.externalKey, 'igdb:42');
+  });
+
+  it('preserves unmatched library state when a title is linked with minimal input', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+    const imported = await manualEntry({
+      status: 'completed',
+      isOwned: true,
+      storeName: 'GOG',
+      platformName: 'Linux',
+      shareWithHousehold: true,
+    });
+
+    const response = await request(createApp().app)
+      .post(`/api/v1/game-library/${imported.id}/match`)
+      .send({ category: 'game', catalogId: 42 });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.status, 'completed');
+    assert.equal(response.body.entry.isOwned, true);
+    assert.equal(response.body.entry.storeName, 'GOG');
+    assert.equal(response.body.entry.platformName, 'Linux');
+    assert.equal(response.body.entry.shareWithHousehold, true);
+  });
+
+  it('allows household sharing for a Steam-owned match and retains Steam facts', async () => {
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getCatalogGame',
+      async () => catalogGame
+    );
+    const imported = await manualEntry({
+      externalKey: 'steam:413150',
+      source: 'steam',
+      steamAppId: 413150,
+      steamOwned: true,
+      playtimeMinutes: 125,
+      status: 'playing',
+      storeName: 'Steam',
+      platformName: 'PC',
+    });
+
+    const response = await request(createApp().app)
+      .post(`/api/v1/game-library/${imported.id}/match`)
+      .send({
+        category: 'game',
+        catalogId: 42,
+        status: 'playing',
+        isOwned: false,
+        storeName: 'Steam',
+        platformName: 'PC',
+        shareWithHousehold: true,
+      });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.entry.shareWithHousehold, true);
+    assert.equal(response.body.entry.steamOwned, true);
+    assert.equal(response.body.entry.playtimeMinutes, 125);
+    assert.equal(response.body.entry.storeName, 'Steam');
   });
 
   it('requires a signed-in browser session for changes, even with an API key', async () => {

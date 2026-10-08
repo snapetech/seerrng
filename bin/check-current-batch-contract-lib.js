@@ -5092,7 +5092,7 @@ const validateCurrentBatchContract = (files) => {
     '<Header>{intl.formatMessage(globalMessages.settings)}</Header>',
     '<SettingsTabs tabType="filter" settingsRoutes={settingsRoutes} />',
     'className="discover-filter-control settings-page-search"',
-    '<article className="app-card-main settings-main-card">',
+    '<article className="app-card-main settings-main-card max-w-full min-w-0">',
     'className="settings-page-actions"',
     'buttonType="danger"',
     'buttonType="success"',

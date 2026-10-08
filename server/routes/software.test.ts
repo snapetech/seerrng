@@ -73,6 +73,7 @@ const providerSettings = () => {
     },
     emulationCatalogProvider: 'questarr',
     emulationSystemGroups: { nes: 'retro' },
+    emulationPlatformMappings: {},
     steamApiKey: '',
   };
 };
@@ -180,6 +181,8 @@ const createSoftwareRequest = async (options: {
       status: options.status ?? 'failed',
       externalRequestId: options.externalRequestId ?? 'seerrng:software:test',
       catalogId: 42,
+      catalogProvider: 'igdb',
+      catalogKey: '42',
       title: 'Test Game',
       summary: null,
       coverUrl: null,
@@ -189,6 +192,8 @@ const createSoftwareRequest = async (options: {
       operatingSystem: null,
       architecture: null,
       attempt: 1,
+      providerStage: null,
+      failureCode: null,
       errorMessage: null,
       lastCheckedAt: null,
     })
@@ -337,6 +342,53 @@ describe('software request routes', () => {
     assert.deepStrictEqual(refreshed, [saved.externalRequestId]);
   });
 
+  it('stores provider progress and safe failure codes in request history', async () => {
+    const saved = await createSoftwareRequest({
+      status: 'approved',
+      externalRequestId: 'seerrng:software:progress-history',
+    });
+    let providerStatus: SoftwareProviderRequest = {
+      ...acceptedRequest(saved.externalRequestId, 'downloading'),
+      stage: 'downloading',
+      percent: 38.5,
+    };
+    mock.method(
+      ROMarrNGAPI.prototype,
+      'getRequest',
+      async () => providerStatus
+    );
+
+    const progress = await request(createApp()).get(
+      `/request/software/status/${saved.id}`
+    );
+    assert.strictEqual(progress.status, 200);
+    assert.strictEqual(progress.body.request.percent, 38.5);
+    assert.strictEqual(progress.body.request.stage, 'downloading');
+    assert.strictEqual(progress.body.history[0].percent, 38.5);
+    assert.strictEqual(progress.body.history[0].providerStage, 'downloading');
+
+    providerStatus = {
+      ...acceptedRequest(saved.externalRequestId, 'failed'),
+      stage: 'failed',
+      percent: 143,
+      failureCode: 'IMPORT_FAILED',
+      failureMessage: 'A private path must not be shown to users.',
+    };
+    const failed = await request(createApp()).get(
+      `/request/software/status/${saved.id}`
+    );
+    assert.strictEqual(failed.status, 200);
+    assert.strictEqual(failed.body.request.percent, null);
+    assert.strictEqual(failed.body.request.failureCode, 'IMPORT_FAILED');
+    assert.strictEqual(
+      failed.body.request.error,
+      'The download could not be imported into the library.'
+    );
+    assert.doesNotMatch(JSON.stringify(failed.body), /private path/);
+    assert.strictEqual(failed.body.history.length, 2);
+    assert.strictEqual(failed.body.history[1].failureCode, 'IMPORT_FAILED');
+  });
+
   it('marks PC titles already owned in QuestarrNG as available', async () => {
     mock.method(QuestarrNGAPI.prototype, 'getCatalogPlatforms', async () => [
       { id: 6, name: 'PC (Microsoft Windows)' },
@@ -431,6 +483,12 @@ describe('software request routes', () => {
       'getCatalogGame',
       async () => ({
         ...pcGame,
+        steamAppId: 570,
+        timeToBeat: {
+          hastily: 1.5,
+          normally: 24.25,
+          completely: Number.POSITIVE_INFINITY,
+        },
         coverUrl: 'https://evil.example/cover.jpg',
         rating: 87,
         screenshots: [
@@ -453,6 +511,11 @@ describe('software request routes', () => {
     assert.strictEqual(response.body.game.title, 'Test Game');
     assert.strictEqual(response.body.game.coverUrl, '');
     assert.strictEqual(response.body.game.rating, 8.7);
+    assert.strictEqual(response.body.game.steamAppId, 570);
+    assert.deepStrictEqual(response.body.game.timeToBeat, {
+      hastily: 1.5,
+      normally: 24.25,
+    });
     assert.deepStrictEqual(response.body.game.screenshots, [
       'https://images.igdb.com/igdb/image/upload/screenshot.jpg',
     ]);
@@ -659,6 +722,69 @@ describe('software request routes', () => {
     assert.strictEqual(invalid.status, 400);
   });
 
+  it('previews unique platform matches and returns unmatched systems', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(ROMarrNGAPI.prototype, 'getPlatforms', async () => [
+      {
+        slug: 'nes',
+        name: 'Nintendo Entertainment System',
+        aliases: ['Nintendo'],
+        media: 'rom',
+        extensions: ['.nes'],
+        max_size_mb: 16,
+      },
+      {
+        slug: 'unknown',
+        name: 'Unlisted Console',
+        media: 'rom',
+        extensions: ['.rom'],
+        max_size_mb: 16,
+      },
+    ]);
+    mock.method(ROMarrNGAPI.prototype, 'getCatalogPlatforms', async () => [
+      { id: 130, name: 'Nintendo Entertainment System' },
+      { id: 6, name: 'PC (Microsoft Windows)' },
+    ]);
+
+    const response = await request(app).get(
+      '/api/v1/settings/software-acquisition/platform-mapping/preview'
+    );
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.body.systems[0].status, 'automatic');
+    assert.strictEqual(response.body.systems[0].automaticMatch.id, 130);
+    assert.deepStrictEqual(response.body.unmatchedSystems, [
+      { slug: 'unknown', name: 'Unlisted Console' },
+    ]);
+    assert.deepStrictEqual(response.body.unmatchedCatalogPlatforms, [
+      { id: 6, name: 'PC (Microsoft Windows)' },
+    ]);
+  });
+
+  it('requires ROMarrNG DAT catalog capability before selecting the DAT source', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
+      service: 'ROMarrNG',
+      apiVersion: 1,
+      requestContractVersion: 2,
+      capabilities: {
+        catalog: false,
+        datCatalog: true,
+        pcAcquisition: false,
+        emulationAcquisition: true,
+        requestActions: { retry: true, cancel: true },
+        assetStreaming: true,
+      },
+    }));
+
+    const response = await request(app)
+      .put('/api/v1/settings/software-acquisition')
+      .send({ emulationCatalogProvider: 'romarr-dat' });
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.body.emulationCatalogProvider, 'romarr-dat');
+  });
+
   it('requires ROMarrNG to advertise catalog support before selecting it', async () => {
     const app = createOpenApiValidatedSettingsApp();
     mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
@@ -813,6 +939,10 @@ describe('software request routes', () => {
         ];
       }
     );
+    mock.method(ROMarrNGAPI.prototype, 'getDatCatalogPlatforms', async () => ({
+      results: [],
+      unmatchedDatNames: [],
+    }));
 
     const response = await request(app)
       .post('/api/v1/settings/software-acquisition/test/romarr')
@@ -830,6 +960,29 @@ describe('software request routes', () => {
     assert.strictEqual(response.body.requestContractVersion, 2);
     assert.strictEqual(response.body.capabilities.datCatalog, true);
     assert.strictEqual(response.body.platformCount, 1);
+    assert.strictEqual(response.body.datCatalogPlatformCount, 0);
+  });
+
+  it('rejects unsupported ROMarrNG request contract versions', async () => {
+    const app = createOpenApiValidatedSettingsApp();
+    mock.method(ROMarrNGAPI.prototype, 'getHandshake', async () => ({
+      service: 'ROMarrNG',
+      apiVersion: 1,
+      requestContractVersion: 3,
+    }));
+
+    const response = await request(app)
+      .post('/api/v1/settings/software-acquisition/test/romarr')
+      .send({
+        hostname: 'romarr.test',
+        port: 6868,
+        useSsl: false,
+        baseUrl: '',
+        apiKey: 'romarr-test-key',
+      });
+
+    assert.strictEqual(response.status, 502);
+    assert.match(response.body.error, /unsupported integration contract/i);
   });
 
   it('rejects unsupported ROMarrNG request contract versions', async () => {
@@ -1050,6 +1203,153 @@ describe('software request routes', () => {
         catalogPlatformId: 130,
       },
     ]);
+  });
+
+  it('browses DAT titles, keeps DAT keys, and submits the same identity to ROMarrNG', async () => {
+    getSettings().softwareAcquisition.emulationCatalogProvider = 'romarr-dat';
+    getSettings().softwareAcquisition.emulationSystemGroups = { snes: 'retro' };
+    const catalogKey = `dat-${'0'.repeat(64)}`;
+    const datGame: SoftwareCatalogGame = {
+      id: catalogKey,
+      catalogProvider: 'dat',
+      catalogId: catalogKey,
+      title: 'Chrono Trigger',
+      summary: '',
+      coverUrl: '',
+      releaseDate: '',
+      platforms: ['Super Nintendo Entertainment System'],
+      platformOptions: [
+        { key: 'snes', name: 'Super Nintendo Entertainment System' },
+      ],
+      genres: [],
+      source: 'DAT',
+      dat: {
+        name: 'Nintendo - Super Nintendo Entertainment System',
+        version: '2026',
+        entry: 'Chrono Trigger (USA)',
+        variants: 2,
+      },
+    };
+    mock.method(ROMarrNGAPI.prototype, 'getPlatforms', async () => [
+      {
+        slug: 'snes',
+        name: 'Super Nintendo Entertainment System',
+        media: 'rom',
+        extensions: ['.sfc'],
+        max_size_mb: 32,
+      },
+    ]);
+    mock.method(ROMarrNGAPI.prototype, 'getDatCatalogPlatforms', async () => ({
+      results: [{ slug: 'snes', name: 'SNES', gameCount: 1 }],
+      unmatchedDatNames: [],
+    }));
+    const searchDat = mock.method(
+      ROMarrNGAPI.prototype,
+      'searchDatCatalogPage',
+      async () => ({ results: [datGame], nextCursor: null })
+    );
+    const browseDat = mock.method(
+      ROMarrNGAPI.prototype,
+      'browseDatCatalogPage',
+      async () => ({ results: [datGame], nextOffset: 24 })
+    );
+    const getDatGame = mock.method(
+      ROMarrNGAPI.prototype,
+      'getDatCatalogGame',
+      async () => datGame
+    );
+
+    const systems = await request(createApp()).get(
+      '/request/software/catalog/systems'
+    );
+    const search = await request(createApp())
+      .get('/request/software/catalog/search')
+      .query({ category: 'retro', q: 'Chrono Trigger' });
+    const browse = await request(createApp())
+      .get('/request/software/catalog/popular')
+      .query({ category: 'retro', limit: 24 });
+    const detail = await request(createApp())
+      .get(`/request/software/catalog/games/${catalogKey}`)
+      .query({ category: 'retro', catalogProvider: 'dat' });
+
+    assert.strictEqual(systems.status, 200);
+    assert.strictEqual(systems.body.catalogProvider, 'dat');
+    assert.deepStrictEqual(systems.body.catalogSystemSlugs, ['snes']);
+    assert.strictEqual(search.status, 200);
+    assert.strictEqual(search.body.results[0].catalogProvider, 'dat');
+    assert.strictEqual(search.body.results[0].catalogId, catalogKey);
+    assert.deepStrictEqual(search.body.results[0].emulationSystems, [
+      {
+        slug: 'snes',
+        name: 'Super Nintendo Entertainment System',
+        group: 'retro',
+        catalogPlatformKey: 'snes',
+      },
+    ]);
+    assert.deepStrictEqual(searchDat.mock.calls[0].arguments, [
+      'Chrono Trigger',
+      24,
+      undefined,
+      ['snes'],
+    ]);
+    assert.strictEqual(browse.status, 200);
+    assert.strictEqual(browse.body.results[0].catalogId, catalogKey);
+    assert.strictEqual(browse.body.nextOffset, 24);
+    assert.deepStrictEqual(browseDat.mock.calls[0].arguments, [
+      24,
+      0,
+      ['snes'],
+    ]);
+    assert.strictEqual(detail.status, 200);
+    assert.strictEqual(detail.body.game.catalogProvider, 'dat');
+    assert.strictEqual(getDatGame.mock.calls.length, 1);
+
+    const created = await request(createApp()).post('/request/software').send({
+      category: 'retro',
+      catalogProvider: 'dat',
+      catalogKey,
+      platformSlug: 'snes',
+    });
+    assert.strictEqual(created.status, 201);
+    const saved = await getRepository(SoftwareRequest).findOneByOrFail({
+      id: created.body.request.id,
+    });
+    assert.strictEqual(saved.catalogProvider, 'dat');
+    assert.strictEqual(saved.catalogId, null);
+    assert.strictEqual(saved.catalogKey, catalogKey);
+    assert.strictEqual(saved.platformId, null);
+
+    mock.method(ROMarrNGAPI.prototype, 'getRequest', async () => {
+      throw Object.assign(new Error('Request not found.'), {
+        response: { status: 404 },
+      });
+    });
+    const dispatched: unknown[] = [];
+    mock.method(
+      ROMarrNGAPI.prototype,
+      'createRequest',
+      async (
+        externalRequestId: string,
+        title: string,
+        platform: string,
+        _catalogId?: number,
+        _platformId?: number,
+        identity?: { catalogKey: string; platformSlug: string }
+      ) => {
+        dispatched.push({ externalRequestId, title, platform, identity });
+        return acceptedRequest(externalRequestId);
+      }
+    );
+    const approval = await request(
+      createApp(1, Permission.MANAGE_REQUESTS)
+    ).post(`/request/software/status/${saved.id}/approve`);
+    assert.strictEqual(approval.status, 200);
+    assert.deepStrictEqual(dispatched[0], {
+      externalRequestId: saved.externalRequestId,
+      title: 'Chrono Trigger',
+      platform: 'snes',
+      identity: { catalogKey, platformSlug: 'snes' },
+    });
   });
 
   it('passes ROM platform IDs and a search cursor to QuestarrNG', async () => {
@@ -1649,5 +1949,66 @@ describe('software request routes', () => {
       .set('Range', 'bytes=100-');
     assert.strictEqual(invalidRange.status, 416);
     assert.strictEqual(invalidRange.headers['content-range'], 'bytes */8');
+  });
+
+  it('streams Questarr bundles as request-scoped gzip downloads', async () => {
+    const saved = await createSoftwareRequest({
+      provider: 'questarr',
+      status: 'available',
+      externalRequestId: 'seerrng:software:bundle',
+    });
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'getRequest',
+      async (externalRequestId: string) =>
+        acceptedRequest(externalRequestId, 'available')
+    );
+    mock.method(QuestarrNGAPI.prototype, 'getAssets', async () => ({
+      assets: [
+        { id: 'asset-1', name: 'part-1.zip', size: 4, url: '' },
+        { id: 'asset-2', name: 'part-2.zip', size: 4, url: '' },
+      ],
+      bundleSupported: true,
+      bundleName: 'Test Game.tar.gz',
+    }));
+    let streamCalls = 0;
+    mock.method(
+      QuestarrNGAPI.prototype,
+      'streamBundle',
+      async (externalRequestId: string) => {
+        streamCalls += 1;
+        assert.strictEqual(externalRequestId, saved.externalRequestId);
+        return {
+          stream: Readable.from([Buffer.from('gzip')]),
+          filename: '../evil.exe',
+          contentLength: -1,
+          contentType: 'text/html',
+          rangeSupported: true,
+          statusCode: 206,
+          contentRange: 'bytes 0-3/4',
+        };
+      }
+    );
+
+    const outsider = await request(createApp(3, Permission.REQUEST)).get(
+      `/request/software/status/${saved.id}/bundle`
+    );
+    assert.strictEqual(outsider.status, 404);
+
+    const download = await request(createApp())
+      .get(`/request/software/status/${saved.id}/bundle`)
+      .set('Range', 'bytes=0-3');
+    assert.strictEqual(download.status, 200);
+    assert.match(download.headers['content-disposition'], /attachment/);
+    assert.match(
+      decodeURIComponent(download.headers['content-disposition']),
+      /\.\._evil\.exe\.tar\.gz/
+    );
+    assert.match(download.headers['content-type'], /^application\/gzip/);
+    assert.strictEqual(download.headers['content-length'], undefined);
+    assert.strictEqual(download.headers['accept-ranges'], undefined);
+    assert.strictEqual(download.headers['content-range'], undefined);
+    assert.strictEqual(download.body.toString('utf8'), 'gzip');
+    assert.strictEqual(streamCalls, 1);
   });
 });

@@ -1,8 +1,35 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import path from 'node:path';
 import { it } from 'node:test';
 import ROMarrNGAPI from './romarrng';
+
+const contractFixture = JSON.parse(
+  readFileSync(
+    path.join(process.cwd(), 'docs', 'SEERRNG-INTEGRATION.contract-v2.json'),
+    'utf8'
+  )
+) as {
+  requestContractVersion: number;
+  handshake: {
+    service: string;
+    apiVersion: number;
+    requestContractVersion: number;
+    capabilities: Record<string, unknown>;
+  };
+  identityExamples: {
+    dat: { catalogProvider: 'dat'; catalogKey: string; platformSlug: string };
+  };
+  failureExample: {
+    status: string;
+    stage: string;
+    percent: number | null;
+    failureCode: string;
+    failureMessage: string;
+  };
+};
 
 it('uses the versioned SeerrNG catalog contract and preserves IGDB identity', async () => {
   const requests: { method: string; path: string; body?: unknown }[] = [];
@@ -270,6 +297,124 @@ it('rejects a request contract version it does not understand', async () => {
     await assert.rejects(
       api.lookupLibrary([{ title: 'Example', platform: 'nes' }]),
       /request contract v3 is not supported/
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it('uses the shared version 2 DAT catalog and failure contract fixture', async () => {
+  const requests: { method: string; path: string; body?: unknown }[] = [];
+  const server = createServer((request, response) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => (body += chunk));
+    request.on('end', () => {
+      requests.push({
+        method: request.method ?? 'GET',
+        path: url.pathname,
+        ...(body ? { body: JSON.parse(body) as unknown } : {}),
+      });
+      const payload = url.pathname.endsWith('/ping')
+        ? contractFixture.handshake
+        : url.pathname.endsWith('/dat/platforms')
+          ? { results: [{ slug: 'snes', name: 'SNES', gameCount: 1 }] }
+          : url.pathname.endsWith('/dat/search-page')
+            ? { results: [], nextCursor: null }
+            : url.pathname.endsWith('/dat/browse-page')
+              ? { results: [], nextOffset: null }
+              : url.pathname.endsWith(
+                    `/dat/games/${contractFixture.identityExamples.dat.catalogKey}`
+                  )
+                ? {
+                    id: contractFixture.identityExamples.dat.catalogKey,
+                    catalogProvider: 'dat',
+                    catalogId: contractFixture.identityExamples.dat.catalogKey,
+                    title: 'Example DAT title',
+                  }
+                : url.pathname.endsWith('/requests')
+                  ? {
+                      externalRequestId: 'request-dat-1',
+                      ...contractFixture.failureExample,
+                      deliverable: false,
+                    }
+                  : url.pathname.endsWith('/requests/request-dat-1')
+                    ? {
+                        externalRequestId: 'request-dat-1',
+                        ...contractFixture.failureExample,
+                        deliverable: false,
+                      }
+                    : { error: 'Unknown test endpoint' };
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify(payload));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  try {
+    const api = new ROMarrNGAPI({
+      hostname: '127.0.0.1',
+      port: (server.address() as AddressInfo).port,
+      baseUrl: '',
+      useSsl: false,
+      apiKey: 'romarr-contract-v2-test',
+    });
+    const handshake = await api.getHandshake();
+    const platforms = await api.getDatCatalogPlatforms();
+    await api.searchDatCatalogPage('Example DAT title', 10, undefined, [
+      'snes',
+    ]);
+    await api.browseDatCatalogPage(10, 0, ['snes']);
+    const game = await api.getDatCatalogGame(
+      contractFixture.identityExamples.dat.catalogKey
+    );
+    const created = await api.createRequest(
+      'request-dat-1',
+      game.title,
+      'snes',
+      undefined,
+      undefined,
+      contractFixture.identityExamples.dat
+    );
+    const status = await api.getRequest('request-dat-1');
+
+    assert.equal(
+      handshake.requestContractVersion,
+      contractFixture.requestContractVersion
+    );
+    assert.deepEqual(platforms.results[0], {
+      slug: 'snes',
+      name: 'SNES',
+      gameCount: 1,
+    });
+    assert.equal(game.catalogProvider, 'dat');
+    assert.equal(
+      created.failureCode,
+      contractFixture.failureExample.failureCode
+    );
+    assert.equal(status.stage, contractFixture.failureExample.stage);
+    assert.equal(status.percent, null);
+    assert.deepEqual(requests[5].body, {
+      externalRequestId: 'request-dat-1',
+      game: 'Example DAT title',
+      platform: 'snes',
+      identity: contractFixture.identityExamples.dat,
+    });
+    assert.deepEqual(
+      requests.map(
+        ({ method, path: requestPath }) => `${method} ${requestPath}`
+      ),
+      [
+        'GET /api/integration/seerrng/v1/ping',
+        'GET /api/integration/seerrng/v1/catalog/dat/platforms',
+        'GET /api/integration/seerrng/v1/catalog/dat/search-page',
+        'GET /api/integration/seerrng/v1/catalog/dat/browse-page',
+        `GET /api/integration/seerrng/v1/catalog/dat/games/${contractFixture.identityExamples.dat.catalogKey}`,
+        'POST /api/integration/seerrng/v1/requests',
+        'GET /api/integration/seerrng/v1/requests/request-dat-1',
+      ]
     );
   } finally {
     server.closeAllConnections();

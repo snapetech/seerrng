@@ -1,0 +1,48 @@
+{
+  "requestContractVersion": 2,
+  "handshake": {
+    "service": "ROMarrNG",
+    "apiVersion": 1,
+    "requestContractVersion": 2,
+    "capabilities": {
+      "catalog": true,
+      "datCatalog": true,
+      "pcAcquisition": false,
+      "emulationAcquisition": true,
+      "requestActions": {
+        "retry": true,
+        "cancel": true
+      },
+      "assetStreaming": true
+    }
+  },
+  "identityExamples": {
+    "igdb": {
+      "catalogProvider": "igdb",
+      "catalogId": 42,
+      "platformId": 130
+    },
+    "dat": {
+      "catalogProvider": "dat",
+      "catalogKey": "dat-0000000000000000000000000000000000000000000000000000000000000000",
+      "platformSlug": "snes"
+    }
+  },
+  "failureExample": {
+    "status": "failed",
+    "stage": "failed",
+    "percent": null,
+    "failureCode": "IMPORT_FAILED",
+    "failureMessage": "The download could not be imported into the library."
+  },
+  "privacy": {
+    "requestStatusForbiddenFields": [
+      "assets",
+      "path",
+      "paths",
+      "localPath",
+      "absolutePath"
+    ],
+    "assetMetadataFields": ["id", "name", "size"]
+  }
+}
