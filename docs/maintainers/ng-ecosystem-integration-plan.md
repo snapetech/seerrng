@@ -52,7 +52,7 @@ yet.
 | 1 SSE route + OpenAPI | done | Route test with a fake qBittorrent server and real HTTP stream (3 tests); `seerr-api.yml` paths and schemas added. |
 | 1 Browser store + overlay | done | `src/utils/liveDownloadStore.ts`, `src/hooks/useLiveDownload.ts` (6 tests); used by `DownloadBlock` and `StatusBadge`. |
 | 1 Follow-up: user-scoped live IDs and stale-value clearing | blocked | Focused progress checks: 36/36 on Node 26.10.0; changed-file ESLint and Prettier pass. Two cumulative attempts reached native TypeScript and failed before JavaScript/tooling: attempt 1 had 2,952 tests (2,947 pass, 1 fail, 4 skip); attempt 2 had 2,952 tests (2,945 pass, 3 fail, 4 skip) across 599 suites, with `GET /discover/books` marked failed. Focused auth/override reruns passed 145/145, and the complete discovery route file passed 124/124, so the cumulative-only failures still need their exact assertions isolated. Continue investigating before finalization; live client round-trip and desktop/narrow review remain pending. |
-| 1 Settings UI | built | `SettingsDownloadClients.tsx` on Settings → Services; no new CSS families. Needs desktop/narrow human review. |
+| 1 Settings UI | built | `SettingsDownloadClients.tsx` on Settings → Services; no new CSS families. Desktop/narrow inspection may be recorded as evidence; it is not a human review gate under the user's 2026-10-07 direction. |
 | 1 Docs + release note | done | `docs/using-seerr/live-download-progress.md`, `release-notes/2026-10-06-live-download-progress.md`. |
 | 1 Stall signal for Download Recovery | pending | |
 | 1 Pre-approval free-space check | pending | Needs TorrentNG `/api/v1/storage`; other clients do not expose per-root free space the same way. |

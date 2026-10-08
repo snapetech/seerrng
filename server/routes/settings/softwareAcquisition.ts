@@ -173,7 +173,10 @@ const hasProviderCapabilities = (
     typeof value.emulationAcquisition === 'boolean' &&
     typeof value.requestActions.retry === 'boolean' &&
     typeof value.requestActions.cancel === 'boolean' &&
-    typeof value.assetStreaming === 'boolean'
+    typeof value.assetStreaming === 'boolean' &&
+    (value.assetBundles === undefined ||
+      typeof value.assetBundles === 'boolean') &&
+    (value.datCatalog === undefined || typeof value.datCatalog === 'boolean')
   );
 };
 

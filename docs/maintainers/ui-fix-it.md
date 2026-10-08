@@ -104,7 +104,7 @@ not permission to skip suites, change CI or install tools into the live preview.
 4. Run proportional lint/type checking and compilation for changed source types/style owners. Check service health only after authorized publication. Compile/type/HTTP success does not establish visual inspection evidence or a successful provider round trip.
 5. Diagnose a failing check. Repair actual behavior or update a genuinely superseded assertion with equivalent coverage and acceptance evidence. Never weaken or delete a live behavior check merely to obtain a passing count.
 6. Avoid repeated full builds, rerunning unchanged suites, broad source copies and serial work that can safely be batched. Keep one authoritative readback, one owned edit batch, focused checks and a final cumulative verification. Communicate shared-file barriers and completion promptly.
-7. If scope, safety, source identity or gate coverage is unresolved, fail closed: do not finalize or claim completion. Record unrelated baseline failures and request direction before expanding scope; do not automatically repair unrelated backend code. Deferral never converts a failed required gate into a pass.
+7. If scope, safety, source identity or gate coverage is unresolved, fail closed: do not finalize or claim completion. Keep a narrow visual task from expanding into unrelated backend work unless the user explicitly authorizes broader remediation or requests the complete required gate. When that authorization covers a gate failure, repair it and rerun the gate without asking again. Deferral never converts a failed required gate into a pass.
 
 ## 7. Record, report and evolve
 
