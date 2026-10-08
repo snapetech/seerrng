@@ -120,8 +120,40 @@ describe('TV Details', () => {
         });
       });
     }).as('seriesDetails');
-    // The current tree prefetches season metadata before disclosure opens.
-    cy.intercept('/api/v1/tv/66732/season/4').as('season4');
+    cy.intercept('GET', '/api/v1/tv/66732/season/*', (request) => {
+      const seasonNumber = Number(
+        new URL(request.url).pathname.split('/').pop()
+      );
+      const episodes =
+        seasonNumber === 4
+          ? Array.from({ length: 9 }, (_, index) => ({
+              id: 900 + index,
+              name: index === 8 ? 'Chapter Nine' : `Episode ${index + 1}`,
+              airDate: null,
+              episodeNumber: index + 1,
+              overview: '',
+              productionCode: '',
+              seasonNumber,
+              showId: 66732,
+              voteAverage: 0,
+              voteCount: 0,
+            }))
+          : [];
+      const response = {
+        airDate: '',
+        id: 400 + seasonNumber,
+        name: `Season ${seasonNumber}`,
+        overview: '',
+        seasonNumber,
+        episodes,
+        externalIds: {},
+      };
+
+      if (seasonNumber === 4) {
+        request.alias = 'season4';
+      }
+      request.reply({ body: response });
+    });
     cy.visit('/tv/66732');
     cy.get('script#__NEXT_DATA__')
       .invoke('text')

@@ -375,7 +375,6 @@ const GameLibrary = () => {
   );
   const libraryLoadingMore = librarySize > (libraryPages?.length ?? 0);
   const sharedLoadingMore = sharedSize > (sharedPages?.length ?? 0);
-  const isLoading = tab === 'library' ? libraryLoading : sharedLoading;
   const pageError = tab === 'library' ? libraryError : sharedError;
 
   useEffect(() => {

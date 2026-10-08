@@ -30,6 +30,7 @@ const messages = defineMessages('components.MediaDetails.SeriesBrowser', {
 });
 
 interface SeriesSeasonEpisodeBrowserProps {
+  active: boolean;
   contained?: boolean;
   metadataRetry: MessageRetry;
   onLoadingChange?: (loading: boolean) => void;
@@ -42,6 +43,7 @@ interface SeriesSeasonEpisodeBrowserProps {
 }
 
 const SeriesSeasonEpisodeBrowser = ({
+  active,
   contained = false,
   metadataRetry,
   onLoadingChange,
@@ -58,7 +60,7 @@ const SeriesSeasonEpisodeBrowser = ({
     [seasons]
   );
   const { data, error, isValidating, mutate } = useSWR<SeasonWithEpisodes[]>(
-    visibleSeasons.length
+    active && visibleSeasons.length
       ? [
           'series-season-metadata',
           tvId,

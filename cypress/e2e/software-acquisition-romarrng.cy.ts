@@ -115,6 +115,11 @@ const mockIntegrationData = () => {
           avatar: { imageCount: 0, size: 0 },
         },
       });
+    } else if (pathname === '/api/v1/settings/download-clients') {
+      request.reply({
+        pollIntervalSeconds: 3,
+        clients: [],
+      });
     } else if (pathname === '/api/v1/settings/reader-delivery') {
       request.reply({
         grimmoryUrl: '',

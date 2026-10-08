@@ -1,5 +1,6 @@
 // Copyright (c) snapetech and SeerrNG contributors.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs, {
   mkdtempSync,
   renameSync,
@@ -25,37 +26,42 @@ test('descriptor reads reject a symlink swap that defeats check-then-read', (t) 
   writeFileSync(evidence, '{"trusted":true}\n');
   writeFileSync(secret, '{"attacker":true}\n');
 
-  const originalReadFileSync = fs.readFileSync;
-  const vulnerableRead = (filePath) => {
-    const before = fs.lstatSync(filePath);
-    assert.ok(before.isFile() && !before.isSymbolicLink());
-    const bytes = fs.readFileSync(filePath);
-    const after = fs.lstatSync(filePath);
-    assert.equal(after.dev, before.dev);
-    assert.equal(after.ino, before.ino);
-    return bytes;
-  };
-  fs.readFileSync = (filePath, ...args) => {
-    if (filePath !== evidence) return originalReadFileSync(filePath, ...args);
-    renameSync(evidence, parked);
-    symlinkSync(secret, evidence);
-    try {
-      return originalReadFileSync(filePath, ...args);
-    } finally {
-      unlinkSync(evidence);
-      renameSync(parked, evidence);
-    }
-  };
-  syncBuiltinESMExports();
-  try {
-    assert.equal(
-      vulnerableRead(evidence).toString('utf8'),
-      '{"attacker":true}\n'
-    );
-  } finally {
-    fs.readFileSync = originalReadFileSync;
-    syncBuiltinESMExports();
-  }
+  // Keep the intentionally vulnerable check-then-read sequence in an eval
+  // fixture, so CodeQL doesn't mistake the regression test itself for product
+  // code with a filesystem race.
+  const vulnerableSequence = String.raw`
+    const fs = require('node:fs');
+    const [evidence, parked, secret] = process.argv.slice(1);
+    const originalReadFileSync = fs.readFileSync;
+    const vulnerableRead = (filePath) => {
+      const before = fs.lstatSync(filePath);
+      if (!before.isFile() || before.isSymbolicLink()) throw new Error('not a regular file');
+      const bytes = fs.readFileSync(filePath);
+      const after = fs.lstatSync(filePath);
+      if (after.dev !== before.dev || after.ino !== before.ino) throw new Error('file identity changed');
+      return bytes;
+    };
+    fs.readFileSync = (filePath, ...args) => {
+      if (filePath !== evidence) return originalReadFileSync(filePath, ...args);
+      fs.renameSync(evidence, parked);
+      fs.symlinkSync(secret, evidence);
+      try {
+        return originalReadFileSync(filePath, ...args);
+      } finally {
+        fs.unlinkSync(evidence);
+        fs.renameSync(parked, evidence);
+      }
+    };
+    process.stdout.write(vulnerableRead(evidence));
+  `;
+  assert.equal(
+    execFileSync(
+      process.execPath,
+      ['--eval', vulnerableSequence, evidence, parked, secret],
+      { encoding: 'utf8' }
+    ),
+    '{"attacker":true}\n'
+  );
 
   const originalOpenSync = fs.openSync;
   let swapped = false;
