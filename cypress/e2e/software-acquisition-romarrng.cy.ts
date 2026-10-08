@@ -117,6 +117,14 @@ const mockIntegrationData = () => {
         pollIntervalSeconds: 3,
         clients: [],
       });
+    } else if (
+      pathname === '/api/v1/settings/audiobookshelf' ||
+      pathname === '/api/v1/settings/navidrome' ||
+      pathname === '/api/v1/settings/jellystat'
+    ) {
+      // These settings endpoints return one optional service, not a list.
+      // `[]` is truthy and makes the service cards render invalid fields.
+      request.reply(null);
     } else if (pathname === '/api/v1/settings/tunerr') {
       request.reply({
         enabled: false,
