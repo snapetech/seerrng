@@ -1010,3 +1010,45 @@ merged as `800745e107b2d044045484e74d0f0686239a3e05`, and its result was release
 from `fe1ef9790369c4694cb6b7de4444e6c9330dcfc1` as `v3.54.0`. The historical
 failed macOS tooling receipt remains evidence of that attempt, not a current
 merge prohibition.
+
+## Current-main integration and software-catalog repair — October 8, 2026
+
+PR #175 integrates the remaining published feature branches and security fixes
+on `integration/all-branches-main-20261007`. The integration source before the
+latest-main sync was `da97fc6accdd44c2965b41797b2ea176c6e95104`; the new target
+was `origin/main` at `42397ee61d496337134106ef341a7d8b45ff412b` (v3.55.1), and
+their common ancestor was `40bb94fb085026c99b93ea129333ff30de81889b`. Main's
+intervening release and feature commits were integrated in merge commit
+`4578abe09e79f779db61a6ece9f47e0843efc8b6`.
+
+The forward merge retained both sides of three overlaps. ROMarrNG's version 1
+and version 2 request-contract route and regression test from main remain beside
+the DAT catalog API and stable DAT identity tests. The software-acquisition
+guide documents both the shared versioned route and the optional IGDB/DAT
+catalog capabilities. Main's IMDb profile-watchlist repair, AppImage runtime
+repair, and v3.55.1 release records are also retained.
+
+The latest hosted unit run found three integration defects: the OpenAPI
+contract omitted the platform-mapping preview route and the `romarr-dat`
+provider value; a version 2 ROMarrNG connection test did not stub its DAT
+platform request; and the DAT software migration reused timestamp
+`1791100000000`, already assigned to Hardcover. The API contract and test stub
+are corrected. The software migration and its SQLite/PostgreSQL classes were
+renumbered to `1791130000000`; the existing cross-history regression now passes.
+The failed software-acquisition Cypress assertion occurred before the page's
+settings data had been confirmed. Its fixture now uses an explicit response
+alias and waits for that response before the existing platform-mapping
+assertions.
+
+Focused verification on the latest-main merge passed: ROMarrNG contract tests
+5/5, software-route tests 47/47, and the Phase 7 plus software SQLite migration
+tests 3/3. Formatting, whitespace checks, and the release-note preview against
+`origin/main` passed. The preview includes the merged user-facing feature,
+security, and migration-order notes.
+
+The exact merged source was pushed to PR #175. Its fresh GitHub-hosted
+validation, including the guarded production build and browser suites, remains
+pending on the final checkpoint commit. No local production build, live
+provider round trip, or new manual visual inspection was performed. Those
+evidence limits are reported separately; explicit maintainer direction to
+merge and release removes a separate human sign-off gate.
