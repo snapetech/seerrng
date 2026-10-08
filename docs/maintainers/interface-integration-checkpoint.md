@@ -1109,4 +1109,32 @@ remaining Prowlarr responsive Cypress spec used a fixture without the newly
 required Sports mapping; the settings form correctly kept Test and Save disabled
 until every category had a selection. The fixture now includes the standard
 `sports: [5060]` mapping, and the existing interaction assertion is unchanged.
-A fresh hosted run is required for the final receipt.
+A fresh hosted run 37833591956 passed for the corrected candidate. GitHub
+validated the synthetic PR merge commit `7b15b40fa15c24ca2a8bed8ca63d8ec57906fe60`,
+combining head `630cf235499e5dc1c903c1cf8ac22baa0091be5b` with the then-current
+main `42397ee61d496337134106ef341a7d8b45ff412b`. Its immutable validation plan
+covered 703 test files: 525 Vitest, 75 tooling, 58 native `node:test` MJS, one
+documentation-security, 43 Cypress, and one Playwright file. All applicable
+hosted units and both CodeQL analyses passed; the Helm chart job was correctly
+not applicable to this PR's file changes.
+
+Executed test evidence: Vitest ran 3,613 tests (3,609 passed, four skipped);
+the 58 native JavaScript files ran 481 tests (all passed); the 75 tooling files
+ran 858 tests (852 passed, six skipped); Cypress ran all 43 files across six
+passing shards (153 passed, 32 pending, zero failed); and Playwright passed its
+one test. The four Vitest skips are the pre-existing real-PostgreSQL migration
+checks in `server/migration/postgres/mediaUniqueness.test.ts`; they require
+`SEERR_TEST_POSTGRES_URL`, which was not configured. The new Sportarr
+PostgreSQL index migration was therefore not exercised against PostgreSQL.
+Its SQLite counterpart's uniqueness migration test passed in the native test
+lane. The documentation image-parser security test, `pnpm build`, generated
+API docs plus the documentation-site build, Jellyfin bridge build and smoke
+test on Jellyfin 10.11.11, i18n, documentation links, release-note contract,
+and JavaScript/Actions CodeQL checks also passed. The aggregate native
+validation-engine result is success with no failures.
+
+This is hosted pre-merge evidence for the stated synthetic merge candidate;
+integrated-main validation is still required after merge. Rendered desktop or
+narrow review and live Sportarr or media-server round-trips were not performed.
+Episode Queue playback dispatch was tested with disposable SQLite and mocked
+Jellyfin/Sonarr APIs, not a live service.
