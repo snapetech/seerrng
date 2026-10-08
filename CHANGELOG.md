@@ -188,6 +188,34 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.56.0](https://github.com/snapetech/seerrng/compare/v3.55.1..v3.56.0) - 2026-10-08
+
+### User-facing changes
+
+#### Added
+
+- **Sportarr:** SeerrNG now connects to Sportarr so users can browse sports leagues, request additions, and follow monitored events and available files from league details.
+  - **Action required:** Connect Sportarr in Settings > Services to browse and request leagues.
+
+#### Changed
+
+- **Episode Queue:** New TV requests can start with one episode and use linked Plex, Jellyfin, or Emby playback to keep a small Sonarr episode buffer requested. The request screen explains setup requirements, and turning the queue off restores normal season selection.
+
+### 🚀 Features
+- Add Sportarr and TV Episode Queue integrations - ([d4c28aa](https://github.com/snapetech/seerrng/commit/d4c28aac7d063cbb6cec28d0b393e9af79bb5c89))
+
+### 🐛 Bug Fixes
+- *(appimage)* Load bundled WASM compiler at startup (#178) - ([42397ee](https://github.com/snapetech/seerrng/commit/42397ee61d496337134106ef341a7d8b45ff412b))
+- Preserve TV episode selections in queue - ([239fc2e](https://github.com/snapetech/seerrng/commit/239fc2e4a1c98719d0139ca940b75ede5b150ca2))
+
+### 📖 Documentation
+- Record hosted Sportarr validation - ([acc51ca](https://github.com/snapetech/seerrng/commit/acc51ca11e340cb782b17e1f407cb7eb2e9824e6))
+
+### 🧪 Testing
+- Update Prowlarr sports category fixture - ([630cf23](https://github.com/snapetech/seerrng/commit/630cf235499e5dc1c903c1cf8ac22baa0091be5b))
+
 ## [3.55.1](https://github.com/snapetech/seerrng/compare/v3.55.0..v3.55.1) - 2026-10-08
 
 ### User-facing changes
