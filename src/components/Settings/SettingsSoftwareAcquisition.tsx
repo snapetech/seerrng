@@ -3,6 +3,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SelectionCircle from '@app/components/Common/SelectionCircle';
 import Tooltip from '@app/components/Common/Tooltip';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import defineMessages from '@app/utils/defineMessages';
 import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import type { EmulationSystemGroup } from '@server/lib/settings';
@@ -40,6 +41,11 @@ const messages = defineMessages('components.SettingsSoftwareAcquisition', {
   catalogReady: 'IGDB catalog ready',
   catalogUnavailable:
     'This ROMarrNG version does not advertise the SeerrNG IGDB catalog. QuestarrNG remains the default.',
+  datCatalogReady: 'DAT catalog ready for {count} systems',
+  datCatalogUnavailable:
+    'This ROMarrNG version does not advertise a loaded DAT catalog.',
+  unmatchedDatNames:
+    '{count} DAT names are not linked to a ROMarrNG system: {names}',
   contractVersion: 'Integration API v{version}',
   saved: 'Software acquisition settings saved.',
   systemGroups: 'Emulation system groups',
@@ -69,7 +75,23 @@ const messages = defineMessages('components.SettingsSoftwareAcquisition', {
   saveError: 'Settings could not be saved.',
   emulationCatalog: 'Emulation catalog source',
   emulationCatalogDescription:
-    'QuestarrNG is the default. Choose ROMarrNG only when its connection test reports the SeerrNG IGDB catalog capability. ROMarrNG still acquires ROM requests; PC game requests always use QuestarrNG.',
+    'QuestarrNG is the default. ROMarrNG can provide its IGDB catalog or a DAT-backed catalog when DAT files are loaded. ROMarrNG still acquires ROM requests; PC game requests always use QuestarrNG.',
+  platformMappings: 'ROMarrNG to IGDB platform matching',
+  platformMappingsDescription:
+    'SeerrNG matches system names and aliases automatically when they resolve to one IGDB platform. Preview the matches and choose an override for systems that need a different platform.',
+  previewPlatformMappings: 'Preview platform matches',
+  loadingPlatformMappings: 'Loading platform matches…',
+  automaticMatch: 'Automatic match',
+  unmatched: 'No automatic match',
+  manualMatch: 'Manual match',
+  unavailableMatch: 'Saved platform is unavailable',
+  unmatchedSystems: 'Systems without a match: {count}',
+  unusedCatalogPlatforms: 'Unused IGDB platforms: {count}',
+  platformPreviewError: 'Platform matches could not be loaded.',
+  platformMappingHelp:
+    'Choosing Automatic match removes a saved override. A system without a match is hidden from the ROM catalog until you choose an IGDB platform.',
+  unmatchedDatSystems:
+    '{count} DAT names are not linked to a ROMarrNG system. Update ROMarrNG platform aliases to include them: {names}',
   steamLibraryTitle: 'Steam Library Import',
   steamLibraryDescription:
     'Users can privately import their owned Steam games and playtime after linking their account. Steam Game Details must be public for library sync to work.',
@@ -94,7 +116,8 @@ interface SoftwareSettingsResponse {
   romarr: Omit<ProviderSettings, 'clearApiKey'>;
   questarr: Omit<ProviderSettings, 'clearApiKey'>;
   emulationSystemGroups: Record<string, EmulationSystemGroup>;
-  emulationCatalogProvider: 'questarr' | 'romarr';
+  emulationCatalogProvider: 'questarr' | 'romarr' | 'romarr-dat';
+  emulationPlatformMappings: Record<string, number>;
   steamApiKey: string;
   steamApiKeyConfigured: boolean;
 }
@@ -107,6 +130,22 @@ interface EmulationSystem {
 
 interface SystemResponse {
   results: EmulationSystem[];
+  catalogProvider?: 'questarr' | 'igdb' | 'dat';
+  catalogSystemSlugs?: string[];
+  unmatchedDatNames?: string[];
+}
+
+interface PlatformMappingPreview {
+  systems: {
+    slug: string;
+    name: string;
+    automaticMatch: { id: number; name: string } | null;
+    selectedMatch: { id: number; name: string } | null;
+    status: 'automatic' | 'manual' | 'unmatched';
+  }[];
+  catalogPlatforms: { id: number; name: string }[];
+  unmatchedSystems: { slug: string; name: string }[];
+  unmatchedCatalogPlatforms: { id: number; name: string }[];
 }
 
 interface TestState {
@@ -137,6 +176,8 @@ const getProviderPayload = (provider: ProviderSettings) => ({
 
 const SettingsSoftwareAcquisition = () => {
   const intl = useIntl();
+  const romarrSuggestion = useSetupConnectionSuggestion('romarrng');
+  const questarrSuggestion = useSetupConnectionSuggestion('questarrng');
   const { data, error, isLoading } = useSWR<SoftwareSettingsResponse>(
     '/api/v1/settings/software-acquisition'
   );
@@ -153,8 +194,15 @@ const SettingsSoftwareAcquisition = () => {
     Record<string, EmulationSystemGroup>
   >({});
   const [emulationCatalogProvider, setEmulationCatalogProvider] = useState<
-    'questarr' | 'romarr'
+    'questarr' | 'romarr' | 'romarr-dat'
   >('questarr');
+  const [emulationPlatformMappings, setEmulationPlatformMappings] = useState<
+    Record<string, number>
+  >({});
+  const [mappingPreview, setMappingPreview] =
+    useState<PlatformMappingPreview | null>(null);
+  const [mappingPreviewError, setMappingPreviewError] = useState('');
+  const [loadingMappingPreview, setLoadingMappingPreview] = useState(false);
   const [steamApiKey, setSteamApiKey] = useState('');
   const [clearSteamApiKey, setClearSteamApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -167,10 +215,35 @@ const SettingsSoftwareAcquisition = () => {
 
   useEffect(() => {
     if (!data) return;
-    setRomarr(toProviderState(data.romarr));
-    setQuestarr(toProviderState(data.questarr));
+    setRomarr((current) => {
+      const next = current ?? toProviderState(data.romarr);
+      if (data.romarr.hostname || next.hostname || !romarrSuggestion) {
+        return next;
+      }
+      return {
+        ...next,
+        hostname: romarrSuggestion.hostname,
+        port: romarrSuggestion.port,
+      };
+    });
+    setQuestarr((current) => {
+      const next = current ?? toProviderState(data.questarr);
+      if (data.questarr.hostname || next.hostname || !questarrSuggestion) {
+        return next;
+      }
+      return {
+        ...next,
+        hostname: questarrSuggestion.hostname,
+        port: questarrSuggestion.port,
+      };
+    });
+  }, [data, romarrSuggestion, questarrSuggestion]);
+
+  useEffect(() => {
+    if (!data) return;
     setEmulationCatalogProvider(data.emulationCatalogProvider ?? 'questarr');
     setSystemGroups(data.emulationSystemGroups ?? {});
+    setEmulationPlatformMappings(data.emulationPlatformMappings ?? {});
     setSteamApiKey('');
     setClearSteamApiKey(false);
   }, [data]);
@@ -196,6 +269,26 @@ const SettingsSoftwareAcquisition = () => {
     });
   };
 
+  const previewPlatformMappings = async () => {
+    setLoadingMappingPreview(true);
+    setMappingPreviewError('');
+    try {
+      const response = await axios.get<PlatformMappingPreview>(
+        '/api/v1/settings/software-acquisition/platform-mapping/preview'
+      );
+      setMappingPreview(response.data);
+    } catch (error) {
+      const detail =
+        axios.isAxiosError(error) &&
+        typeof error.response?.data?.error === 'string'
+          ? error.response.data.error
+          : intl.formatMessage(messages.platformPreviewError);
+      setMappingPreviewError(detail);
+    } finally {
+      setLoadingMappingPreview(false);
+    }
+  };
+
   const testProvider = async (provider: 'romarr' | 'questarr') => {
     const current = provider === 'romarr' ? romarr : questarr;
     if (!current) return;
@@ -207,7 +300,9 @@ const SettingsSoftwareAcquisition = () => {
         platformCount?: number;
         apiVersion?: number;
         requestContractVersion?: number;
-        capabilities?: { catalog?: boolean };
+        capabilities?: { catalog?: boolean; datCatalog?: boolean };
+        datCatalogPlatformCount?: number;
+        unmatchedDatNames?: string[];
       }>(
         `/api/v1/settings/software-acquisition/test/${provider}`,
         getProviderPayload(current)
@@ -221,14 +316,33 @@ const SettingsSoftwareAcquisition = () => {
           : intl.formatMessage(messages.connectionSuccess, {
               service: response.data.service,
             });
-      const providerDetail =
+      const providerDetails =
         provider === 'romarr'
-          ? intl.formatMessage(
-              response.data.capabilities?.catalog
-                ? messages.catalogReady
-                : messages.catalogUnavailable
-            )
-          : '';
+          ? [
+              intl.formatMessage(
+                response.data.capabilities?.catalog
+                  ? messages.catalogReady
+                  : messages.catalogUnavailable
+              ),
+              response.data.capabilities?.datCatalog &&
+              typeof response.data.datCatalogPlatformCount === 'number'
+                ? intl.formatMessage(messages.datCatalogReady, {
+                    count: response.data.datCatalogPlatformCount,
+                  })
+                : intl.formatMessage(messages.datCatalogUnavailable),
+              ...(response.data.unmatchedDatNames?.length
+                ? [
+                    intl.formatMessage(messages.unmatchedDatNames, {
+                      count: response.data.unmatchedDatNames.length,
+                      names: response.data.unmatchedDatNames
+                        .slice(0, 4)
+                        .join(', '),
+                    }),
+                  ]
+                : []),
+            ]
+          : [];
+      const providerDetail = providerDetails.join(' · ');
       setTestState({
         provider,
         success: true,
@@ -279,6 +393,7 @@ const SettingsSoftwareAcquisition = () => {
         questarr: getProviderPayload(questarr),
         emulationCatalogProvider,
         emulationSystemGroups: systemGroups,
+        emulationPlatformMappings,
         ...(clearSteamApiKey
           ? { steamApiKey: '' }
           : steamApiKey
@@ -450,6 +565,31 @@ const SettingsSoftwareAcquisition = () => {
     );
   }
 
+  const selectedPlatformForSystem = (
+    system: PlatformMappingPreview['systems'][number]
+  ) => {
+    const override = emulationPlatformMappings[system.slug];
+    return override
+      ? (mappingPreview?.catalogPlatforms.find(
+          (platform) => platform.id === override
+        ) ?? null)
+      : system.automaticMatch;
+  };
+  const unmatchedSystemCount =
+    mappingPreview?.systems.filter(
+      (system) => !selectedPlatformForSystem(system)
+    ).length ?? 0;
+  const selectedPlatformIds = new Set(
+    (mappingPreview?.systems ?? []).flatMap((system) => {
+      const platform = selectedPlatformForSystem(system);
+      return platform ? [platform.id] : [];
+    })
+  );
+  const unusedCatalogPlatformCount =
+    mappingPreview?.catalogPlatforms.filter(
+      (platform) => !selectedPlatformIds.has(platform.id)
+    ).length ?? 0;
+
   return (
     <>
       <div className="mt-10 mb-6">
@@ -464,28 +604,132 @@ const SettingsSoftwareAcquisition = () => {
           {renderProvider('questarr', questarr)}
         </div>
 
-        <section className="mt-8 rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-5">
-          <h4 className="text-lg font-semibold text-white">
+        <section className="settings-group-card">
+          <h4 className="settings-group-heading">
             {intl.formatMessage(messages.emulationCatalog)}
           </h4>
-          <p className="mt-1 mb-4 text-sm text-gray-300">
+          <p className="settings-group-description">
             {intl.formatMessage(messages.emulationCatalogDescription)}
           </p>
-          <label className="block max-w-xl text-sm text-gray-200">
+          <label>
             {intl.formatMessage(messages.emulationCatalog)}
             <select
-              className="input input-lite mt-1 w-full"
+              className="input input-lite"
               value={emulationCatalogProvider}
               onChange={(event) =>
                 setEmulationCatalogProvider(
-                  event.target.value as 'questarr' | 'romarr'
+                  event.target.value as 'questarr' | 'romarr' | 'romarr-dat'
                 )
               }
             >
               <option value="questarr">QuestarrNG</option>
-              <option value="romarr">ROMarrNG</option>
+              <option value="romarr">ROMarrNG · IGDB</option>
+              <option value="romarr-dat">ROMarrNG · DAT</option>
             </select>
           </label>
+        </section>
+
+        <section className="settings-group-card">
+          <h4 className="settings-group-heading">
+            {intl.formatMessage(messages.platformMappings)}
+          </h4>
+          <p className="settings-group-description">
+            {intl.formatMessage(messages.platformMappingsDescription)}
+          </p>
+          <Button
+            buttonType="default"
+            buttonSize="sm"
+            disabled={loadingMappingPreview || !romarr?.hostname}
+            onClick={() => void previewPlatformMappings()}
+          >
+            {loadingMappingPreview
+              ? intl.formatMessage(messages.loadingPlatformMappings)
+              : intl.formatMessage(messages.previewPlatformMappings)}
+          </Button>
+          {mappingPreviewError && (
+            <Alert type="error" title={mappingPreviewError} />
+          )}
+          {mappingPreview && (
+            <>
+              <p className="settings-group-description">
+                {intl.formatMessage(messages.platformMappingHelp)}
+              </p>
+              <div className="app-list-items section">
+                <dl className="app-list">
+                  {mappingPreview.systems.map((system) => {
+                    const override = emulationPlatformMappings[system.slug];
+                    const selectedMatch = selectedPlatformForSystem(system);
+                    const status = override
+                      ? selectedMatch
+                        ? 'manual'
+                        : 'unmatched'
+                      : system.automaticMatch
+                        ? 'automatic'
+                        : 'unmatched';
+                    return (
+                      <div className="app-list-row" key={system.slug}>
+                        <div>
+                          <dt className="app-list-label">{system.name}</dt>
+                          <dd className="app-list-value">
+                            {intl.formatMessage(
+                              override && !selectedMatch
+                                ? messages.unavailableMatch
+                                : status === 'manual'
+                                  ? messages.manualMatch
+                                  : status === 'automatic'
+                                    ? messages.automaticMatch
+                                    : messages.unmatched
+                            )}
+                            {selectedMatch ? ` · ${selectedMatch.name}` : ''}
+                          </dd>
+                          <select
+                            className="input input-lite"
+                            aria-label={`${system.name}: ${intl.formatMessage(messages.platformMappings)}`}
+                            value={override ? String(override) : ''}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setEmulationPlatformMappings((current) => {
+                                const next = { ...current };
+                                if (value) next[system.slug] = Number(value);
+                                else delete next[system.slug];
+                                return next;
+                              });
+                            }}
+                          >
+                            {override && !selectedMatch && (
+                              <option value={override}>
+                                {intl.formatMessage(messages.unavailableMatch)}
+                              </option>
+                            )}
+                            <option value="">
+                              {intl.formatMessage(messages.automaticMatch)}
+                            </option>
+                            {mappingPreview.catalogPlatforms.map((platform) => (
+                              <option key={platform.id} value={platform.id}>
+                                {platform.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </div>
+              <div className="settings-group-description">
+                <p>
+                  {intl.formatMessage(messages.unmatchedSystems, {
+                    count: unmatchedSystemCount,
+                  })}
+                </p>
+                <p>
+                  {intl.formatMessage(messages.unusedCatalogPlatforms, {
+                    count: unusedCatalogPlatformCount,
+                  })}
+                </p>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="app-card-main card-layout">
@@ -565,6 +809,18 @@ const SettingsSoftwareAcquisition = () => {
               <p className="mt-2 text-xs text-gray-400">
                 {intl.formatMessage(messages.systemGroupsSourceHint)}
               </p>
+            ) : null}
+            {systemsData?.catalogProvider === 'dat' &&
+            systemsData.unmatchedDatNames?.length ? (
+              <div role="status">
+                <Alert
+                  type="warning"
+                  title={intl.formatMessage(messages.unmatchedDatSystems, {
+                    count: systemsData.unmatchedDatNames.length,
+                    names: systemsData.unmatchedDatNames.slice(0, 4).join(', '),
+                  })}
+                />
+              </div>
             ) : null}
           </div>
           {systemsLoading ? (

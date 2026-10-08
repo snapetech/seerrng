@@ -157,8 +157,9 @@ Current-batch/shared-style validators and changed-component lint pass;
 formatting passes. The actual PostCSS configuration compiles the shared CSS
 with zero warnings. Palette/theme, Book-order and other unreconciled failures
 remain recorded. The earlier frozen full/native-JS receipts are retained;
-this follow-up has only focused evidence and still needs rendered/human review.
-Repository/toolchain prerequisites and full gate/build remain blocked.
+this follow-up was recorded with focused evidence and without rendered review.
+Repository/toolchain prerequisites and the full gate/build remained blocked at
+that historical checkpoint; it is not an ongoing human-review gate.
 
 ## Latest bounded preview checkpoint — October 2, 2026
 
@@ -407,12 +408,12 @@ older records remain historical evidence for their original source trees.
   completed successfully in this isolated candidate.
 - The exact final `pnpm validate:development` run, one production build, browser
   run, screenshots, release-note preview, commits and remote push are pending.
-  human visual review of the new game and reader surfaces remains a release
-  gate; previous visual acceptance applies only to its recorded older scope.
-  A screenshot or passing build does not fulfill that human review.
-- No task commit, push, tag, draft/published release, merge, or deployment has
-  occurred. The user authorized pushing this work and cutting a release after
-  its required verification/review gates.
+  human visual review of the new game and reader surfaces was listed as a
+  release gate in this historical checkpoint. The user's 2026-10-07 instruction
+  supersedes that requirement; no human review is required for this repository.
+- No task commit, push, tag, draft/published release, merge, or deployment had
+  occurred at that checkpoint. The user later authorized merging and releasing
+  this work; current automated checks are recorded on the corresponding PR.
 
 ## Complete dirty-worktree inclusion — October 4, 2026
 
@@ -520,10 +521,11 @@ element diagnostics on failure.
   generated links, service-card width, and non-overlapping copy actions. Logs:
   `/tmp/seerrng-final-ui-game-cypress-20261005.log` and
   `/tmp/seerrng-final-ui-reader-cypress-20261005.log`.
-- Desktop and mobile review captures are at
+- Desktop and mobile rendered-content captures are at
   `/tmp/seerrng-game-library-final-review-20261005/` and
-  `/tmp/seerrng-reader-settings-final-review-20261005/`. These are iteration
-  captures, not a substitute for human review. The first exact-tree gate attempt
+  `/tmp/seerrng-reader-settings-final-review-20261005/`. They record the
+  automated rendered-content check; separate human review is not required under
+  the user's 2026-10-07 instruction. The first exact-tree gate attempt
   stopped during formatting before any test lane, reporting ENOENT for
   temporary locale `.bak` paths. A subsequent isolated sequential
   `pnpm i18n:check` and `pnpm format:check` passed. The first output is preserved
@@ -669,7 +671,9 @@ The game and reader workflows each passed **1/1** in their separate Chromium
 153 headless runs, checking desktop and narrow layouts. Captures are in
 `/tmp/seerrng-game-library-final-review-20261005/` and
 `/tmp/seerrng-reader-settings-final-review-20261005/`; their rendered content
-was inspected. The screenshots are iteration evidence, not a substitute for human review. Tests used disposable SQLite and local app endpoints only; no live
+was inspected. They record the automated rendered-content check. Human-review
+status from this checkpoint was superseded by the user's 2026-10-07 instruction.
+Tests used disposable SQLite and local app endpoints only; no live
 Grimmory, BookOrbit, Steam, QuestarrNG, or ROMarrNG provider was contacted.
 Release-note preview and branch push remained pending at that checkpoint.
 Human visual review status was pending; these entries are superseded by the
@@ -971,5 +975,6 @@ so the cumulative gate is not green; the raw log is
 `/private/tmp/seerrng-phase2-validate-current-main-20261007.log`. No build was
 run, as the maintainer assigned that to another agent. No live
 ReadMeABook/Hardcover round-trip or new visual/physical Swipe review was done.
-Do not merge into `main` until compatible tooling verification, the assigned
-build, and review are complete.
+This historical checkpoint's merge hold was superseded by the user's
+2026-10-07 authorization to merge without human review. PR #171's automated
+GitHub checks passed; the separate assigned build remains with its agent.

@@ -43,3 +43,6 @@ All tests already present in the preview remain in their original locations.
 The saved recipe archive is deliberately not unpacked into those locations:
 that would create duplicate test discovery or overwrite a different revision.
 No future run is automatically authorized by this preservation operation.
+
+The earlier `validation-engine-20261004.tar.gz` snapshot remains in the repository
+for historical recovery; `validation-engine-v1.1.0.tar.gz` is the current copy.

@@ -4,6 +4,7 @@ import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
 import type { RadarrTestResponse } from '@app/components/Settings/SettingsServices';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -96,6 +97,7 @@ interface RadarrModalProps {
 
 const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('radarr');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(radarr ? true : false);
@@ -224,8 +226,8 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
       <Formik
         initialValues={{
           name: radarr?.name,
-          hostname: radarr?.hostname,
-          port: radarr?.port ?? 7878,
+          hostname: radarr?.hostname ?? setupConnection?.hostname,
+          port: radarr?.port ?? setupConnection?.port ?? 7878,
           ssl: radarr?.useSsl ?? false,
           apiKey: radarr?.apiKey,
           baseUrl: radarr?.baseUrl,

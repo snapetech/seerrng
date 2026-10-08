@@ -21,6 +21,10 @@ import { isMediaCategoryEnabled } from '@server/lib/mediaCategories';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
+  getAutomaticCatalogPlatform,
+  normalizeCatalogPlatformName,
+} from '@server/lib/softwareCatalogPlatformMapping';
+import {
   approveSoftwareRequest,
   cancelSoftwareRequest,
   declineSoftwareRequest,
@@ -250,19 +254,12 @@ const parseCatalogQuery = (
     : null;
 };
 
-const normalizePlatformName = (value: string): string =>
-  value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-
 const gameOptions = (game: SoftwareCatalogGame) =>
   game.platformOptions.filter(
     (platform) =>
-      Number.isSafeInteger(platform.id) &&
-      platform.id > 0 &&
+      ((Number.isSafeInteger(platform.id) && (platform.id ?? 0) > 0) ||
+        (typeof platform.key === 'string' &&
+          /^[a-z0-9][a-z0-9_-]{0,63}$/.test(platform.key))) &&
       typeof platform.name === 'string' &&
       platform.name.length > 0 &&
       platform.name.length <= 128
@@ -286,81 +283,127 @@ const isSafeCatalogCoverUrl = (value: unknown): value is string => {
   }
 };
 
-const sanitizeGame = (game: SoftwareCatalogGame): SoftwareCatalogGame => ({
-  id: `igdb-${game.igdbId}`,
-  igdbId: game.igdbId,
-  title: game.title.slice(0, 512),
-  summary: typeof game.summary === 'string' ? game.summary.slice(0, 5000) : '',
-  coverUrl: isSafeCatalogCoverUrl(game.coverUrl) ? game.coverUrl : '',
-  releaseDate:
-    typeof game.releaseDate === 'string' ? game.releaseDate.slice(0, 32) : '',
-  steamAppId:
-    typeof game.steamAppId === 'number' &&
-    Number.isSafeInteger(game.steamAppId) &&
-    game.steamAppId > 0
-      ? game.steamAppId
-      : null,
-  platforms: Array.isArray(game.platforms)
-    ? game.platforms
-        .filter((platform): platform is string => typeof platform === 'string')
-        .slice(0, 100)
-        .map((platform) => platform.slice(0, 128))
-    : [],
-  platformOptions: gameOptions(game).slice(0, 100),
-  genres: Array.isArray(game.genres)
-    ? game.genres
-        .filter((genre): genre is string => typeof genre === 'string')
-        .slice(0, 40)
-        .map((genre) => genre.slice(0, 128))
-    : [],
-  rating:
-    typeof game.rating === 'number' &&
-    Number.isFinite(game.rating) &&
-    game.rating >= 0 &&
-    game.rating <= 100
-      ? Math.round(game.rating) / 10
-      : null,
-  publishers: Array.isArray(game.publishers)
-    ? game.publishers
-        .filter((name): name is string => typeof name === 'string')
-        .slice(0, 20)
-        .map((name) => name.slice(0, 128))
-    : [],
-  developers: Array.isArray(game.developers)
-    ? game.developers
-        .filter((name): name is string => typeof name === 'string')
-        .slice(0, 20)
-        .map((name) => name.slice(0, 128))
-    : [],
-  screenshots: Array.isArray(game.screenshots)
-    ? game.screenshots.filter(isSafeCatalogCoverUrl).slice(0, 12)
-    : [],
-  videos: Array.isArray(game.videos)
-    ? game.videos
-        .filter(
-          (video) =>
-            video &&
-            typeof video.videoId === 'string' &&
-            /^[A-Za-z0-9_-]{11}$/.test(video.videoId)
-        )
-        .slice(0, 6)
-        .map((video) => ({
-          name: typeof video.name === 'string' ? video.name.slice(0, 120) : '',
-          videoId: video.videoId,
-        }))
-    : [],
-  timeToBeat:
-    game.timeToBeat && typeof game.timeToBeat === 'object'
+const sanitizeGame = (game: SoftwareCatalogGame): SoftwareCatalogGame => {
+  const catalogProvider = game.catalogProvider === 'dat' ? 'dat' : 'igdb';
+  const catalogId =
+    catalogProvider === 'dat'
+      ? typeof game.catalogId === 'string' &&
+        /^dat-[0-9a-f]{64}$/.test(game.catalogId)
+        ? game.catalogId
+        : ''
+      : Number.isSafeInteger(game.igdbId) && (game.igdbId ?? 0) > 0
+        ? String(game.igdbId)
+        : '';
+  const sanitizePlaytime = (value: unknown): number | undefined =>
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= 10_000
+      ? value
+      : undefined;
+  const timeToBeat = isRecord(game.timeToBeat)
+    ? {
+        hastily: sanitizePlaytime(game.timeToBeat.hastily),
+        normally: sanitizePlaytime(game.timeToBeat.normally),
+        completely: sanitizePlaytime(game.timeToBeat.completely),
+      }
+    : undefined;
+  const hasTimeToBeat = Boolean(
+    timeToBeat?.hastily || timeToBeat?.normally || timeToBeat?.completely
+  );
+  return {
+    id: catalogProvider === 'dat' ? catalogId : `igdb-${catalogId}`,
+    catalogProvider,
+    catalogId,
+    ...(catalogProvider === 'igdb' && Number.isSafeInteger(game.igdbId)
+      ? { igdbId: game.igdbId }
+      : {}),
+    title: game.title.slice(0, 512),
+    summary:
+      typeof game.summary === 'string' ? game.summary.slice(0, 5000) : '',
+    coverUrl: isSafeCatalogCoverUrl(game.coverUrl) ? game.coverUrl : '',
+    releaseDate:
+      typeof game.releaseDate === 'string' ? game.releaseDate.slice(0, 32) : '',
+    platforms: Array.isArray(game.platforms)
+      ? game.platforms
+          .filter(
+            (platform): platform is string => typeof platform === 'string'
+          )
+          .slice(0, 100)
+          .map((platform) => platform.slice(0, 128))
+      : [],
+    platformOptions: gameOptions(game).slice(0, 100),
+    genres: Array.isArray(game.genres)
+      ? game.genres
+          .filter((genre): genre is string => typeof genre === 'string')
+          .slice(0, 40)
+          .map((genre) => genre.slice(0, 128))
+      : [],
+    rating:
+      typeof game.rating === 'number' &&
+      Number.isFinite(game.rating) &&
+      game.rating >= 0 &&
+      game.rating <= 100
+        ? Math.round(game.rating) / 10
+        : null,
+    publishers: Array.isArray(game.publishers)
+      ? game.publishers
+          .filter((name): name is string => typeof name === 'string')
+          .slice(0, 20)
+          .map((name) => name.slice(0, 128))
+      : [],
+    developers: Array.isArray(game.developers)
+      ? game.developers
+          .filter((name): name is string => typeof name === 'string')
+          .slice(0, 20)
+          .map((name) => name.slice(0, 128))
+      : [],
+    screenshots: Array.isArray(game.screenshots)
+      ? game.screenshots.filter(isSafeCatalogCoverUrl).slice(0, 12)
+      : [],
+    videos: Array.isArray(game.videos)
+      ? game.videos
+          .filter(
+            (video) =>
+              video &&
+              typeof video.videoId === 'string' &&
+              /^[A-Za-z0-9_-]{11}$/.test(video.videoId)
+          )
+          .slice(0, 6)
+          .map((video) => ({
+            name:
+              typeof video.name === 'string' ? video.name.slice(0, 120) : '',
+            videoId: video.videoId,
+          }))
+      : [],
+    steamAppId:
+      typeof game.steamAppId === 'number' &&
+      Number.isSafeInteger(game.steamAppId) &&
+      game.steamAppId > 0
+        ? game.steamAppId
+        : null,
+    ...(hasTimeToBeat ? { timeToBeat } : { timeToBeat: null }),
+    ...(game.source === 'DAT' ? { source: 'DAT' as const } : {}),
+    ...(game.dat &&
+    typeof game.dat.name === 'string' &&
+    typeof game.dat.version === 'string' &&
+    typeof game.dat.entry === 'string' &&
+    Number.isSafeInteger(game.dat.variants) &&
+    game.dat.variants >= 0
       ? {
-          hastily: game.timeToBeat.hastily,
-          normally: game.timeToBeat.normally,
-          completely: game.timeToBeat.completely,
+          dat: {
+            name: game.dat.name.slice(0, 256),
+            version: game.dat.version.slice(0, 128),
+            entry: game.dat.entry.slice(0, 512),
+            variants: game.dat.variants,
+          },
         }
-      : null,
-});
+      : {}),
+  };
+};
 
 const isPcPlatformName = (value: string): boolean => {
-  const name = normalizePlatformName(value);
+  const name = normalizeCatalogPlatformName(value);
   return (
     name === 'pc microsoft windows' ||
     name === 'pc linux' ||
@@ -378,7 +421,7 @@ const isPcTargetPlatformName = (
   target: CatalogFilters['pcPlatform']
 ): boolean => {
   if (!target) return isPcPlatformName(value);
-  const name = normalizePlatformName(value);
+  const name = normalizeCatalogPlatformName(value);
   if (target === 'windows') {
     return ['pc microsoft windows', 'microsoft windows', 'windows'].includes(
       name
@@ -421,25 +464,55 @@ const getEmulationPlatforms = async (): Promise<
     }));
 };
 
+const getRomarrApi = (): ROMarrNGAPI => {
+  const settings = getSettings().softwareAcquisition.romarr;
+  if (!settings.hostname || !settings.apiKey) {
+    throw new SoftwareProviderNotConfiguredError('ROMarrNG is not configured.');
+  }
+  return new ROMarrNGAPI(settings);
+};
+
+const getDatCatalogCategoryContext = async (
+  category: SoftwareRequestCategory,
+  filters: CatalogFilters
+) => {
+  const api = getRomarrApi();
+  const [catalog, allSystems] = await Promise.all([
+    api.getDatCatalogPlatforms(),
+    getEmulationPlatforms(),
+  ]);
+  const availableSlugs = new Set(catalog.results.map((item) => item.slug));
+  const systems = allSystems.filter(
+    (system) =>
+      system.group === category &&
+      availableSlugs.has(system.slug) &&
+      (!filters.systemSlug || system.slug === filters.systemSlug)
+  );
+  return { api, systems, platformSlugs: systems.map(({ slug }) => slug) };
+};
+
 const systemMatchesGame = (
   system: RomarrPlatform,
-  game: SoftwareCatalogGame
-): { id: number; name: string } | undefined => {
+  game: SoftwareCatalogGame,
+  platformMappings: Record<string, number> = {}
+): { id?: number; key?: string; name: string } | undefined => {
+  const overrideId = platformMappings[system.slug];
+  if (overrideId && game.catalogProvider !== 'dat') {
+    return gameOptions(game).find((platform) => platform.id === overrideId);
+  }
+  const datPlatform = gameOptions(game).find(
+    (platform) => platform.key === system.slug
+  );
+  if (datPlatform) return datPlatform;
   const names = new Set(
     [system.name, system.slug, ...(system.aliases ?? [])]
-      .map(normalizePlatformName)
+      .map(normalizeCatalogPlatformName)
       .filter(Boolean)
   );
   return gameOptions(game).find((platform) =>
-    names.has(normalizePlatformName(platform.name))
+    names.has(normalizeCatalogPlatformName(platform.name))
   );
 };
-
-const systemMatchesPlatform = (system: RomarrPlatform, name: string): boolean =>
-  [system.name, system.slug, ...(system.aliases ?? [])].some(
-    (candidate) =>
-      normalizePlatformName(candidate) === normalizePlatformName(name)
-  );
 
 const getCatalogCategoryContext = async (
   api: SoftwareCatalogApi,
@@ -458,10 +531,18 @@ const getCatalogCategoryContext = async (
           )
         ),
   ]);
+  const mappings =
+    getSettings().softwareAcquisition.emulationPlatformMappings ?? {};
   const matches = (platform: SoftwareCatalogPlatform) =>
     category === 'game'
       ? isPcTargetPlatformName(platform.name, filters.pcPlatform)
-      : systems.some((system) => systemMatchesPlatform(system, platform.name));
+      : systems.some((system) => {
+          const overrideId = mappings[system.slug];
+          if (overrideId) return platform.id === overrideId;
+          return (
+            getAutomaticCatalogPlatform(system, platforms)?.id === platform.id
+          );
+        });
   return {
     platformIds: platforms
       .filter(matches)
@@ -477,7 +558,8 @@ type CatalogGameResult = SoftwareCatalogGame & {
     slug: string;
     name: string;
     group: 'retro' | 'modern' | null;
-    catalogPlatformId: number;
+    catalogPlatformId?: number;
+    catalogPlatformKey?: string;
   }[];
 };
 
@@ -485,7 +567,8 @@ const mapCategoryGames = (
   games: SoftwareCatalogGame[],
   category: SoftwareRequestCategory,
   systems: (RomarrPlatform & { group: 'retro' | 'modern' | null })[],
-  filters: CatalogFilters
+  filters: CatalogFilters,
+  platformMappings: Record<string, number> = {}
 ): CatalogGameResult[] => {
   const sanitized = games.map(sanitizeGame);
   if (category === 'game') {
@@ -497,14 +580,15 @@ const mapCategoryGames = (
   }
   return sanitized.flatMap((game) => {
     const systemsForGame = systems.flatMap((system) => {
-      const platform = systemMatchesGame(system, game);
+      const platform = systemMatchesGame(system, game, platformMappings);
       return platform
         ? [
             {
               slug: system.slug,
               name: system.name,
               group: system.group,
-              catalogPlatformId: platform.id,
+              ...(platform.id ? { catalogPlatformId: platform.id } : {}),
+              ...(platform.key ? { catalogPlatformKey: platform.key } : {}),
             },
           ]
         : [];
@@ -531,7 +615,18 @@ const addCatalogAvailability = async (
   if (!results.length) return [];
   try {
     if (category === 'game') {
-      const ids = [...new Set(results.map((game) => game.igdbId))];
+      const ids = [
+        ...new Set(
+          results
+            .map((game) => game.igdbId)
+            .filter(
+              (id): id is number => Number.isSafeInteger(id) && (id ?? 0) > 0
+            )
+        ),
+      ];
+      if (!ids.length) {
+        return results.map((game) => ({ ...game, availability: 'unknown' }));
+      }
       const steamAppIds = [
         ...new Set(
           results
@@ -563,8 +658,8 @@ const addCatalogAvailability = async (
           .map((game) => [game.steamAppId, game.owned])
       );
       return results.map((game) => {
-        const status = statuses.get(game.igdbId);
-        const deliverable = deliverability.get(game.igdbId);
+        const status = statuses.get(game.igdbId ?? 0);
+        const deliverable = deliverability.get(game.igdbId ?? 0);
         const availability: CatalogAvailability =
           status === 'owned' || status === 'playing' || status === 'completed'
             ? deliverable === false
@@ -642,10 +737,14 @@ const addTrackedRequestAvailability = async (
 ) => {
   if (!results.length) return results;
   try {
+    const catalogKeys = [
+      ...new Set(results.map((game) => game.catalogId).filter(Boolean)),
+    ];
+    if (!catalogKeys.length) return results;
     const requests = await getRepository(SoftwareRequest).find({
       where: {
         category,
-        catalogId: In(results.map((game) => game.igdbId)),
+        catalogKey: In(catalogKeys),
         status: In([
           'pending',
           'approved',
@@ -658,7 +757,9 @@ const addTrackedRequestAvailability = async (
     });
     return results.map((game) => {
       const tracked = requests.filter(
-        (request) => request.catalogId === game.igdbId
+        (request) =>
+          request.catalogProvider === (game.catalogProvider ?? 'igdb') &&
+          request.catalogKey === game.catalogId
       );
       const availableSystems = [
         ...new Set([
@@ -720,22 +821,25 @@ const getQuestarrApi = (): QuestarrNGAPI => {
 };
 
 const getCatalogProviderName = (category: SoftwareRequestCategory) =>
-  category !== 'game' &&
-  getSettings().softwareAcquisition.emulationCatalogProvider === 'romarr'
-    ? 'ROMarrNG'
-    : 'QuestarrNG';
+  category === 'game'
+    ? 'QuestarrNG'
+    : getSettings().softwareAcquisition.emulationCatalogProvider === 'romarr'
+      ? 'ROMarrNG IGDB'
+      : getSettings().softwareAcquisition.emulationCatalogProvider ===
+          'romarr-dat'
+        ? 'ROMarrNG DAT'
+        : 'QuestarrNG';
 
 const getCatalogApi = (
   category: SoftwareRequestCategory
 ): SoftwareCatalogApi => {
   const settings = getSettings().softwareAcquisition;
-  if (category !== 'game' && settings.emulationCatalogProvider === 'romarr') {
-    if (!settings.romarr.hostname || !settings.romarr.apiKey) {
-      throw new SoftwareProviderNotConfiguredError(
-        'ROMarrNG is not configured.'
-      );
-    }
-    return new ROMarrNGAPI(settings.romarr);
+  if (
+    category !== 'game' &&
+    (settings.emulationCatalogProvider === 'romarr' ||
+      settings.emulationCatalogProvider === 'romarr-dat')
+  ) {
+    return getRomarrApi();
   }
   return getQuestarrApi();
 };
@@ -760,6 +864,8 @@ const serializeRequest = (
   summary: request.summary ?? null,
   coverUrl: request.coverUrl ?? null,
   catalogId: request.catalogId ?? null,
+  catalogProvider: request.catalogProvider ?? 'igdb',
+  catalogKey: request.catalogKey ?? null,
   actions: actions ?? null,
   platform: request.platformSlug
     ? {
@@ -777,6 +883,8 @@ const serializeRequest = (
       : null,
   attempt: request.attempt,
   percent: request.percent ?? null,
+  stage: request.providerStage ?? null,
+  failureCode: request.failureCode ?? null,
   error: request.errorMessage ?? null,
   createdAt: request.createdAt,
   updatedAt: request.updatedAt,
@@ -826,14 +934,16 @@ const respondEmulationCatalogUnavailable = (
       : undefined;
   if (
     category === 'game' ||
-    getCatalogProviderName(category) !== 'ROMarrNG' ||
+    !getCatalogProviderName(category).startsWith('ROMarrNG') ||
     (status !== 503 && !(includeNotFound && status === 404))
   ) {
     return false;
   }
   res.status(503).json({
     error:
-      'ROMarrNG’s emulation catalog is unavailable. Configure IGDB and the SeerrNG catalog contract in ROMarrNG, or select QuestarrNG as the emulation catalog source.',
+      getCatalogProviderName(category) === 'ROMarrNG DAT'
+        ? 'ROMarrNG’s DAT catalog is unavailable. Load DAT files in ROMarrNG or select another emulation catalog source.'
+        : 'ROMarrNG’s IGDB catalog is unavailable. Configure IGDB and the SeerrNG catalog contract in ROMarrNG, or select QuestarrNG as the emulation catalog source.',
   });
   return true;
 };
@@ -842,7 +952,29 @@ softwareRoutes.use(isAuthenticated());
 
 softwareRoutes.get('/catalog/systems', async (_req, res) => {
   try {
-    return res.status(200).json({ results: await getEmulationPlatforms() });
+    const settings = getSettings().softwareAcquisition;
+    const results = await getEmulationPlatforms();
+    const datCatalog =
+      settings.emulationCatalogProvider === 'romarr-dat'
+        ? await getRomarrApi().getDatCatalogPlatforms()
+        : undefined;
+    return res.status(200).json({
+      results,
+      catalogProvider:
+        settings.emulationCatalogProvider === 'romarr-dat'
+          ? 'dat'
+          : settings.emulationCatalogProvider === 'romarr'
+            ? 'igdb'
+            : 'questarr',
+      ...(datCatalog
+        ? {
+            catalogSystemSlugs: datCatalog.results.map(
+              (platform) => platform.slug
+            ),
+            unmatchedDatNames: datCatalog.unmatchedDatNames,
+          }
+        : {}),
+    });
   } catch (error) {
     return respondProviderError(res, error);
   }
@@ -860,6 +992,43 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
   }
 
   try {
+    if (
+      parsed.category !== 'game' &&
+      getSettings().softwareAcquisition.emulationCatalogProvider ===
+        'romarr-dat'
+    ) {
+      if (parsed.filters.genre || parsed.filters.releaseYear) {
+        return res.status(400).json({
+          error:
+            'The DAT catalog does not include genre or release-year filters.',
+        });
+      }
+      const { api, systems, platformSlugs } =
+        await getDatCatalogCategoryContext(parsed.category, parsed.filters);
+      if (!platformSlugs.length) {
+        return res.status(200).json({ results: [], nextCursor: null });
+      }
+      const page = await api.searchDatCatalogPage(
+        parsed.query,
+        parsed.limit,
+        parsed.cursor,
+        platformSlugs
+      );
+      const mappings =
+        getSettings().softwareAcquisition.emulationPlatformMappings ?? {};
+      const results = mapCategoryGames(
+        page.results,
+        parsed.category,
+        systems,
+        parsed.filters,
+        mappings
+      ).slice(0, parsed.limit);
+      enqueueImageCacheWarm(extractImageCacheUrls(results));
+      return res.status(200).json({
+        results: await catalogResultsWithAvailability(results, parsed.category),
+        nextCursor: normalizeNextCatalogCursor(page.nextCursor, parsed.cursor),
+      });
+    }
     const api = getCatalogApi(parsed.category);
     const { platformIds, systems } = await getCatalogCategoryContext(
       api,
@@ -895,7 +1064,7 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
       }
       if (
         parsed.category !== 'game' &&
-        getCatalogProviderName(parsed.category) === 'ROMarrNG' &&
+        getCatalogProviderName(parsed.category).startsWith('ROMarrNG') &&
         !parsed.cursor &&
         !parsed.filters.genre &&
         !parsed.filters.releaseYear &&
@@ -935,7 +1104,8 @@ softwareRoutes.get('/catalog/search', async (req, res) => {
       games,
       parsed.category,
       systems,
-      parsed.filters
+      parsed.filters,
+      getSettings().softwareAcquisition.emulationPlatformMappings ?? {}
     ).slice(0, legacyCatalog ? CATALOG_PROVIDER_FETCH_LIMIT : parsed.limit);
     enqueueImageCacheWarm(extractImageCacheUrls(results));
     return res.status(200).json({
@@ -976,6 +1146,35 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
   }
 
   try {
+    if (
+      category !== 'game' &&
+      getSettings().softwareAcquisition.emulationCatalogProvider ===
+        'romarr-dat'
+    ) {
+      if (filters.genre || filters.releaseYear) {
+        return res.status(400).json({
+          error:
+            'The DAT catalog does not include genre or release-year filters.',
+        });
+      }
+      const { api, systems, platformSlugs } =
+        await getDatCatalogCategoryContext(category, filters);
+      if (!platformSlugs.length) {
+        return res.status(200).json({ results: [], nextOffset: null });
+      }
+      const page = await api.browseDatCatalogPage(limit, offset, platformSlugs);
+      const results = mapCategoryGames(
+        page.results,
+        category,
+        systems,
+        filters
+      ).slice(0, limit);
+      enqueueImageCacheWarm(extractImageCacheUrls(results));
+      return res.status(200).json({
+        results: await catalogResultsWithAvailability(results, category),
+        nextOffset: normalizeNextCatalogOffset(page.nextOffset, offset),
+      });
+    }
     const api = getCatalogApi(category);
     const { platformIds, systems } = await getCatalogCategoryContext(
       api,
@@ -1010,7 +1209,7 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
       }
       if (
         category !== 'game' &&
-        getCatalogProviderName(category) === 'ROMarrNG' &&
+        getCatalogProviderName(category).startsWith('ROMarrNG') &&
         offset === 0 &&
         !filters.genre &&
         !filters.releaseYear &&
@@ -1035,10 +1234,13 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
       nextOffset = null;
       legacyCatalog = true;
     }
-    const results = mapCategoryGames(games, category, systems, filters).slice(
-      0,
-      legacyCatalog ? CATALOG_PROVIDER_FETCH_LIMIT : limit
-    );
+    const results = mapCategoryGames(
+      games,
+      category,
+      systems,
+      filters,
+      getSettings().softwareAcquisition.emulationPlatformMappings ?? {}
+    ).slice(0, legacyCatalog ? CATALOG_PROVIDER_FETCH_LIMIT : limit);
     enqueueImageCacheWarm(extractImageCacheUrls(results));
     return res.status(200).json({
       results: await catalogResultsWithAvailability(results, category),
@@ -1054,11 +1256,24 @@ softwareRoutes.get('/catalog/popular', async (req, res) => {
 
 softwareRoutes.get('/catalog/games/:id', async (req, res) => {
   const category = req.query.category;
+  const rawCatalogProvider = req.query.catalogProvider;
+  if (
+    rawCatalogProvider !== undefined &&
+    rawCatalogProvider !== 'dat' &&
+    rawCatalogProvider !== 'igdb'
+  ) {
+    return res.status(400).json({
+      error: 'Choose IGDB or DAT as the catalog provider.',
+    });
+  }
+  const catalogProvider = rawCatalogProvider === 'dat' ? 'dat' : 'igdb';
   const catalogId = Number(req.params.id);
+  const catalogKey = req.params.id;
   if (
     (category !== 'retro' && category !== 'modern' && category !== 'game') ||
-    !/^[1-9]\d*$/.test(req.params.id) ||
-    !Number.isSafeInteger(catalogId)
+    (catalogProvider === 'dat'
+      ? category === 'game' || !/^dat-[0-9a-f]{64}$/.test(catalogKey)
+      : !/^[1-9]\d*$/.test(req.params.id) || !Number.isSafeInteger(catalogId))
   ) {
     return res
       .status(400)
@@ -1069,10 +1284,23 @@ softwareRoutes.get('/catalog/games/:id', async (req, res) => {
   }
 
   try {
-    const api = getCatalogApi(category);
+    const isDat = catalogProvider === 'dat';
     if (
+      isDat !==
+      (category !== 'game' &&
+        getSettings().softwareAcquisition.emulationCatalogProvider ===
+          'romarr-dat')
+    ) {
+      return res.status(409).json({
+        error:
+          'The selected catalog source changed. Reload the title before requesting it.',
+      });
+    }
+    const api = isDat ? getRomarrApi() : getCatalogApi(category);
+    if (
+      !isDat &&
       category !== 'game' &&
-      getCatalogProviderName(category) === 'ROMarrNG'
+      getCatalogProviderName(category).startsWith('ROMarrNG')
     ) {
       try {
         await api.getCatalogPlatforms();
@@ -1084,14 +1312,17 @@ softwareRoutes.get('/catalog/games/:id', async (req, res) => {
       }
     }
     const [game, systems] = await Promise.all([
-      api.getCatalogGame(catalogId),
+      isDat
+        ? getRomarrApi().getDatCatalogGame(catalogKey)
+        : getCatalogApi(category).getCatalogGame(catalogId),
       category === 'game' ? Promise.resolve([]) : getEmulationPlatforms(),
     ]);
     const result = mapCategoryGames(
       [game],
       category,
       systems.filter((system) => system.group === category),
-      {}
+      {},
+      getSettings().softwareAcquisition.emulationPlatformMappings ?? {}
     )[0];
     if (!result) {
       return res
@@ -1116,11 +1347,31 @@ softwareRoutes.get('/catalog/games/:id', async (req, res) => {
 softwareRoutes.post('/', async (req, res) => {
   const body = isRecord(req.body) ? req.body : {};
   const category = body.category;
-  const catalogId = Number(body.catalogId);
+  const settings = getSettings().softwareAcquisition;
+  const expectedCatalogProvider =
+    category !== 'game' && settings.emulationCatalogProvider === 'romarr-dat'
+      ? 'dat'
+      : 'igdb';
+  const catalogProvider =
+    body.catalogProvider === undefined
+      ? expectedCatalogProvider
+      : body.catalogProvider;
+  const catalogKey =
+    typeof body.catalogKey === 'string'
+      ? body.catalogKey
+      : typeof body.catalogId === 'string'
+        ? body.catalogId
+        : '';
+  const catalogId =
+    catalogProvider === 'igdb' ? Number(body.catalogId ?? catalogKey) : null;
   if (
     (category !== 'retro' && category !== 'modern' && category !== 'game') ||
-    !Number.isSafeInteger(catalogId) ||
-    catalogId <= 0
+    (catalogProvider !== 'igdb' && catalogProvider !== 'dat') ||
+    catalogProvider !== expectedCatalogProvider ||
+    (catalogProvider === 'igdb' &&
+      (!Number.isSafeInteger(catalogId) || (catalogId ?? 0) <= 0)) ||
+    (catalogProvider === 'dat' &&
+      (category === 'game' || !/^dat-[0-9a-f]{64}$/.test(catalogKey)))
   ) {
     return res.status(400).json({
       error: 'A valid software category and catalog title are required.',
@@ -1145,8 +1396,12 @@ softwareRoutes.post('/', async (req, res) => {
   const repository = getRepository(SoftwareRequest);
   try {
     const selectedGame = sanitizeGame(
-      await getCatalogApi(category).getCatalogGame(catalogId)
+      catalogProvider === 'dat'
+        ? await getRomarrApi().getDatCatalogGame(catalogKey)
+        : await getCatalogApi(category).getCatalogGame(catalogId as number)
     );
+    const selectedCatalogKey =
+      catalogProvider === 'dat' ? catalogKey : String(catalogId);
     let provider: SoftwareRequestProvider;
     let platformSlug: string | null = null;
     let platformName: string | null = null;
@@ -1181,7 +1436,11 @@ softwareRoutes.post('/', async (req, res) => {
           error: 'Choose a system assigned to this emulation category.',
         });
       }
-      const catalogPlatform = systemMatchesGame(system, selectedGame);
+      const catalogPlatform = systemMatchesGame(
+        system,
+        selectedGame,
+        settings.emulationPlatformMappings ?? {}
+      );
       if (!catalogPlatform) {
         return res
           .status(400)
@@ -1190,13 +1449,18 @@ softwareRoutes.post('/', async (req, res) => {
       provider = 'romarr';
       platformSlug = system.slug;
       platformName = system.name;
-      platformId = catalogPlatform.id;
+      platformId = catalogPlatform.id ?? null;
     }
 
     const query = repository
       .createQueryBuilder('request')
       .where('request.requestedById = :userId', { userId: req.user.id })
-      .andWhere('request.catalogId = :catalogId', { catalogId })
+      .andWhere('request.catalogProvider = :catalogProvider', {
+        catalogProvider,
+      })
+      .andWhere('request.catalogKey = :catalogKey', {
+        catalogKey: selectedCatalogKey,
+      })
       .andWhere('request.category = :category', { category })
       .andWhere('request.status IN (:...statuses)', {
         statuses: [...ACTIVE_STATUSES, 'available'],
@@ -1224,7 +1488,9 @@ softwareRoutes.post('/', async (req, res) => {
       provider,
       status: 'pending',
       externalRequestId: `seerrng:software:${randomUUID()}`,
-      catalogId,
+      catalogId: catalogId ?? null,
+      catalogProvider,
+      catalogKey: selectedCatalogKey,
       title: selectedGame.title,
       summary: selectedGame.summary,
       coverUrl: selectedGame.coverUrl,
@@ -1234,6 +1500,8 @@ softwareRoutes.post('/', async (req, res) => {
       operatingSystem: variant?.operatingSystem ?? null,
       architecture: variant?.architecture ?? null,
       attempt: 0,
+      providerStage: 'pending',
+      failureCode: null,
       errorMessage: null,
     });
     await repository.save(request);
@@ -1244,7 +1512,10 @@ softwareRoutes.post('/', async (req, res) => {
         requestedById: request.requestedById,
         status: request.status,
         message: 'Request submitted.',
-        fingerprint: `${request.status}:0`,
+        providerStage: request.providerStage,
+        failureCode: null,
+        percent: null,
+        fingerprint: `${request.status}:0:${request.providerStage}:na:na`,
       })
     );
 
@@ -1715,20 +1986,25 @@ softwareRoutes.get('/status/:id/bundle', async (req, res) => {
 
   try {
     const result = await streamSoftwareRequestBundle(view.request);
-    const filename = (result.filename ?? view.bundleName)
+    const sanitizedFilename = (result.filename ?? view.bundleName)
       .replace(/[\\/\r\n\0"<>:|?*]/g, '_')
+      .trim()
       .slice(0, 180);
+    const filename = (sanitizedFilename || view.bundleName).endsWith('.tar.gz')
+      ? sanitizedFilename || view.bundleName
+      : `${sanitizedFilename || 'software-files'}.tar.gz`;
     const headers: Record<string, string> = {
-      'Content-Type': result.contentType ?? 'application/gzip',
+      'Content-Type': 'application/gzip',
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename || view.bundleName)}`,
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     };
-    if (result.contentLength !== undefined)
+    if (
+      Number.isSafeInteger(result.contentLength) &&
+      (result.contentLength ?? -1) >= 0
+    )
       headers['Content-Length'] = String(result.contentLength);
-    if (result.rangeSupported) headers['Accept-Ranges'] = 'bytes';
-    if (result.contentRange) headers['Content-Range'] = result.contentRange;
-    res.status(result.statusCode).set(headers);
+    res.status(200).set(headers);
     result.stream.on('error', (error) => {
       logger.warn('Software bundle stream ended with an error', {
         requestId: request.id,

@@ -3,6 +3,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -108,6 +109,7 @@ interface LidarrModalProps {
 
 const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('lidarr');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(lidarr ? true : false);
@@ -236,8 +238,8 @@ const LidarrModal = ({ onClose, lidarr, onSave }: LidarrModalProps) => {
       <Formik
         initialValues={{
           name: lidarr?.name,
-          hostname: lidarr?.hostname,
-          port: lidarr?.port ?? 8686,
+          hostname: lidarr?.hostname ?? setupConnection?.hostname,
+          port: lidarr?.port ?? setupConnection?.port ?? 8686,
           ssl: lidarr?.useSsl ?? false,
           apiKey: lidarr?.apiKey,
           baseUrl: lidarr?.baseUrl,

@@ -8,6 +8,7 @@ import {
   getSharedGameLibrary,
   markSteamOwnershipUnverified,
   normalizeGameTitle,
+  SharedGameLibraryLimitError,
   syncSteamLibrary,
 } from '@server/lib/gameLibrary';
 import { setupTestDb } from '@server/test/db';
@@ -63,6 +64,49 @@ describe('personal game library sync and household privacy', () => {
 
   it('normalizes accented and non-Latin titles without deleting their letters', () => {
     assert.equal(normalizeGameTitle('Café 東京'), 'cafe 東京');
+  });
+
+  it('bounds the number of shared entries loaded into memory', async () => {
+    const repository = getRepository(GameLibraryEntry);
+    await repository.save([
+      new GameLibraryEntry({
+        userId: 2,
+        externalKey: 'manual:shared-limit-one',
+        catalogId: null,
+        category: 'game',
+        title: 'Shared Game One',
+        status: 'played',
+        isOwned: true,
+        steamAppId: null,
+        steamOwned: false,
+        playtimeMinutes: 0,
+        storeName: 'Steam',
+        platformName: '',
+        shareWithHousehold: true,
+        source: 'manual',
+      }),
+      new GameLibraryEntry({
+        userId: 2,
+        externalKey: 'manual:shared-limit-two',
+        catalogId: null,
+        category: 'game',
+        title: 'Shared Game Two',
+        status: 'played',
+        isOwned: true,
+        steamAppId: null,
+        steamOwned: false,
+        playtimeMinutes: 0,
+        storeName: 'Steam',
+        platformName: '',
+        shareWithHousehold: true,
+        source: 'manual',
+      }),
+    ]);
+
+    await assert.rejects(
+      () => getSharedGameLibrary(1),
+      SharedGameLibraryLimitError
+    );
   });
 
   it('does not automatically match imported Steam titles to a catalog title', async () => {

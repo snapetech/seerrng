@@ -132,9 +132,13 @@ export async function getSoftwareReleaseCalendar(
       Number(request.catalogId) < 1
     )
       continue;
+    const selectedCatalogProvider =
+      settings.emulationCatalogProvider === 'romarr-dat'
+        ? 'romarr'
+        : settings.emulationCatalogProvider;
     const provider = catalogProviderFor(
       request.category,
-      settings.emulationCatalogProvider
+      selectedCatalogProvider
     );
     const platformId =
       request.category === 'game'

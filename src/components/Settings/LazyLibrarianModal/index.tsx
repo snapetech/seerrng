@@ -1,6 +1,7 @@
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import SettingsField from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -66,6 +67,7 @@ const LazyLibrarianModal = ({
   onSave,
 }: LazyLibrarianModalProps) => {
   const intl = useIntl();
+  const setupConnection = useSetupConnectionSuggestion('lazylibrarian');
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(Boolean(lazylibrarian));
@@ -153,8 +155,8 @@ const LazyLibrarianModal = ({
       <Formik
         initialValues={{
           name: lazylibrarian?.name ?? '',
-          hostname: lazylibrarian?.hostname ?? '',
-          port: lazylibrarian?.port ?? 5299,
+          hostname: lazylibrarian?.hostname ?? setupConnection?.hostname ?? '',
+          port: lazylibrarian?.port ?? setupConnection?.port ?? 5299,
           ssl: lazylibrarian?.useSsl ?? false,
           apiKey: lazylibrarian?.apiKey ?? '',
           baseUrl: lazylibrarian?.baseUrl ?? '',

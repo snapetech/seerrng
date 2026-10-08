@@ -4,6 +4,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Field, {
   default as SettingsField,
 } from '@app/components/Settings/SettingsField';
+import { useSetupConnectionSuggestion } from '@app/context/SetupConnectionsContext';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -148,6 +149,9 @@ const ReadarrModal = ({
   onSave,
 }: ReadarrModalProps) => {
   const intl = useIntl();
+  const bookshelfSuggestion = useSetupConnectionSuggestion('bookshelf');
+  const chaptarrSuggestion = useSetupConnectionSuggestion('chaptarrng');
+  const setupConnection = bookshelfSuggestion ?? chaptarrSuggestion;
   const initialLoad = useRef(false);
   const { addToast } = useToasts();
   const [isValidated, setIsValidated] = useState(readarr ? true : false);
@@ -305,8 +309,13 @@ const ReadarrModal = ({
       <Formik
         initialValues={{
           name: readarr?.name ?? '',
-          hostname: readarr?.hostname ?? copyFrom?.hostname ?? '',
-          port: readarr?.port ?? copyFrom?.port ?? 8787,
+          hostname:
+            readarr?.hostname ??
+            copyFrom?.hostname ??
+            setupConnection?.hostname ??
+            '',
+          port:
+            readarr?.port ?? copyFrom?.port ?? setupConnection?.port ?? 8787,
           ssl: readarr?.useSsl ?? copyFrom?.useSsl ?? false,
           apiKey: readarr?.apiKey ?? copyFrom?.apiKey ?? '',
           baseUrl: readarr?.baseUrl ?? copyFrom?.baseUrl ?? '',

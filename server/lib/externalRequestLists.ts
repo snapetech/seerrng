@@ -19,6 +19,7 @@ import xml2js from 'xml2js';
 
 export const MAX_EXTERNAL_REQUEST_LISTS_PER_USER = 10;
 export const MAX_EXTERNAL_REQUEST_LIST_ITEMS = 100;
+export const MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE = 100;
 
 export type ExternalRequestListProvider = 'imdb' | 'goodreads' | 'hardcover';
 
@@ -520,26 +521,46 @@ export const syncExternalRequestList = async (
   return result;
 };
 
-export const syncAllExternalRequestLists = async (): Promise<void> => {
-  const lists = await getRepository(ExternalRequestList)
-    .createQueryBuilder('list')
-    .leftJoinAndSelect('list.user', 'user')
-    .addSelect('list.apiToken')
-    .orderBy('list.id', 'ASC')
-    .getMany();
+export const syncAllExternalRequestLists = async (
+  syncOne: typeof syncExternalRequestList = syncExternalRequestList,
+  requestedBatchSize = MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE
+): Promise<void> => {
+  const repository = getRepository(ExternalRequestList);
+  const batchSize = Number.isSafeInteger(requestedBatchSize)
+    ? Math.max(
+        1,
+        Math.min(requestedBatchSize, MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE)
+      )
+    : MAX_EXTERNAL_REQUEST_LIST_SYNC_BATCH_SIZE;
+  let lastId = 0;
 
-  for (const list of lists) {
-    if (!list.user) continue;
-    const result = await syncExternalRequestList(list, list.user);
-    logger.info('External request list synchronization completed.', {
-      label: 'External Request Lists',
-      listId: list.id,
-      provider: list.provider,
-      requested: result.requested,
-      alreadyRequested: result.alreadyRequested,
-      unmatched: result.unmatched,
-      failed: result.failed,
-      error: result.error,
-    });
+  while (true) {
+    const lists = await repository
+      .createQueryBuilder('list')
+      .leftJoinAndSelect('list.user', 'user')
+      .addSelect('list.apiToken')
+      .where('list.id > :lastId', { lastId })
+      .orderBy('list.id', 'ASC')
+      .take(batchSize)
+      .getMany();
+    if (!lists.length) return;
+
+    for (const list of lists) {
+      lastId = list.id;
+      if (!list.user) continue;
+      const result = await syncOne(list, list.user);
+      logger.info('External request list synchronization completed.', {
+        label: 'External Request Lists',
+        listId: list.id,
+        provider: list.provider,
+        requested: result.requested,
+        alreadyRequested: result.alreadyRequested,
+        unmatched: result.unmatched,
+        failed: result.failed,
+        error: result.error,
+      });
+    }
+
+    if (lists.length < batchSize) return;
   }
 };

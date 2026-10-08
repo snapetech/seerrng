@@ -34,6 +34,7 @@ This fork is maintained by snapetech. Upstream Seerr remains the base project fo
   - [Configure comics](./docs/using-seerr/comics-backend.md)
   - [Configure magazines](./docs/using-seerr/magazines-backend.md)
   - [Companion services and SeerrNG NG forks](./docs/using-seerr/companion-services.md)
+  - [Cross-platform setup assistant](./docs/using-seerr/setup-assistant.md)
   - [Indexer searches by media category](./docs/using-seerr/indexer-searches.md)
   - [Configure services](./docs/using-seerr/settings/services.md)
 - [Screenshots](#screenshots)
@@ -190,6 +191,9 @@ services:
       - /path/to/seerrng/config:/app/config
     restart: unless-stopped
 ```
+
+To create a guided starter stack for SeerrNG and common media apps on Windows,
+macOS, or Linux, use the [cross-platform setup assistant](./docs/using-seerr/setup-assistant.md).
 
 ### Unraid
 

@@ -4,6 +4,7 @@ export type SoftwareProviderConnection = SoftwareProviderSettings;
 
 export interface SoftwareProviderCapabilities {
   catalog: boolean;
+  datCatalog?: boolean;
   pcAcquisition: boolean;
   emulationAcquisition: boolean;
   requestActions: { retry: boolean; cancel: boolean };
@@ -27,7 +28,9 @@ export interface SoftwareProviderActions {
 
 export interface SoftwareCatalogGame {
   id: string;
-  igdbId: number;
+  catalogProvider?: 'igdb' | 'dat';
+  catalogId?: string;
+  igdbId?: number;
   title: string;
   summary: string;
   coverUrl: string;
@@ -35,7 +38,7 @@ export interface SoftwareCatalogGame {
   /** Exact day-precision release for the requested IGDB platform, when asked. */
   platformReleaseDate?: string | null;
   platforms: string[];
-  platformOptions: { id: number; name: string }[];
+  platformOptions: { id?: number; key?: string; name: string }[];
   genres: string[];
   /** Steam App ID from the IGDB Steam store link, when available. */
   steamAppId?: number | null;
@@ -49,11 +52,29 @@ export interface SoftwareCatalogGame {
     normally?: number;
     completely?: number;
   } | null;
+  source?: 'IGDB' | 'DAT';
+  dat?: {
+    name: string;
+    version: string;
+    entry: string;
+    variants: number;
+  };
 }
 
 export interface SoftwareCatalogPlatform {
   id: number;
   name: string;
+}
+
+export interface SoftwareDatCatalogPlatform {
+  slug: string;
+  name: string;
+  gameCount: number;
+}
+
+export interface SoftwareDatCatalogPlatformsResponse {
+  results: SoftwareDatCatalogPlatform[];
+  unmatchedDatNames: string[];
 }
 
 export interface SoftwareAsset {
@@ -104,6 +125,10 @@ export interface SoftwareProviderRomPlacement {
 export interface SoftwareProviderRequest {
   externalRequestId: string;
   status: SoftwareProviderStatus;
+  stage?: string | null;
+  percent?: number | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
   deliverable: boolean;
   rommPlacement?: SoftwareProviderRomPlacement | null;
   error?: string | null;
@@ -113,8 +138,10 @@ export interface SoftwareProviderRequest {
   platform?: string;
   identity?: {
     catalogProvider: string;
-    catalogId: number;
+    catalogId?: number;
+    catalogKey?: string;
     platformId?: number;
+    platformSlug?: string;
   } | null;
   actions?: SoftwareProviderActions | null;
 }

@@ -135,9 +135,9 @@ const messages = defineMessages('components.GameLibrary', {
   loadMore: 'Load More Games',
   loadingMore: 'Loading more games…',
   totalGames: '{count, plural, one {# game} other {# games}}',
-  ownerCountFilter: 'Owners',
-  multipleOwners: '2+ people',
-  allOwners: 'Any number',
+  sharedFilterLabel: 'Owner count',
+  sharedOnly: '2+ owners',
+  allShared: 'All shared games',
   addGame: 'Add a Game',
   addGameTitle: 'Add a game to My Games',
   manualTitle: 'Game title',
@@ -375,6 +375,7 @@ const GameLibrary = () => {
   );
   const libraryLoadingMore = librarySize > (libraryPages?.length ?? 0);
   const sharedLoadingMore = sharedSize > (sharedPages?.length ?? 0);
+  const isLoading = tab === 'library' ? libraryLoading : sharedLoading;
   const pageError = tab === 'library' ? libraryError : sharedError;
 
   useEffect(() => {
@@ -751,9 +752,7 @@ const GameLibrary = () => {
                   void patchEntry(entry, { isOwned: !entry.isOwned })
                 }
               />
-              <span className="game-library-sharing-label">
-                {intl.formatMessage(messages.manualOwnership)}
-              </span>
+              <span>{intl.formatMessage(messages.manualOwnership)}</span>
               <SelectionCircle
                 label={intl.formatMessage(messages.shareWithHousehold)}
                 selected={entry.shareWithHousehold}
@@ -764,7 +763,7 @@ const GameLibrary = () => {
                   })
                 }
               />
-              <span className="game-library-sharing-label">
+              <span>
                 {entry.shareWithHousehold
                   ? intl.formatMessage(messages.shareWithHousehold)
                   : intl.formatMessage(messages.privateLibrary)}
@@ -907,322 +906,324 @@ const GameLibrary = () => {
   return (
     <>
       <PageTitle title={intl.formatMessage(messages.title)} />
-      <div>
-        <div className="page-title-row">
-          <h1 className="page-title">{intl.formatMessage(messages.title)}</h1>
-          {tab === 'library' && (
-            <div className="app-action-row">
-              <span className="card-body-text">
-                {intl.formatMessage(messages.totalGames, {
-                  count: totalLibraryGames,
-                })}
-              </span>
-              <Button
-                buttonType="primary"
-                buttonSize="sm"
-                onClick={openManualAdd}
-              >
-                {intl.formatMessage(messages.addGame)}
-              </Button>
-            </div>
-          )}
-        </div>
-        <p className="page-title-subtext">
-          {intl.formatMessage(messages.intro)}
-        </p>
+      <main className="page-layout">
+        <div data-page-layout-part="content">
+          <div className="page-title-row">
+            <h1 className="page-title">{intl.formatMessage(messages.title)}</h1>
+            {tab === 'library' && (
+              <div className="app-action-row">
+                <span className="card-body-text">
+                  {intl.formatMessage(messages.totalGames, {
+                    count: totalLibraryGames,
+                  })}
+                </span>
+                <Button
+                  buttonType="primary"
+                  buttonSize="sm"
+                  onClick={openManualAdd}
+                >
+                  {intl.formatMessage(messages.addGame)}
+                </Button>
+              </div>
+            )}
+          </div>
+          <p className="page-title-subtext">
+            {intl.formatMessage(messages.intro)}
+          </p>
 
-        {tab === 'library' && (
-          <section className="app-card-main card-layout">
-            <h2 className="page-heading">
-              {intl.formatMessage(messages.steamTitle)}
-            </h2>
-            <p className="card-body-text">
-              {intl.formatMessage(messages.steamDescription)}
-            </p>
-            <p className="card-body-text">
-              {intl.formatMessage(messages.steamPrivacy)}{' '}
-              <a
-                href="https://steamcommunity.com/my/edit/settings"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {intl.formatMessage(messages.steamPrivacyLink)}
-              </a>
-            </p>
-            {steamStatus?.connected && (
+          {tab === 'library' && (
+            <section className="app-card-main card-layout">
+              <h2 className="page-heading">
+                {intl.formatMessage(messages.steamTitle)}
+              </h2>
               <p className="card-body-text">
-                {intl.formatMessage(messages.steamConnected)}
-                {steamStatus.lastSyncedAt
-                  ? ` · ${intl.formatMessage(messages.steamLastSynced, {
-                      date: intl.formatDate(steamStatus.lastSyncedAt),
-                      count: steamStatus.lastSyncCount,
-                    })}`
-                  : ` · ${intl.formatMessage(messages.steamNeverSynced)}`}
+                {intl.formatMessage(messages.steamDescription)}
               </p>
-            )}
-            {!steamStatus?.apiKeyConfigured && (
-              <p className="page-status">
-                {intl.formatMessage(messages.steamNotConfigured)}
+              <p className="card-body-text">
+                {intl.formatMessage(messages.steamPrivacy)}{' '}
+                <a
+                  href="https://steamcommunity.com/my/edit/settings"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {intl.formatMessage(messages.steamPrivacyLink)}
+                </a>
               </p>
-            )}
-            {steamFeedback && (
-              <p
-                className={
-                  steamFeedbackIsError ? 'page-error-message' : 'page-status'
-                }
-                role={steamFeedbackIsError ? 'alert' : 'status'}
-              >
-                {steamFeedback}
-              </p>
-            )}
-            <div className="app-action-row">
-              {steamStatus?.connected ? (
-                <>
-                  <Button
-                    buttonType="primary"
-                    buttonSize="sm"
-                    disabled={busyId === -1 || !steamStatus.apiKeyConfigured}
-                    onClick={() => void syncSteam()}
+              {steamStatus?.connected && (
+                <p className="card-body-text">
+                  {intl.formatMessage(messages.steamConnected)}
+                  {steamStatus.lastSyncedAt
+                    ? ` · ${intl.formatMessage(messages.steamLastSynced, {
+                        date: intl.formatDate(steamStatus.lastSyncedAt),
+                        count: steamStatus.lastSyncCount,
+                      })}`
+                    : ` · ${intl.formatMessage(messages.steamNeverSynced)}`}
+                </p>
+              )}
+              {!steamStatus?.apiKeyConfigured && (
+                <p className="page-status">
+                  {intl.formatMessage(messages.steamNotConfigured)}
+                </p>
+              )}
+              {steamFeedback && (
+                <p
+                  className={
+                    steamFeedbackIsError ? 'page-error-message' : 'page-status'
+                  }
+                  role={steamFeedbackIsError ? 'alert' : 'status'}
+                >
+                  {steamFeedback}
+                </p>
+              )}
+              <div className="app-action-row">
+                {steamStatus?.connected ? (
+                  <>
+                    <Button
+                      buttonType="primary"
+                      buttonSize="sm"
+                      disabled={busyId === -1 || !steamStatus.apiKeyConfigured}
+                      onClick={() => void syncSteam()}
+                    >
+                      {busyId === -1
+                        ? intl.formatMessage(messages.steamSyncing)
+                        : intl.formatMessage(messages.steamSync)}
+                    </Button>
+                    <Button
+                      buttonType="default"
+                      buttonSize="sm"
+                      disabled={busyId === -1}
+                      onClick={() => void unlinkSteam()}
+                    >
+                      {intl.formatMessage(messages.steamDisconnect)}
+                    </Button>
+                  </>
+                ) : steamStatus?.apiKeyConfigured ? (
+                  <a
+                    className="app-button app-button-default"
+                    href={`${router.basePath}/api/v1/game-library/steam/connect`}
                   >
-                    {busyId === -1
-                      ? intl.formatMessage(messages.steamSyncing)
-                      : intl.formatMessage(messages.steamSync)}
-                  </Button>
+                    {intl.formatMessage(messages.steamConnect)}
+                  </a>
+                ) : null}
+              </div>
+            </section>
+          )}
+
+          <nav
+            className="app-filter-row"
+            aria-label={intl.formatMessage(messages.title)}
+          >
+            <button
+              type="button"
+              aria-pressed={tab === 'library'}
+              className={getFilterToggleButtonClass(tab === 'library')}
+              onClick={() => setTab('library')}
+            >
+              {intl.formatMessage(messages.libraryTab)}
+            </button>
+            <button
+              type="button"
+              aria-pressed={tab === 'together'}
+              className={getFilterToggleButtonClass(tab === 'together')}
+              onClick={() => setTab('together')}
+            >
+              {intl.formatMessage(messages.togetherTab)}
+            </button>
+          </nav>
+
+          {tab === 'library' ? (
+            <>
+              <div className="app-filter-row">
+                <label className="discover-filter-control app-filter-search-control">
+                  <span className="discover-filter-control-label">
+                    <MagnifyingGlassIcon
+                      className="app-action-icon"
+                      aria-hidden="true"
+                    />
+                    {intl.formatMessage(messages.search)}
+                  </span>
+                  <input
+                    type="search"
+                    className="app-filter-search-input"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder={intl.formatMessage(messages.searchPlaceholder)}
+                    aria-label={intl.formatMessage(messages.search)}
+                  />
+                </label>
+                <CompactSelect
+                  label={intl.formatMessage(messages.allStatuses)}
+                  value={statusFilter}
+                  options={statusOptions}
+                  onChange={(value) => setStatusFilter(value)}
+                />
+                <CompactSelect
+                  label={intl.formatMessage(messages.allCategories)}
+                  value={categoryFilter}
+                  options={categoryOptions}
+                  onChange={(value) => setCategoryFilter(value)}
+                />
+              </div>
+              {feedback && (
+                <p className="page-status" role="status">
+                  {feedback}
+                </p>
+              )}
+              {errorMessage && (
+                <p className="page-error-message" role="alert">
+                  {errorMessage}
+                </p>
+              )}
+              {libraryLoading ? (
+                <div className="page-status" role="status">
+                  <LoadingSpinner /> {intl.formatMessage(messages.loading)}
+                </div>
+              ) : pageError ? (
+                <div className="page-error-message" role="alert">
+                  <p>{intl.formatMessage(messages.loadError)}</p>
                   <Button
                     buttonType="default"
                     buttonSize="sm"
-                    disabled={busyId === -1}
-                    onClick={() => void unlinkSteam()}
+                    onClick={() => void mutateLibrary()}
                   >
-                    {intl.formatMessage(messages.steamDisconnect)}
-                  </Button>
-                </>
-              ) : steamStatus?.apiKeyConfigured ? (
-                <a
-                  className="app-button app-button-default"
-                  href={`${router.basePath}/api/v1/game-library/steam/connect`}
-                >
-                  {intl.formatMessage(messages.steamConnect)}
-                </a>
-              ) : null}
-            </div>
-          </section>
-        )}
-
-        <nav
-          className="app-filter-row"
-          aria-label={intl.formatMessage(messages.title)}
-        >
-          <button
-            type="button"
-            aria-pressed={tab === 'library'}
-            className={getFilterToggleButtonClass(tab === 'library')}
-            onClick={() => setTab('library')}
-          >
-            {intl.formatMessage(messages.libraryTab)}
-          </button>
-          <button
-            type="button"
-            aria-pressed={tab === 'together'}
-            className={getFilterToggleButtonClass(tab === 'together')}
-            onClick={() => setTab('together')}
-          >
-            {intl.formatMessage(messages.togetherTab)}
-          </button>
-        </nav>
-
-        {tab === 'library' ? (
-          <>
-            <div className="app-filter-row">
-              <label className="discover-filter-control app-filter-search-control">
-                <span className="discover-filter-control-label">
-                  <MagnifyingGlassIcon
-                    className="app-action-icon"
-                    aria-hidden="true"
-                  />
-                  {intl.formatMessage(messages.search)}
-                </span>
-                <input
-                  type="search"
-                  className="app-filter-search-input"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder={intl.formatMessage(messages.searchPlaceholder)}
-                  aria-label={intl.formatMessage(messages.search)}
-                />
-              </label>
-              <CompactSelect
-                label={intl.formatMessage(messages.allStatuses)}
-                value={statusFilter}
-                options={statusOptions}
-                onChange={(value) => setStatusFilter(value)}
-              />
-              <CompactSelect
-                label={intl.formatMessage(messages.allCategories)}
-                value={categoryFilter}
-                options={categoryOptions}
-                onChange={(value) => setCategoryFilter(value)}
-              />
-            </div>
-            {feedback && (
-              <p className="page-status" role="status">
-                {feedback}
-              </p>
-            )}
-            {errorMessage && (
-              <p className="page-error-message" role="alert">
-                {errorMessage}
-              </p>
-            )}
-            {libraryLoading ? (
-              <div className="page-status" role="status">
-                <LoadingSpinner /> {intl.formatMessage(messages.loading)}
-              </div>
-            ) : pageError ? (
-              <div className="page-error-message" role="alert">
-                <p>{intl.formatMessage(messages.loadError)}</p>
-                <Button
-                  buttonType="default"
-                  buttonSize="sm"
-                  onClick={() => void mutateLibrary()}
-                >
-                  {intl.formatMessage(messages.retry)}
-                </Button>
-              </div>
-            ) : entries.length > 0 ? (
-              <ul className="card-list" data-list-layout="stacked">
-                {entries.map(renderGame)}
-              </ul>
-            ) : (
-              <section className="app-card-main card-layout">
-                <h2 className="page-heading">
-                  {totalLibraryGames === 0
-                    ? intl.formatMessage(messages.noGames)
-                    : intl.formatMessage(messages.noMatches)}
-                </h2>
-                {totalLibraryGames === 0 && (
-                  <p className="card-body-text">
-                    {intl.formatMessage(messages.noGamesHelp)}
-                  </p>
-                )}
-                <div className="app-action-row">
-                  <Button
-                    buttonType="primary"
-                    buttonSize="sm"
-                    onClick={() => void router.push('/software')}
-                  >
-                    {intl.formatMessage(messages.openCatalog)}
+                    {intl.formatMessage(messages.retry)}
                   </Button>
                 </div>
-              </section>
-            )}
-            {canLoadMoreLibrary && (
-              <div className="app-action-row">
-                <Button
-                  buttonType="default"
-                  buttonSize="sm"
-                  disabled={libraryLoadingMore}
-                  onClick={() => void setLibrarySize((size) => size + 1)}
-                >
-                  {libraryLoadingMore
-                    ? intl.formatMessage(messages.loadingMore)
-                    : intl.formatMessage(messages.loadMore)}
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="page-title-subtext">
-              {intl.formatMessage(messages.sharedIntro)}
-            </p>
-            <div className="app-filter-row">
-              <label className="discover-filter-control app-filter-search-control">
-                <span className="discover-filter-control-label">
-                  <MagnifyingGlassIcon
-                    className="app-action-icon"
-                    aria-hidden="true"
-                  />
-                  {intl.formatMessage(messages.search)}
-                </span>
-                <input
-                  type="search"
-                  className="app-filter-search-input"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder={intl.formatMessage(messages.searchPlaceholder)}
-                  aria-label={intl.formatMessage(messages.search)}
-                />
-              </label>
-              <CompactSelect
-                label={intl.formatMessage(messages.ownerCountFilter)}
-                value={sharedFilter}
-                options={[
-                  {
-                    value: 'multiple',
-                    label: intl.formatMessage(messages.multipleOwners),
-                  },
-                  {
-                    value: 'all',
-                    label: intl.formatMessage(messages.allOwners),
-                  },
-                ]}
-                onChange={setSharedFilter}
-              />
-            </div>
-            {sharedLoading ? (
-              <div className="page-status" role="status">
-                <LoadingSpinner /> {intl.formatMessage(messages.loading)}
-              </div>
-            ) : sharedError ? (
-              <div className="page-error-message" role="alert">
-                <p>{intl.formatMessage(messages.loadError)}</p>
-                <Button
-                  buttonType="default"
-                  buttonSize="sm"
-                  onClick={() => void mutateShared()}
-                >
-                  {intl.formatMessage(messages.retry)}
-                </Button>
-              </div>
-            ) : shownSharedGames.length > 0 ? (
-              <ul className="card-list" data-list-layout="stacked">
-                {shownSharedGames.map(renderSharedGame)}
-              </ul>
-            ) : (
-              <section className="app-card-main card-layout">
-                <h2 className="page-heading">
-                  {intl.formatMessage(messages.noSharedGames)}
-                </h2>
-                <p className="card-body-text">
-                  {intl.formatMessage(messages.noSharedGamesHelp)}
-                </p>
-              </section>
-            )}
-            {canLoadMoreShared && (
-              <div className="app-action-row">
-                <Button
-                  buttonType="default"
-                  buttonSize="sm"
-                  disabled={sharedLoadingMore}
-                  onClick={() => void setSharedSize((size) => size + 1)}
-                >
-                  {sharedLoadingMore
-                    ? intl.formatMessage(messages.loadingMore)
-                    : intl.formatMessage(messages.loadMore)}
-                </Button>
-              </div>
-            )}
-            {totalSharedGames > 0 && (
-              <p className="card-body-text">
-                {intl.formatMessage(messages.totalGames, {
-                  count: totalSharedGames,
-                })}
+              ) : entries.length > 0 ? (
+                <ul className="card-list" data-list-layout="stacked">
+                  {entries.map(renderGame)}
+                </ul>
+              ) : (
+                <section className="app-card-main card-layout">
+                  <h2 className="page-heading">
+                    {totalLibraryGames === 0
+                      ? intl.formatMessage(messages.noGames)
+                      : intl.formatMessage(messages.noMatches)}
+                  </h2>
+                  {totalLibraryGames === 0 && (
+                    <p className="card-body-text">
+                      {intl.formatMessage(messages.noGamesHelp)}
+                    </p>
+                  )}
+                  <div className="app-action-row">
+                    <Button
+                      buttonType="primary"
+                      buttonSize="sm"
+                      onClick={() => void router.push('/software')}
+                    >
+                      {intl.formatMessage(messages.openCatalog)}
+                    </Button>
+                  </div>
+                </section>
+              )}
+              {canLoadMoreLibrary && (
+                <div className="app-action-row">
+                  <Button
+                    buttonType="default"
+                    buttonSize="sm"
+                    disabled={libraryLoadingMore}
+                    onClick={() => void setLibrarySize((size) => size + 1)}
+                  >
+                    {libraryLoadingMore
+                      ? intl.formatMessage(messages.loadingMore)
+                      : intl.formatMessage(messages.loadMore)}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="page-title-subtext">
+                {intl.formatMessage(messages.sharedIntro)}
               </p>
-            )}
-          </>
-        )}
-      </div>
+              <div className="app-filter-row">
+                <label className="discover-filter-control app-filter-search-control">
+                  <span className="discover-filter-control-label">
+                    <MagnifyingGlassIcon
+                      className="app-action-icon"
+                      aria-hidden="true"
+                    />
+                    {intl.formatMessage(messages.search)}
+                  </span>
+                  <input
+                    type="search"
+                    className="app-filter-search-input"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder={intl.formatMessage(messages.searchPlaceholder)}
+                    aria-label={intl.formatMessage(messages.search)}
+                  />
+                </label>
+                <CompactSelect
+                  label={intl.formatMessage(messages.sharedFilterLabel)}
+                  value={sharedFilter}
+                  options={[
+                    {
+                      value: 'multiple',
+                      label: intl.formatMessage(messages.sharedOnly),
+                    },
+                    {
+                      value: 'all',
+                      label: intl.formatMessage(messages.allShared),
+                    },
+                  ]}
+                  onChange={setSharedFilter}
+                />
+              </div>
+              {sharedLoading ? (
+                <div className="page-status" role="status">
+                  <LoadingSpinner /> {intl.formatMessage(messages.loading)}
+                </div>
+              ) : sharedError ? (
+                <div className="page-error-message" role="alert">
+                  <p>{intl.formatMessage(messages.loadError)}</p>
+                  <Button
+                    buttonType="default"
+                    buttonSize="sm"
+                    onClick={() => void mutateShared()}
+                  >
+                    {intl.formatMessage(messages.retry)}
+                  </Button>
+                </div>
+              ) : shownSharedGames.length > 0 ? (
+                <ul className="card-list" data-list-layout="stacked">
+                  {shownSharedGames.map(renderSharedGame)}
+                </ul>
+              ) : (
+                <section className="app-card-main card-layout">
+                  <h2 className="page-heading">
+                    {intl.formatMessage(messages.noSharedGames)}
+                  </h2>
+                  <p className="card-body-text">
+                    {intl.formatMessage(messages.noSharedGamesHelp)}
+                  </p>
+                </section>
+              )}
+              {canLoadMoreShared && (
+                <div className="app-action-row">
+                  <Button
+                    buttonType="default"
+                    buttonSize="sm"
+                    disabled={sharedLoadingMore}
+                    onClick={() => void setSharedSize((size) => size + 1)}
+                  >
+                    {sharedLoadingMore
+                      ? intl.formatMessage(messages.loadingMore)
+                      : intl.formatMessage(messages.loadMore)}
+                  </Button>
+                </div>
+              )}
+              {totalSharedGames > 0 && (
+                <p className="card-body-text">
+                  {intl.formatMessage(messages.totalGames, {
+                    count: totalSharedGames,
+                  })}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </main>
 
       {editing && draft && (
         <Modal
