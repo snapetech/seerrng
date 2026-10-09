@@ -140,12 +140,25 @@ const mockIntegrationData = () => {
       // These settings endpoints return one optional service, not a list.
       // `[]` is truthy and makes the service cards render invalid fields.
       request.reply({ body: null });
+    } else if (pathname === '/api/v1/settings/tunerr/sportarr') {
+      request.reply({
+        tunerr: {
+          configured: false,
+          sportsAutomation: 'unavailable',
+        },
+        sportarr: {
+          configured: false,
+          reachable: null,
+          feeds: { linked: false },
+        },
+      });
     } else if (pathname === '/api/v1/settings/tunerr') {
       request.reply({
         enabled: false,
         hostname: '',
         useSsl: false,
         baseUrl: '',
+        sportarrBaseUrl: '',
         deckPort: 48879,
         tunerPort: 5004,
         guideUrl: '',
@@ -322,6 +335,10 @@ describe('ROMarrNG software acquisition integration', () => {
       });
     });
     cy.contains('h3', 'Software acquisition').should('be.visible');
+    cy.contains('h4', 'Optional Sportarr DVR link').should('be.visible');
+    cy.contains(
+      'Enable and configure IPTV Tunerr to connect its sports feeds.'
+    ).should('be.visible');
     cy.contains('h4', 'ROMarrNG to IGDB platform matching', {
       timeout: 10000,
     }).scrollIntoView();
