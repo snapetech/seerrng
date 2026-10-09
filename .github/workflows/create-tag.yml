@@ -105,13 +105,14 @@ jobs:
           sed -i "s/^version:.*/version: ${next_chart_version}/" "$chart_file"
           sed -i "s/^appVersion:.*/appVersion: '${TAG_VERSION}'/" "$chart_file"
           sed -i -E \
-            -e "s/AppVersion-v[0-9A-Za-z._+-]+/AppVersion-${TAG_VERSION}/g" \
+            -e "s/AppVersion-v[0-9A-Za-z._+-]+/AppVersion-${TAG_VERSION}-informational/g" \
             -e "s/AppVersion: v[0-9A-Za-z._+-]+/AppVersion: ${TAG_VERSION}/g" \
             -e "s/Version-[0-9]+\.[0-9]+\.[0-9]+/Version-${next_chart_version}/g" \
             -e "s/Version: [0-9]+\.[0-9]+\.[0-9]+/Version: ${next_chart_version}/g" \
             "$chart_readme"
           grep -Fxq "appVersion: '${TAG_VERSION}'" "$chart_file"
           grep -Fq "AppVersion: ${TAG_VERSION}" "$chart_readme"
+          grep -Fq "AppVersion-${TAG_VERSION}-informational" "$chart_readme"
           grep -Fq "Version: ${next_chart_version}" "$chart_readme"
 
       - name: Generate checked-in changelog
