@@ -194,6 +194,22 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.58.0](https://github.com/snapetech/seerrng/compare/v3.57.1..v3.58.0) - 2026-10-09
+
+### User-facing changes
+
+#### Added
+
+- **Sports:** Administrators can optionally connect IPTV Tunerr's sports playlist and guide to Sportarr's DVR from Settings → Services. SeerrNG checks and imports both feeds, reports their status, and keeps each service usable on its own.
+
+### 🚀 Features
+- *(sports)* Connect Tunerr feeds to Sportarr - ([75eab54](https://github.com/snapetech/seerrng/commit/75eab5445c74a1fb3a37fc5046f068100e95966a))
+
+### 🧪 Testing
+- *(cypress)* Mock optional Sportarr status - ([75043b4](https://github.com/snapetech/seerrng/commit/75043b40f3a9a46655689363a897741bb0350a6d))
+
 ## [3.57.1](https://github.com/snapetech/seerrng/compare/v3.57.0..v3.57.1) - 2026-10-09
 
 ### User-facing changes
