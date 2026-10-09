@@ -1273,3 +1273,55 @@ lockfile now resolve to patched 4.7.10. `pnpm install --lockfile-only
 --frozen-lockfile --offline` passed, and `pnpm audit --prod` reported no known
 vulnerabilities in the updated lockfile. The hosted run for the synced candidate
 must be repeated after this dependency update.
+
+## Integrated feature and release verification — October 8, 2026
+
+### ReadMeABook and book services
+
+ReadMeABook Phase 7 was merged in PR #171 as
+`800745e107b2d044045484e74d0f0686239a3e05` and shipped in the published
+`v3.54.0` release. PR #180's later current-main candidate retained these changes
+and passed hosted validation in run
+[`37858283340`](https://github.com/snapetech/seerrng/actions/runs/37858283340).
+The earlier local macOS ARM64 tooling failure remains a historical failed
+receipt; the later hosted candidate passed. No live ReadMeABook or Hardcover
+round-trip, desktop/narrow visual review, or physical Swipe interaction review
+was performed. The acquisition and download pipeline remains in ReadMeABook;
+SeerrNG uses its API for audiobook discovery and requests.
+
+The ecosystem research note now distinguishes three names: `BookDate` is
+ReadMeABook's audiobook recommender; SeerrNG's `/swipe` is a separate discovery
+feature; and the report's single `BookData` reference was unsupported and is
+corrected. SeerrNG has no direct BookLore connector. BookshelfNG supports
+BookLore BookDrop uploads, while SeerrNG's reader destinations are Grimmory and
+BookOrbit. See `market-research-2026-10-06.md` for the source-backed detail.
+
+### Sportarr and Episode Queue
+
+PR #180 merged as `091411e26701f8ad0cfa454096a8fa3a78fe0e20`. The tagged
+`v3.57.0` release commit `3afe778d2c63a3d4ec246d6ae26d027faa9db907` contains
+that merge. The hosted PR run passed: Vitest ran 3,613 tests (3,609 passed,
+four PostgreSQL-only skips); native Node tests passed 481/481; tooling passed
+852/858 with six skips; Cypress passed 153 with 32 pending tests; Playwright
+passed 1/1. Builds, i18n, docs, and CodeQL passed. No live Sportarr or
+Plex/Jellyfin/Emby round-trip, nor a human desktop/narrow visual review, was
+performed. Episode Queue playback was tested with disposable databases and
+mocked media-server/Sonarr APIs.
+
+The macOS arm64 release archive's published SHA-256 matched. Started from a
+fresh temporary configuration under Node 24.21.0, the v3.57.0 bundle applied
+its startup migrations, logged `Server ready`, and served the setup page on
+localhost with HTTP 200 after the expected redirect. The process shut down
+cleanly, and its temporary configuration was removed. This verifies packaged
+startup and the setup UI; it is not a live-provider or visual acceptance test.
+
+The v3.57.0 draft contains the Sportarr and Episode Queue notes. The Helm chart
+package was published and signature-verified at chart version `1.0.106` with
+`appVersion: v3.57.0`. Follow-up PR #183 made the tag-time README metadata
+update idempotent and added the missing internal tooling note. Its complete
+hosted PR validation passed; the maintainer merged it as
+`23a406f49300d40c8d16146aad074c796e23a5b8`. At the time of this checkpoint,
+the v3.57.0 GitHub Release remains a draft while the Ubuntu Jammy and Noble PPA
+jobs finish publishing and verifying. Snap, AUR, COPR, Flatpak, Debian, RPM,
+and AppImage checks have passed. No `seerr.home` deployment was run by these
+release checks.

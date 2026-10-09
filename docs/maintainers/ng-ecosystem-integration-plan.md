@@ -417,13 +417,17 @@ feature covers movies, series, and books.
 
 ## Phase 7: ReadMeABook and per-user book integration
 
-Status: implemented on `feat/ng-phase2-tunerr` and carried on
-`integration/ng-phase2-main-20261007`, rebased onto `origin/main` at
-`1ba2da2033a8c26f5001c7e5a0d6ee58f670a7c1`. A passing cumulative gate and build
-are still required before finalization. SeerrNG remains the request layer. ReadMeABook owns the
-download and processing pipeline; SeerrNG uses its token-authenticated API and
-does not duplicate its indexer search/ranking, download clients, organization,
-M4B chapter merging, release blocklist, import, or ebook sidecar.
+Status: merged in [PR #171](https://github.com/snapetech/seerrng/pull/171) as
+`800745e107b2d044045484e74d0f0686239a3e05` and included in the published
+`v3.54.0` release. The later current-main candidate for [PR #180](https://github.com/snapetech/seerrng/pull/180), which retained this integration, passed its hosted validation run
+[`37858283340`](https://github.com/snapetech/seerrng/actions/runs/37858283340).
+An earlier macOS ARM64 tooling failure remains a historical failed receipt;
+the later hosted candidate passed. No live ReadMeABook or Hardcover service
+round-trip, desktop/narrow visual review, or physical Swipe interaction review
+was performed. SeerrNG remains the request layer. ReadMeABook owns the download
+and processing pipeline; SeerrNG uses its token-authenticated API and does not
+duplicate its indexer search/ranking, download clients, organization, M4B
+chapter merging, release blocklist, import, or ebook sidecar.
 
 | Feature | Implementation | Automated evidence |
 | --- | --- | --- |
