@@ -770,11 +770,19 @@ test('tag preparation keeps Helm metadata aligned with the application release',
   );
 
   assert.ok(syncStep);
-  assert.match(syncStep.run, /charts\/seerr-chart\/Chart\.yaml/u);
-  assert.match(syncStep.run, /appVersion:/u);
-  assert.match(syncStep.run, /chart_patch=\$\(\(10#\$chart_patch \+ 1\)\)/u);
-  assert.match(syncStep.run, /charts\/seerr-chart\/README\.md/u);
-  assert.match(syncStep.run, /next_chart_version/u);
+  assert.match(
+    syncStep.run,
+    /node scripts\/update-helm-release-metadata\.mjs "\$TAG_VERSION"/u
+  );
+  const metadataScript = fs.readFileSync(
+    path.join(rootDirectory, 'scripts', 'update-helm-release-metadata.mjs'),
+    'utf8'
+  );
+  assert.match(metadataScript, /'charts', 'seerr-chart'/u);
+  assert.match(metadataScript, /appVersion:/u);
+  assert.match(metadataScript, /README\.md/u);
+  assert.match(metadataScript, /Version-\$\{escapeRegExp\(chartVersion\)\}/u);
+  assert.match(metadataScript, /informational\?style=flat-square/u);
   const commitStep = createTag.steps.find(
     (step) => step.name === 'Commit updated files'
   );
