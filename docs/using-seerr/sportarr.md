@@ -65,6 +65,29 @@ An event marked **Available** has a file in Sportarr. **Not downloaded** means
 Sportarr reports no file for that event; acquisition and download progress are
 managed in Sportarr.
 
+## Optional IPTV Tunerr sports DVR
+
+When both services are configured, an administrator can connect Tunerr's
+generated sports playlist and XMLTV guide to Sportarr. Open **Settings →
+Services → Live TV (IPTV Tunerr)**, set **Tunerr URL reachable from Sportarr**
+if Sportarr uses a different network address, then select **Connect sports
+feeds**. SeerrNG tests the playlist from Sportarr's network before adding it,
+links the guide to that playlist, and shows the imported channel and programme
+counts. Repeating the setup reuses the same feed URLs.
+
+After connecting, review the channels in Sportarr, map the channels you want to
+use to their leagues, and enable Sportarr's automatic DVR option for those
+leagues. Sportarr controls the channel mapping, event monitoring, and recording
+schedule. Adding the feeds alone does not make an unmapped channel recordable.
+If an existing XMLTV feed is already configured differently in Sportarr,
+SeerrNG leaves it untouched and explains the manual repair step.
+
+This link is optional. Sportarr league discovery and acquisition still work
+without Tunerr; SeerrNG's Live TV requests and followed-team recordings still
+work with Tunerr alone. Those SeerrNG recording requests remain subject to the
+normal approval settings and are separate from recordings scheduled by
+Sportarr.
+
 ## Troubleshooting
 
 - If connection testing fails, check the hostname, port, HTTPS option, URL
@@ -75,6 +98,11 @@ managed in Sportarr.
   is unmonitored there. Enable it in Sportarr to make its events visible.
 - If **Sports** does not appear in Discover, enable the Sports media category
   under **Settings → Media Categories**.
+- If Sportarr cannot import the feeds, confirm the Tunerr sports automation is
+  enabled and that the base URL is reachable from the Sportarr host/container.
+- If the feeds appear but no recordings are scheduled, check that Sportarr has
+  imported the guide, the desired channels are mapped to the league, and
+  automatic DVR is enabled for that league.
 
 See the [Sportarr Integration API](https://wiki.sportarr.net/development/integration-api/)
 and [Sportarr API reference](https://wiki.sportarr.net/api/) for the provider's

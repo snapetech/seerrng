@@ -17,7 +17,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Discover.DiscoverSports', {
   title: 'Sports',
   description:
-    'Browse leagues available in Sportarr. Requesting a league adds it to Sportarr using its configured quality profile and folder settings.',
+    'Browse leagues available in Sportarr. Requesting a league adds it to Sportarr using its configured quality profile and folder settings. If an administrator links IPTV Tunerr in Settings > Services, Sportarr can also use Tunerr’s live sports feeds for its DVR.',
   search: 'Search Sportarr leagues',
   placeholder: 'League name',
   unavailable: 'Sportarr league discovery is unavailable right now.',
