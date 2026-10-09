@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
+import { MAX_SERVARR_CONFIGURATION_RESULTS } from '@server/api/servarr/base';
 import type { AxiosInstance } from 'axios';
 
 import SportarrAPI from './sportarr';
@@ -212,5 +213,171 @@ describe('Sportarr native API adapter', () => {
     assert.equal(result.records[0].fileCount, 1);
     assert.equal('filePath' in result.records[0], false);
     assert.equal('files' in result.records[0], false);
+  });
+
+  it('uses authenticated Sportarr IPTV and XMLTV setup endpoints', async () => {
+    const api = buildSportarr();
+    const transport = getAxios(api);
+    const get = mock.method(transport, 'get', async (url: string) => ({
+      data: url.endsWith('/iptv/sources')
+        ? [
+            {
+              id: 21,
+              name: 'IPTV Tunerr Sports',
+              type: 'M3U',
+              url: 'http://tunerr:5004/sports/live.m3u',
+              isActive: true,
+              channelCount: 4,
+            },
+          ]
+        : [
+            {
+              id: 31,
+              name: 'IPTV Tunerr Sports Guide',
+              url: 'http://tunerr:5004/sports/guide.xml',
+              isActive: true,
+              priority: 25,
+              programCount: 12,
+              iptvSourceId: 21,
+            },
+          ],
+    }));
+    const post = mock.method(
+      transport,
+      'post',
+      async (url: string, body: unknown) => ({
+        data: url.endsWith('/iptv/sources/test')
+          ? { success: true, channelCount: 4 }
+          : url.endsWith('/iptv/sources')
+            ? {
+                id: 21,
+                name: 'IPTV Tunerr Sports',
+                type: 'M3U',
+                url: 'http://tunerr:5004/sports/live.m3u',
+                isActive: true,
+                channelCount: 0,
+              }
+            : url.endsWith('/epg/sources')
+              ? {
+                  id: 31,
+                  name: 'IPTV Tunerr Sports Guide',
+                  url: 'http://tunerr:5004/sports/guide.xml',
+                  isActive: true,
+                  priority: 25,
+                  iptvSourceId: 21,
+                }
+              : {
+                  success: true,
+                  channelCount: 4,
+                  programCount: 12,
+                  mappedChannelCount: 4,
+                },
+        body,
+      })
+    );
+
+    const sources = await api.getIptvSources();
+    const tested = await api.testIptvM3uSource({
+      name: 'IPTV Tunerr Sports',
+      url: 'http://tunerr:5004/sports/live.m3u',
+    });
+    const addedSource = await api.addIptvM3uSource({
+      name: 'IPTV Tunerr Sports',
+      url: 'http://tunerr:5004/sports/live.m3u',
+    });
+    const guides = await api.getEpgSources();
+    const addedGuide = await api.addEpgSource({
+      name: 'IPTV Tunerr Sports Guide',
+      url: 'http://tunerr:5004/sports/guide.xml',
+      iptvSourceId: 21,
+    });
+    const sync = await api.syncEpgSource(31);
+
+    assert.equal(sources[0].type, 'M3U');
+    assert.equal(tested.success, true);
+    assert.equal(addedSource.id, 21);
+    assert.equal(guides[0].iptvSourceId, 21);
+    assert.equal(addedGuide.id, 31);
+    assert.deepEqual(sync, {
+      success: true,
+      channelCount: 4,
+      programCount: 12,
+      mappedChannelCount: 4,
+    });
+    assert.deepEqual(
+      post.mock.calls.map((call) => call.arguments[0]),
+      [
+        'http://127.0.0.1:1867/api/iptv/sources/test',
+        'http://127.0.0.1:1867/api/iptv/sources',
+        'http://127.0.0.1:1867/api/epg/sources',
+        'http://127.0.0.1:1867/api/epg/sources/31/sync',
+      ]
+    );
+    assert.deepEqual(post.mock.calls[0].arguments[1], {
+      name: 'IPTV Tunerr Sports',
+      type: 'M3U',
+      url: 'http://tunerr:5004/sports/live.m3u',
+      maxStreams: 1,
+    });
+    assert.deepEqual(post.mock.calls[2].arguments[1], {
+      name: 'IPTV Tunerr Sports Guide',
+      url: 'http://tunerr:5004/sports/guide.xml',
+      priority: 25,
+      iptvSourceId: 21,
+    });
+    const defaults = transport.defaults.headers as unknown as {
+      common?: Record<string, unknown>;
+      'X-Api-Key'?: unknown;
+    };
+    assert.equal(
+      defaults.common?.['X-Api-Key'] ?? defaults['X-Api-Key'],
+      'test-api-key'
+    );
+    assert.equal(get.mock.callCount(), 2);
+  });
+
+  it('rejects malformed and oversized IPTV source responses', async () => {
+    const api = buildSportarr();
+    const get = mock.method(getAxios(api), 'get', async () => ({
+      data: [
+        {
+          id: 21,
+          name: 'Invalid source',
+          type: 'M3U',
+          url: 'http://tunerr:5004/sports/live.m3u',
+          isActive: true,
+          channelCount: -1,
+        },
+      ],
+    }));
+
+    await assert.rejects(api.getIptvSources(), /invalid IPTV source/iu);
+
+    get.mock.mockImplementation(
+      async () =>
+        ({
+          data: Array.from(
+            { length: MAX_SERVARR_CONFIGURATION_RESULTS + 1 },
+            () => ({})
+          ),
+        }) as never
+    );
+    await assert.rejects(api.getIptvSources(), /invalid IPTV source list/iu);
+  });
+
+  it('propagates Sportarr transport errors from feed setup calls', async () => {
+    const api = buildSportarr();
+    const failure = new Error('Sportarr transport unavailable');
+    mock.method(getAxios(api), 'post', async () => {
+      throw failure;
+    });
+
+    await assert.rejects(
+      api.testIptvM3uSource({
+        name: 'IPTV Tunerr Sports',
+        url: 'http://tunerr:5004/sports/live.m3u',
+      }),
+      (error: unknown) => error === failure
+    );
   });
 });

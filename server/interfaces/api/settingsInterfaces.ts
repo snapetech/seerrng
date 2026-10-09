@@ -113,3 +113,35 @@ export interface TlsStatusResponse {
   pendingRestart: boolean;
   setupRequired: boolean;
 }
+
+export interface TunerrSportarrIntegrationStatus {
+  tunerr: {
+    configured: boolean;
+    sportsAutomation: 'unavailable' | 'disabled' | 'enabled';
+    eventCount?: number;
+    matchedEventCount?: number;
+  };
+  sportarr: {
+    configured: boolean;
+    reachable: boolean | null;
+    name?: string;
+    feeds: {
+      linked: boolean;
+      source?: {
+        id: number;
+        name: string;
+        active: boolean;
+        channelCount: number;
+        hasError: boolean;
+      };
+      guide?: {
+        id: number;
+        name: string;
+        active: boolean;
+        programCount: number;
+        linkedToSource: boolean;
+        hasError: boolean;
+      };
+    };
+  };
+}

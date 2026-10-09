@@ -1,7 +1,20 @@
+import SportarrAPI from '@server/api/servarr/sportarr';
 import TunerrAPI, { TunerrError } from '@server/api/tunerr';
+import type { TunerrSportarrIntegrationStatus } from '@server/interfaces/api/settingsInterfaces';
+import { getExternalRuntimeConfig } from '@server/lib/externalRuntimeConfig';
 import { guideIndex } from '@server/lib/liveTv/guideIndex';
+import { createLiveTvProvider } from '@server/lib/liveTv/provider';
+import {
+  buildTunerrSportsFeedUrls,
+  connectTunerrSportsFeeds,
+  inspectSportarrSportsFeeds,
+  normalizeSportarrTunerrBaseUrl,
+  SportarrSportsFeedSetupError,
+} from '@server/lib/liveTv/sportarrIntegration';
 import { Permission } from '@server/lib/permissions';
+import { runWithCurrentServarrService } from '@server/lib/serviceAdmission';
 import { getSettings, type TunerrSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { authorizedMutation } from '@server/middleware/authorizedMutation';
 import { REDACTED_SECRET } from '@server/utils/security';
 import {
@@ -94,6 +107,19 @@ export const parseTunerrSettings = (
     }
   }
 
+  const sportarrBaseUrl =
+    value.sportarrBaseUrl ?? current.sportarrBaseUrl ?? '';
+  if (
+    typeof sportarrBaseUrl !== 'string' ||
+    sportarrBaseUrl.length > 1024 ||
+    normalizeSportarrTunerrBaseUrl(sportarrBaseUrl) === undefined
+  ) {
+    return {
+      error:
+        'Tunerr URL reachable from Sportarr must be an HTTP or HTTPS base address without credentials, query strings, or fragments.',
+    };
+  }
+
   const guideHours = value.guideHours ?? current.guideHours;
   if (
     typeof guideHours !== 'number' ||
@@ -141,6 +167,7 @@ export const parseTunerrSettings = (
       deckPort: deckPort.value,
       tunerPort: tunerPort.value,
       guideUrl: guideUrl.trim(),
+      sportarrBaseUrl: normalizeSportarrTunerrBaseUrl(sportarrBaseUrl) ?? '',
       username,
       password,
       guideHours,
@@ -155,6 +182,157 @@ export const tunerrSettingsView = (settings: TunerrSettings) => ({
 });
 
 const tunerrRoutes = Router();
+
+const getDefaultSportarrService = () => {
+  const services = getExternalRuntimeConfig().sportarr;
+  return services.find((service) => service.isDefault) ?? services[0];
+};
+
+tunerrRoutes.get('/sportarr', async (_req, res) => {
+  const tunerr = getSettings().tunerr;
+  const tunerrConfigured = tunerr.enabled && Boolean(tunerr.hostname);
+  const status: TunerrSportarrIntegrationStatus = {
+    tunerr: {
+      configured: tunerrConfigured,
+      sportsAutomation: 'unavailable',
+    },
+    sportarr: {
+      configured: false,
+      reachable: null,
+      feeds: { linked: false },
+    },
+  };
+
+  if (tunerrConfigured) {
+    try {
+      const report = await createLiveTvProvider(tunerr).getSportsReport();
+      status.tunerr.sportsAutomation =
+        report.enabled === false ? 'disabled' : 'enabled';
+      status.tunerr.eventCount = report.events.length;
+      status.tunerr.matchedEventCount = report.events.filter(
+        (item) => item.matched && Boolean(item.channels?.length)
+      ).length;
+    } catch {
+      status.tunerr.sportsAutomation = 'unavailable';
+    }
+  }
+
+  const service = getDefaultSportarrService();
+  if (!service) return res.status(200).json(status);
+  status.sportarr.configured = true;
+  status.sportarr.name = service.name.slice(0, 200);
+  if (!tunerr.hostname) return res.status(200).json(status);
+
+  try {
+    const feeds = await runWithCurrentServarrService(
+      'sportarr',
+      service.id,
+      async (current) =>
+        inspectSportarrSportsFeeds(
+          new SportarrAPI({
+            url: SportarrAPI.buildUrl(current, '/api'),
+            apiKey: current.apiKey,
+          }),
+          buildTunerrSportsFeedUrls(tunerr)
+        )
+    );
+    if (!feeds) {
+      status.sportarr.reachable = false;
+      return res.status(200).json(status);
+    }
+    status.sportarr.reachable = true;
+    status.sportarr.feeds = feeds;
+  } catch {
+    status.sportarr.reachable = false;
+  }
+
+  return res.status(200).json(status);
+});
+
+tunerrRoutes.post(
+  '/sportarr/connect',
+  authorizedMutation(Permission.ADMIN, async (_req, res) => {
+    const tunerr = getSettings().tunerr;
+    if (!tunerr.enabled || !tunerr.hostname) {
+      return res.status(409).json({
+        error: 'Configure and enable IPTV Tunerr before connecting Sportarr.',
+      });
+    }
+    const service = getDefaultSportarrService();
+    if (!service) {
+      return res
+        .status(409)
+        .json({ error: 'Connect Sportarr in Settings > Services first.' });
+    }
+
+    let feedUrls: ReturnType<typeof buildTunerrSportsFeedUrls>;
+    try {
+      feedUrls = buildTunerrSportsFeedUrls(tunerr);
+    } catch (error) {
+      return res.status(400).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Tunerr URL reachable from Sportarr is invalid.',
+      });
+    }
+
+    try {
+      const report = await createLiveTvProvider(tunerr).getSportsReport();
+      if (report.enabled === false) {
+        return res.status(409).json({
+          error:
+            'Turn on Sports Automation in IPTV Tunerr before connecting its sports feeds.',
+        });
+      }
+    } catch {
+      return res.status(503).json({
+        error:
+          'Tunerr sports automation could not be reached. Check its setup, then retry.',
+      });
+    }
+
+    try {
+      const result = await runWithCurrentServarrService(
+        'sportarr',
+        service.id,
+        async (current) =>
+          connectTunerrSportsFeeds(
+            new SportarrAPI({
+              url: SportarrAPI.buildUrl(current, '/api'),
+              apiKey: current.apiKey,
+            }),
+            feedUrls
+          )
+      );
+      if (!result) {
+        return res.status(503).json({
+          error:
+            'The default Sportarr connection changed during setup. Refresh the page and retry.',
+          partial: false,
+        });
+      }
+      return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      if (error instanceof SportarrSportsFeedSetupError) {
+        return res.status(error.status).json({
+          error: error.message,
+          partial: error.partial,
+        });
+      }
+      logger.warn('Could not connect Tunerr sports feeds to Sportarr', {
+        label: 'Sportarr',
+        serviceId: service.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return res.status(502).json({
+        error:
+          'Sportarr could not finish connecting the Tunerr sports feeds. Check both services and retry; any feed already created will be reused.',
+        partial: true,
+      });
+    }
+  })
+);
 
 tunerrRoutes.get('/', (_req, res) => {
   res.status(200).json(tunerrSettingsView(getSettings().tunerr));

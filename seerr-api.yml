@@ -405,6 +405,9 @@ components:
           maximum: 65535
         guideUrl:
           type: string
+        sportarrBaseUrl:
+          type: string
+          description: Optional tuner base URL as reachable from Sportarr; empty derives it from hostname, HTTPS, and tunerPort.
         username:
           type: string
         password:
@@ -416,6 +419,125 @@ components:
           type: integer
           minimum: 6
           maximum: 336
+    TunerrSportarrIntegrationStatus:
+      type: object
+      required: [tunerr, sportarr]
+      properties:
+        tunerr:
+          type: object
+          required: [configured, sportsAutomation]
+          properties:
+            configured:
+              type: boolean
+            sportsAutomation:
+              type: string
+              enum: [unavailable, disabled, enabled]
+            eventCount:
+              type: integer
+              minimum: 0
+            matchedEventCount:
+              type: integer
+              minimum: 0
+        sportarr:
+          type: object
+          required: [configured, reachable, feeds]
+          properties:
+            configured:
+              type: boolean
+            reachable:
+              type: boolean
+              nullable: true
+            name:
+              type: string
+            feeds:
+              type: object
+              required: [linked]
+              properties:
+                linked:
+                  type: boolean
+                source:
+                  type: object
+                  required: [id, name, active, channelCount, hasError]
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    active:
+                      type: boolean
+                    channelCount:
+                      type: integer
+                    hasError:
+                      type: boolean
+                guide:
+                  type: object
+                  required:
+                    [id, name, active, programCount, linkedToSource, hasError]
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    active:
+                      type: boolean
+                    programCount:
+                      type: integer
+                    linkedToSource:
+                      type: boolean
+                    hasError:
+                      type: boolean
+    TunerrSportarrIntegrationResult:
+      type: object
+      required: [success, sourceCreated, guideCreated, source, guide, sync]
+      properties:
+        success:
+          type: boolean
+        sourceCreated:
+          type: boolean
+        guideCreated:
+          type: boolean
+        source:
+          type: object
+          required: [id, name, active, channelCount, hasError]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            active:
+              type: boolean
+            channelCount:
+              type: integer
+            hasError:
+              type: boolean
+        guide:
+          type: object
+          required: [id, name, active, programCount, linkedToSource, hasError]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            active:
+              type: boolean
+            programCount:
+              type: integer
+            linkedToSource:
+              type: boolean
+            hasError:
+              type: boolean
+        sync:
+          type: object
+          required: [success, channelCount, programCount, mappedChannelCount]
+          properties:
+            success:
+              type: boolean
+            channelCount:
+              type: integer
+            programCount:
+              type: integer
+            mappedChannelCount:
+              type: integer
     DownloadClientSettings:
       type: object
       required: [name, type, hostname]
@@ -8994,6 +9116,44 @@ paths:
           description: Invalid settings
         '502':
           description: The deck or guide could not be reached
+  /settings/tunerr/sportarr:
+    get:
+      summary: Get the optional Tunerr-to-Sportarr sports DVR link status
+      description: Returns sanitized service and feed status without API credentials or feed URLs.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Optional integration status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunerrSportarrIntegrationStatus'
+        '403':
+          description: Admin access required
+  /settings/tunerr/sportarr/connect:
+    post:
+      summary: Connect Tunerr sports feeds to Sportarr
+      description: Tests the generated M3U from Sportarr, adds or reuses the playlist and linked XMLTV source, then syncs the guide. This operation is idempotent and does not delete existing feeds.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Playlist and guide connected and synced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunerrSportarrIntegrationResult'
+        '403':
+          description: Admin access required
+        '400':
+          description: Invalid Tunerr URL reachable from Sportarr
+        '409':
+          description: A required service or feed setup is disabled or conflicts with an existing source
+        '502':
+          description: A feed could not be tested or synced; a partial setup may remain and can be retried
+        '503':
+          description: Tunerr sports automation could not be reached
   /soulseek/status:
     get:
       summary: Get Soulseek request availability

@@ -209,6 +209,8 @@ export interface TunerrSettings {
   tunerPort: number;
   /** Optional full XMLTV URL; defaults to the tuner's /guide.xml. */
   guideUrl: string;
+  /** Optional tuner address as reachable from Sportarr for sports feed import. */
+  sportarrBaseUrl: string;
   username: string;
   password: string;
   /** How far ahead to index the guide, in hours. */
@@ -223,6 +225,7 @@ export const defaultTunerrSettings = (): TunerrSettings => ({
   deckPort: 48879,
   tunerPort: 5004,
   guideUrl: '',
+  sportarrBaseUrl: '',
   username: '',
   password: '',
   guideHours: 72,

@@ -16,6 +16,8 @@ import ServarrBase, {
 } from './base';
 
 const MAX_TEXT_LENGTH = 10_000;
+const MAX_CONFIGURATION_NAME_LENGTH = 200;
+const MAX_CONFIGURATION_URL_LENGTH = 4_096;
 const MAX_EVENT_RESULTS = 1_000;
 const MAX_EVENT_FILES = 100;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -26,6 +28,10 @@ const optionalText = (value: unknown): string | undefined =>
   text(value).trim() || undefined;
 const integer = (value: unknown): number | undefined =>
   Number.isSafeInteger(value) ? (value as number) : undefined;
+const nonNegativeInteger = (value: unknown): number | undefined => {
+  const parsed = integer(value);
+  return parsed !== undefined && parsed >= 0 ? parsed : undefined;
+};
 const finiteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 const boolean = (value: unknown): boolean => value === true;
@@ -83,6 +89,176 @@ export interface SportarrAddLeagueOptions {
   country?: string;
   overview?: string;
 }
+
+export interface SportarrIptvSource {
+  id: number;
+  name: string;
+  type: 'M3U' | 'Xtream';
+  url: string;
+  isActive: boolean;
+  channelCount: number;
+  lastError?: string;
+}
+
+export interface SportarrIptvSourceTestResult {
+  success: boolean;
+  channelCount: number;
+  error?: string;
+}
+
+export interface SportarrEpgSource {
+  id: number;
+  name: string;
+  url: string;
+  isActive: boolean;
+  priority: number;
+  programCount: number;
+  iptvSourceId?: number;
+  lastError?: string;
+}
+
+export interface SportarrEpgSyncResult {
+  success: boolean;
+  channelCount: number;
+  programCount: number;
+  mappedChannelCount: number;
+}
+
+const sanitizeIptvSource = (value: unknown): SportarrIptvSource | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = integer(value.id);
+  const type = value.type;
+  const name = text(value.name).trim().slice(0, MAX_CONFIGURATION_NAME_LENGTH);
+  const url = text(value.url).trim();
+  const channelCount = nonNegativeInteger(value.channelCount);
+  if (
+    id === undefined ||
+    id <= 0 ||
+    !name ||
+    !url ||
+    url.length > MAX_CONFIGURATION_URL_LENGTH ||
+    typeof value.isActive !== 'boolean' ||
+    channelCount === undefined ||
+    (type !== 'M3U' && type !== 'Xtream')
+  ) {
+    return undefined;
+  }
+  return {
+    id,
+    name,
+    type,
+    url,
+    isActive: value.isActive,
+    channelCount,
+    ...(optionalText(value.lastError)
+      ? { lastError: optionalText(value.lastError) }
+      : {}),
+  };
+};
+
+const sanitizeEpgSource = (
+  value: unknown,
+  allowMissingProgramCount = false
+): SportarrEpgSource | undefined => {
+  if (!isRecord(value)) return undefined;
+  const id = integer(value.id);
+  const name = text(value.name).trim().slice(0, MAX_CONFIGURATION_NAME_LENGTH);
+  const url = text(value.url).trim();
+  const priority = nonNegativeInteger(value.priority);
+  const programCount = nonNegativeInteger(value.programCount);
+  if (
+    id === undefined ||
+    id <= 0 ||
+    !name ||
+    !url ||
+    url.length > MAX_CONFIGURATION_URL_LENGTH ||
+    typeof value.isActive !== 'boolean' ||
+    priority === undefined ||
+    (programCount === undefined && !allowMissingProgramCount)
+  ) {
+    return undefined;
+  }
+  const iptvSourceId = integer(value.iptvSourceId);
+  return {
+    id,
+    name,
+    url,
+    isActive: value.isActive,
+    priority,
+    programCount: programCount ?? 0,
+    ...(iptvSourceId !== undefined && iptvSourceId > 0 ? { iptvSourceId } : {}),
+    ...(optionalText(value.lastError)
+      ? { lastError: optionalText(value.lastError) }
+      : {}),
+  };
+};
+
+const sanitizeConfigurationList = <T>(
+  value: unknown,
+  sanitize: (item: unknown) => T | undefined,
+  label: string
+): T[] => {
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_SERVARR_CONFIGURATION_RESULTS
+  ) {
+    throw new Error(`Sportarr returned an invalid ${label} list.`);
+  }
+  return value.map((item) => {
+    const sanitized = sanitize(item);
+    if (!sanitized) {
+      throw new Error(`Sportarr returned an invalid ${label}.`);
+    }
+    return sanitized;
+  });
+};
+
+const sanitizeSourceTestResult = (
+  value: unknown
+): SportarrIptvSourceTestResult => {
+  const channelCount = isRecord(value)
+    ? nonNegativeInteger(value.channelCount)
+    : undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.success !== 'boolean' ||
+    channelCount === undefined
+  ) {
+    throw new Error('Sportarr returned an invalid IPTV source test result.');
+  }
+  return {
+    success: value.success,
+    channelCount,
+    ...(optionalText(value.error) ? { error: optionalText(value.error) } : {}),
+  };
+};
+
+const sanitizeEpgSyncResult = (value: unknown): SportarrEpgSyncResult => {
+  const channelCount = isRecord(value)
+    ? nonNegativeInteger(value.channelCount)
+    : undefined;
+  const programCount = isRecord(value)
+    ? nonNegativeInteger(value.programCount)
+    : undefined;
+  const mappedChannelCount = isRecord(value)
+    ? nonNegativeInteger(value.mappedChannelCount)
+    : undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.success !== 'boolean' ||
+    channelCount === undefined ||
+    programCount === undefined ||
+    mappedChannelCount === undefined
+  ) {
+    throw new Error('Sportarr returned an invalid XMLTV sync result.');
+  }
+  return {
+    success: value.success,
+    channelCount,
+    programCount,
+    mappedChannelCount,
+  };
+};
 
 const unwrapRecords = (value: unknown): unknown[] | undefined => {
   if (Array.isArray(value)) return value.slice(0, MAX_SERVARR_LIBRARY_RESULTS);
@@ -450,6 +626,98 @@ class SportarrAPI extends ServarrBase<unknown> {
       }
     );
     return sanitizeEventPage(response.data, page, pageSize);
+  }
+
+  public async getIptvSources(): Promise<SportarrIptvSource[]> {
+    const response = await this.request<unknown>(
+      'GET',
+      '/iptv/sources',
+      undefined,
+      { maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    return sanitizeConfigurationList(
+      response.data,
+      sanitizeIptvSource,
+      'IPTV source'
+    );
+  }
+
+  public async testIptvM3uSource(input: {
+    name: string;
+    url: string;
+  }): Promise<SportarrIptvSourceTestResult> {
+    const response = await this.request<unknown>(
+      'POST',
+      '/iptv/sources/test',
+      { name: input.name, type: 'M3U', url: input.url, maxStreams: 1 },
+      { maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    return sanitizeSourceTestResult(response.data);
+  }
+
+  public async addIptvM3uSource(input: {
+    name: string;
+    url: string;
+  }): Promise<SportarrIptvSource> {
+    const response = await this.request<unknown>(
+      'POST',
+      '/iptv/sources',
+      { name: input.name, type: 'M3U', url: input.url, maxStreams: 1 },
+      { maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    const source = sanitizeIptvSource(response.data);
+    if (!source) throw new Error('Sportarr returned an invalid IPTV source.');
+    return source;
+  }
+
+  public async getEpgSources(): Promise<SportarrEpgSource[]> {
+    const response = await this.request<unknown>(
+      'GET',
+      '/epg/sources',
+      undefined,
+      { maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    return sanitizeConfigurationList(
+      response.data,
+      sanitizeEpgSource,
+      'XMLTV source'
+    );
+  }
+
+  public async addEpgSource(input: {
+    name: string;
+    url: string;
+    iptvSourceId: number;
+  }): Promise<SportarrEpgSource> {
+    const response = await this.request<unknown>(
+      'POST',
+      '/epg/sources',
+      {
+        name: input.name,
+        url: input.url,
+        priority: 25,
+        iptvSourceId: input.iptvSourceId,
+      },
+      { maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    // Sportarr's create response omits ProgramCount even though the list
+    // endpoint includes it. The guide sync below supplies the initial count.
+    const source = sanitizeEpgSource(response.data, true);
+    if (!source) throw new Error('Sportarr returned an invalid XMLTV source.');
+    return source;
+  }
+
+  public async syncEpgSource(id: number): Promise<SportarrEpgSyncResult> {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('Sportarr XMLTV source ID must be a positive integer.');
+    }
+    const response = await this.request<unknown>(
+      'POST',
+      `/epg/sources/${id}/sync`,
+      undefined,
+      { timeout: 120_000, maxContentLength: MAX_SERVARR_LIBRARY_RESPONSE_BYTES }
+    );
+    return sanitizeEpgSyncResult(response.data);
   }
 
   public async addLeague(

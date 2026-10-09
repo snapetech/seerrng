@@ -79,3 +79,8 @@ your behalf, with the usual approval rules.
 A game you already requested is not requested again, even if you cancelled it.
 Each person can follow up to 20 teams. Unfollowing a team does not cancel
 recordings already requested.
+
+If Sportarr is also connected, an administrator can optionally add Tunerr's
+generated sports playlist and guide to Sportarr so its own DVR can schedule
+monitored, mapped league events. That setup does not change how SeerrNG's Live
+TV recording requests use approval settings. See the [Sportarr guide](./sportarr.md#optional-iptv-tunerr-sports-dvr).

@@ -5,6 +5,7 @@ import SettingsField from '@app/components/Settings/SettingsField';
 import { useLiveTvStatus } from '@app/hooks/useLiveTv';
 import useToasts from '@app/hooks/useToasts';
 import defineMessages from '@app/utils/defineMessages';
+import type { TunerrSportarrIntegrationStatus } from '@server/interfaces/api/settingsInterfaces';
 import type { TunerrSettings } from '@server/lib/settings';
 import axios from 'axios';
 import type { FormEvent } from 'react';
@@ -33,6 +34,50 @@ const messages = defineMessages('components.Settings.SettingsTunerr', {
   guideHours: 'Guide Window (Hours)',
   guideHoursDescription:
     'How far ahead SeerrNG looks for airings. Larger windows use more memory.',
+  sportarrIntegrationTitle: 'Optional Sportarr DVR link',
+  sportarrIntegrationDescription:
+    'Make Tunerr’s matched live sports channels and guide available to Sportarr’s IPTV DVR. Sportarr still controls channel mappings, monitored leagues, and recordings.',
+  sportarrBaseUrl: 'Tunerr URL reachable from Sportarr',
+  sportarrBaseUrlDescription:
+    'Leave empty to use the Tunerr hostname, HTTPS setting, and tuner port above. Set a base URL if Sportarr runs in a different network or uses a reverse proxy.',
+  sportarrLinkSetup:
+    'Save Tunerr settings, configure the default Sportarr connection, and enable Sports Automation in Tunerr before linking feeds.',
+  sportarrStatusChecking: 'Checking Tunerr and Sportarr connection status…',
+  sportarrTunerrMissing:
+    'Enable and configure IPTV Tunerr to connect its sports feeds.',
+  sportarrAutomationDisabled:
+    'Turn on Sports Automation in IPTV Tunerr to publish the event playlist and guide.',
+  sportarrAutomationReady:
+    'Tunerr sports automation is on: {matched} of {events} scheduled events currently match a channel.',
+  sportarrAutomationUnavailable:
+    'SeerrNG could not read Tunerr’s sports schedule. Check Tunerr and retry.',
+  sportarrMissing:
+    'Connect a default Sportarr instance in Settings → Services to use its DVR.',
+  sportarrUnavailable:
+    'Sportarr is configured but could not be reached. Check its connection and retry.',
+  sportarrNotLinked: 'The Tunerr sports feeds are not linked to Sportarr yet.',
+  sportarrPaused:
+    'The Tunerr playlist or guide is inactive in Sportarr. Enable both feeds there to use DVR scheduling.',
+  sportarrFeedError:
+    'Sportarr reports an error for one of the Tunerr feeds. Review the source details in Sportarr.',
+  sportarrLinked:
+    'Tunerr sports feeds are linked to {name}: {channels} channels and {programmes} guide programmes.',
+  sportarrNoMatches:
+    'No scheduled Tunerr events currently match a channel. Check Tunerr’s sports mappings; the linked Sportarr feed will populate when a match is available.',
+  sportarrSourceOnly:
+    'Sportarr has the Tunerr playlist, but its XMLTV guide is missing. Retry the setup to add it; if the playlist is inactive, enable it in Sportarr.',
+  sportarrGuideConflict:
+    'Sportarr already has this Tunerr guide attached to another playlist. Resolve the guide link in Sportarr before retrying.',
+  sportarrLinkError: 'The Tunerr feeds could not be connected to Sportarr.',
+  sportarrLinkSuccess:
+    'Tunerr’s sports playlist and guide are connected to Sportarr.',
+  sportarrConnect: 'Connect sports feeds',
+  sportarrSync: 'Sync guide',
+  sportarrConnecting: 'Connecting…',
+  sportarrSteps:
+    'After linking, review the imported channels in Sportarr, map channels to leagues, and enable automatic DVR for the leagues you want recorded.',
+  sportarrIndependent:
+    'SeerrNG’s own Live TV recording requests remain available and continue to follow request approval settings.',
   username: 'Deck Username',
   password: 'Deck Password',
   savedSecret: 'Saved — leave empty to keep it',
@@ -87,6 +132,7 @@ const toPayload = (draft: Draft) => ({
   deckPort: Number(draft.deckPort),
   tunerPort: Number(draft.tunerPort),
   guideUrl: draft.guideUrl.trim(),
+  sportarrBaseUrl: draft.sportarrBaseUrl.trim(),
   guideHours: Number(draft.guideHours),
   username: draft.username,
   password: draft.password,
@@ -111,6 +157,18 @@ const SettingsTunerr = () => {
   const [saveError, setSaveError] = useState<string>();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>();
+  const [connectingSportarr, setConnectingSportarr] = useState(false);
+  const [sportarrConnectError, setSportarrConnectError] = useState<string>();
+  const [sportarrConnectSuccess, setSportarrConnectSuccess] = useState(false);
+  const {
+    data: sportarrIntegration,
+    error: sportarrIntegrationError,
+    isLoading: sportarrIntegrationLoading,
+    mutate: mutateSportarrIntegration,
+  } = useSWR<TunerrSportarrIntegrationStatus>(
+    data ? '/api/v1/settings/tunerr/sportarr' : null,
+    { revalidateOnFocus: false }
+  );
 
   useEffect(() => {
     if (data && !isDirty) setDraft(toDraft(data));
@@ -120,6 +178,8 @@ const SettingsTunerr = () => {
     setDraft((current) => (current ? { ...current, ...patch } : current));
     setIsDirty(true);
     setTestResult(undefined);
+    setSportarrConnectError(undefined);
+    setSportarrConnectSuccess(false);
   };
 
   const submit = async (event: FormEvent) => {
@@ -134,6 +194,7 @@ const SettingsTunerr = () => {
       );
       await mutate(response.data, { revalidate: false });
       void mutateStatus();
+      void mutateSportarrIntegration();
       setIsDirty(false);
       addToast(intl.formatMessage(messages.saveSuccess), {
         appearance: 'success',
@@ -176,6 +237,24 @@ const SettingsTunerr = () => {
     }
   };
 
+  const connectSportarr = async () => {
+    setConnectingSportarr(true);
+    setSportarrConnectError(undefined);
+    setSportarrConnectSuccess(false);
+    try {
+      await axios.post('/api/v1/settings/tunerr/sportarr/connect');
+      setSportarrConnectSuccess(true);
+      await mutateSportarrIntegration();
+    } catch (failure) {
+      setSportarrConnectError(
+        errorMessage(failure) ?? intl.formatMessage(messages.sportarrLinkError)
+      );
+      await mutateSportarrIntegration();
+    } finally {
+      setConnectingSportarr(false);
+    }
+  };
+
   const textField = (
     id: keyof Draft,
     label: string,
@@ -196,7 +275,7 @@ const SettingsTunerr = () => {
             inputMode={options.inputMode}
             maxLength={options.maxLength ?? 255}
             autoComplete="off"
-            disabled={isSaving}
+            disabled={isSaving || connectingSportarr}
             value={String(draft?.[id] ?? '')}
             onChange={(event) =>
               update({ [id]: event.currentTarget.value } as Partial<Draft>)
@@ -268,7 +347,7 @@ const SettingsTunerr = () => {
                     name="tunerr-enabled"
                     label={intl.formatMessage(messages.enabled)}
                     checked={draft.enabled}
-                    disabled={isSaving}
+                    disabled={isSaving || connectingSportarr}
                     onCheckedChange={(checked) => update({ enabled: checked })}
                   />
                 </div>
@@ -295,7 +374,7 @@ const SettingsTunerr = () => {
                     name="tunerr-ssl"
                     label={intl.formatMessage(messages.useSsl)}
                     checked={draft.useSsl}
-                    disabled={isSaving}
+                    disabled={isSaving || connectingSportarr}
                     onCheckedChange={(checked) => update({ useSsl: checked })}
                   />
                 </div>
@@ -318,7 +397,9 @@ const SettingsTunerr = () => {
                     type="password"
                     autoComplete="new-password"
                     maxLength={2048}
-                    disabled={isSaving || draft.clearPassword}
+                    disabled={
+                      isSaving || connectingSportarr || draft.clearPassword
+                    }
                     value={draft.password === REDACTED ? '' : draft.password}
                     placeholder={
                       draft.password === REDACTED
@@ -342,7 +423,7 @@ const SettingsTunerr = () => {
                       name="tunerr-clear-password"
                       label={intl.formatMessage(messages.clearSecret)}
                       checked={draft.clearPassword}
-                      disabled={isSaving}
+                      disabled={isSaving || connectingSportarr}
                       onCheckedChange={(checked) =>
                         update({ clearPassword: checked })
                       }
@@ -362,6 +443,193 @@ const SettingsTunerr = () => {
               maxLength: 3,
               description: intl.formatMessage(messages.guideHoursDescription),
             })}
+            <section className="app-card-sub card-layout">
+              <h4 className="card-title">
+                {intl.formatMessage(messages.sportarrIntegrationTitle)}
+              </h4>
+              <p className="card-body-text">
+                {intl.formatMessage(messages.sportarrIntegrationDescription)}
+              </p>
+              {textField(
+                'sportarrBaseUrl',
+                intl.formatMessage(messages.sportarrBaseUrl),
+                {
+                  inputMode: 'url',
+                  maxLength: 1024,
+                  description: intl.formatMessage(
+                    messages.sportarrBaseUrlDescription
+                  ),
+                }
+              )}
+              {isDirty && (
+                <p className="settings-form-row-description" role="status">
+                  {intl.formatMessage(messages.sportarrLinkSetup)}
+                </p>
+              )}
+              {sportarrIntegrationError && (
+                <Alert
+                  type="warning"
+                  title={intl.formatMessage(messages.sportarrLinkError)}
+                />
+              )}
+              {sportarrIntegrationLoading && (
+                <p className="settings-form-row-description" role="status">
+                  {intl.formatMessage(messages.sportarrStatusChecking)}
+                </p>
+              )}
+              {sportarrIntegration?.tunerr.configured === false && (
+                <Alert
+                  type="info"
+                  title={intl.formatMessage(messages.sportarrTunerrMissing)}
+                />
+              )}
+              {sportarrIntegration?.tunerr.configured &&
+                sportarrIntegration.tunerr.sportsAutomation === 'disabled' && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(
+                      messages.sportarrAutomationDisabled
+                    )}
+                  />
+                )}
+              {sportarrIntegration?.tunerr.configured &&
+                sportarrIntegration.tunerr.sportsAutomation === 'enabled' && (
+                  <p className="settings-form-row-description" role="status">
+                    {intl.formatMessage(messages.sportarrAutomationReady, {
+                      matched:
+                        sportarrIntegration.tunerr.matchedEventCount ?? 0,
+                      events: sportarrIntegration.tunerr.eventCount ?? 0,
+                    })}
+                  </p>
+                )}
+              {sportarrIntegration?.tunerr.configured &&
+                sportarrIntegration.tunerr.sportsAutomation ===
+                  'unavailable' && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(
+                      messages.sportarrAutomationUnavailable
+                    )}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.configured === false && (
+                <Alert
+                  type="info"
+                  title={intl.formatMessage(messages.sportarrMissing)}
+                />
+              )}
+              {sportarrIntegration?.sportarr.configured &&
+                sportarrIntegration.sportarr.reachable === false && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(messages.sportarrUnavailable)}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                sportarrIntegration.sportarr.feeds.linked &&
+                sportarrIntegration.sportarr.feeds.source &&
+                sportarrIntegration.sportarr.feeds.guide &&
+                !sportarrIntegration.sportarr.feeds.source.hasError &&
+                !sportarrIntegration.sportarr.feeds.guide.hasError && (
+                  <Alert type="info">
+                    {intl.formatMessage(messages.sportarrLinked, {
+                      name: sportarrIntegration.sportarr.name ?? 'Sportarr',
+                      channels:
+                        sportarrIntegration.sportarr.feeds.source.channelCount,
+                      programmes:
+                        sportarrIntegration.sportarr.feeds.guide.programCount,
+                    })}
+                  </Alert>
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                sportarrIntegration.sportarr.feeds.linked &&
+                sportarrIntegration.tunerr.matchedEventCount === 0 && (
+                  <p className="settings-form-row-description" role="status">
+                    {intl.formatMessage(messages.sportarrNoMatches)}
+                  </p>
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                (sportarrIntegration.sportarr.feeds.source?.hasError ||
+                  sportarrIntegration.sportarr.feeds.guide?.hasError) && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(messages.sportarrFeedError)}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                sportarrIntegration.sportarr.feeds.source &&
+                !sportarrIntegration.sportarr.feeds.linked &&
+                !sportarrIntegration.sportarr.feeds.guide && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(messages.sportarrSourceOnly)}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                sportarrIntegration.sportarr.feeds.source &&
+                !sportarrIntegration.sportarr.feeds.linked &&
+                sportarrIntegration.sportarr.feeds.guide &&
+                !sportarrIntegration.sportarr.feeds.guide.linkedToSource && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(messages.sportarrGuideConflict)}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                sportarrIntegration.sportarr.feeds.source &&
+                !sportarrIntegration.sportarr.feeds.linked &&
+                sportarrIntegration.sportarr.feeds.guide?.linkedToSource && (
+                  <Alert
+                    type="warning"
+                    title={intl.formatMessage(messages.sportarrPaused)}
+                  />
+                )}
+              {sportarrIntegration?.sportarr.reachable &&
+                !sportarrIntegration.sportarr.feeds.source && (
+                  <Alert
+                    type="info"
+                    title={intl.formatMessage(messages.sportarrNotLinked)}
+                  />
+                )}
+              {sportarrConnectError && (
+                <Alert type="error" title={sportarrConnectError} />
+              )}
+              {sportarrConnectSuccess && (
+                <Alert type="info">
+                  {intl.formatMessage(messages.sportarrLinkSuccess)}
+                </Alert>
+              )}
+              <p className="card-body-text">
+                {intl.formatMessage(messages.sportarrSteps)}
+              </p>
+              <p className="card-body-text">
+                {intl.formatMessage(messages.sportarrIndependent)}
+              </p>
+              <div className="settings-card-actions settings-service-card-actions">
+                <Button
+                  type="button"
+                  buttonType="primary"
+                  buttonSize="sm"
+                  disabled={
+                    isDirty ||
+                    isSaving ||
+                    connectingSportarr ||
+                    !sportarrIntegration?.tunerr.configured ||
+                    sportarrIntegration.tunerr.sportsAutomation !== 'enabled' ||
+                    sportarrIntegration.sportarr.reachable !== true
+                  }
+                  onClick={() => void connectSportarr()}
+                >
+                  {intl.formatMessage(
+                    connectingSportarr
+                      ? messages.sportarrConnecting
+                      : sportarrIntegration?.sportarr.feeds.linked
+                        ? messages.sportarrSync
+                        : messages.sportarrConnect
+                  )}
+                </Button>
+              </div>
+            </section>
             {testResult &&
               (testResult.deck &&
               testResult.guide &&
@@ -401,7 +669,12 @@ const SettingsTunerr = () => {
                   type="button"
                   buttonType="warning"
                   buttonSize="sm"
-                  disabled={isSaving || testing || !draft.hostname.trim()}
+                  disabled={
+                    isSaving ||
+                    connectingSportarr ||
+                    testing ||
+                    !draft.hostname.trim()
+                  }
                   onClick={() => void test()}
                 >
                   {intl.formatMessage(
@@ -412,7 +685,7 @@ const SettingsTunerr = () => {
                   <Button
                     type="button"
                     buttonSize="sm"
-                    disabled={isSaving}
+                    disabled={isSaving || connectingSportarr}
                     onClick={() => {
                       setDraft(toDraft(data));
                       setIsDirty(false);
@@ -426,7 +699,7 @@ const SettingsTunerr = () => {
                   type="submit"
                   buttonType="primary"
                   buttonSize="sm"
-                  disabled={!isDirty || isSaving}
+                  disabled={!isDirty || isSaving || connectingSportarr}
                 >
                   {intl.formatMessage(
                     isSaving ? messages.saving : messages.save

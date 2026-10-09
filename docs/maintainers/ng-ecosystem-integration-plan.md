@@ -64,6 +64,7 @@ yet.
 | 2 Live TV API + sync job | done | `/api/v1/live-tv/*`, `/api/v1/settings/tunerr`, `live-tv-sync` job. Integration test against a fake deck and guide (4 tests), OpenAPI validator test (5), settings parser (5). |
 | 2 UI | built | On Live TV button + dialog on movie/series pages, `/recordings` page, Settings → Services section. Component test (4). Needs human visual review. No sidebar entry yet (sidebar links cannot be conditional on settings today). |
 | 2 Tunerr fork: rule-driven recorder | done (pushed) | Branch `feat/seerrng-recording-rules` is at `f8340e5` (implementation `751ae6b`): `title_equals`, `start_after`/`start_before`, response-only `features`, `catchup-daemon -rules-only`. A clean isolated `./scripts/verify` passed, including Go tests, build, council, and binary smoke; GitHub Local Identity run `37630122249` passed. No real IPTV provider was available. Operators must run the recorder with `-rules-only`. |
+| 2 Optional Tunerr → Sportarr sports DVR link | built | [Sportarr–IPTV Tunerr integration plan](./sportarr-iptvtunerr-integration-plan.md). Admin-only, explicit, retry-safe import of Tunerr's generated sports M3U/XMLTV into the default Sportarr instance. Existing direct Tunerr recording and Sportarr league acquisition remain optional standalone paths. |
 | 2 Live check: deck proxy + Basic auth from another host | pending | Verified from Tunerr source only; needs a local Tunerr run. |
 | 3 slskdN client + settings | done | `server/api/slskdn.ts` (X-API-Key), per-feature probes (wishlist, library health, SongID); `/api/v1/settings/slskdn`. Endpoints read from `~/slskdn-current` source. |
 | 3 Track requests | done | `TrackRequest` entity + migrations `1791050000000`, wishlist-backed search with approval, `soulseek-sync` job, `/api/v1/soulseek/track-requests*`. Integration test against a fake slskdN. |
@@ -92,6 +93,16 @@ cumulative gate used cached Node 24.19.0 and pnpm 10.24.0 with
 files, 56 JavaScript node-test files, and 32 tooling files, with zero platform
 exclusions; the JavaScript and tooling lanes were not executed after the
 TypeScript failure.
+
+## Phase 2 follow-up: optional Sportarr DVR link
+
+The detailed design and completion criteria are in
+[sportarr-iptvtunerr-integration-plan.md](./sportarr-iptvtunerr-integration-plan.md).
+This work uses Tunerr's generated sports playlist and guide to add an optional
+Sportarr DVR input. It does not map independent provider event IDs, bypass
+SeerrNG approval, or delete feeds from Sportarr. Contract fixtures and the
+repository build validate the SeerrNG side; a real Sportarr/Tunerr round-trip
+is a separate live-service check.
 
 ## Testing without home infrastructure
 
