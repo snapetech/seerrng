@@ -192,6 +192,24 @@ that are not called out here.
 
 # Changelog
 
+# Changelog
+
+## [3.57.1](https://github.com/snapetech/seerrng/compare/v3.57.0..v3.57.1) - 2026-10-09
+
+### User-facing changes
+
+#### Fixed
+
+- **Charts:** Helm chart release badges now stay in sync with chart metadata, so operators can identify the published chart and application versions reliably.
+
+### 🐛 Bug Fixes
+- Make Helm release metadata sync idempotent - ([3e521f0](https://github.com/snapetech/seerrng/commit/3e521f083ffd7f199a4fc95f9126886b399886f6))
+- Bump chart version with release docs - ([863516e](https://github.com/snapetech/seerrng/commit/863516e4d9e723b7f2eb64e8782890d4124b755c))
+- Keep Helm release badge docs in sync - ([72dee80](https://github.com/snapetech/seerrng/commit/72dee80014a25a9735c53d88d465ce1df603d632))
+
+### 📖 Documentation
+- Clarify book integration status - ([14a689d](https://github.com/snapetech/seerrng/commit/14a689d6e8f4a9dfb35d80cfd13e5fa3b3f14589))
+
 ## [3.57.0](https://github.com/snapetech/seerrng/compare/v3.56.0..v3.57.0) - 2026-10-08
 
 ### User-facing changes
